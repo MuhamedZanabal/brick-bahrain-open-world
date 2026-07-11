@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - v14-phone-apk
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
