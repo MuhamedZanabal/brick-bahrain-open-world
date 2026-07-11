@@ -1,0 +1,1 @@
+Runtime screenshots are captured from the actual Godot viewport by collect_runtime_screenshots.gd. The collector validates PNG signature indirectly through verify_ci_artifacts.py, dimensions and non-zero file size. It does not create placeholders.
