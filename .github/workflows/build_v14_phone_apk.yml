@@ -28,6 +28,18 @@ jobs:
       - name: Checkout v1.2 baseline and v1.4 delta
         uses: actions/checkout@v4
 
+      - name: Install required build utilities and OpenJDK 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3 openjdk-17-jdk-headless unzip xz-utils ca-certificates
+          update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+          update-alternatives --set javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+          python3 --version
+          java -version
+
       - name: Reconstruct exact v1.4 source
         shell: bash
         run: |
