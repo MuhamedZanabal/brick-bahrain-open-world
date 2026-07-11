@@ -83,6 +83,48 @@ jobs:
             test -f tests/runtime_smoke_test_v14.gd && echo runtime_test=present
           } | tee build/logs/v14-source-validation.txt
 
+      - name: Fix Godot 4.3 parser errors found by real import
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee build/logs/parser-fixes-applied.txt
+          from pathlib import Path
+
+          patches = {
+              "tests/runtime_smoke_test_v14.gd": [
+                  ("var candidate := SaveManager.save_path + suffix", "var candidate: String = SaveManager.save_path + str(suffix)", 2),
+              ],
+              "scripts/hero_district_builder.gd": [
+                  ("var outward := side * float(level) * 0.18", "var outward: float = float(side) * float(level) * 0.18", 1),
+                  ("var label_data := storefront_names[shop_index % storefront_names.size()]", "var label_data: Array = storefront_names[shop_index % storefront_names.size()]", 1),
+                  ("var z := z_slots[index]", "var z: float = float(z_slots[index])", 1),
+                  ("var x := side * (24.0 + float(index % 2) * 2.5)", "var x: float = float(side) * (24.0 + float(index % 2) * 2.5)", 1),
+              ],
+              "scripts/hud.gd": [
+                  ("var in_vehicle := player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", "var in_vehicle: bool = player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", 1),
+              ],
+              "scripts/phone_ui.gd": [
+                  ("var location := district.call(\"get_location_name\", position) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", "var location: String = str(district.call(\"get_location_name\", position)) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", 1),
+              ],
+              "scripts/traffic_manager.gd": [
+                  ("var archetype := ARCHETYPES[index % ARCHETYPES.size()]", "var archetype: Dictionary = ARCHETYPES[index % ARCHETYPES.size()]", 1),
+              ],
+              "scripts/wanted_level.gd": [
+                  ("var police := police_npcs.pop_back()", "var police: Node3D = police_npcs.pop_back() as Node3D", 1),
+              ],
+          }
+          for filename, replacements in patches.items():
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+              for old, new, expected_count in replacements:
+                  actual = text.count(old)
+                  if actual != expected_count:
+                      raise SystemExit(f"{filename}: expected {expected_count} occurrence(s) of {old!r}, found {actual}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+              print(f"fixed={filename}")
+          PY
+
       - name: Configure Godot 4.3 and Android toolchain
         shell: bash
         run: |
@@ -123,6 +165,11 @@ jobs:
         run: |
           set -o pipefail
           godot --headless --path . --editor --quit --verbose 2>&1 | tee build/logs/godot-import.log
+          test "${PIPESTATUS[0]}" -eq 0
+          if grep -E 'SCRIPT ERROR:|ERROR: Failed to load script|Failed to create an autoload' build/logs/godot-import.log; then
+            echo 'Godot import contained script or autoload failures.' >&2
+            exit 1
+          fi
 
       - name: Run v1.4 runtime smoke test
         shell: bash
