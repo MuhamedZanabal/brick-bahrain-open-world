@@ -102,7 +102,7 @@ func _find_name(scope: Node, fragment: String) -> Node:
     if scope == null: return null
     var queue: Array[Node] = [scope]
     while not queue.is_empty():
-        var node := queue.pop_front()
+        var node: Node = queue.pop_front() as Node
         if fragment.to_lower() in String(node.name).to_lower(): return node
         for child in node.get_children():
             if child is Node: queue.append(child)
