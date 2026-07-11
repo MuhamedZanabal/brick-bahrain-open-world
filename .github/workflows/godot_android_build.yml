@@ -1,4 +1,4 @@
-name: Brick Bahrain v1.4 Phone APK Build
+name: Godot 4.3 Android Toolchain Package
 
 on:
   workflow_dispatch:
@@ -18,26 +18,21 @@ env:
   ANDROID_HOME: '/usr/local/lib/android/sdk'
   ANDROID_SDK_ROOT: '/usr/local/lib/android/sdk'
   JAVA_HOME: '/usr/lib/jvm/java-17-openjdk-amd64'
-  APK_PATH: 'build/brick_bahrain_v14-phone-test.apk'
-  LOG_DIR: 'build/logs'
 
 jobs:
-  direct_phone_build:
-    name: Direct import, runtime test and Android APK
+  package_toolchain:
+    name: Package exact local-build toolchain
     runs-on: ubuntu-22.04
-    timeout-minutes: 70
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install host dependencies
+      - name: Install host dependencies and JDK 17
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends curl unzip python3 openjdk-17-jdk libasound2 libpulse0 libgl1 libglu1-mesa libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2 libwayland-client0
-          mkdir -p "$LOG_DIR" build
-          java -version 2>&1 | tee "$LOG_DIR/java-version.txt"
-          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
-          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
-          command -v sdkmanager || find "$ANDROID_SDK_ROOT" -name sdkmanager -type f -print
+          sudo apt-get install -y --no-install-recommends curl unzip openjdk-17-jdk
+          mkdir -p build
+          java -version
 
       - name: Install Android SDK packages
         run: |
@@ -45,83 +40,34 @@ jobs:
           test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}"
-          "$SDKMANAGER" --list_installed | tee "$LOG_DIR/android-sdk-packages.txt"
 
-      - name: Install Godot 4.3 and Android templates
+      - name: Install Godot 4.3 and matching export templates
         run: bash tools/ci_install_godot_linux.sh
 
-      - name: Configure Android export environment
+      - name: Package portable toolchain
         run: |
-          mkdir -p "$HOME/.config/godot" "$HOME/.android"
-          if [[ ! -f debug.keystore ]]; then
-            keytool -genkeypair -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'
-          fi
-          cat > "$HOME/.config/godot/editor_settings-4.tres" <<SETTINGS
-          [gd_resource type="EditorSettings" format=3]
-          [resource]
-          export/android/android_sdk_path = "${ANDROID_SDK_ROOT}"
-          export/android/java_sdk_path = "${JAVA_HOME}"
-          SETTINGS
-          export PATH="$HOME/.local/bin:$PATH"
-          godot --version | tee "$LOG_DIR/godot-version.txt"
+          GODOT_BIN="$(find "$HOME/.local/share/godot-ci/bin" -maxdepth 1 -type f -name 'Godot_v*_linux.x86_64' -print -quit)"
+          test -x "$GODOT_BIN"
+          test -s "$HOME/.local/share/godot/export_templates/4.3.stable/android_debug.apk"
+          test -x "$ANDROID_SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/aapt"
+          test -x "$JAVA_HOME/bin/java"
+          sudo tar --numeric-owner -C / -czf "$GITHUB_WORKSPACE/build/godot43-android34-jdk17-toolchain.tar.gz" \
+            "${GODOT_BIN#/}" \
+            "home/runner/.local/share/godot/export_templates/4.3.stable" \
+            "usr/local/lib/android/sdk/build-tools/$ANDROID_BUILD_TOOLS" \
+            "usr/local/lib/android/sdk/platforms/android-$ANDROID_API" \
+            "usr/local/lib/android/sdk/platform-tools" \
+            "usr/lib/jvm/java-17-openjdk-amd64"
+          sha256sum build/godot43-android34-jdk17-toolchain.tar.gz > build/godot43-android34-jdk17-toolchain.tar.gz.sha256
+          ls -lh build/godot43-android34-jdk17-toolchain.tar.gz
 
-      - name: Import exact v1.4 project
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          set +e
-          timeout 900 godot --headless --path . --editor --quit --verbose 2>&1 | tee "$LOG_DIR/godot-import.log"
-          status=${PIPESTATUS[0]}
-          set -e
-          echo "$status" > "$LOG_DIR/godot-import-exit.txt"
-          test "$status" -eq 0
-          python3 tools/check_godot_log.py "$LOG_DIR/godot-import.log" --report "$LOG_DIR/godot-import-analysis.txt"
-
-      - name: Execute v1.4 runtime smoke test
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          set +e
-          timeout 1200 godot --headless --path . --script res://tests/runtime_smoke_test_v14.gd 2>&1 | tee "$LOG_DIR/runtime-smoke.log"
-          status=${PIPESTATUS[0]}
-          set -e
-          echo "$status" > "$LOG_DIR/runtime-smoke-exit.txt"
-          test "$status" -eq 0
-          grep -q 'RUNTIME_SMOKE_TEST_PASS' "$LOG_DIR/runtime-smoke.log"
-          python3 tools/check_godot_log.py "$LOG_DIR/runtime-smoke.log" --report "$LOG_DIR/runtime-smoke-analysis.txt"
-
-      - name: Export Android debug APK
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          set +e
-          timeout 1800 godot --headless --path . --export-debug Android "$APK_PATH" 2>&1 | tee "$LOG_DIR/android-export.log"
-          status=${PIPESTATUS[0]}
-          set -e
-          echo "$status" > "$LOG_DIR/android-export-exit.txt"
-          test "$status" -eq 0
-          test -s "$APK_PATH"
-
-      - name: Verify APK identity, integrity and signature
-        run: |
-          AAPT="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt"
-          APKSIGNER="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
-          ZIPALIGN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
-          unzip -t "$APK_PATH" | tee "$LOG_DIR/apk-unzip-test.txt"
-          "$ZIPALIGN" -c -P 16 -v 4 "$APK_PATH" | tee "$LOG_DIR/apk-zipalign.txt"
-          "$AAPT" dump badging "$APK_PATH" | tee "$LOG_DIR/apk-badging.txt"
-          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH" | tee "$LOG_DIR/apk-signature.txt"
-          sha256sum "$APK_PATH" | tee "${APK_PATH}.sha256"
-          grep -q "package: name='com.brickbahrain.openworld' versionCode='14' versionName='1.4.0'" "$LOG_DIR/apk-badging.txt"
-          unzip -l "$APK_PATH" | tee "$LOG_DIR/apk-file-list.txt"
-          grep -Eq 'assets/.*\.pck|assets/.*\.godot|assets/_cl_' "$LOG_DIR/apk-file-list.txt"
-
-      - name: Upload phone-test APK and build evidence
-        if: always()
+      - name: Upload portable toolchain
         uses: actions/upload-artifact@v4
         with:
-          name: brick-bahrain-v14-phone-test
+          name: godot43-android34-jdk17-toolchain
           path: |
-            build/brick_bahrain_v14-phone-test.apk
-            build/brick_bahrain_v14-phone-test.apk.sha256
-            build/logs/
-            build/ci_logs/
-          if-no-files-found: warn
-          retention-days: 30
+            build/godot43-android34-jdk17-toolchain.tar.gz
+            build/godot43-android34-jdk17-toolchain.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
