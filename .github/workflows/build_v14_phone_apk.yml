@@ -31,12 +31,36 @@ jobs:
       - name: Reconstruct exact v1.4 source
         shell: bash
         run: |
-          set -euo pipefail
-          cat ci/v14_delta.b64.* > /tmp/runtime_v14_delta.b64
-          base64 --decode /tmp/runtime_v14_delta.b64 > /tmp/runtime_v14_delta.tar.xz
-          echo "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7  /tmp/runtime_v14_delta.tar.xz" | sha256sum --check
-          tar -xJf /tmp/runtime_v14_delta.tar.xz -C .
           mkdir -p build/logs
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee build/logs/v14-reconstruction.log
+          import base64
+          import glob
+          import hashlib
+          import io
+          import pathlib
+          import tarfile
+
+          expected = "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7"
+          parts = sorted(glob.glob("ci/v14_delta.b64.*"))
+          if not parts:
+              raise SystemExit("No v1.4 delta chunks found")
+          print(f"parts={len(parts)}")
+          encoded = b"".join(pathlib.Path(p).read_bytes() for p in parts)
+          print(f"base64_bytes={len(encoded)}")
+          raw = base64.b64decode(encoded, validate=True)
+          digest = hashlib.sha256(raw).hexdigest()
+          print(f"archive_bytes={len(raw)}")
+          print(f"archive_sha256={digest}")
+          if digest != expected:
+              raise SystemExit(f"v1.4 delta checksum mismatch: expected {expected}, got {digest}")
+          with tarfile.open(fileobj=io.BytesIO(raw), mode="r:xz") as archive:
+              members = archive.getmembers()
+              print(f"archive_members={len(members)}")
+              archive.extractall(".")
+          print("v1.4 source reconstruction: PASS")
+          PY
+          test "${PIPESTATUS[0]}" -eq 0
           {
             grep 'version/code=' export_presets.cfg
             grep 'version/name=' export_presets.cfg
