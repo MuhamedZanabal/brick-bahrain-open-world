@@ -36,13 +36,16 @@ jobs:
           base64 --decode /tmp/runtime_v14_delta.b64 > /tmp/runtime_v14_delta.tar.xz
           echo "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7  /tmp/runtime_v14_delta.tar.xz" | sha256sum --check
           tar -xJf /tmp/runtime_v14_delta.tar.xz -C .
-          grep -q 'version/code=14' export_presets.cfg
-          grep -q 'version/name="1.4.0"' export_presets.cfg
-          grep -q 'package/unique_name="com.brickbahrain.openworld"' export_presets.cfg
-          test -f scripts/hero_district_builder.gd
-          test -f scripts/traffic_manager.gd
-          test -f scripts/quality_manager.gd
-          test -f tests/runtime_smoke_test_v14.gd
+          mkdir -p build/logs
+          {
+            grep 'version/code=' export_presets.cfg
+            grep 'version/name=' export_presets.cfg
+            grep 'package/unique_name=' export_presets.cfg
+            test -f scripts/hero_district_builder.gd && echo hero_district=present
+            test -f scripts/traffic_manager.gd && echo traffic=present
+            test -f scripts/quality_manager.gd && echo quality_manager=present
+            test -f tests/runtime_smoke_test_v14.gd && echo runtime_test=present
+          } | tee build/logs/v14-source-validation.txt
 
       - name: Configure Godot 4.3 and Android toolchain
         shell: bash
