@@ -1,0 +1,151 @@
+name: Build Brick Bahrain v1.4 Phone APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v14-phone-apk
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.3"
+  APK_NAME: brick_bahrain_v14-phone-test.apk
+
+jobs:
+  build-android-v14:
+    name: Import, runtime test, and Android debug export
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: barichello/godot-ci:4.3
+
+    steps:
+      - name: Checkout v1.2 baseline and v1.4 delta
+        uses: actions/checkout@v4
+
+      - name: Reconstruct exact v1.4 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat ci/v14_delta.b64.* > /tmp/runtime_v14_delta.b64
+          base64 --decode /tmp/runtime_v14_delta.b64 > /tmp/runtime_v14_delta.tar.xz
+          echo "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7  /tmp/runtime_v14_delta.tar.xz" | sha256sum --check
+          tar -xJf /tmp/runtime_v14_delta.tar.xz -C .
+          grep -q 'version/code=14' export_presets.cfg
+          grep -q 'version/name="1.4.0"' export_presets.cfg
+          grep -q 'config/name="com.brickbahrain.openworld"' export_presets.cfg
+          test -f scripts/hero_district_builder.gd
+          test -f scripts/traffic_manager.gd
+          test -f scripts/quality_manager.gd
+          test -f tests/runtime_smoke_test_v14.gd
+
+      - name: Configure Godot 4.3 and Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/share/godot/export_templates" "$HOME/.config/godot" build/logs
+          if [ -d "/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable" ] && [ ! -e "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" ]; then
+            cp -a "/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable" "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          fi
+          if [ -d /root/.config/godot ]; then
+            cp -a /root/.config/godot/. "$HOME/.config/godot/" || true
+          fi
+          godot --version | tee build/logs/godot-version.txt
+          java -version 2>&1 | tee build/logs/java-version.txt
+          {
+            echo "ANDROID_HOME=${ANDROID_HOME:-}"
+            echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+            command -v adb || true
+            command -v aapt || true
+            command -v apksigner || true
+            command -v zipalign || true
+            command -v sdkmanager || true
+            find /opt /usr/local /root -type f \( -name adb -o -name aapt -o -name apksigner -o -name zipalign -o -name sdkmanager \) 2>/dev/null | head -100 || true
+          } | tee build/logs/android-toolchain.txt
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Import project and compile scripts/resources
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --editor --quit --verbose 2>&1 | tee build/logs/godot-import.log
+
+      - name: Run v1.4 runtime smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/runtime_smoke_test_v14.gd 2>&1 | tee build/logs/runtime-smoke-v14.log
+
+      - name: Export Android debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          set -o pipefail
+          godot --headless --path . --verbose --export-debug "Android" "build/${APK_NAME}" 2>&1 | tee build/logs/android-export.log
+          test -s "build/${APK_NAME}"
+
+      - name: Verify APK, manifest, version, project data, and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/${APK_NAME}"
+          unzip -t "$APK" | tee build/logs/apk-zip-integrity.txt
+          sha256sum "$APK" | tee "${APK}.sha256"
+
+          AAPT_BIN="$(command -v aapt || true)"
+          APKSIGNER_BIN="$(command -v apksigner || true)"
+          ZIPALIGN_BIN="$(command -v zipalign || true)"
+          if [ -z "$AAPT_BIN" ]; then AAPT_BIN="$(find "${ANDROID_HOME:-/opt}" "${ANDROID_SDK_ROOT:-/opt}" /opt /root -type f -name aapt 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$APKSIGNER_BIN" ]; then APKSIGNER_BIN="$(find "${ANDROID_HOME:-/opt}" "${ANDROID_SDK_ROOT:-/opt}" /opt /root -type f -name apksigner 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$ZIPALIGN_BIN" ]; then ZIPALIGN_BIN="$(find "${ANDROID_HOME:-/opt}" "${ANDROID_SDK_ROOT:-/opt}" /opt /root -type f -name zipalign 2>/dev/null | sort -V | tail -1)"; fi
+
+          test -x "$AAPT_BIN"
+          test -x "$APKSIGNER_BIN"
+          test -x "$ZIPALIGN_BIN"
+          "$AAPT_BIN" dump badging "$APK" | tee build/logs/aapt-badging.txt
+          grep -q "package: name='com.brickbahrain.openworld' versionCode='14' versionName='1.4.0'" build/logs/aapt-badging.txt
+          "$APKSIGNER_BIN" verify --verbose --print-certs "$APK" | tee build/logs/apksigner-verification.txt
+          "$ZIPALIGN_BIN" -c -v 4 "$APK" | tee build/logs/zipalign-verification.txt
+
+          python3 - "$APK" <<'PY' | tee build/logs/apk-content-verification.txt
+          import sys, zipfile
+          apk = sys.argv[1]
+          with zipfile.ZipFile(apk) as z:
+              names = z.namelist()
+              assert 'AndroidManifest.xml' in names, 'AndroidManifest.xml missing'
+              native = [n for n in names if n.startswith('lib/') and n.endswith('.so')]
+              assert native, 'Godot native libraries missing'
+              project_data = [n for n in names if n.startswith('assets/') and not n.endswith('/')]
+              assert project_data, 'Godot project data/assets missing'
+              print(f'entries={len(names)}')
+              print(f'native_libraries={len(native)}')
+              print(f'asset_entries={len(project_data)}')
+              print('APK content verification: PASS')
+          PY
+
+          stat -c 'apk_bytes=%s' "$APK" | tee build/logs/apk-size.txt
+
+      - name: Upload v1.4 phone-test APK and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brick-bahrain-v14-phone-test
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            build/brick_bahrain_v14-phone-test.apk
+            build/brick_bahrain_v14-phone-test.apk.sha256
+            build/logs/**
