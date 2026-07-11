@@ -38,7 +38,7 @@ jobs:
           tar -xJf /tmp/runtime_v14_delta.tar.xz -C .
           grep -q 'version/code=14' export_presets.cfg
           grep -q 'version/name="1.4.0"' export_presets.cfg
-          grep -q 'config/name="com.brickbahrain.openworld"' export_presets.cfg
+          grep -q 'package/unique_name="com.brickbahrain.openworld"' export_presets.cfg
           test -f scripts/hero_district_builder.gd
           test -f scripts/traffic_manager.gd
           test -f scripts/quality_manager.gd
