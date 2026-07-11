@@ -23,7 +23,7 @@ jobs:
   package_toolchain:
     name: Package exact local-build toolchain
     runs-on: ubuntu-22.04
-    timeout-minutes: 45
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
 
@@ -44,7 +44,7 @@ jobs:
       - name: Install Godot 4.3 and matching export templates
         run: bash tools/ci_install_godot_linux.sh
 
-      - name: Package portable toolchain
+      - name: Package and split portable toolchain
         run: |
           GODOT_BIN="$(find "$HOME/.local/share/godot-ci/bin" -maxdepth 1 -type f -name 'Godot_v*_linux.x86_64' -print -quit)"
           test -x "$GODOT_BIN"
@@ -59,14 +59,56 @@ jobs:
             "usr/local/lib/android/sdk/platform-tools" \
             "usr/lib/jvm/java-17-openjdk-amd64"
           sha256sum build/godot43-android34-jdk17-toolchain.tar.gz > build/godot43-android34-jdk17-toolchain.tar.gz.sha256
-          ls -lh build/godot43-android34-jdk17-toolchain.tar.gz
+          split -b 320M -d -a 2 build/godot43-android34-jdk17-toolchain.tar.gz build/toolchain.part-
+          ls -lh build/godot43-android34-jdk17-toolchain.tar.gz build/toolchain.part-*
+          test -s build/toolchain.part-00
+          test -s build/toolchain.part-01
+          test -s build/toolchain.part-02
+          test -s build/toolchain.part-03
+          test -s build/toolchain.part-04
 
-      - name: Upload portable toolchain
+      - name: Upload toolchain part 00
         uses: actions/upload-artifact@v4
         with:
-          name: godot43-android34-jdk17-toolchain
+          name: godot43-toolchain-part-00
+          path: build/toolchain.part-00
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload toolchain part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot43-toolchain-part-01
+          path: build/toolchain.part-01
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload toolchain part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot43-toolchain-part-02
+          path: build/toolchain.part-02
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload toolchain part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot43-toolchain-part-03
+          path: build/toolchain.part-03
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+      - name: Upload toolchain part 04 and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot43-toolchain-part-04
           path: |
-            build/godot43-android34-jdk17-toolchain.tar.gz
+            build/toolchain.part-04
             build/godot43-android34-jdk17-toolchain.tar.gz.sha256
           if-no-files-found: error
           compression-level: 0
