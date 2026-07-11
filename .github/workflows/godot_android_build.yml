@@ -4,6 +4,8 @@ on:
   workflow_dispatch:
   push:
     branches: [v14-runtime-verification]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: read
