@@ -1,0 +1,266 @@
+name: Godot v1.4 Runtime and Android Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v14-runtime-verification]
+  pull_request:
+    paths:
+      - 'project.godot'
+      - 'export_presets.cfg'
+      - 'scenes/**'
+      - 'scripts/**'
+      - 'shaders/**'
+      - 'tests/**'
+      - 'tools/**'
+      - '.github/workflows/godot_android_build.yml'
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: '4.3'
+  GODOT_RELEASE: '4.3-stable'
+  ANDROID_API: '34'
+  ANDROID_BUILD_TOOLS: '34.0.0'
+  APK_PATH: 'build/brick_bahrain_v14-debug.apk'
+  CI_LOG_DIR: 'build/ci_logs'
+
+jobs:
+  import_project:
+    name: 1 - Godot 4.3 project import
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies and OpenJDK 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl unzip python3 openjdk-17-jdk libasound2 libpulse0 libgl1 libglu1-mesa libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2 libwayland-client0
+      - name: Install Godot 4.3 and templates
+        run: tools/ci_install_godot_linux.sh
+      - name: Import project
+        run: |
+          mkdir -p "$CI_LOG_DIR"
+          export PATH="$HOME/.local/bin:$PATH"
+          godot --version | tee "$CI_LOG_DIR/godot-version.txt"
+          set +e
+          timeout 900 godot --headless --path . --editor --quit --verbose 2>&1 | tee "$CI_LOG_DIR/godot-import.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "godot_exit_code=$status" | tee "$CI_LOG_DIR/godot-import-exit.txt"
+          test "$status" -eq 0
+          python3 tools/check_godot_log.py "$CI_LOG_DIR/godot-import.log" --report "$CI_LOG_DIR/godot-import-analysis.txt"
+      - name: Upload v14 import logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-godot-import-logs
+          path: build/ci_logs/
+          if-no-files-found: warn
+          retention-days: 30
+
+  runtime_smoke:
+    name: 2 - Runtime smoke test
+    needs: import_project
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl unzip python3 libasound2 libpulse0 libgl1 libglu1-mesa libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2
+      - run: tools/ci_install_godot_linux.sh
+      - name: Import and run smoke test
+        run: |
+          mkdir -p "$CI_LOG_DIR"
+          export PATH="$HOME/.local/bin:$PATH"
+          timeout 900 godot --headless --path . --editor --quit 2>&1 | tee "$CI_LOG_DIR/runtime-import.log"
+          set +e
+          timeout 1200 godot --headless --path . --script res://tests/runtime_smoke_test_v14.gd 2>&1 | tee "$CI_LOG_DIR/runtime-smoke.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "godot_exit_code=$status" | tee "$CI_LOG_DIR/runtime-smoke-exit.txt"
+          test "$status" -eq 0
+          grep -q 'RUNTIME_SMOKE_TEST_PASS' "$CI_LOG_DIR/runtime-smoke.log"
+          python3 tools/check_godot_log.py "$CI_LOG_DIR/runtime-smoke.log" --report "$CI_LOG_DIR/runtime-smoke-analysis.txt"
+      - name: Upload v14 runtime logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-runtime-smoke-logs
+          path: build/ci_logs/
+          if-no-files-found: warn
+          retention-days: 30
+
+  visual_runtime:
+    name: 3 - Rendered visual runtime test
+    needs: import_project
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install renderer dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl unzip python3 xvfb xauth mesa-utils libasound2 libpulse0 libgl1 libglu1-mesa libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2 libwayland-client0
+      - run: tools/ci_install_godot_linux.sh
+      - name: Render and capture actual gameplay
+        run: |
+          mkdir -p "$CI_LOG_DIR" build/runtime_screenshots
+          export PATH="$HOME/.local/bin:$PATH"
+          xvfb-run -a -s '-screen 0 1280x720x24' glxinfo -B 2>&1 | tee "$CI_LOG_DIR/glxinfo.txt"
+          xvfb-run -a -s '-screen 0 1280x720x24' timeout 900 godot --path . --editor --quit --rendering-method gl_compatibility 2>&1 | tee "$CI_LOG_DIR/visual-import.log"
+          set +e
+          xvfb-run -a -s '-screen 0 1280x720x24' timeout 1200 godot --path . --rendering-method gl_compatibility --resolution 1280x720 --script res://tests/visual_runtime_check_v14.gd 2>&1 | tee "$CI_LOG_DIR/visual-runtime.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          test "$status" -eq 0
+          grep -q 'VISUAL_RUNTIME_CHECK_PASS' "$CI_LOG_DIR/visual-runtime.log"
+          python3 tools/verify_ci_artifacts.py --screenshots build/runtime_screenshots --report "$CI_LOG_DIR/visual-artifact-verification.json"
+      - name: Upload v14 visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-runtime-screenshots
+          path: |
+            build/runtime_screenshots/
+            build/ci_logs/
+          if-no-files-found: warn
+          retention-days: 30
+
+  android_build:
+    name: 4-5 - Android export and APK verification
+    needs: import_project
+    runs-on: ubuntu-22.04
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install exact Android SDK packages
+        run: |
+          mkdir -p "$CI_LOG_DIR"
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}"
+      - run: tools/ci_install_godot_linux.sh
+      - name: Configure Android paths and debug signing
+        run: |
+          mkdir -p "$HOME/.config/godot" "$HOME/.android" build
+          if [[ ! -f "$HOME/.android/debug.keystore" ]]; then keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'; fi
+          cat > "$HOME/.config/godot/editor_settings-4.tres" <<SETTINGS
+          [gd_resource type="EditorSettings" format=3]
+          [resource]
+          export/android/android_sdk_path = "${ANDROID_SDK_ROOT}"
+          export/android/java_sdk_path = "${JAVA_HOME}"
+          SETTINGS
+      - name: Import and export APK
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          timeout 900 godot --headless --path . --editor --quit 2>&1 | tee "$CI_LOG_DIR/android-import.log"
+          timeout 1800 godot --headless --path . --export-debug Android "$APK_PATH" 2>&1 | tee "$CI_LOG_DIR/android-export.log"
+          test -s "$APK_PATH"
+      - name: Verify APK
+        run: |
+          AAPT="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt"
+          APKSIGNER="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/apksigner"
+          ZIPALIGN="${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/zipalign"
+          unzip -t "$APK_PATH" | tee "$CI_LOG_DIR/apk-unzip-test.txt"
+          "$ZIPALIGN" -c -P 16 -v 4 "$APK_PATH" | tee "$CI_LOG_DIR/apk-zipalign.txt"
+          python3 tools/verify_ci_artifacts.py --apk "$APK_PATH" --aapt "$AAPT" --apksigner "$APKSIGNER" --report "$CI_LOG_DIR/apk-verification.json" --sha256-file "${APK_PATH}.sha256"
+      - name: Upload v14 Android APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-android-debug-apk
+          path: |
+            build/brick_bahrain_v14-debug.apk
+            build/brick_bahrain_v14-debug.apk.sha256
+            build/ci_logs/
+          if-no-files-found: warn
+          retention-days: 30
+
+  android_emulator:
+    name: 6 - Android emulator smoke test
+    needs: android_build
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: v14-android-debug-apk
+          path: downloaded-apk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Locate package and activity
+        id: apk
+        run: |
+          mkdir -p "$CI_LOG_DIR" build/emulator
+          sdkmanager "platform-tools" "build-tools;${ANDROID_BUILD_TOOLS}" "emulator" "system-images;android-${ANDROID_API};google_apis;x86_64"
+          APK="$(find downloaded-apk -name 'brick_bahrain_v14-debug.apk' -print -quit)"
+          BADGING="$(${ANDROID_SDK_ROOT}/build-tools/${ANDROID_BUILD_TOOLS}/aapt dump badging "$APK")"
+          PACKAGE="$(printf '%s\n' "$BADGING" | sed -n "s/^package: name='\([^']*\)'.*/\1/p")"
+          ACTIVITY="$(printf '%s\n' "$BADGING" | sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p")"
+          test -s "$APK" && test -n "$PACKAGE" && test -n "$ACTIVITY"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"; echo "package=$PACKAGE" >> "$GITHUB_OUTPUT"; echo "activity=$ACTIVITY" >> "$GITHUB_OUTPUT"
+      - name: Install and launch twice
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: |
+            set -euo pipefail
+            adb logcat -c
+            adb install -r "${{ steps.apk.outputs.apk }}" | tee "$CI_LOG_DIR/emulator-install.txt"
+            PACKAGE="${{ steps.apk.outputs.package }}"; ACTIVITY="${{ steps.apk.outputs.activity }}"
+            adb shell am start -W -n "${PACKAGE}/${ACTIVITY}" | tee "$CI_LOG_DIR/emulator-launch-1.txt"
+            sleep 20
+            adb exec-out screencap -p > build/emulator/first-launch.png || true
+            adb logcat -d -v threadtime > "$CI_LOG_DIR/emulator-logcat-first.txt"
+            ! grep -E "FATAL EXCEPTION|Unable to start activity|Couldn't load project data" "$CI_LOG_DIR/emulator-logcat-first.txt"
+            adb shell am force-stop "$PACKAGE"
+            adb shell am start -W -n "${PACKAGE}/${ACTIVITY}" | tee "$CI_LOG_DIR/emulator-launch-2.txt"
+            sleep 15
+            adb exec-out screencap -p > build/emulator/second-launch.png || true
+            adb logcat -d -v threadtime > "$CI_LOG_DIR/emulator-logcat-second.txt"
+            ! grep -E "FATAL EXCEPTION|Unable to start activity|Couldn't load project data" "$CI_LOG_DIR/emulator-logcat-second.txt"
+            adb shell pidof "$PACKAGE" | tee "$CI_LOG_DIR/emulator-pid.txt"
+      - name: Upload v14 emulator evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-android-emulator-evidence
+          path: |
+            build/emulator/
+            build/ci_logs/
+          if-no-files-found: warn
+          retention-days: 30
+
+  verification_summary:
+    name: Verification artifact index
+    if: always()
+    needs: [import_project, runtime_smoke, visual_runtime, android_build, android_emulator]
+    runs-on: ubuntu-22.04
+    steps:
+      - run: |
+          mkdir -p build/ci_logs
+          printf '{"import_project":"%s","runtime_smoke":"%s","visual_runtime":"%s","android_build":"%s","android_emulator":"%s","commit":"%s","run_id":"%s"}\n' '${{ needs.import_project.result }}' '${{ needs.runtime_smoke.result }}' '${{ needs.visual_runtime.result }}' '${{ needs.android_build.result }}' '${{ needs.android_emulator.result }}' '${{ github.sha }}' '${{ github.run_id }}' > build/ci_logs/workflow-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v14-verification-summary
+          path: build/ci_logs/workflow-results.json
+          retention-days: 30
