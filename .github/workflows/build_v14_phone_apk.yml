@@ -1,0 +1,246 @@
+name: Build Brick Bahrain v1.4 Phone APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - v14-phone-apk
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.3"
+  APK_NAME: brick_bahrain_v14-phone-test.apk
+
+jobs:
+  build-android-v14:
+    name: Import, runtime test, and Android debug export
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: barichello/godot-ci:4.3
+
+    steps:
+      - name: Checkout v1.2 baseline and v1.4 delta
+        uses: actions/checkout@v4
+
+      - name: Install required build utilities and OpenJDK 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3 openjdk-17-jdk-headless unzip xz-utils ca-certificates
+          update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+          update-alternatives --set javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+          python3 --version
+          java -version
+
+      - name: Reconstruct exact v1.4 source
+        shell: bash
+        run: |
+          mkdir -p build/logs
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee build/logs/v14-reconstruction.log
+          import base64
+          import glob
+          import hashlib
+          import io
+          import pathlib
+          import tarfile
+
+          expected = "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7"
+          parts = sorted(glob.glob("ci/v14_delta.b64.*"))
+          if not parts:
+              raise SystemExit("No v1.4 delta chunks found")
+          print(f"parts={len(parts)}")
+          encoded = b"".join(pathlib.Path(p).read_bytes() for p in parts)
+          print(f"base64_bytes={len(encoded)}")
+          raw = base64.b64decode(encoded, validate=True)
+          digest = hashlib.sha256(raw).hexdigest()
+          print(f"archive_bytes={len(raw)}")
+          print(f"archive_sha256={digest}")
+          if digest != expected:
+              raise SystemExit(f"v1.4 delta checksum mismatch: expected {expected}, got {digest}")
+          with tarfile.open(fileobj=io.BytesIO(raw), mode="r:xz") as archive:
+              members = archive.getmembers()
+              print(f"archive_members={len(members)}")
+              archive.extractall(".")
+          print("v1.4 source reconstruction: PASS")
+          PY
+          test "${PIPESTATUS[0]}" -eq 0
+          {
+            grep 'version/code=' export_presets.cfg
+            grep 'version/name=' export_presets.cfg
+            grep 'package/unique_name=' export_presets.cfg
+            test -f scripts/hero_district_builder.gd && echo hero_district=present
+            test -f scripts/traffic_manager.gd && echo traffic=present
+            test -f scripts/quality_manager.gd && echo quality_manager=present
+            test -f tests/runtime_smoke_test_v14.gd && echo runtime_test=present
+          } | tee build/logs/v14-source-validation.txt
+
+      - name: Fix Godot 4.3 parser errors found by real import
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee build/logs/parser-fixes-applied.txt
+          from pathlib import Path
+
+          patches = {
+              "tests/runtime_smoke_test_v14.gd": [
+                  ("var candidate := SaveManager.save_path + suffix", "var candidate: String = SaveManager.save_path + str(suffix)", 2),
+              ],
+              "scripts/hero_district_builder.gd": [
+                  ("var outward := side * float(level) * 0.18", "var outward: float = float(side) * float(level) * 0.18", 1),
+                  ("var label_data := storefront_names[shop_index % storefront_names.size()]", "var label_data: Array = storefront_names[shop_index % storefront_names.size()]", 1),
+                  ("var z := z_slots[index]", "var z: float = float(z_slots[index])", 1),
+                  ("var x := side * (24.0 + float(index % 2) * 2.5)", "var x: float = float(side) * (24.0 + float(index % 2) * 2.5)", 1),
+              ],
+              "scripts/hud.gd": [
+                  ("var in_vehicle := player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", "var in_vehicle: bool = player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", 1),
+              ],
+              "scripts/phone_ui.gd": [
+                  ("var location := district.call(\"get_location_name\", position) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", "var location: String = str(district.call(\"get_location_name\", position)) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", 1),
+              ],
+              "scripts/traffic_manager.gd": [
+                  ("var archetype := ARCHETYPES[index % ARCHETYPES.size()]", "var archetype: String = str(ARCHETYPES[index % ARCHETYPES.size()])", 1),
+              ],
+              "scripts/wanted_level.gd": [
+                  ("var police := police_npcs.pop_back()", "var police: Node3D = police_npcs.pop_back() as Node3D", 1),
+              ],
+          }
+          for filename, replacements in patches.items():
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+              for old, new, expected_count in replacements:
+                  actual = text.count(old)
+                  if actual != expected_count:
+                      raise SystemExit(f"{filename}: expected {expected_count} occurrence(s) of {old!r}, found {actual}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+              print(f"fixed={filename}")
+          PY
+
+      - name: Configure Godot 4.3 and Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/share/godot/export_templates" "$HOME/.config/godot" build/logs
+          if [ -d "/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable" ] && [ ! -e "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable" ]; then
+            cp -a "/root/.local/share/godot/export_templates/${GODOT_VERSION}.stable" "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          fi
+          if [ -d /root/.config/godot ]; then
+            cp -a /root/.config/godot/. "$HOME/.config/godot/" || true
+          fi
+          godot --version | tee build/logs/godot-version.txt
+          java -version 2>&1 | tee build/logs/java-version.txt
+          {
+            echo "ANDROID_HOME=${ANDROID_HOME:-}"
+            echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-}"
+            command -v adb || true
+            command -v aapt || true
+            command -v apksigner || true
+            command -v zipalign || true
+            command -v sdkmanager || true
+            find /opt /usr/local /root -type f \( -name adb -o -name aapt -o -name apksigner -o -name zipalign -o -name sdkmanager \) 2>/dev/null | head -100 || true
+          } | tee build/logs/android-toolchain.txt
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Cache imported Godot resources
+        uses: actions/cache@v4
+        with:
+          path: .godot
+          key: brick-bahrain-v14-godot43-assets-parserfix-v2
+
+      - name: Import project and compile scripts/resources
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --editor --quit --verbose 2>&1 | tee build/logs/godot-import.log
+          test "${PIPESTATUS[0]}" -eq 0
+          if grep -E 'SCRIPT ERROR:|ERROR: Failed to load script|Failed to create an autoload' build/logs/godot-import.log; then
+            echo 'Godot import contained script or autoload failures.' >&2
+            exit 1
+          fi
+
+      - name: Run v1.4 runtime smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/runtime_smoke_test_v14.gd 2>&1 | tee build/logs/runtime-smoke-v14.log
+
+      - name: Export Android debug APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          set -o pipefail
+          godot --headless --path . --verbose --export-debug "Android" "build/${APK_NAME}" 2>&1 | tee build/logs/android-export.log
+          test -s "build/${APK_NAME}"
+
+      - name: Verify APK, manifest, version, project data, and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="build/${APK_NAME}"
+          unzip -t "$APK" | tee build/logs/apk-zip-integrity.txt
+          sha256sum "$APK" | tee "${APK}.sha256"
+
+          AAPT_BIN="$(command -v aapt || true)"
+          APKSIGNER_BIN="$(command -v apksigner || true)"
+          ZIPALIGN_BIN="$(command -v zipalign || true)"
+          if [ -z "$AAPT_BIN" ]; then AAPT_BIN="$(find "${ANDROID_HOME:-/opt}" "${ANDROID_SDK_ROOT:-/opt}" /opt /root -type f -name aapt 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$APKSIGNER_BIN" ]; then APKSIGNER_BIN="$(find "${ANDROID_HOME:-/opt}" "${ANDROID_SDK_ROOT:-/opt}" /opt /root -type f -name apksigner 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$ZIPALIGN_BIN" ]; then ZIPALIGN_BIN="$(find "${ANDROID_HOME:-/opt}" "${ANDROID_SDK_ROOT:-/opt}" /opt /root -type f -name zipalign 2>/dev/null | sort -V | tail -1)"; fi
+
+          test -x "$AAPT_BIN"
+          test -x "$APKSIGNER_BIN"
+          test -x "$ZIPALIGN_BIN"
+          "$AAPT_BIN" dump badging "$APK" | tee build/logs/aapt-badging.txt
+          grep -q "package: name='com.brickbahrain.openworld' versionCode='14' versionName='1.4.0'" build/logs/aapt-badging.txt
+          "$APKSIGNER_BIN" verify --verbose --print-certs "$APK" | tee build/logs/apksigner-verification.txt
+          "$ZIPALIGN_BIN" -c -v 4 "$APK" | tee build/logs/zipalign-verification.txt
+
+          python3 - "$APK" <<'PY' | tee build/logs/apk-content-verification.txt
+          import sys, zipfile
+          apk = sys.argv[1]
+          with zipfile.ZipFile(apk) as z:
+              names = z.namelist()
+              assert 'AndroidManifest.xml' in names, 'AndroidManifest.xml missing'
+              native = [n for n in names if n.startswith('lib/') and n.endswith('.so')]
+              assert native, 'Godot native libraries missing'
+              project_data = [n for n in names if n.startswith('assets/') and not n.endswith('/')]
+              assert project_data, 'Godot project data/assets missing'
+              print(f'entries={len(names)}')
+              print(f'native_libraries={len(native)}')
+              print(f'asset_entries={len(project_data)}')
+              print('APK content verification: PASS')
+          PY
+
+          stat -c 'apk_bytes=%s' "$APK" | tee build/logs/apk-size.txt
+
+      - name: Upload v1.4 phone-test APK and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: brick-bahrain-v14-phone-test
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            build/brick_bahrain_v14-phone-test.apk
+            build/brick_bahrain_v14-phone-test.apk.sha256
+            build/logs/**
