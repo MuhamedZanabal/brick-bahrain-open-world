@@ -15,6 +15,9 @@ env:
   GODOT_RELEASE: '4.3-stable'
   ANDROID_API: '34'
   ANDROID_BUILD_TOOLS: '34.0.0'
+  ANDROID_HOME: '/usr/local/lib/android/sdk'
+  ANDROID_SDK_ROOT: '/usr/local/lib/android/sdk'
+  JAVA_HOME: '/usr/lib/jvm/java-17-openjdk-amd64'
   APK_PATH: 'build/brick_bahrain_v14-phone-test.apk'
   LOG_DIR: 'build/logs'
 
@@ -32,14 +35,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends curl unzip python3 openjdk-17-jdk libasound2 libpulse0 libgl1 libglu1-mesa libx11-6 libxcursor1 libxi6 libxinerama1 libxrandr2 libwayland-client0
           mkdir -p "$LOG_DIR" build
           java -version 2>&1 | tee "$LOG_DIR/java-version.txt"
-
-      - uses: android-actions/setup-android@v3
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          command -v sdkmanager || find "$ANDROID_SDK_ROOT" -name sdkmanager -type f -print
 
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}"
-          sdkmanager --list_installed | tee "$LOG_DIR/android-sdk-packages.txt"
+          SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager -print | sort -V | tail -1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-${ANDROID_API}" "build-tools;${ANDROID_BUILD_TOOLS}"
+          "$SDKMANAGER" --list_installed | tee "$LOG_DIR/android-sdk-packages.txt"
 
       - name: Install Godot 4.3 and Android templates
         run: bash tools/ci_install_godot_linux.sh
