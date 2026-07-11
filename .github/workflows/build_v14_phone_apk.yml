@@ -107,7 +107,7 @@ jobs:
                   ("var location := district.call(\"get_location_name\", position) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", "var location: String = str(district.call(\"get_location_name\", position)) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", 1),
               ],
               "scripts/traffic_manager.gd": [
-                  ("var archetype := ARCHETYPES[index % ARCHETYPES.size()]", "var archetype: Dictionary = ARCHETYPES[index % ARCHETYPES.size()]", 1),
+                  ("var archetype := ARCHETYPES[index % ARCHETYPES.size()]", "var archetype: String = str(ARCHETYPES[index % ARCHETYPES.size()])", 1),
               ],
               "scripts/wanted_level.gd": [
                   ("var police := police_npcs.pop_back()", "var police: Node3D = police_npcs.pop_back() as Node3D", 1),
@@ -159,6 +159,12 @@ jobs:
               -validity 10000 \
               -dname "CN=Android Debug,O=Android,C=US"
           fi
+
+      - name: Cache imported Godot resources
+        uses: actions/cache@v4
+        with:
+          path: .godot
+          key: brick-bahrain-v14-godot43-assets-parserfix-v2
 
       - name: Import project and compile scripts/resources
         shell: bash
