@@ -182,7 +182,7 @@ def scan_android_signing(root: Path) -> list[Finding]:
             "ANDROID_RELEASE_KEYSTORE_IN_CONFIG", "P1", "export_presets.cfg", release[1],
             "Release keystore path is stored in versioned export configuration.",
         ))
-    if release and debug and release[0] == debug[0]:
+    if release and debug and release[0] and release[0] == debug[0]:
         findings.append(Finding(
             "ANDROID_DEBUG_KEY_USED_FOR_RELEASE", "P0", "export_presets.cfg", release[1],
             "Debug and release export profiles reference the same keystore.",
