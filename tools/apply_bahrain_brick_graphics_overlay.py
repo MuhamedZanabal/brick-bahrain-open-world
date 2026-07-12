@@ -30,6 +30,13 @@ def main()->int:
     overlay=repo/'presentation_overlay'; manifest=json.loads((repo/'tools/bahrain_brick_graphics_manifest.json').read_text())
     if not (root/'project.godot').is_file(): raise RuntimeError('not a Godot project')
 
+    # The controls baseline smoke deliberately writes a dedicated test save. Remove only
+    # that test artifact before the post-presentation smoke so the second run is isolated.
+    user_data_root=Path.home()/'.local/share/godot/app_userdata'
+    if user_data_root.exists():
+        for test_save in user_data_root.rglob('savegame.v14.smoke.json'):
+            test_save.unlink()
+
     base_relative='assets/ui/runtime/splash_zanabal.svg'
     base_source=overlay/base_relative
     if not base_source.is_file(): raise RuntimeError(f'missing overlay file: {base_relative}')
