@@ -3,8 +3,9 @@
 
 This script reconstructs the exact v1.4 delta, applies only the parser corrections
 already proven by historical Godot 4.3 import, assigns an isolated QA package/version,
-forces landscape orientation, configures runtime-only debug signing, and generates a
-project-loaded smoke scene so project autoloads are available.
+forces landscape orientation, removes incomplete microphone/voice behavior, configures
+runtime-only debug signing, and generates a project-loaded smoke scene so project
+autoloads are available.
 
 It does not claim or create v15 authority.
 """
@@ -152,12 +153,71 @@ def configure_qa(root: Path) -> None:
         "keystore/release": '""',
         "keystore/release_password": '""',
         "keystore/release_user": '""',
+        "permissions/record_audio": "false",
     }
     for key, value in replacements.items():
         preset, count = re.subn(rf"(?m)^{re.escape(key)}=.*$", f"{key}={value}", preset)
         if count != 1:
             raise RuntimeError(f"{key}: replacements={count}")
     preset_path.write_text(preset, encoding="utf-8")
+
+
+def disable_voice_for_qa(root: Path) -> list[str]:
+    chat_path = root / "scripts/chat_manager.gd"
+    chat = chat_path.read_text(encoding="utf-8")
+
+    old_begin = '''func begin_push_to_talk() -> void:
+	if is_voice_active:
+		return
+	_check_microphone_permission()
+	is_voice_active = true
+	_voice_indicator.visible = true
+	_voice_indicator.text = (
+		"MIC ACTIVE" if microphone_permission_granted else "MIC PERMISSION REQUIRED"
+	)
+	_voice_indicator.add_theme_color_override(
+		"font_color",
+		Color(1.0, 0.3, 0.25) if microphone_permission_granted else Color(1.0, 0.75, 0.2)
+	)
+	voice_toggled.emit(true)
+	voice_status_changed.emit(
+		"capture_active_stub" if microphone_permission_granted else "permission_required"
+	)
+'''
+    new_begin = '''func begin_push_to_talk() -> void:
+	microphone_permission_granted = false
+	is_voice_active = false
+	_voice_indicator.visible = true
+	_voice_indicator.text = "VOICE CHAT DISABLED IN QA BUILD"
+	_voice_indicator.add_theme_color_override("font_color", Color(1.0, 0.75, 0.2))
+	voice_toggled.emit(false)
+	voice_status_changed.emit("feature_disabled")
+'''
+    chat = replace_exact(chat, old_begin, new_begin, 1, "chat_manager begin_push_to_talk")
+
+    old_check = '''func _check_microphone_permission() -> void:
+	if OS.get_name() != "Android":
+		microphone_permission_granted = true
+		return
+	var permissions: PackedStringArray = OS.get_granted_permissions()
+	microphone_permission_granted = permissions.has("android.permission.RECORD_AUDIO")
+	if not microphone_permission_granted:
+		OS.request_permission("android.permission.RECORD_AUDIO")
+'''
+    new_check = '''func _check_microphone_permission() -> void:
+	microphone_permission_granted = false
+'''
+    chat = replace_exact(chat, old_check, new_check, 1, "chat_manager microphone permission")
+    chat_path.write_text(chat, encoding="utf-8")
+
+    phone_path = root / "scripts/phone_ui.gd"
+    phone = phone_path.read_text(encoding="utf-8")
+    old_note = 'voice_note.text = "Voice: push-to-talk state and microphone permission are enabled.\\nNetwork audio transport remains an integration point."'
+    new_note = 'voice_note.text = "Voice chat is disabled in this controlled QA build.\\nNo microphone permission is requested."'
+    phone = replace_exact(phone, old_note, new_note, 1, "phone UI voice notice")
+    phone_path.write_text(phone, encoding="utf-8")
+
+    return ["export_presets.cfg", "scripts/chat_manager.gd", "scripts/phone_ui.gd"]
 
 
 def generate_project_loaded_runner(root: Path) -> list[str]:
@@ -200,6 +260,7 @@ def main() -> int:
     reconstruction = reconstruct(root)
     parser_files = apply_parser_fixes(root)
     configure_qa(root)
+    voice_files = disable_voice_for_qa(root)
     runner_files = generate_project_loaded_runner(root)
 
     provenance = {
@@ -210,6 +271,8 @@ def main() -> int:
         "delta_branch_head": DELTA_BRANCH_HEAD,
         **reconstruction,
         "parser_fix_files": parser_files,
+        "voice_feature_gate_files": voice_files,
+        "microphone_permission_requested": False,
         "generated_runner_files": runner_files,
         "qa_package": "com.brickbahrain.openworld.fallbackqa",
         "qa_version_code": 1401,
