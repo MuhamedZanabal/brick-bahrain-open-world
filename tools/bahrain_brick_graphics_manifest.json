@@ -1,50 +1,115 @@
 {
   "baseline_controls_commit": "c5548465627942a2889a0bd09f8979c3a29fbcdd",
-  "overlay_archive_bytes": 681552,
-  "overlay_archive_sha256": "3da1bd79909ed35e7c240ccf12ebf387349be478566a6c1e8539481466b3dee2",
-  "overlay_base64_parts": 21,
   "overlay_files": {
-    "assets/ui/runtime/boot_background.webp": {"bytes": 2786, "sha256": "00dbfc20c28ef21689830ee1746443fecc9af4ed90ebfc364d5740ed6bcf817c"},
-    "assets/ui/runtime/character_select_background.webp": {"bytes": 78016, "sha256": "8f4d4069ba799e23adf8b8c3aa0040b8740f587adb784f8a10461308a608465a"},
-    "assets/ui/runtime/credits_background.webp": {"bytes": 54852, "sha256": "c5d4f35f0caece6fb623a645649e9c6b999bb2a1a972fbef7eb706bcda9758f5"},
-    "assets/ui/runtime/loading_background.webp": {"bytes": 114238, "sha256": "5839aad90d53d82a4fab87fe4c142b9cd5c2860dac3f1bef50ba54a23418a410"},
-    "assets/ui/runtime/main_menu_background.webp": {"bytes": 106532, "sha256": "337e7c2c44e3fb82cda44129d729d4ee6b11b96edb0fc05adcf2ad853508b027"},
-    "assets/ui/runtime/pause_background.webp": {"bytes": 14168, "sha256": "434bc01e298ec5e2e13b6c0f4b7511585b544fbf49afa22d2e2ef6292dccf0a7"},
-    "assets/ui/runtime/splash_mansoory.webp": {"bytes": 136906, "sha256": "4845fbc63a4f5354afd92a12979777a5fb1de51f8c864ddebef0114c130118a7"},
-    "assets/ui/runtime/splash_zanabal.webp": {"bytes": 140172, "sha256": "bbe83f1e94ef73dae98f7f866522bf0ba69047fb930f51593e447b2928c1d1b2"},
-    "download_and_build_apk.py": {"bytes": 3303, "sha256": "5df8954088a97b157f55373423b31ddcb6e913c27b6a741042995d22bc859cf9"},
-    "export_presets.cfg": {"bytes": 1691, "sha256": "077abf57ee556630ed280e9d9d7ab2e1f7971740937f38211dffdc38bcb3e497"},
-    "project.godot": {"bytes": 7724, "sha256": "6694c0dc4dd00772a1f0c995283583c7d98e221ed1bea89bdbb73e30cff33ccf"},
-    "reassemble_apk.py": {"bytes": 2644, "sha256": "3b3d14002c301b681b56f30b4feaace4a4b178fd87eccb22f7f5edc3fd2c500a"},
-    "scenes/loading_screen.tscn": {"bytes": 309, "sha256": "e07818c54065e8d76e9f974d12924ad899b59dbc75a3ea37a00f81bbc62f1a4a"},
-    "scenes/pause_menu.tscn": {"bytes": 301, "sha256": "e90b29b09c3eddc8c02cbff29f48337b9f3cd22672e5e659c0491aa0f4720bed"},
-    "scenes/presentation_flow_test.tscn": {"bytes": 206, "sha256": "4214522a1f3af97ecb2ccd1b52bfa47ee89c31fb4f7024c97392270bd32e5027"},
-    "scenes/presentation_visual_evidence.tscn": {"bytes": 218, "sha256": "6e117b13c297a09e05a1494b60f59ed5ab2adc175eaaca65d7bb9ffa0bbeea6c"},
-    "scenes/settings_panel.tscn": {"bytes": 309, "sha256": "d112ca59a5f896051398b48fcbacf74d4e31ed2f33212d2cb8eebeaf6e01bbf0"},
-    "scripts/character_select.gd": {"bytes": 10899, "sha256": "a452d3887d3805e1556cc3d510b4e18de5c869009d07c8b36e97c7664be7763b"},
-    "scripts/game_manager.gd": {"bytes": 9807, "sha256": "008e2d06e6144ae71922591dbf815b7ba40e4431e3a715b0ef7e206fa2ba17ba"},
-    "scripts/hud.gd": {"bytes": 19080, "sha256": "e5f36de2f3e380c2ea03a404d8681edfa7a4ef0145b242159be6557dede30470"},
-    "scripts/loading_screen.gd": {"bytes": 9048, "sha256": "04169de465a4f44dfde5cefb3d91778bdae66e1bd1b18d0ae8f702c038a429c0"},
-    "scripts/main_menu.gd": {"bytes": 9540, "sha256": "333c353de64dfa9479c31bac88c8d3d169e6845cad0e9afd086e483322bf57c1"},
-    "scripts/pause_menu.gd": {"bytes": 4750, "sha256": "593f25cb2d34c3628cf6d1a3c727d7362b5ba87c84cd40c9d1fcbdab17e8d0a3"},
-    "scripts/presentation_capture.gd": {"bytes": 2111, "sha256": "34ae4d5a245d8bf5eb7b355845eac6d30e74244e9a5b842f6616b7250e5fb49b"},
-    "scripts/settings_panel.gd": {"bytes": 7741, "sha256": "78f61447051ea05f30018f920b6e6838edb73c24b2e0c79ad7c12c2ff4f4b6b0"},
-    "scripts/splash_screen.gd": {"bytes": 6564, "sha256": "c2597176dad51be6349d31817b5393b753da6fdb76294744237e4e32049e251b"},
-    "scripts/ui_theme.gd": {"bytes": 4093, "sha256": "b5518c73033730dbec95d06480834b076eefb0e32837924f6fc86f5f4691f91a"},
-    "scripts/world.gd": {"bytes": 15106, "sha256": "77b363e5eefaf77f0341c73d94ab3e43bdcba8ff1bca65dca35dbab21b74731c"},
-    "tests/presentation_flow_test.gd": {"bytes": 7681, "sha256": "5b81ea5fcd44f0720a4c2c97afa22f1631a4a949eae0771a51affce67c7b4576"},
-    "tests/presentation_visual_evidence.gd": {"bytes": 2856, "sha256": "9262cd362b9b4ed87a26a4921dc9f7d8cf994e2eaab3426c7e01359660ba4518"},
-    "tests/runtime_smoke_test_v14.gd": {"bytes": 8695, "sha256": "e2c2e649e00fd07bbe7d911f852176a9cc9d87c2a97296d27060117c0ea774e4"}
+    "assets/ui/runtime/character_select_background.svg": {
+      "bytes": 3338,
+      "sha256": "06156d4cc94ddbc1ab69bbb9343c9351b12b20048c6399c64ce9c9a20b2cb0d2"
+    },
+    "assets/ui/runtime/loading_background.svg": {
+      "bytes": 3338,
+      "sha256": "64e773e612ead4acc687bed17acb6dabdad40aff8552ea8814d8a1b6e49b26b6"
+    },
+    "assets/ui/runtime/main_menu_background.svg": {
+      "bytes": 3338,
+      "sha256": "220e5b028f1a45459c19544bfa36c4846d0a01a49a62b9624db14dead2f4c54c"
+    },
+    "assets/ui/runtime/pause_background.svg": {
+      "bytes": 3339,
+      "sha256": "e145fb596c63b6186fd980f58bda4792c1e1d1afc6fea08f7af539e209963ba4"
+    },
+    "assets/ui/runtime/splash_mansoory.svg": {
+      "bytes": 3339,
+      "sha256": "21f7a703b8686fe5b074dcbe37fcc536c90b9a5e8c3319cf83ae30173bf6a1fc"
+    },
+    "assets/ui/runtime/splash_zanabal.svg": {
+      "bytes": 3338,
+      "sha256": "5632bb56c0f219a39267d79a059c66a3f55f26be47b996d407574291be5ab468"
+    },
+    "scenes/loading_screen.tscn": {
+      "bytes": 276,
+      "sha256": "9a25293a2958058977057b050fa7f2f660acffcace42dbabfe5e88fa06989cb5"
+    },
+    "scenes/pause_menu.tscn": {
+      "bytes": 268,
+      "sha256": "fd0297d297aa8549893c141ab45df8567156ede94ce16ebac4091d89eefee5a1"
+    },
+    "scenes/presentation_flow_test.tscn": {
+      "bytes": 185,
+      "sha256": "3989768599fb626d351152248af0ce2fe09431abc24f118c7594708002b9a872"
+    },
+    "scenes/presentation_visual_evidence.tscn": {
+      "bytes": 197,
+      "sha256": "eb7888c6ccf8434810c472395f4c4f6ef5068e3f03e23e1aa7667dbfc8cbdc1a"
+    },
+    "scenes/settings_panel.tscn": {
+      "bytes": 181,
+      "sha256": "50a311be5f9c792d32bbd2becf8cc2ea48cf8a59f57a39ac9c0653ca6df8d535"
+    },
+    "scripts/character_select.gd": {
+      "bytes": 3234,
+      "sha256": "b5d430cde3656a9b0732afb325cd5e1fbc08cd66ca34628622dfec422a95f9a3"
+    },
+    "scripts/loading_screen.gd": {
+      "bytes": 3850,
+      "sha256": "9a376966a7e1f92831df9a3e306dabd0f550cb383d62e2127dad51c75953d6ac"
+    },
+    "scripts/main_menu.gd": {
+      "bytes": 3971,
+      "sha256": "f3a1615aeed952343e1005e2d1a333dcc99ff558f278a3564cc7af541d9cec2d"
+    },
+    "scripts/pause_menu.gd": {
+      "bytes": 2330,
+      "sha256": "97d66472627a743b318e55db01725652bc52b132551a57f6342d3c66e4d481d9"
+    },
+    "scripts/settings_panel.gd": {
+      "bytes": 2106,
+      "sha256": "6b995fdb9874d30f65d5c475e2b78825f682c21f572aa28caf6d3f30b1faf4e4"
+    },
+    "scripts/splash_screen.gd": {
+      "bytes": 3510,
+      "sha256": "a658f92ee8907bfa28045bf40d872512baa517b6feaf58d4bc2e94c718da35a6"
+    },
+    "scripts/ui_theme.gd": {
+      "bytes": 2610,
+      "sha256": "d1b60c57893e3db15ef14738b663540ec8e474c787d3042077d34c518c615794"
+    },
+    "tests/presentation_flow_test.gd": {
+      "bytes": 2272,
+      "sha256": "9f983023892b83666807ff4f883532f518edcdb402fc7280c70f4b4d8b270e06"
+    },
+    "tests/presentation_visual_evidence.gd": {
+      "bytes": 2781,
+      "sha256": "c89d2f7b6ff25cf3290f78ddf51b4b34eeacdcd420c6f85a33dedcc13ac4b0af"
+    }
   },
   "runtime_assets": {
-    "assets/ui/runtime/boot_background.webp": {"bytes": 2786, "sha256": "00dbfc20c28ef21689830ee1746443fecc9af4ed90ebfc364d5740ed6bcf817c"},
-    "assets/ui/runtime/character_select_background.webp": {"bytes": 78016, "sha256": "8f4d4069ba799e23adf8b8c3aa0040b8740f587adb784f8a10461308a608465a"},
-    "assets/ui/runtime/credits_background.webp": {"bytes": 54852, "sha256": "c5d4f35f0caece6fb623a645649e9c6b999bb2a1a972fbef7eb706bcda9758f5"},
-    "assets/ui/runtime/loading_background.webp": {"bytes": 114238, "sha256": "5839aad90d53d82a4fab87fe4c142b9cd5c2860dac3f1bef50ba54a23418a410"},
-    "assets/ui/runtime/main_menu_background.webp": {"bytes": 106532, "sha256": "337e7c2c44e3fb82cda44129d729d4ee6b11b96edb0fc05adcf2ad853508b027"},
-    "assets/ui/runtime/pause_background.webp": {"bytes": 14168, "sha256": "434bc01e298ec5e2e13b6c0f4b7511585b544fbf49afa22d2e2ef6292dccf0a7"},
-    "assets/ui/runtime/splash_mansoory.webp": {"bytes": 136906, "sha256": "4845fbc63a4f5354afd92a12979777a5fb1de51f8c864ddebef0114c130118a7"},
-    "assets/ui/runtime/splash_zanabal.webp": {"bytes": 140172, "sha256": "bbe83f1e94ef73dae98f7f866522bf0ba69047fb930f51593e447b2928c1d1b2"}
+    "assets/ui/runtime/character_select_background.svg": {
+      "bytes": 3338,
+      "sha256": "06156d4cc94ddbc1ab69bbb9343c9351b12b20048c6399c64ce9c9a20b2cb0d2"
+    },
+    "assets/ui/runtime/loading_background.svg": {
+      "bytes": 3338,
+      "sha256": "64e773e612ead4acc687bed17acb6dabdad40aff8552ea8814d8a1b6e49b26b6"
+    },
+    "assets/ui/runtime/main_menu_background.svg": {
+      "bytes": 3338,
+      "sha256": "220e5b028f1a45459c19544bfa36c4846d0a01a49a62b9624db14dead2f4c54c"
+    },
+    "assets/ui/runtime/pause_background.svg": {
+      "bytes": 3339,
+      "sha256": "e145fb596c63b6186fd980f58bda4792c1e1d1afc6fea08f7af539e209963ba4"
+    },
+    "assets/ui/runtime/splash_mansoory.svg": {
+      "bytes": 3339,
+      "sha256": "21f7a703b8686fe5b074dcbe37fcc536c90b9a5e8c3319cf83ae30173bf6a1fc"
+    },
+    "assets/ui/runtime/splash_zanabal.svg": {
+      "bytes": 3338,
+      "sha256": "5632bb56c0f219a39267d79a059c66a3f55f26be47b996d407574291be5ab468"
+    }
   },
-  "deleted_files": ["assets/splash_screen.png", "assets/splash_screen.png.import"]
+  "deleted_files": [
+    "assets/splash_screen.png",
+    "assets/splash_screen.png.import"
+  ]
 }
