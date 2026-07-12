@@ -28,21 +28,56 @@ jobs:
         with:
           ref: v14-phone-apk
           path: recovery/v14
-      - name: Install build dependencies
+      - name: Install build and rendered-evidence dependencies
         shell: bash
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y --no-install-recommends python3 openjdk-17-jdk-headless unzip ca-certificates coreutils
+          apt-get install -y --no-install-recommends \
+            python3 openjdk-17-jdk-headless unzip ca-certificates coreutils \
+            xvfb ffmpeg libgl1-mesa-dri libglx-mesa0 libx11-6 libxcursor1 \
+            libxinerama1 libxi6 libxrandr2 libxrender1
           update-alternatives --set java "$JAVA_HOME/bin/java"
           update-alternatives --set javac "$JAVA_HOME/bin/javac"
           python3 -m py_compile tools/prepare_v14_fallback.py tools/apply_bahrain_brick_overlay.py
           bash -n tools/run_bahrain_brick_controls_ci.sh
-      - name: Reconstruct, test controls, export and verify
+      - name: Reconstruct, test every control direction, export and verify
         shell: bash
         run: bash tools/run_bahrain_brick_controls_ci.sh recovery/v14
-      - name: Upload APK, source and evidence
+      - name: Render movement, camera and jump evidence
+        shell: bash
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          mkdir -p recovery/v14/build/visual_evidence/frames recovery/v14/build/visual_evidence/screenshots
+          set -o pipefail
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" \
+            godot --path recovery/v14 --audio-driver Dummy \
+            --display-driver x11 --rendering-method gl_compatibility \
+            res://scenes/mobile_input_visual_evidence.tscn \
+            2>&1 | tee recovery/v14/build/logs/mobile-input-visual-evidence.log
+          status="${PIPESTATUS[0]}"
+          set +o pipefail
+          test "$status" -eq 0
+          grep -q 'Bahrain Brick rendered control evidence complete:' \
+            recovery/v14/build/logs/mobile-input-visual-evidence.log
+          test -s recovery/v14/build/visual_evidence/screenshots/forward_moving.png
+          test -s recovery/v14/build/visual_evidence/screenshots/backward_moving.png
+          test -s recovery/v14/build/visual_evidence/screenshots/left_moving.png
+          test -s recovery/v14/build/visual_evidence/screenshots/right_moving.png
+          test -s recovery/v14/build/visual_evidence/screenshots/diagonal_moving.png
+          test -s recovery/v14/build/visual_evidence/screenshots/camera_rotated.png
+          test -s recovery/v14/build/visual_evidence/screenshots/jump_airborne.png
+          ffmpeg -y -framerate 12 \
+            -i recovery/v14/build/visual_evidence/frames/frame_%04d.png \
+            -vf "scale=1280:-2:flags=lanczos" -c:v libx264 -preset medium -crf 22 \
+            -pix_fmt yuv420p recovery/v14/build/visual_evidence/bahrain_brick_controls_evidence.mp4
+          sha256sum recovery/v14/build/visual_evidence/bahrain_brick_controls_evidence.mp4 \
+            recovery/v14/build/visual_evidence/screenshots/*.png \
+            > recovery/v14/build/visual_evidence/CHECKSUMS.sha256
+      - name: Upload APK, source, logs and visual evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -57,3 +92,4 @@ jobs:
             recovery/v14/build/BAHRAIN_BRICK_OVERLAY_REPORT.json
             recovery/v14/build/v14-source-provenance.json
             recovery/v14/build/logs/**
+            recovery/v14/build/visual_evidence/**
