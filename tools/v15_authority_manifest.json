@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "project": "Bahrain Bricks / Brick Bahrain Open World",
+  "authority": {
+    "branch": "audit/v15.0.1-authority",
+    "commit": "796b112802c83ce78f8233e9a215e97c39ca028e",
+    "tree": "26bb58714fa7066c1fd887cd33456553f3739462",
+    "engine": "Godot 4.3",
+    "package": "com.brickbahrain.openworld",
+    "version_name": "1.5.0",
+    "version_code": 16
+  },
+  "artifacts": {
+    "brick_bahrain_v15.0.1-authority.bundle": {
+      "kind": "git_bundle",
+      "sha256": "af928699cbc786083de77ba994eb357d54e2a9b4770268dc4971029067ca411b",
+      "size": 123889126
+    },
+    "brick_bahrain_v15.0.1-authority-source.zip": {
+      "kind": "source_zip",
+      "sha256": "a009474ca5b556d4a3a9735bc742affd25acc3966d1b9f485303319e74313077",
+      "size": 133073308
+    },
+    "brick_bahrain_v15.0.1-audit-qa.apk": {
+      "kind": "apk",
+      "sha256": "1fbd907e7c287d42fa2a2b893967e8d5f033330342d0ba24d41d0cf3138a53f0",
+      "size": 192629155,
+      "signing": "Android debug certificate; controlled QA only"
+    },
+    "brick_bahrain_v15-production.apk": {
+      "kind": "apk",
+      "sha256": "ec16515799bafb0d656c9af72193a647434cab3214e0c76836203817a400d4b2",
+      "size": 188955090,
+      "status": "historical; not authority proof"
+    },
+    "brick_bahrain_v15-landscape-gameplay-source.zip": {
+      "kind": "source_zip",
+      "sha256": "edcd20298eefcc54bf1ee536d38e1d77edf00662c5749e9f9346eab2dc7b323b",
+      "status": "historical source candidate; not authority proof"
+    }
+  }
+}

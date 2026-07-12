@@ -1,0 +1,80 @@
+name: Authority Recovery Checks
+
+on:
+  push:
+    branches:
+      - ops/v15-authority-recovery
+    paths:
+      - "tools/verify_v15_authority.py"
+      - "tools/audit_source_tree.py"
+      - "tools/generate_asset_license_ledger.py"
+      - "tools/v15_authority_manifest.json"
+      - "tools/tests/**"
+      - "docs/audit/**"
+      - ".github/workflows/authority_recovery_checks.yml"
+  pull_request:
+    paths:
+      - "tools/verify_v15_authority.py"
+      - "tools/audit_source_tree.py"
+      - "tools/generate_asset_license_ledger.py"
+      - "tools/v15_authority_manifest.json"
+      - "tools/tests/**"
+      - "docs/audit/**"
+      - ".github/workflows/authority_recovery_checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate Python syntax
+        run: python -m compileall -q tools/verify_v15_authority.py tools/audit_source_tree.py tools/generate_asset_license_ledger.py tools/tests
+
+      - name: Validate authority manifest JSON
+        run: python -m json.tool tools/v15_authority_manifest.json >/dev/null
+
+      - name: Run tooling regression suite
+        run: python -m unittest discover -s tools/tests -v
+
+      - name: Generate source-tree pre-audit
+        run: |
+          mkdir -p reports
+          python tools/audit_source_tree.py . \
+            --json-out reports/source_tree_audit.json \
+            --markdown-out reports/source_tree_audit.md
+
+      - name: Upload source-tree pre-audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-tree-preaudit
+          path: reports/source_tree_audit.*
+          if-no-files-found: error
+
+      - name: Generate asset license ledger
+        run: |
+          python tools/generate_asset_license_ledger.py . \
+            --csv-out reports/ASSET_LICENSE_LEDGER.csv \
+            --notices-out reports/THIRD_PARTY_NOTICES.md \
+            --summary-out reports/asset_license_summary.json
+
+      - name: Upload asset license ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-license-ledger
+          path: |
+            reports/ASSET_LICENSE_LEDGER.csv
+            reports/THIRD_PARTY_NOTICES.md
+            reports/asset_license_summary.json
+          if-no-files-found: error

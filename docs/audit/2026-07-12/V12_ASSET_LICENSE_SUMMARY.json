@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "rows": 321,
+  "status_counts": {
+    "BLOCKED": 11,
+    "PROJECT_PROVENANCE_REQUIRED": 310
+  },
+  "blocked_paths": [
+    "addons/flexible_toon_shader/FlexibleToonMaterial.tres",
+    "addons/flexible_toon_shader/HatchToonMaterial.tres",
+    "addons/flexible_toon_shader/example/CupMaterial.tres",
+    "addons/flexible_toon_shader/example/CupMaterialHatch.tres",
+    "addons/flexible_toon_shader/example/ExampleScene.tscn",
+    "addons/flexible_toon_shader/example/cup.obj",
+    "addons/flexible_toon_shader/example/cup_specular.png",
+    "addons/flexible_toon_shader/example/cup_texture.png",
+    "addons/flexible_toon_shader/flexible_toon.gdshader",
+    "addons/flexible_toon_shader/hatch.png",
+    "addons/flexible_toon_shader/hatch_toon.gdshader"
+  ]
+}

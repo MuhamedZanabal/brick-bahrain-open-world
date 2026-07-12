@@ -1,0 +1,336 @@
+name: Build v1.4 Landscape Fallback QA
+
+on:
+  push:
+    branches:
+      - ops/v15-authority-recovery
+    paths:
+      - ".github/workflows/build_v14_fallback_qa.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/build_v14_fallback_qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  APK_NAME: brick_bahrain_v14.0.1-landscape-fallback-qa.apk
+  PACKAGE_NAME: com.brickbahrain.openworld.fallbackqa
+
+jobs:
+  build-v14-fallback:
+    name: Reconstruct, smoke-test, and export fallback QA APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: barichello/godot-ci:4.3
+    steps:
+      - name: Check out recovery branch
+        uses: actions/checkout@v4
+
+      - name: Check out frozen v1.4 delta branch
+        uses: actions/checkout@v4
+        with:
+          ref: v14-phone-apk
+          path: recovery/v14
+
+      - name: Install build utilities and OpenJDK 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3 openjdk-17-jdk-headless unzip ca-certificates coreutils
+          update-alternatives --set java /usr/lib/jvm/java-17-openjdk-amd64/bin/java
+          update-alternatives --set javac /usr/lib/jvm/java-17-openjdk-amd64/bin/javac
+          mkdir -p recovery/v14/build/logs recovery/v14/build/ci
+          godot --version | tee recovery/v14/build/logs/godot-version.txt
+          java -version 2>&1 | tee recovery/v14/build/logs/java-version.txt
+
+      - name: Reconstruct exact v1.4 source and apply recorded parser fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' 2>&1 | tee recovery/v14/build/logs/reconstruction-and-fixes.log
+          import base64
+          import hashlib
+          import io
+          import json
+          import pathlib
+          import tarfile
+
+          root = pathlib.Path("recovery/v14").resolve()
+          expected = "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7"
+          parts = sorted(root.glob("ci/v14_delta.b64.*"))
+          if len(parts) != 17:
+              raise SystemExit(f"expected 17 delta chunks, found {len(parts)}")
+          raw = base64.b64decode(b"".join(path.read_bytes() for path in parts), validate=True)
+          digest = hashlib.sha256(raw).hexdigest()
+          if digest != expected:
+              raise SystemExit(f"delta checksum mismatch: expected {expected}, got {digest}")
+          with tarfile.open(fileobj=io.BytesIO(raw), mode="r:xz") as archive:
+              members = archive.getmembers()
+              for member in members:
+                  target = (root / member.name).resolve()
+                  if root != target and root not in target.parents:
+                      raise SystemExit(f"unsafe archive member: {member.name}")
+              archive.extractall(root, filter="data")
+
+          patches = {
+              "tests/runtime_smoke_test_v14.gd": [
+                  ("var candidate := SaveManager.save_path + suffix", "var candidate: String = SaveManager.save_path + str(suffix)", 2),
+              ],
+              "scripts/hero_district_builder.gd": [
+                  ("var outward := side * float(level) * 0.18", "var outward: float = float(side) * float(level) * 0.18", 1),
+                  ("var label_data := storefront_names[shop_index % storefront_names.size()]", "var label_data: Array = storefront_names[shop_index % storefront_names.size()]", 1),
+                  ("var z := z_slots[index]", "var z: float = float(z_slots[index])", 1),
+                  ("var x := side * (24.0 + float(index % 2) * 2.5)", "var x: float = float(side) * (24.0 + float(index % 2) * 2.5)", 1),
+              ],
+              "scripts/hud.gd": [
+                  ("var in_vehicle := player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", "var in_vehicle: bool = player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", 1),
+              ],
+              "scripts/phone_ui.gd": [
+                  ("var location := district.call(\"get_location_name\", position) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", "var location: String = str(district.call(\"get_location_name\", position)) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", 1),
+              ],
+              "scripts/traffic_manager.gd": [
+                  ("var archetype := ARCHETYPES[index % ARCHETYPES.size()]", "var archetype: String = str(ARCHETYPES[index % ARCHETYPES.size()])", 1),
+              ],
+              "scripts/wanted_level.gd": [
+                  ("var police := police_npcs.pop_back()", "var police: Node3D = police_npcs.pop_back() as Node3D", 1),
+              ],
+          }
+          for filename, replacements in patches.items():
+              path = root / filename
+              text = path.read_text(encoding="utf-8")
+              for old, new, expected_count in replacements:
+                  actual = text.count(old)
+                  if actual != expected_count:
+                      raise SystemExit(f"{filename}: expected {expected_count} occurrence(s), found {actual}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+
+          pathlib.Path("recovery/v14/build/v14-source-provenance.json").write_text(
+              json.dumps({
+                  "evidence_class": "VERIFIED",
+                  "classification": "historical v1.4 landscape fallback QA; not v15 authority",
+                  "base_commit": "08378d1383eb7aeb1ae91b9eeb8994b79a96f1de",
+                  "delta_branch": "v14-phone-apk",
+                  "delta_branch_head": "721e8c9df6cb8a4e142c18723a7fc72c27350159",
+                  "delta_sha256": digest,
+                  "delta_members": len(members),
+                  "parser_fix_files": sorted(patches),
+              }, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(f"delta_sha256={digest}")
+          print(f"delta_members={len(members)}")
+          print(f"parser_fix_files={len(patches)}")
+          PY
+
+      - name: Configure isolated landscape QA identity and runtime-only signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          root = Path("recovery/v14")
+          project = root / "project.godot"
+          text = project.read_text(encoding="utf-8")
+          text, count = re.subn(r'(?m)^window/handheld/orientation=.*$', 'window/handheld/orientation=4', text)
+          if count != 1:
+              raise SystemExit(f"project orientation replacements={count}")
+          project.write_text(text, encoding="utf-8")
+
+          preset = root / "export_presets.cfg"
+          text = preset.read_text(encoding="utf-8")
+          replacements = {
+              "version/code": "1401",
+              "version/name": '"1.4.0.1-fallback-qa"',
+              "package/unique_name": '"com.brickbahrain.openworld.fallbackqa"',
+              "package/name": '"Brick Bahrain Fallback QA"',
+              "keystore/debug": '"res://build/ci/debug.keystore"',
+              "keystore/debug_password": '"android"',
+              "keystore/debug_user": '"androiddebugkey"',
+              "keystore/release": '""',
+              "keystore/release_password": '""',
+              "keystore/release_user": '""',
+          }
+          for key, value in replacements.items():
+              pattern = re.compile(rf'(?m)^{re.escape(key)}=.*$')
+              text, count = pattern.subn(f"{key}={value}", text)
+              if count != 1:
+                  raise SystemExit(f"{key}: replacements={count}")
+          preset.write_text(text, encoding="utf-8")
+          PY
+          keytool -genkeypair -noprompt \
+            -keystore recovery/v14/build/ci/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Brick Bahrain Fallback QA,O=Zanabal Gaming,C=BH"
+
+      - name: Generate project-loaded runtime smoke scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("recovery/v14")
+          source = (root / "tests/runtime_smoke_test_v14.gd").read_text(encoding="utf-8")
+          replacements = [
+              ("extends SceneTree", "extends Node", 1),
+              ("func _initialize() -> void:", "func _ready() -> void:", 1),
+              ("await process_frame", "await get_tree().process_frame", 2),
+              ("root.add_child(world)", "get_tree().root.add_child(world)", 1),
+              ("\tquit(1 if _failed > 0 else 0)", "\tget_tree().quit(1 if _failed > 0 else 0)", 1),
+          ]
+          for old, new, expected in replacements:
+              actual = source.count(old)
+              if actual != expected:
+                  raise SystemExit(f"runner transform {old!r}: expected {expected}, found {actual}")
+              source = source.replace(old, new)
+          runner = root / "build/ci/runtime_smoke_runner_v14.gd"
+          runner.write_text(source, encoding="utf-8")
+          (root / "build/ci/runtime_smoke_runner_v14.tscn").write_text(
+              '[gd_scene load_steps=2 format=3]\n\n'
+              '[ext_resource type="Script" path="res://build/ci/runtime_smoke_runner_v14.gd" id="1"]\n\n'
+              '[node name="RuntimeSmokeRunner" type="Node"]\n'
+              'script = ExtResource("1")\n',
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Import project and compile all scripts/resources
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path recovery/v14 --editor --quit --verbose 2>&1 | tee recovery/v14/build/logs/godot-import.log
+          test "${PIPESTATUS[0]}" -eq 0
+          if grep -E 'SCRIPT ERROR:|ERROR: Failed to load script|Failed to create an autoload' recovery/v14/build/logs/godot-import.log; then
+            echo 'Godot import contained script or autoload failures.' >&2
+            exit 1
+          fi
+
+      - name: Run project-loaded v1.4 runtime smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 420 godot --headless --path recovery/v14 --audio-driver Dummy res://build/ci/runtime_smoke_runner_v14.tscn 2>&1 | tee recovery/v14/build/logs/runtime-smoke-v14-project-loaded.log
+          status="${PIPESTATUS[0]}"
+          echo "runtime_exit=${status}" | tee recovery/v14/build/logs/runtime-exit.txt
+          test "$status" -eq 0
+          grep -q 'Brick Bahrain v1.4 runtime smoke test complete:' recovery/v14/build/logs/runtime-smoke-v14-project-loaded.log
+          grep -q ', 0 failed' recovery/v14/build/logs/runtime-smoke-v14-project-loaded.log
+
+      - name: Export isolated Android fallback QA APK
+        shell: bash
+        run: |
+          set -o pipefail
+          APK_PATH="$GITHUB_WORKSPACE/recovery/v14/build/${APK_NAME}"
+          godot --headless --path recovery/v14 --verbose --export-debug "Android" "$APK_PATH" 2>&1 | tee recovery/v14/build/logs/android-export.log
+          status="${PIPESTATUS[0]}"
+          test "$status" -eq 0
+          test -s "$APK_PATH"
+
+      - name: Verify APK integrity, package, orientation, and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="recovery/v14/build/${APK_NAME}"
+          unzip -t "$APK" | tee recovery/v14/build/logs/apk-zip-integrity.txt
+          sha256sum "$APK" | tee "${APK}.sha256"
+
+          AAPT_BIN="$(command -v aapt || true)"
+          APKSIGNER_BIN="$(command -v apksigner || true)"
+          ZIPALIGN_BIN="$(command -v zipalign || true)"
+          if [ -z "$AAPT_BIN" ]; then AAPT_BIN="$(find /opt /root /usr/local -type f -name aapt 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$APKSIGNER_BIN" ]; then APKSIGNER_BIN="$(find /opt /root /usr/local -type f -name apksigner 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$ZIPALIGN_BIN" ]; then ZIPALIGN_BIN="$(find /opt /root /usr/local -type f -name zipalign 2>/dev/null | sort -V | tail -1)"; fi
+          test -x "$AAPT_BIN"
+          test -x "$APKSIGNER_BIN"
+          test -x "$ZIPALIGN_BIN"
+
+          "$AAPT_BIN" dump badging "$APK" | tee recovery/v14/build/logs/aapt-badging.txt
+          grep -q "package: name='${PACKAGE_NAME}' versionCode='1401' versionName='1.4.0.1-fallback-qa'" recovery/v14/build/logs/aapt-badging.txt
+          "$AAPT_BIN" dump xmltree "$APK" AndroidManifest.xml | tee recovery/v14/build/logs/aapt-manifest.txt
+          grep -Eq 'android:screenOrientation.*(0xb|=11)' recovery/v14/build/logs/aapt-manifest.txt
+          "$APKSIGNER_BIN" verify --verbose --print-certs "$APK" | tee recovery/v14/build/logs/apksigner-verification.txt
+          "$ZIPALIGN_BIN" -c -v 4 "$APK" | tee recovery/v14/build/logs/zipalign-verification.txt
+
+          python3 - "$APK" <<'PY' | tee recovery/v14/build/logs/apk-content-verification.txt
+          import json
+          import sys
+          import zipfile
+          apk = sys.argv[1]
+          with zipfile.ZipFile(apk) as archive:
+              names = archive.namelist()
+              native = [name for name in names if name.startswith("lib/") and name.endswith(".so")]
+              assets = [name for name in names if name.startswith("assets/") and not name.endswith("/")]
+              result = {
+                  "entries": len(names),
+                  "native_libraries": len(native),
+                  "asset_entries": len(assets),
+                  "manifest_present": "AndroidManifest.xml" in names,
+              }
+              if not result["manifest_present"] or not native or not assets:
+                  raise SystemExit(json.dumps(result))
+              print(json.dumps(result, indent=2))
+          PY
+
+      - name: Generate build provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import re
+
+          root = pathlib.Path("recovery/v14")
+          apk = root / "build/brick_bahrain_v14.0.1-landscape-fallback-qa.apk"
+          runtime = (root / "build/logs/runtime-smoke-v14-project-loaded.log").read_text(encoding="utf-8", errors="replace")
+          match = re.search(r"complete: (\d+) passed, (\d+) failed", runtime)
+          if not match:
+              raise SystemExit("runtime result summary missing")
+          provenance = json.loads((root / "build/v14-source-provenance.json").read_text())
+          provenance.update({
+              "apk": apk.name,
+              "apk_bytes": apk.stat().st_size,
+              "apk_sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
+              "package": "com.brickbahrain.openworld.fallbackqa",
+              "version_code": 1401,
+              "version_name": "1.4.0.1-fallback-qa",
+              "orientation": "sensorLandscape",
+              "runtime_passed": int(match.group(1)),
+              "runtime_failed": int(match.group(2)),
+              "signing": "runtime-generated Android debug certificate; controlled QA only",
+              "physical_device_tested": False,
+              "authority_warning": "historical fallback; must not replace v15.0.1 authority",
+          })
+          (root / "build/V14_FALLBACK_BUILD_PROVENANCE.json").write_text(
+              json.dumps(provenance, indent=2) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(provenance, indent=2))
+          PY
+
+      - name: Upload fallback QA APK and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-landscape-fallback-qa
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/${{ env.APK_NAME }}
+            recovery/v14/build/${{ env.APK_NAME }}.sha256
+            recovery/v14/build/V14_FALLBACK_BUILD_PROVENANCE.json
+            recovery/v14/build/v14-source-provenance.json
+            recovery/v14/build/logs/**

@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "root": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world",
+  "files_scanned": 846,
+  "finding_counts": {
+    "INFO": 0,
+    "P3": 0,
+    "P2": 0,
+    "P1": 3,
+    "P0": 4
+  },
+  "findings": [
+    {
+      "rule_id": "THIRD_PARTY_LICENSE_EVIDENCE_MISSING",
+      "severity": "P0",
+      "path": "addons/flexible_toon_shader",
+      "line": null,
+      "message": "Third-party component root has no adjacent license/notice file.",
+      "fingerprint": null
+    },
+    {
+      "rule_id": "SENSITIVE_FILE_COMMITTED",
+      "severity": "P0",
+      "path": "debug.keystore",
+      "line": null,
+      "message": "Sensitive credential/signing file type is present in the source tree.",
+      "fingerprint": null
+    },
+    {
+      "rule_id": "ANDROID_DEBUG_KEY_USED_FOR_RELEASE",
+      "severity": "P0",
+      "path": "export_presets.cfg",
+      "line": 29,
+      "message": "Debug and release export profiles reference the same keystore.",
+      "fingerprint": null
+    },
+    {
+      "rule_id": "ANDROID_SIGNING_PASSWORD_IN_CONFIG",
+      "severity": "P0",
+      "path": "export_presets.cfg",
+      "line": 30,
+      "message": "keystore/release_password is stored in versioned export configuration; value withheld.",
+      "fingerprint": "sha256:f60ed56a9c82;len:7"
+    },
+    {
+      "rule_id": "ROOT_LICENSE_MISSING",
+      "severity": "P1",
+      "path": ".",
+      "line": null,
+      "message": "No root license/notice file was found.",
+      "fingerprint": null
+    },
+    {
+      "rule_id": "ANDROID_SIGNING_PASSWORD_IN_CONFIG",
+      "severity": "P1",
+      "path": "export_presets.cfg",
+      "line": 27,
+      "message": "keystore/debug_password is stored in versioned configuration; value withheld.",
+      "fingerprint": "sha256:f60ed56a9c82;len:7"
+    },
+    {
+      "rule_id": "ANDROID_RELEASE_KEYSTORE_IN_CONFIG",
+      "severity": "P1",
+      "path": "export_presets.cfg",
+      "line": 29,
+      "message": "Release keystore path is stored in versioned export configuration.",
+      "fingerprint": null
+    }
+  ]
+}

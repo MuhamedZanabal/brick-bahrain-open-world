@@ -1,0 +1,85 @@
+name: Build v1.4 Landscape Fallback QA v3
+
+on:
+  push:
+    branches:
+      - ops/v15-authority-recovery
+    paths:
+      - ".github/workflows/build_v14_fallback_qa_v3.yml"
+      - "tools/prepare_v14_fallback.py"
+      - "tools/configure_godot_android_editor.gd"
+      - "tools/run_v14_fallback_ci.sh"
+  pull_request:
+    paths:
+      - ".github/workflows/build_v14_fallback_qa_v3.yml"
+      - "tools/prepare_v14_fallback.py"
+      - "tools/configure_godot_android_editor.gd"
+      - "tools/run_v14_fallback_ci.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  APK_NAME: brick_bahrain_v14.0.1-landscape-fallback-qa.apk
+  PACKAGE_NAME: com.brickbahrain.openworld.fallbackqa
+  JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+jobs:
+  build-fallback:
+    name: Build and verify fallback QA APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: barichello/godot-ci:4.3
+
+    steps:
+      - name: Check out recovery tooling
+        uses: actions/checkout@v4
+
+      - name: Check out checksum-locked v1.4 delta branch
+        uses: actions/checkout@v4
+        with:
+          ref: v14-phone-apk
+          path: recovery/v14
+
+      - name: Install runtime dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3 openjdk-17-jdk-headless unzip ca-certificates coreutils
+          update-alternatives --set java "$JAVA_HOME/bin/java"
+          update-alternatives --set javac "$JAVA_HOME/bin/javac"
+          bash -n tools/run_v14_fallback_ci.sh
+          python3 -m py_compile tools/prepare_v14_fallback.py
+
+      - name: Build and verify fallback QA APK
+        shell: bash
+        run: bash tools/run_v14_fallback_ci.sh recovery/v14
+
+      - name: Verify microphone permission is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          BADGING="recovery/v14/build/logs/aapt-badging.txt"
+          PROVENANCE="recovery/v14/build/V14_FALLBACK_BUILD_PROVENANCE.json"
+          ! grep -q 'android.permission.RECORD_AUDIO' "$BADGING"
+          ! grep -q 'android.hardware.microphone' "$BADGING"
+          grep -q '"microphone_permission_requested": false' "$PROVENANCE"
+
+      - name: Upload APK and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-landscape-fallback-qa-v3
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/${{ env.APK_NAME }}
+            recovery/v14/build/${{ env.APK_NAME }}.sha256
+            recovery/v14/build/V14_FALLBACK_BUILD_PROVENANCE.json
+            recovery/v14/build/v14-source-provenance.json
+            recovery/v14/build/logs/**

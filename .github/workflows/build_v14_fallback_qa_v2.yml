@@ -1,0 +1,256 @@
+name: Build v1.4 Landscape Fallback QA v2
+
+on:
+  push:
+    branches:
+      - ops/v15-authority-recovery
+    paths:
+      - ".github/workflows/build_v14_fallback_qa_v2.yml"
+      - "tools/prepare_v14_fallback.py"
+  pull_request:
+    paths:
+      - ".github/workflows/build_v14_fallback_qa_v2.yml"
+      - "tools/prepare_v14_fallback.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  APK_NAME: brick_bahrain_v14.0.1-landscape-fallback-qa.apk
+  PACKAGE_NAME: com.brickbahrain.openworld.fallbackqa
+  JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+
+jobs:
+  build-fallback:
+    name: Prepare, smoke-test, export, and verify fallback QA APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: barichello/godot-ci:4.3
+
+    steps:
+      - name: Check out recovery tooling
+        uses: actions/checkout@v4
+
+      - name: Check out checksum-locked v1.4 delta branch
+        uses: actions/checkout@v4
+        with:
+          ref: v14-phone-apk
+          path: recovery/v14
+
+      - name: Initialize Godot Android export environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3 openjdk-17-jdk-headless unzip ca-certificates coreutils
+          update-alternatives --set java "$JAVA_HOME/bin/java"
+          update-alternatives --set javac "$JAVA_HOME/bin/javac"
+
+          mkdir -p "$HOME/.local/share/godot/export_templates" "$HOME/.config/godot"
+          test -d /root/.local/share/godot/export_templates/4.3.stable
+          rm -rf "$HOME/.local/share/godot/export_templates/4.3.stable"
+          cp -a /root/.local/share/godot/export_templates/4.3.stable "$HOME/.local/share/godot/export_templates/4.3.stable"
+          if [ -d /root/.config/godot ]; then
+            cp -a /root/.config/godot/. "$HOME/.config/godot/"
+          fi
+
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "$SDK_ROOT" ]; then
+            AAPT_BIN="$(find /opt /root /usr/local -type f -path '*/build-tools/*/aapt' 2>/dev/null | sort -V | tail -1)"
+            test -x "$AAPT_BIN"
+            SDK_ROOT="${AAPT_BIN%%/build-tools/*}"
+          fi
+          test -d "$SDK_ROOT"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+
+          mkdir -p recovery/v14/build/logs recovery/v14/build/ci
+          godot --version | tee recovery/v14/build/logs/godot-version.txt
+          java -version 2>&1 | tee recovery/v14/build/logs/java-version.txt
+          printf 'HOME=%s\nJAVA_HOME=%s\nANDROID_SDK_ROOT=%s\n' "$HOME" "$JAVA_HOME" "$SDK_ROOT" | tee recovery/v14/build/logs/export-environment.txt
+          find "$HOME/.local/share/godot/export_templates/4.3.stable" -maxdepth 1 -type f -printf '%f\n' | sort | tee recovery/v14/build/logs/export-templates.txt
+
+      - name: Reconstruct and prepare isolated v1.4 fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/prepare_v14_fallback.py recovery/v14 \
+            --provenance-out recovery/v14/build/v14-source-provenance.json \
+            | tee recovery/v14/build/logs/fallback-preparation.log
+
+          keytool -genkeypair -noprompt \
+            -keystore recovery/v14/build/ci/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Brick Bahrain Fallback QA,O=Zanabal Gaming,C=BH"
+
+      - name: Configure Godot Android editor paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > recovery/v14/build/ci/configure_android_editor.gd <<'GD'
+          extends SceneTree
+
+          func _initialize() -> void:
+              var java_path := OS.get_environment("JAVA_HOME")
+              var sdk_path := OS.get_environment("ANDROID_SDK_ROOT")
+              if java_path.is_empty() or sdk_path.is_empty():
+                  push_error("JAVA_HOME or ANDROID_SDK_ROOT is empty")
+                  quit(2)
+                  return
+              EditorSettings.set_setting("export/android/java_sdk_path", java_path)
+              EditorSettings.set_setting("export/android/android_sdk_path", sdk_path)
+              EditorSettings.save()
+              print("configured_java_sdk=", EditorSettings.get_setting("export/android/java_sdk_path"))
+              print("configured_android_sdk=", EditorSettings.get_setting("export/android/android_sdk_path"))
+              quit(0)
+          GD
+          set -o pipefail
+          godot --headless --editor --path recovery/v14 \
+            --script res://build/ci/configure_android_editor.gd \
+            2>&1 | tee recovery/v14/build/logs/android-editor-configuration.log
+          test "${PIPESTATUS[0]}" -eq 0
+          grep -q 'configured_java_sdk=' recovery/v14/build/logs/android-editor-configuration.log
+          grep -q 'configured_android_sdk=' recovery/v14/build/logs/android-editor-configuration.log
+
+      - name: Import project and compile scripts/resources
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path recovery/v14 --editor --quit --verbose \
+            2>&1 | tee recovery/v14/build/logs/godot-import.log
+          test "${PIPESTATUS[0]}" -eq 0
+          if grep -E 'SCRIPT ERROR:|ERROR: Failed to load script|Failed to create an autoload' recovery/v14/build/logs/godot-import.log; then
+            echo 'Godot import contained script or autoload failures.' >&2
+            exit 1
+          fi
+
+      - name: Run project-loaded runtime smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 420 godot --headless --path recovery/v14 --audio-driver Dummy \
+            res://build/ci/runtime_smoke_runner_v14.tscn \
+            2>&1 | tee recovery/v14/build/logs/runtime-smoke-v14-project-loaded.log
+          status="${PIPESTATUS[0]}"
+          echo "runtime_exit=${status}" | tee recovery/v14/build/logs/runtime-exit.txt
+          test "$status" -eq 0
+          grep -q 'Brick Bahrain v1.4 runtime smoke test complete:' recovery/v14/build/logs/runtime-smoke-v14-project-loaded.log
+          grep -q ', 0 failed' recovery/v14/build/logs/runtime-smoke-v14-project-loaded.log
+
+      - name: Export Android fallback QA APK
+        shell: bash
+        run: |
+          set -o pipefail
+          APK_PATH="$GITHUB_WORKSPACE/recovery/v14/build/${APK_NAME}"
+          godot --headless --path recovery/v14 --verbose \
+            --export-debug "Android" "$APK_PATH" \
+            2>&1 | tee recovery/v14/build/logs/android-export.log
+          status="${PIPESTATUS[0]}"
+          test "$status" -eq 0
+          test -s "$APK_PATH"
+
+      - name: Verify APK identity, orientation, content, alignment, and signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="recovery/v14/build/${APK_NAME}"
+          unzip -t "$APK" | tee recovery/v14/build/logs/apk-zip-integrity.txt
+          sha256sum "$APK" | tee "${APK}.sha256"
+
+          AAPT_BIN="$(command -v aapt || true)"
+          APKSIGNER_BIN="$(command -v apksigner || true)"
+          ZIPALIGN_BIN="$(command -v zipalign || true)"
+          if [ -z "$AAPT_BIN" ]; then AAPT_BIN="$(find "$ANDROID_SDK_ROOT" -type f -name aapt 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$APKSIGNER_BIN" ]; then APKSIGNER_BIN="$(find "$ANDROID_SDK_ROOT" -type f -name apksigner 2>/dev/null | sort -V | tail -1)"; fi
+          if [ -z "$ZIPALIGN_BIN" ]; then ZIPALIGN_BIN="$(find "$ANDROID_SDK_ROOT" -type f -name zipalign 2>/dev/null | sort -V | tail -1)"; fi
+          test -x "$AAPT_BIN"
+          test -x "$APKSIGNER_BIN"
+          test -x "$ZIPALIGN_BIN"
+
+          "$AAPT_BIN" dump badging "$APK" | tee recovery/v14/build/logs/aapt-badging.txt
+          grep -q "package: name='${PACKAGE_NAME}' versionCode='1401' versionName='1.4.0.1-fallback-qa'" recovery/v14/build/logs/aapt-badging.txt
+          "$AAPT_BIN" dump xmltree "$APK" AndroidManifest.xml | tee recovery/v14/build/logs/aapt-manifest.txt
+          grep -Eq 'android:screenOrientation.*(0xb|=11)' recovery/v14/build/logs/aapt-manifest.txt
+          "$APKSIGNER_BIN" verify --verbose --print-certs "$APK" | tee recovery/v14/build/logs/apksigner-verification.txt
+          "$ZIPALIGN_BIN" -c -v 4 "$APK" | tee recovery/v14/build/logs/zipalign-verification.txt
+
+          python3 - "$APK" <<'PY' | tee recovery/v14/build/logs/apk-content-verification.txt
+          import json
+          import sys
+          import zipfile
+
+          apk = sys.argv[1]
+          with zipfile.ZipFile(apk) as archive:
+              names = archive.namelist()
+              native = [name for name in names if name.startswith("lib/") and name.endswith(".so")]
+              assets = [name for name in names if name.startswith("assets/") and not name.endswith("/")]
+              result = {
+                  "entries": len(names),
+                  "native_libraries": len(native),
+                  "asset_entries": len(assets),
+                  "manifest_present": "AndroidManifest.xml" in names,
+              }
+              if not result["manifest_present"] or not native or not assets:
+                  raise SystemExit(json.dumps(result))
+              print(json.dumps(result, indent=2))
+          PY
+
+      - name: Generate build provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import re
+
+          root = pathlib.Path("recovery/v14")
+          apk = root / "build/brick_bahrain_v14.0.1-landscape-fallback-qa.apk"
+          runtime = (root / "build/logs/runtime-smoke-v14-project-loaded.log").read_text(encoding="utf-8", errors="replace")
+          match = re.search(r"complete: (\d+) passed, (\d+) failed", runtime)
+          if not match:
+              raise SystemExit("runtime result summary missing")
+          provenance = json.loads((root / "build/v14-source-provenance.json").read_text())
+          provenance.update({
+              "apk": apk.name,
+              "apk_bytes": apk.stat().st_size,
+              "apk_sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
+              "package": "com.brickbahrain.openworld.fallbackqa",
+              "version_code": 1401,
+              "version_name": "1.4.0.1-fallback-qa",
+              "orientation": "sensorLandscape",
+              "runtime_passed": int(match.group(1)),
+              "runtime_failed": int(match.group(2)),
+              "signing": "runtime-generated Android debug certificate; controlled QA only",
+              "physical_device_tested": False,
+              "authority_warning": "historical fallback; must not replace v15.0.1 authority",
+          })
+          (root / "build/V14_FALLBACK_BUILD_PROVENANCE.json").write_text(
+              json.dumps(provenance, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(provenance, indent=2))
+          PY
+
+      - name: Upload APK and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-landscape-fallback-qa-v2
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/${{ env.APK_NAME }}
+            recovery/v14/build/${{ env.APK_NAME }}.sha256
+            recovery/v14/build/V14_FALLBACK_BUILD_PROVENANCE.json
+            recovery/v14/build/v14-source-provenance.json
+            recovery/v14/build/logs/**
