@@ -33,6 +33,8 @@ python3 "$WORKSPACE/tools/prepare_v14_fallback.py" "$ROOT_DIR" \
   --provenance-out "$ROOT_DIR/build/v14-source-provenance.json" | tee "$LOG_DIR/fallback-preparation.log"
 python3 "$WORKSPACE/tools/apply_bahrain_brick_overlay.py" "$ROOT_DIR" \
   --report "$ROOT_DIR/build/BAHRAIN_BRICK_OVERLAY_REPORT.json" | tee "$LOG_DIR/overlay-application.log"
+git -C "$ROOT_DIR" apply --check "$WORKSPACE/tools/bahrain_brick_runtime.patch"
+git -C "$ROOT_DIR" apply "$WORKSPACE/tools/bahrain_brick_runtime.patch"
 
 log "Generate ephemeral QA signing identity"
 KEYSTORE_DIR="${RUNNER_TEMP:-/tmp}/bahrain-brick-controls-qa"
