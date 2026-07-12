@@ -7,12 +7,15 @@ ROOT_DIR="$(python3 -c 'import pathlib,sys; print(pathlib.Path(sys.argv[1]).reso
 LOG_DIR="$ROOT_DIR/build/logs"
 REPORT_DIR="$ROOT_DIR/build/reports"
 VISUAL_DIR="$ROOT_DIR/build/visual_evidence"
+TEST_DATA_ROOT="$ROOT_DIR/build/ci/test-user-data"
 APK_NAME="bahrain_brick_v14.0.3-graphics-qa.apk"
 APK_PATH="$ROOT_DIR/build/$APK_NAME"
 PACKAGE_NAME="com.bahrainbrick.game.qa"
 JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-17-openjdk-amd64}"
 export JAVA_HOME
 mkdir -p "$LOG_DIR" "$REPORT_DIR" "$VISUAL_DIR"
+rm -rf "$TEST_DATA_ROOT"
+mkdir -p "$TEST_DATA_ROOT/runtime-smoke" "$TEST_DATA_ROOT/mobile-controls" "$TEST_DATA_ROOT/presentation"
 
 log(){ printf '\n===== %s =====\n' "$1"; }
 
@@ -70,7 +73,8 @@ fi
 
 log "Run baseline project smoke after presentation integration"
 set -o pipefail
-timeout 500 godot --headless --path "$ROOT_DIR" --audio-driver Dummy \
+env XDG_DATA_HOME="$TEST_DATA_ROOT/runtime-smoke" \
+  timeout 500 godot --headless --path "$ROOT_DIR" --audio-driver Dummy \
   res://build/ci/runtime_smoke_runner_v14.tscn \
   2>&1 | tee "$LOG_DIR/runtime-smoke-after-graphics.log"
 status="${PIPESTATUS[0]}"; set +o pipefail
@@ -79,7 +83,8 @@ grep -q ', 0 failed' "$LOG_DIR/runtime-smoke-after-graphics.log"
 
 log "Run unchanged 28-check mobile-control regression"
 set -o pipefail
-timeout 500 godot --headless --path "$ROOT_DIR" --audio-driver Dummy \
+env XDG_DATA_HOME="$TEST_DATA_ROOT/mobile-controls" \
+  timeout 500 godot --headless --path "$ROOT_DIR" --audio-driver Dummy \
   res://scenes/mobile_input_pipeline_test.tscn \
   2>&1 | tee "$LOG_DIR/mobile-input-regression-after-graphics.log"
 status="${PIPESTATUS[0]}"; set +o pipefail
@@ -89,8 +94,9 @@ grep -q 'Bahrain Brick mobile input pipeline test complete: 28 passed, 0 failed'
 
 log "Run startup, menu, loading, settings and pause acceptance tests"
 set -o pipefail
-timeout 600 godot --headless --path "$ROOT_DIR" --audio-driver Dummy \
-  res://scenes/presentation_flow_test.tscn \
+env XDG_DATA_HOME="$TEST_DATA_ROOT/presentation" \
+  timeout 600 godot --headless --path "$ROOT_DIR" --audio-driver Dummy \
+  res://scenes/presentation_flow_test.tscn -- --presentation-test \
   2>&1 | tee "$LOG_DIR/presentation-flow-test.log"
 status="${PIPESTATUS[0]}"; set +o pipefail
 [[ "$status" -eq 0 ]]
