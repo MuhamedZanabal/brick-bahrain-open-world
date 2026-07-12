@@ -2,8 +2,15 @@
   "tag": "v1.4.0.3-graphics-qa",
   "apk": "bahrain_brick_v14.0.3-graphics-qa.apk",
   "apk_sha256": "753f9fe86a18da880886a6a6a501067aa3348dcbc8853e8f8a20e216e219ad4d",
+  "source": "bahrain_brick_v14.0.3-graphics-source.zip",
+  "source_sha256": "5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a",
+  "workspace": "bahrain_brick_v14.0.3-workspace-handoff.zip",
+  "workspace_sha256": "8b18c0914338bc45143a74361a98821ac359bfcb189767c238a8c21a2f004475",
   "source_workflow_run": 29211024651,
-  "direct_download_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-qa.apk",
+  "apk_download_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-qa.apk",
+  "source_download_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip",
+  "workspace_download_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-workspace-handoff.zip",
   "release_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/tag/v1.4.0.3-graphics-qa",
-  "verified_by_workflow_run": 29212510806
+  "handoff_branch": "handoff/bahrain-brick-v14.0.3",
+  "verified_by_workflow_run": 29213154039
 }
