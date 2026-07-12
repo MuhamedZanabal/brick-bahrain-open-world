@@ -1,0 +1,146 @@
+--- a/scripts/hud.gd
++++ b/scripts/hud.gd
+@@ -35,6 +35,10 @@
+ 	_connect_signals()
+ 
+ 
++func _exit_tree() -> void:
++	TouchInput.reset_all()
++
++
+ func bind_world(
+ 	world_ref: Node3D,
+ 	player_ref: Variant,
+@@ -101,6 +105,8 @@
+ 	var root := Control.new()
+ 	root.name = "SafeAreaHUD"
+ 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
++	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	root.focus_mode = Control.FOCUS_NONE
+ 	root.offset_left = 14
+ 	root.offset_top = 12
+ 	root.offset_right = -14
+@@ -120,7 +126,7 @@
+ 	status.add_theme_constant_override("separation", 6)
+ 	root.add_child(status)
+ 	var logo := Label.new()
+-	logo.text = "BRICK\nBAHRAIN"
++	logo.text = "BAHRAIN\nBRICK"
+ 	logo.add_theme_font_size_override("font_size", 28)
+ 	logo.add_theme_color_override("font_color", Color(1.0, 0.78, 0.06))
+ 	logo.add_theme_color_override("font_shadow_color", Color.BLACK)
+@@ -266,6 +272,7 @@
+ 
+ func _build_touch_controls(root: Control) -> void:
+ 	var joystick := VirtualJoystick.new()
++	joystick.name = "MovementJoystick"
+ 	joystick.anchor_top = 1.0
+ 	joystick.anchor_bottom = 1.0
+ 	joystick.position = Vector2(18, -178)
+@@ -274,6 +281,7 @@
+ 	_walking_controls = Control.new()
+ 	_walking_controls.set_anchors_preset(Control.PRESET_FULL_RECT)
+ 	_walking_controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	_walking_controls.visible = true
+ 	root.add_child(_walking_controls)
+ 	var sprint := _round_action(_walking_controls, "RUN", Vector2(-126, -230), Vector2(78, 78))
+ 	sprint.button_down.connect(func() -> void: TouchInput.set_sprint(true))
+@@ -287,6 +295,7 @@
+ 	_vehicle_controls = Control.new()
+ 	_vehicle_controls.set_anchors_preset(Control.PRESET_FULL_RECT)
+ 	_vehicle_controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
++	_vehicle_controls.visible = false
+ 	root.add_child(_vehicle_controls)
+ 	var throttle := _round_action(_vehicle_controls, "GO", Vector2(-122, -202), Vector2(84, 96))
+ 	throttle.button_down.connect(func() -> void: TouchInput.set_vehicle_throttle(1.0))
+@@ -316,9 +325,6 @@
+ 	root.add_child(_action_bar)
+ 	_add_action_button("PHONE", _on_phone_pressed)
+ 	_add_action_button("CHAT", ChatManager.open_chat_input)
+-	var mic_button := _add_action_button("MIC", Callable())
+-	mic_button.button_down.connect(ChatManager.begin_push_to_talk)
+-	mic_button.button_up.connect(ChatManager.end_push_to_talk)
+ 	_add_action_button("RADIO", _on_radio_pressed)
+ 	_add_action_button("SHOP", _on_shop_pressed)
+ 	_add_action_button("MISSION", _on_mission_pressed)
+@@ -409,10 +415,10 @@
+ 			else "CENTRAL MANAMA"
+ 		)
+ 		var in_vehicle: bool = player.has_method("is_in_vehicle") and bool(player.call("is_in_vehicle"))
++		_walking_controls.visible = not in_vehicle
++		_vehicle_controls.visible = in_vehicle
+ 		if in_vehicle != _vehicle_mode:
+ 			_vehicle_mode = in_vehicle
+-			_walking_controls.visible = not in_vehicle
+-			_vehicle_controls.visible = in_vehicle
+ 			if not in_vehicle:
+ 				TouchInput.reset_vehicle_controls()
+ 		var vehicle := player.call("get_current_vehicle") as Node3D if in_vehicle else null
+--- a/scripts/player_controller.gd
++++ b/scripts/player_controller.gd
+@@ -90,11 +90,6 @@
+ 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+ 		var motion := event as InputEventMouseMotion
+ 		_apply_camera_delta(motion.relative * camera_sensitivity)
+-	elif event is InputEventScreenDrag:
+-		var drag := event as InputEventScreenDrag
+-		var viewport_size := get_viewport().get_visible_rect().size
+-		if drag.position.x > viewport_size.x * 0.32:
+-			_apply_camera_delta(drag.relative * touch_camera_sensitivity)
+ 	elif event is InputEventMouseButton:
+ 		var button := event as InputEventMouseButton
+ 		if button.pressed and button.button_index == MOUSE_BUTTON_WHEEL_UP:
+@@ -146,8 +141,9 @@
+ 
+ func _handle_movement(delta: float) -> void:
+ 	var input_vector := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+-	if TouchInput.movement.length() > 0.05:
+-		input_vector = TouchInput.movement
++	var touch_vector: Vector2 = TouchInput.movement
++	if touch_vector.length_squared() > 0.0004:
++		input_vector = touch_vector
+ 	var camera_basis := Basis(Vector3.UP, camera_yaw)
+ 	var desired_direction := camera_basis * Vector3(input_vector.x, 0.0, -input_vector.y)
+ 	desired_direction.y = 0.0
+@@ -339,6 +335,22 @@
+ 	return current_vehicle
+ 
+ 
++
++func get_input_debug_snapshot() -> Dictionary:
++	return {
++		"instance_id": get_instance_id(),
++		"is_local": is_local,
++		"multiplayer_id": multiplayer_id,
++		"paused": get_tree().paused,
++		"gameplay_input_blocked": GameManager.is_gameplay_input_blocked(),
++		"touch": TouchInput.get_debug_snapshot(),
++		"velocity": velocity,
++		"position": global_position,
++		"camera_yaw": camera_yaw,
++		"camera_pitch": camera_pitch,
++		"in_vehicle": is_in_vehicle(),
++	}
++
+ func take_damage(amount: float, source: String = "") -> void:
+ 	if amount <= 0.0 or health <= 0.0:
+ 		return
+--- a/scripts/world.gd
++++ b/scripts/world.gd
+@@ -48,7 +48,7 @@
+ 		SaveManager.save_game("world exit")
+ 	RadioSystem.stop_radio()
+ 	ChatManager.set_world_active(false)
+-	TouchInput.reset_vehicle_controls()
++	TouchInput.reset_all()
+ 	for lock_name in ["phone", "shop", "chat"]:
+ 		GameManager.release_ui_lock(lock_name)
+ 
+@@ -182,6 +182,7 @@
+ 	add_child(shop_ui)
+ 	if hud.has_method("bind_world"):
+ 		hud.call("bind_world", self, player, phone_ui, shop_ui, day_night)
++	TouchInput.reset_all()
+ 	GameManager.current_state = GameManager.GameState.IN_WORLD
+ 	ChatManager.set_world_active(true)
+ 	_world_ready = true
