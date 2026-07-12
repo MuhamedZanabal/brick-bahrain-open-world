@@ -1,0 +1,9 @@
+{
+  "tag": "v1.4.0.3-graphics-qa",
+  "apk": "bahrain_brick_v14.0.3-graphics-qa.apk",
+  "apk_sha256": "753f9fe86a18da880886a6a6a501067aa3348dcbc8853e8f8a20e216e219ad4d",
+  "source_workflow_run": 29211024651,
+  "direct_download_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-qa.apk",
+  "release_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/tag/v1.4.0.3-graphics-qa",
+  "verified_by_workflow_run": 29212485756
+}
