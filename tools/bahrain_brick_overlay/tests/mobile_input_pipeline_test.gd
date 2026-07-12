@@ -121,15 +121,28 @@ func _run() -> void:
 	var drift_distance := stopped_position.distance_to(player.global_position)
 	_check(drift_distance < 0.15, "player does not drift after joystick release", drift_distance)
 
+	# Move to the open race-start road before testing two-axis displacement so a nearby
+	# building wall at the default spawn cannot invalidate the control test.
+	player.global_position = Vector3(0.0, 2.4, 68.0)
+	player.velocity = Vector3.ZERO
+	player.set("camera_yaw", 0.0)
+	await _wait_physics_frames(20)
 	var diagonal_touch := center + Vector2(rect.size.x * 0.30, -rect.size.y * 0.30)
 	var diagonal_start := player.global_position
 	joystick._input(_screen_touch(42, diagonal_touch, true))
+	await _wait_process_frames(2)
+	var diagonal_input := TouchInput.movement
+	_check(
+		absf(diagonal_input.x) > 0.25 and absf(diagonal_input.y) > 0.25,
+		"diagonal joystick generates two-axis input",
+		diagonal_input
+	)
 	await _wait_physics_frames(70)
 	joystick._input(_screen_touch(42, diagonal_touch, false))
 	var diagonal_delta := player.global_position - diagonal_start
 	_check(
 		absf(diagonal_delta.x) > 0.25 and absf(diagonal_delta.z) > 0.25,
-		"diagonal joystick movement affects both horizontal axes",
+		"diagonal joystick movement affects both horizontal axes in open space",
 		diagonal_delta
 	)
 
