@@ -1,0 +1,256 @@
+name: Recover Frozen v1.4 Source Candidate
+
+on:
+  push:
+    branches:
+      - ops/v15-authority-recovery
+    paths:
+      - ".github/workflows/recover_v14_source.yml"
+      - "tools/audit_source_tree.py"
+      - "tools/generate_asset_license_ledger.py"
+  pull_request:
+    paths:
+      - ".github/workflows/recover_v14_source.yml"
+      - "tools/audit_source_tree.py"
+      - "tools/generate_asset_license_ledger.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover-v14-source:
+    name: Reconstruct, sanitize, audit, and package v1.4 fallback
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out recovery tooling
+        uses: actions/checkout@v4
+
+      - name: Check out frozen v1.4 delta branch
+        uses: actions/checkout@v4
+        with:
+          ref: v14-phone-apk
+          path: recovery/v14
+
+      - name: Reconstruct checksum-locked v1.4 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports artifacts
+          python3 - <<'PY'
+          import base64
+          import glob
+          import hashlib
+          import io
+          import json
+          import pathlib
+          import tarfile
+
+          root = pathlib.Path("recovery/v14").resolve()
+          expected = "7d1f637c83f32824dadf9d5b3a675184507707d3ddc2f557036d7afad1ac45a7"
+          parts = sorted(root.glob("ci/v14_delta.b64.*"))
+          if len(parts) != 17:
+              raise SystemExit(f"expected 17 delta chunks, found {len(parts)}")
+          encoded = b"".join(path.read_bytes() for path in parts)
+          raw = base64.b64decode(encoded, validate=True)
+          digest = hashlib.sha256(raw).hexdigest()
+          if digest != expected:
+              raise SystemExit(f"delta checksum mismatch: expected {expected}, got {digest}")
+          delta_path = pathlib.Path("artifacts/brick_bahrain_v14-delta.tar.xz")
+          delta_path.write_bytes(raw)
+          with tarfile.open(fileobj=io.BytesIO(raw), mode="r:xz") as archive:
+              members = archive.getmembers()
+              for member in members:
+                  target = (root / member.name).resolve()
+                  if root != target and root not in target.parents:
+                      raise SystemExit(f"unsafe archive member: {member.name}")
+              archive.extractall(root, filter="data")
+          pathlib.Path("reports/v14-reconstruction.json").write_text(
+              json.dumps({
+                  "evidence_class": "VERIFIED",
+                  "source_branch": "v14-phone-apk",
+                  "source_branch_head": "721e8c9df6cb8a4e142c18723a7fc72c27350159",
+                  "delta_parts": len(parts),
+                  "delta_base64_bytes": len(encoded),
+                  "delta_bytes": len(raw),
+                  "delta_sha256": digest,
+                  "delta_members": len(members),
+                  "classification": "historical v1.4 fallback; not v15 authority"
+              }, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          print(f"delta_sha256={digest}")
+          print(f"delta_members={len(members)}")
+          PY
+
+      - name: Apply recorded Godot 4.3 parser corrections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path("recovery/v14")
+          patches = {
+              "tests/runtime_smoke_test_v14.gd": [
+                  ("var candidate := SaveManager.save_path + suffix", "var candidate: String = SaveManager.save_path + str(suffix)", 2),
+              ],
+              "scripts/hero_district_builder.gd": [
+                  ("var outward := side * float(level) * 0.18", "var outward: float = float(side) * float(level) * 0.18", 1),
+                  ("var label_data := storefront_names[shop_index % storefront_names.size()]", "var label_data: Array = storefront_names[shop_index % storefront_names.size()]", 1),
+                  ("var z := z_slots[index]", "var z: float = float(z_slots[index])", 1),
+                  ("var x := side * (24.0 + float(index % 2) * 2.5)", "var x: float = float(side) * (24.0 + float(index % 2) * 2.5)", 1),
+              ],
+              "scripts/hud.gd": [
+                  ("var in_vehicle := player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", "var in_vehicle: bool = player.has_method(\"is_in_vehicle\") and bool(player.call(\"is_in_vehicle\"))", 1),
+              ],
+              "scripts/phone_ui.gd": [
+                  ("var location := district.call(\"get_location_name\", position) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", "var location: String = str(district.call(\"get_location_name\", position)) if district and district.has_method(\"get_location_name\") else \"Central Manama\"", 1),
+              ],
+              "scripts/traffic_manager.gd": [
+                  ("var archetype := ARCHETYPES[index % ARCHETYPES.size()]", "var archetype: String = str(ARCHETYPES[index % ARCHETYPES.size()])", 1),
+              ],
+              "scripts/wanted_level.gd": [
+                  ("var police := police_npcs.pop_back()", "var police: Node3D = police_npcs.pop_back() as Node3D", 1),
+              ],
+          }
+          applied = []
+          for filename, replacements in patches.items():
+              path = root / filename
+              text = path.read_text(encoding="utf-8")
+              for old, new, expected_count in replacements:
+                  actual = text.count(old)
+                  if actual != expected_count:
+                      raise SystemExit(f"{filename}: expected {expected_count} occurrence(s), found {actual}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+              applied.append(filename)
+          Path("reports/v14-parser-fixes.txt").write_text("\n".join(applied) + "\n", encoding="utf-8")
+          print(f"parser_fix_files={len(applied)}")
+          PY
+
+      - name: Remove embedded signing material from fallback package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          root = Path("recovery/v14")
+          removed = []
+          keystore = root / "debug.keystore"
+          if keystore.exists():
+              removed.append(str(keystore.relative_to(root)))
+              keystore.unlink()
+
+          preset = root / "export_presets.cfg"
+          text = preset.read_text(encoding="utf-8")
+          keys = [
+              "keystore/debug", "keystore/debug_password", "keystore/debug_user",
+              "keystore/release", "keystore/release_password", "keystore/release_user",
+          ]
+          changed = []
+          for key in keys:
+              pattern = re.compile(rf'(?m)^{re.escape(key)}=.*$')
+              replacement = f'{key}=""'
+              text, count = pattern.subn(replacement, text)
+              if count:
+                  changed.append(key)
+          preset.write_text(text, encoding="utf-8")
+          Path("reports/v14-signing-sanitization.json").write_text(
+              json.dumps({
+                  "removed_files": removed,
+                  "blanked_export_fields": changed,
+                  "purpose": "prevent redistribution of embedded test signing material",
+                  "classification": "sanitized fallback; not byte-identical to reconstructed v1.4"
+              }, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Run source security and license pre-audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/audit_source_tree.py recovery/v14 \
+            --json-out reports/v14-source-audit.json \
+            --markdown-out reports/v14-source-audit.md
+
+      - name: Generate v1.4 asset license ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/generate_asset_license_ledger.py recovery/v14 \
+            --csv-out reports/V14_ASSET_LICENSE_LEDGER.csv \
+            --notices-out reports/V14_THIRD_PARTY_NOTICES.md \
+            --summary-out reports/v14-asset-license-summary.json
+
+      - name: Build deterministic sanitized source ZIP and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import zipfile
+
+          root = pathlib.Path("recovery/v14").resolve()
+          output = pathlib.Path("artifacts/brick_bahrain_v14-parser-fixed-sanitized-source.zip")
+          excluded_roots = {".git", ".godot", "build", "ci"}
+          excluded_files = {"debug.keystore"}
+          files = []
+          for current, dirs, names in os.walk(root):
+              dirs[:] = sorted(d for d in dirs if d not in excluded_roots)
+              current_path = pathlib.Path(current)
+              for name in sorted(names):
+                  path = current_path / name
+                  rel = path.relative_to(root)
+                  if rel.as_posix() in excluded_files:
+                      continue
+                  files.append((path, rel))
+          with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+              for path, rel in sorted(files, key=lambda item: item[1].as_posix()):
+                  info = zipfile.ZipInfo(rel.as_posix(), date_time=(2026, 7, 12, 0, 0, 0))
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  info.external_attr = (0o100644 & 0xFFFF) << 16
+                  archive.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+          digest = hashlib.sha256(output.read_bytes()).hexdigest()
+          delta = pathlib.Path("artifacts/brick_bahrain_v14-delta.tar.xz")
+          provenance = {
+              "evidence_class": "VERIFIED",
+              "classification": "historical parser-fixed, signing-sanitized v1.4 fallback; not v15 authority",
+              "source_branch": "v14-phone-apk",
+              "source_branch_head": "721e8c9df6cb8a4e142c18723a7fc72c27350159",
+              "base_commit": "08378d1383eb7aeb1ae91b9eeb8994b79a96f1de",
+              "delta_sha256": hashlib.sha256(delta.read_bytes()).hexdigest(),
+              "source_zip": output.name,
+              "source_zip_sha256": digest,
+              "source_zip_bytes": output.stat().st_size,
+              "packaged_files": len(files),
+              "security_sanitization": "debug.keystore removed; versioned keystore fields blanked",
+              "authority_warning": "must not replace audit/v15.0.1-authority"
+          }
+          pathlib.Path("artifacts/V14_RECOVERY_PROVENANCE.json").write_text(
+              json.dumps(provenance, indent=2) + "\n", encoding="utf-8"
+          )
+          pathlib.Path(str(output) + ".sha256").write_text(f"{digest}  {output.name}\n", encoding="utf-8")
+          pathlib.Path(str(delta) + ".sha256").write_text(
+              f"{provenance['delta_sha256']}  {delta.name}\n", encoding="utf-8"
+          )
+          print(json.dumps(provenance, indent=2))
+          PY
+
+      - name: Upload recovered v1.4 fallback package
+        uses: actions/upload-artifact@v4
+        with:
+          name: v14-recovered-source-candidate
+          path: |
+            artifacts/*
+            reports/*
+          if-no-files-found: error
+          retention-days: 30
