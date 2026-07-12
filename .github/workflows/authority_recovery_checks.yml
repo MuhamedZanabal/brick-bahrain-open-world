@@ -1,0 +1,45 @@
+name: Authority Recovery Checks
+
+on:
+  push:
+    branches:
+      - ops/v15-authority-recovery
+    paths:
+      - "tools/verify_v15_authority.py"
+      - "tools/v15_authority_manifest.json"
+      - "tools/tests/**"
+      - "docs/audit/**"
+      - ".github/workflows/authority_recovery_checks.yml"
+  pull_request:
+    paths:
+      - "tools/verify_v15_authority.py"
+      - "tools/v15_authority_manifest.json"
+      - "tools/tests/**"
+      - "docs/audit/**"
+      - ".github/workflows/authority_recovery_checks.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tooling:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate Python syntax
+        run: python -m compileall -q tools/verify_v15_authority.py tools/tests
+
+      - name: Validate authority manifest JSON
+        run: python -m json.tool tools/v15_authority_manifest.json >/dev/null
+
+      - name: Run verifier regression suite
+        run: python -m unittest discover -s tools/tests -v
