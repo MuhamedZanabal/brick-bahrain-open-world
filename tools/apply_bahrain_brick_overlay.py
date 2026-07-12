@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import argparse
-import base64
-import io
 import json
 import re
 import shutil
-import tarfile
 from pathlib import Path
 
 
@@ -20,32 +17,15 @@ def replace_line(text: str, key: str, value: str) -> str:
     return text
 
 
-def read_payload() -> bytes:
-    parts_dir = Path(__file__).resolve().parent / "overlay_payload_parts"
-    parts = sorted(parts_dir.glob("part-*.b64"))
-    if len(parts) != 6:
-        raise RuntimeError(f"expected 6 overlay payload parts, found {len(parts)}")
-    encoded = "".join(part.read_text(encoding="utf-8").strip() for part in parts)
-    return base64.b64decode(encoded, validate=True)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
     root = args.root.resolve()
-    overlay = root / "build" / "embedded_bahrain_brick_overlay"
-    if overlay.exists():
-        shutil.rmtree(overlay)
-    overlay.mkdir(parents=True, exist_ok=True)
-    raw = read_payload()
-    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:gz") as archive:
-        for member in archive.getmembers():
-            target = (overlay / member.name).resolve()
-            if target != overlay and overlay not in target.parents:
-                raise RuntimeError(f"unsafe overlay member: {member.name}")
-        archive.extractall(overlay, filter="data")
+    overlay = Path(__file__).resolve().parent / "bahrain_brick_overlay"
+    if not overlay.is_dir():
+        raise RuntimeError(f"overlay source directory missing: {overlay}")
     changed: list[str] = []
     for source in sorted(path for path in overlay.rglob("*") if path.is_file()):
         relative = source.relative_to(overlay)
