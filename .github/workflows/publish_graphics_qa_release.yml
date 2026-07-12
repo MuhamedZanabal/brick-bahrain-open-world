@@ -4,6 +4,9 @@ on:
   push:
     branches: [work/bahrain-brick-graphics-integration-v14]
     paths: [.github/workflows/publish_graphics_qa_release.yml]
+  pull_request:
+    branches: [work/bahrain-brick-controls-branding-v14]
+    paths: [.github/workflows/publish_graphics_qa_release.yml]
   workflow_dispatch:
 
 permissions:
@@ -21,8 +24,10 @@ jobs:
       SOURCE_RUN_ID: '29211024651'
       APK_NAME: bahrain_brick_v14.0.3-graphics-qa.apk
     steps:
-      - name: Check out release workflow commit
+      - name: Check out release workflow branch
         uses: actions/checkout@v4
+        with:
+          ref: work/bahrain-brick-graphics-integration-v14
 
       - name: Download verified graphics QA artifact
         uses: actions/download-artifact@v4
