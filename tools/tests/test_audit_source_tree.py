@@ -59,6 +59,24 @@ class SourceTreeAuditTests(unittest.TestCase):
             self.assertNotIn("ROOT_LICENSE_MISSING", rules)
             self.assertNotIn("THIRD_PARTY_LICENSE_EVIDENCE_MISSING", rules)
 
+    def test_blank_signing_fields_are_not_misclassified_as_shared_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "LICENSE").write_text("Project license\n", encoding="utf-8")
+            (root / "export_presets.cfg").write_text(
+                "\n".join([
+                    'keystore/debug=""',
+                    'keystore/debug_password=""',
+                    'keystore/release=""',
+                    'keystore/release_password=""',
+                ]),
+                encoding="utf-8",
+            )
+            report = audit_tree(root)
+            rules = {finding["rule_id"] for finding in report["findings"]}
+            self.assertNotIn("ANDROID_DEBUG_KEY_USED_FOR_RELEASE", rules)
+            self.assertNotIn("ANDROID_SIGNING_PASSWORD_IN_CONFIG", rules)
+
 
 if __name__ == "__main__":
     unittest.main()
