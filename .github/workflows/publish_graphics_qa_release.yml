@@ -100,6 +100,30 @@ jobs:
           test -s /tmp/apk-prefix.bin
           printf '%s\n' "$ASSET_URL" | tee release-assets/DIRECT_DOWNLOAD_URL.txt
 
+      - name: Commit verified release marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/releases
+          cat > "docs/releases/$RELEASE_TAG.json" <<EOF
+          {
+            "tag": "$RELEASE_TAG",
+            "apk": "$APK_NAME",
+            "apk_sha256": "$EXPECTED_APK_SHA256",
+            "source_workflow_run": $SOURCE_RUN_ID,
+            "direct_download_url": "https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$APK_NAME",
+            "release_url": "https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG",
+            "verified_by_workflow_run": $GITHUB_RUN_ID
+          }
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "docs/releases/$RELEASE_TAG.json"
+          if ! git diff --cached --quiet; then
+            git commit -m "release: record verified $RELEASE_TAG download"
+            git push origin "HEAD:work/bahrain-brick-graphics-integration-v14"
+          fi
+
       - name: Upload release-publication evidence
         uses: actions/upload-artifact@v4
         with:
@@ -109,3 +133,4 @@ jobs:
             release-assets/RELEASE_IDENTITY.txt
             release-assets/DIRECT_DOWNLOAD_URL.txt
             release-notes.md
+            docs/releases/v1.4.0.3-graphics-qa.json
