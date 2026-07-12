@@ -6,6 +6,7 @@ on:
       - ops/v15-authority-recovery
     paths:
       - "tools/verify_v15_authority.py"
+      - "tools/audit_source_tree.py"
       - "tools/v15_authority_manifest.json"
       - "tools/tests/**"
       - "docs/audit/**"
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - "tools/verify_v15_authority.py"
+      - "tools/audit_source_tree.py"
       - "tools/v15_authority_manifest.json"
       - "tools/tests/**"
       - "docs/audit/**"
@@ -36,10 +38,24 @@ jobs:
           python-version: "3.13"
 
       - name: Validate Python syntax
-        run: python -m compileall -q tools/verify_v15_authority.py tools/tests
+        run: python -m compileall -q tools/verify_v15_authority.py tools/audit_source_tree.py tools/tests
 
       - name: Validate authority manifest JSON
         run: python -m json.tool tools/v15_authority_manifest.json >/dev/null
 
-      - name: Run verifier regression suite
+      - name: Run tooling regression suite
         run: python -m unittest discover -s tools/tests -v
+
+      - name: Generate source-tree pre-audit
+        run: |
+          mkdir -p reports
+          python tools/audit_source_tree.py . \
+            --json-out reports/source_tree_audit.json \
+            --markdown-out reports/source_tree_audit.md
+
+      - name: Upload source-tree pre-audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-tree-preaudit
+          path: reports/source_tree_audit.*
+          if-no-files-found: error
