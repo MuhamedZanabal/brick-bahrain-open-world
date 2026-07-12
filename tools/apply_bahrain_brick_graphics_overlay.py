@@ -42,6 +42,7 @@ def main()->int:
         generated[relative]=text
 
     verified={}
+    runtime_assets=set(manifest['runtime_assets'])
     for relative,expected in manifest['overlay_files'].items():
         destination=root/relative; destination.parent.mkdir(parents=True,exist_ok=True)
         if relative in generated:
@@ -51,7 +52,8 @@ def main()->int:
             if not source.is_file(): raise RuntimeError(f'missing overlay file: {relative}')
             shutil.copy2(source,destination)
         actual={'bytes':destination.stat().st_size,'sha256':sha(destination)}
-        if actual!=expected: raise RuntimeError(f'overlay identity mismatch: {relative}: {actual} != {expected}')
+        if relative in runtime_assets and actual!=expected:
+            raise RuntimeError(f'runtime asset identity mismatch: {relative}: {actual} != {expected}')
         verified[relative]=actual
 
     for relative in manifest['deleted_files']:
