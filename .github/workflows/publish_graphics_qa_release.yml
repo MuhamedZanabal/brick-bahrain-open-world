@@ -1,0 +1,111 @@
+name: Publish Bahrain Brick Graphics QA Release
+
+on:
+  push:
+    branches: [work/bahrain-brick-graphics-integration-v14]
+    paths: [.github/workflows/publish_graphics_qa_release.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v1.4.0.3-graphics-qa
+      EXPECTED_APK_SHA256: 753f9fe86a18da880886a6a6a501067aa3348dcbc8853e8f8a20e216e219ad4d
+      SOURCE_RUN_ID: '29211024651'
+      APK_NAME: bahrain_brick_v14.0.3-graphics-qa.apk
+    steps:
+      - name: Check out release workflow commit
+        uses: actions/checkout@v4
+
+      - name: Download verified graphics QA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bahrain-brick-graphics-qa
+          path: downloaded-artifact
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Locate and verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_SOURCE="$(find downloaded-artifact -type f -name "$APK_NAME" -print -quit)"
+          test -n "$APK_SOURCE"
+          mkdir -p release-assets
+          cp "$APK_SOURCE" "release-assets/$APK_NAME"
+          ACTUAL_SHA256="$(sha256sum "release-assets/$APK_NAME" | awk '{print $1}')"
+          test "$ACTUAL_SHA256" = "$EXPECTED_APK_SHA256"
+          printf '%s  %s\n' "$ACTUAL_SHA256" "$APK_NAME" > "release-assets/$APK_NAME.sha256"
+          printf 'apk=%s\nsha256=%s\nbytes=%s\n' \
+            "$APK_NAME" "$ACTUAL_SHA256" "$(stat -c %s "release-assets/$APK_NAME")" \
+            | tee release-assets/RELEASE_IDENTITY.txt
+
+      - name: Create or update GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'NOTES'
+          # Bahrain Brick v1.4.0.3 Graphics QA
+
+          Test-installable Android prerelease built from the recoverable historical v1.4 fallback source.
+
+          - App label: Bahrain Brick
+          - Package: com.bahrainbrick.game.qa
+          - Version: 1.4.0.3-graphics-qa
+          - Version code: 1403
+          - Orientation: sensorLandscape
+          - Startup: Zanabal Gaming → Mansoory Games → Bahrain Brick
+          - Presentation flow: 10 passed, 0 failed
+          - Mobile controls regression: 28 passed, 0 failed
+          - APK SHA-256: 753f9fe86a18da880886a6a6a501067aa3348dcbc8853e8f8a20e216e219ad4d
+
+          This is QA-signed and not a production release. Physical Android testing remains required.
+          NOTES
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Bahrain Brick v1.4.0.3 Graphics QA" \
+              --notes-file release-notes.md \
+              --prerelease
+            gh release upload "$RELEASE_TAG" \
+              "release-assets/$APK_NAME" \
+              "release-assets/$APK_NAME.sha256" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" \
+              "release-assets/$APK_NAME" \
+              "release-assets/$APK_NAME.sha256" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "work/bahrain-brick-graphics-integration-v14" \
+              --title "Bahrain Brick v1.4.0.3 Graphics QA" \
+              --notes-file release-notes.md \
+              --prerelease
+          fi
+
+      - name: Verify public release asset URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          ASSET_URL="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$APK_NAME"
+          curl --fail --location --silent --show-error --range 0-1023 "$ASSET_URL" -o /tmp/apk-prefix.bin
+          test -s /tmp/apk-prefix.bin
+          printf '%s\n' "$ASSET_URL" | tee release-assets/DIRECT_DOWNLOAD_URL.txt
+
+      - name: Upload release-publication evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-github-release-evidence
+          retention-days: 30
+          path: |
+            release-assets/RELEASE_IDENTITY.txt
+            release-assets/DIRECT_DOWNLOAD_URL.txt
+            release-notes.md
