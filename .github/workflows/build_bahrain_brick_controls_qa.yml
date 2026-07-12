@@ -3,6 +3,8 @@ name: Build Bahrain Brick Controls QA
 on:
   push:
     branches: [work/bahrain-brick-controls-branding-v14]
+  pull_request:
+    branches: [ops/v15-authority-recovery]
   workflow_dispatch:
 
 permissions:
