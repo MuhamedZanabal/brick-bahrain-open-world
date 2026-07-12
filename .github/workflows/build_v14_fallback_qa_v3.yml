@@ -60,6 +60,16 @@ jobs:
         shell: bash
         run: bash tools/run_v14_fallback_ci.sh recovery/v14
 
+      - name: Verify microphone permission is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          BADGING="recovery/v14/build/logs/aapt-badging.txt"
+          PROVENANCE="recovery/v14/build/V14_FALLBACK_BUILD_PROVENANCE.json"
+          ! grep -q 'android.permission.RECORD_AUDIO' "$BADGING"
+          ! grep -q 'android.hardware.microphone' "$BADGING"
+          grep -q '"microphone_permission_requested": false' "$PROVENANCE"
+
       - name: Upload APK and evidence
         if: always()
         uses: actions/upload-artifact@v4
