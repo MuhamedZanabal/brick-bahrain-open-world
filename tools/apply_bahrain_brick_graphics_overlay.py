@@ -31,11 +31,16 @@ def main()->int:
     if not (root/'project.godot').is_file(): raise RuntimeError('not a Godot project')
 
     # The controls baseline smoke deliberately writes a dedicated test save. Remove only
-    # that test artifact before the post-presentation smoke so the second run is isolated.
-    user_data_root=Path.home()/'.local/share/godot/app_userdata'
-    if user_data_root.exists():
-        for test_save in user_data_root.rglob('savegame.v14.smoke.json'):
-            test_save.unlink()
+    # that test artifact from every possible Godot user-data root before the second smoke.
+    user_data_roots={
+        Path.home()/'.local/share/godot/app_userdata',
+        Path('/root/.local/share/godot/app_userdata'),
+        Path('/github/home/.local/share/godot/app_userdata'),
+    }
+    for user_data_root in user_data_roots:
+        if user_data_root.exists():
+            for test_save in user_data_root.rglob('savegame.v14.smoke.json'):
+                test_save.unlink()
 
     base_relative='assets/ui/runtime/splash_zanabal.svg'
     base_source=overlay/base_relative
