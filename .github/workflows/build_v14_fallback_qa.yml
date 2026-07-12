@@ -187,7 +187,7 @@ jobs:
           replacements = [
               ("extends SceneTree", "extends Node", 1),
               ("func _initialize() -> void:", "func _ready() -> void:", 1),
-              ("await process_frame", "await get_tree().process_frame", 3),
+              ("await process_frame", "await get_tree().process_frame", 2),
               ("root.add_child(world)", "get_tree().root.add_child(world)", 1),
               ("\tquit(1 if _failed > 0 else 0)", "\tget_tree().quit(1 if _failed > 0 else 0)", 1),
           ]
@@ -233,10 +233,11 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          godot --headless --path recovery/v14 --verbose --export-debug "Android" "build/${APK_NAME}" 2>&1 | tee recovery/v14/build/logs/android-export.log
+          APK_PATH="$GITHUB_WORKSPACE/recovery/v14/build/${APK_NAME}"
+          godot --headless --path recovery/v14 --verbose --export-debug "Android" "$APK_PATH" 2>&1 | tee recovery/v14/build/logs/android-export.log
           status="${PIPESTATUS[0]}"
           test "$status" -eq 0
-          test -s "recovery/v14/build/${APK_NAME}"
+          test -s "$APK_PATH"
 
       - name: Verify APK integrity, package, orientation, and signature
         shell: bash
@@ -259,7 +260,7 @@ jobs:
           "$AAPT_BIN" dump badging "$APK" | tee recovery/v14/build/logs/aapt-badging.txt
           grep -q "package: name='${PACKAGE_NAME}' versionCode='1401' versionName='1.4.0.1-fallback-qa'" recovery/v14/build/logs/aapt-badging.txt
           "$AAPT_BIN" dump xmltree "$APK" AndroidManifest.xml | tee recovery/v14/build/logs/aapt-manifest.txt
-          grep -q 'A: android:screenOrientation(0x0101001e)=11' recovery/v14/build/logs/aapt-manifest.txt
+          grep -Eq 'android:screenOrientation.*(0xb|=11)' recovery/v14/build/logs/aapt-manifest.txt
           "$APKSIGNER_BIN" verify --verbose --print-certs "$APK" | tee recovery/v14/build/logs/apksigner-verification.txt
           "$ZIPALIGN_BIN" -c -v 4 "$APK" | tee recovery/v14/build/logs/zipalign-verification.txt
 
