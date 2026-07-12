@@ -1,0 +1,57 @@
+name: Build Bahrain Brick Controls QA
+
+on:
+  push:
+    branches: [work/bahrain-brick-controls-branding-v14]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      APK_NAME: bahrain_brick_v14.0.2-controls-qa.apk
+      PACKAGE_NAME: com.bahrainbrick.game.qa
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+    steps:
+      - name: Check out control-repair branch
+        uses: actions/checkout@v4
+      - name: Check out checksum-locked v1.4 delta branch
+        uses: actions/checkout@v4
+        with:
+          ref: v14-phone-apk
+          path: recovery/v14
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3 openjdk-17-jdk-headless unzip ca-certificates coreutils
+          update-alternatives --set java "$JAVA_HOME/bin/java"
+          update-alternatives --set javac "$JAVA_HOME/bin/javac"
+          python3 -m py_compile tools/prepare_v14_fallback.py tools/apply_bahrain_brick_overlay.py
+          bash -n tools/run_bahrain_brick_controls_ci.sh
+      - name: Reconstruct, test controls, export and verify
+        shell: bash
+        run: bash tools/run_bahrain_brick_controls_ci.sh recovery/v14
+      - name: Upload APK, source and evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-controls-qa
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.2-controls-qa.apk
+            recovery/v14/build/bahrain_brick_v14.0.2-controls-qa.apk.sha256
+            recovery/v14/build/bahrain_brick_v14.0.2-controls-source.zip
+            recovery/v14/build/bahrain_brick_v14.0.2-controls-source.zip.sha256
+            recovery/v14/build/BAHRAIN_BRICK_OVERLAY_REPORT.json
+            recovery/v14/build/v14-source-provenance.json
+            recovery/v14/build/logs/**
