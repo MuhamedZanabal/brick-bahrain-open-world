@@ -1,0 +1,177 @@
+name: Build Bahrain Brick Graphics QA
+
+on:
+  push:
+    branches: [work/bahrain-brick-graphics-integration-v14]
+  pull_request:
+    branches: [work/bahrain-brick-controls-branding-v14]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      LIBGL_ALWAYS_SOFTWARE: "1"
+    steps:
+      - name: Check out graphics integration branch
+        uses: actions/checkout@v4
+
+      - name: Check out checksum-locked v1.4 delta branch
+        uses: actions/checkout@v4
+        with:
+          ref: v14-phone-apk
+          path: recovery/v14
+
+      - name: Install build and evidence dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3 python3-pil openjdk-17-jdk-headless unzip ca-certificates coreutils \
+            xvfb ffmpeg libgl1-mesa-dri libglx-mesa0 libx11-6 libxcursor1 \
+            libxinerama1 libxi6 libxrandr2 libxrender1
+          update-alternatives --set java "$JAVA_HOME/bin/java"
+          update-alternatives --set javac "$JAVA_HOME/bin/javac"
+          python3 -m py_compile \
+            tools/prepare_v14_fallback.py \
+            tools/apply_bahrain_brick_overlay.py \
+            tools/apply_bahrain_brick_graphics_overlay.py \
+            tools/verify_frozen_controls.py
+          bash -n tools/run_bahrain_brick_controls_ci.sh
+          bash -n tools/run_bahrain_brick_graphics_ci.sh
+
+      - name: Reconstruct, integrate, test controls and export APK
+        shell: bash
+        run: bash tools/run_bahrain_brick_graphics_ci.sh recovery/v14
+
+      - name: Capture actual startup sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf recovery/v14/build/visual_evidence/startup_frames
+          mkdir -p recovery/v14/build/visual_evidence/startup_frames \
+                   recovery/v14/build/visual_evidence/screenshots
+          set -o pipefail
+          timeout 900 xvfb-run -a -s "-screen 0 1280x720x24" \
+            godot --path recovery/v14 --audio-driver Dummy \
+            --display-driver x11 --rendering-method gl_compatibility \
+            -- --capture-startup \
+            2>&1 | tee recovery/v14/build/logs/startup-sequence-capture.log
+          status="${PIPESTATUS[0]}"
+          set +o pipefail
+          test "$status" -eq 0
+          test -s recovery/v14/build/visual_evidence/startup_capture_complete.txt
+          test -s recovery/v14/build/visual_evidence/screenshots/zanabal_gaming.png
+          test -s recovery/v14/build/visual_evidence/screenshots/mansoory_games.png
+          test -s recovery/v14/build/visual_evidence/screenshots/bahrain_brick_main_menu.png
+          ffmpeg -y -framerate 15 \
+            -i recovery/v14/build/visual_evidence/startup_frames/frame_%04d.png \
+            -vf "scale=1280:-2:flags=lanczos" -c:v libx264 -preset medium -crf 21 \
+            -pix_fmt yuv420p recovery/v14/build/visual_evidence/bahrain_brick_startup_sequence.mp4
+
+      - name: Capture integrated presentation screens
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+            godot --path recovery/v14 --audio-driver Dummy \
+            --display-driver x11 --rendering-method gl_compatibility \
+            res://scenes/presentation_visual_evidence.tscn \
+            2>&1 | tee recovery/v14/build/logs/presentation-visual-evidence.log
+          status="${PIPESTATUS[0]}"
+          set +o pipefail
+          test "$status" -eq 0
+          grep -q 'Bahrain Brick presentation visual evidence complete' \
+            recovery/v14/build/logs/presentation-visual-evidence.log
+          for image in character_selection loading_18_percent loading_62_percent \
+                       loading_100_percent pause_and_settings gameplay_hud; do
+            test -s "recovery/v14/build/visual_evidence/screenshots/${image}.png"
+          done
+
+      - name: Re-run rendered controls evidence after graphics
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf recovery/v14/build/visual_evidence/frames
+          mkdir -p recovery/v14/build/visual_evidence/frames
+          set -o pipefail
+          timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+            godot --path recovery/v14 --audio-driver Dummy \
+            --display-driver x11 --rendering-method gl_compatibility \
+            res://scenes/mobile_input_visual_evidence.tscn \
+            2>&1 | tee recovery/v14/build/logs/mobile-input-visual-regression-after-graphics.log
+          status="${PIPESTATUS[0]}"
+          set +o pipefail
+          test "$status" -eq 0
+          grep -q 'Bahrain Brick rendered control evidence complete:' \
+            recovery/v14/build/logs/mobile-input-visual-regression-after-graphics.log
+          ffmpeg -y -framerate 12 \
+            -i recovery/v14/build/visual_evidence/frames/frame_%04d.png \
+            -vf "scale=1280:-2:flags=lanczos" -c:v libx264 -preset medium -crf 22 \
+            -pix_fmt yuv420p recovery/v14/build/visual_evidence/bahrain_brick_controls_after_graphics.mp4
+
+      - name: Verify rendered evidence is nonblank and ordered
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          import json
+          root=Path('recovery/v14/build/visual_evidence')
+          required=[
+            'screenshots/zanabal_gaming.png','screenshots/mansoory_games.png',
+            'screenshots/bahrain_brick_main_menu.png','screenshots/character_selection.png',
+            'screenshots/loading_18_percent.png','screenshots/loading_62_percent.png',
+            'screenshots/loading_100_percent.png','screenshots/pause_and_settings.png',
+            'screenshots/gameplay_hud.png',
+          ]
+          evidence=[]
+          for rel in required:
+            path=root/rel
+            image=Image.open(path).convert('RGB')
+            if image.size != (1280,720): raise SystemExit(f'unexpected dimensions {rel}: {image.size}')
+            mean=sum(ImageStat.Stat(image.resize((64,36))).mean)/3
+            if mean < 5.0: raise SystemExit(f'blank/dark evidence frame: {rel}, mean={mean}')
+            evidence.append({'file':rel,'mean_luminance':round(mean,2)})
+          frames=sorted((root/'startup_frames').glob('frame_*.png'))
+          if len(frames)<30: raise SystemExit(f'insufficient startup frames: {len(frames)}')
+          black=0; maximum=0
+          for path in frames:
+            mean=sum(ImageStat.Stat(Image.open(path).convert('RGB').resize((32,18))).mean)/3
+            black=black+1 if mean<3.0 else 0; maximum=max(maximum,black)
+          if maximum>4: raise SystemExit(f'persistent black sequence detected: {maximum} frames')
+          report={'screenshots':evidence,'startup_frames':len(frames),'max_consecutive_black_frames':maximum}
+          (root/'RENDERED_EVIDENCE_VERIFICATION.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          PY
+          sha256sum recovery/v14/build/visual_evidence/*.mp4 \
+            recovery/v14/build/visual_evidence/screenshots/*.png \
+            > recovery/v14/build/visual_evidence/CHECKSUMS.sha256
+
+      - name: Upload APK, source, art, screenshots, logs and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-graphics-qa
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.3-graphics-qa.apk
+            recovery/v14/build/bahrain_brick_v14.0.3-graphics-qa.apk.sha256
+            recovery/v14/build/bahrain_brick_v14.0.3-graphics-source.zip
+            recovery/v14/build/bahrain_brick_v14.0.3-graphics-source.zip.sha256
+            recovery/v14/build/logs/**
+            recovery/v14/build/reports/**
+            recovery/v14/build/visual_evidence/**
+            recovery/v14/assets/ui/runtime/**
