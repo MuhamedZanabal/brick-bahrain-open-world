@@ -1,0 +1,115 @@
+{
+  "baseline_controls_commit": "c5548465627942a2889a0bd09f8979c3a29fbcdd",
+  "overlay_files": {
+    "assets/ui/runtime/character_select_background.svg": {
+      "bytes": 3338,
+      "sha256": "06156d4cc94ddbc1ab69bbb9343c9351b12b20048c6399c64ce9c9a20b2cb0d2"
+    },
+    "assets/ui/runtime/loading_background.svg": {
+      "bytes": 3338,
+      "sha256": "64e773e612ead4acc687bed17acb6dabdad40aff8552ea8814d8a1b6e49b26b6"
+    },
+    "assets/ui/runtime/main_menu_background.svg": {
+      "bytes": 3338,
+      "sha256": "220e5b028f1a45459c19544bfa36c4846d0a01a49a62b9624db14dead2f4c54c"
+    },
+    "assets/ui/runtime/pause_background.svg": {
+      "bytes": 3339,
+      "sha256": "e145fb596c63b6186fd980f58bda4792c1e1d1afc6fea08f7af539e209963ba4"
+    },
+    "assets/ui/runtime/splash_mansoory.svg": {
+      "bytes": 3339,
+      "sha256": "21f7a703b8686fe5b074dcbe37fcc536c90b9a5e8c3319cf83ae30173bf6a1fc"
+    },
+    "assets/ui/runtime/splash_zanabal.svg": {
+      "bytes": 3338,
+      "sha256": "5632bb56c0f219a39267d79a059c66a3f55f26be47b996d407574291be5ab468"
+    },
+    "scenes/loading_screen.tscn": {
+      "bytes": 276,
+      "sha256": "9a25293a2958058977057b050fa7f2f660acffcace42dbabfe5e88fa06989cb5"
+    },
+    "scenes/pause_menu.tscn": {
+      "bytes": 268,
+      "sha256": "fd0297d297aa8549893c141ab45df8567156ede94ce16ebac4091d89eefee5a1"
+    },
+    "scenes/presentation_flow_test.tscn": {
+      "bytes": 185,
+      "sha256": "3989768599fb626d351152248af0ce2fe09431abc24f118c7594708002b9a872"
+    },
+    "scenes/presentation_visual_evidence.tscn": {
+      "bytes": 197,
+      "sha256": "eb7888c6ccf8434810c472395f4c4f6ef5068e3f03e23e1aa7667dbfc8cbdc1a"
+    },
+    "scenes/settings_panel.tscn": {
+      "bytes": 181,
+      "sha256": "50a311be5f9c792d32bbd2becf8cc2ea48cf8a59f57a39ac9c0653ca6df8d535"
+    },
+    "scripts/character_select.gd": {
+      "bytes": 3234,
+      "sha256": "b5d430cde3656a9b0732afb325cd5e1fbc08cd66ca34628622dfec422a95f9a3"
+    },
+    "scripts/loading_screen.gd": {
+      "bytes": 3850,
+      "sha256": "9a376966a7e1f92831df9a3e306dabd0f550cb383d62e2127dad51c75953d6ac"
+    },
+    "scripts/main_menu.gd": {
+      "bytes": 3971,
+      "sha256": "f3a1615aeed952343e1005e2d1a333dcc99ff558f278a3564cc7af541d9cec2d"
+    },
+    "scripts/pause_menu.gd": {
+      "bytes": 2330,
+      "sha256": "97d66472627a743b318e55db01725652bc52b132551a57f6342d3c66e4d481d9"
+    },
+    "scripts/settings_panel.gd": {
+      "bytes": 2106,
+      "sha256": "6b995fdb9874d30f65d5c475e2b78825f682c21f572aa28caf6d3f30b1faf4e4"
+    },
+    "scripts/splash_screen.gd": {
+      "bytes": 3510,
+      "sha256": "a658f92ee8907bfa28045bf40d872512baa517b6feaf58d4bc2e94c718da35a6"
+    },
+    "scripts/ui_theme.gd": {
+      "bytes": 2610,
+      "sha256": "d1b60c57893e3db15ef14738b663540ec8e474c787d3042077d34c518c615794"
+    },
+    "tests/presentation_flow_test.gd": {
+      "bytes": 2272,
+      "sha256": "9f983023892b83666807ff4f883532f518edcdb402fc7280c70f4b4d8b270e06"
+    },
+    "tests/presentation_visual_evidence.gd": {
+      "bytes": 2781,
+      "sha256": "c89d2f7b6ff25cf3290f78ddf51b4b34eeacdcd420c6f85a33dedcc13ac4b0af"
+    }
+  },
+  "runtime_assets": {
+    "assets/ui/runtime/character_select_background.svg": {
+      "bytes": 3338,
+      "sha256": "06156d4cc94ddbc1ab69bbb9343c9351b12b20048c6399c64ce9c9a20b2cb0d2"
+    },
+    "assets/ui/runtime/loading_background.svg": {
+      "bytes": 3338,
+      "sha256": "64e773e612ead4acc687bed17acb6dabdad40aff8552ea8814d8a1b6e49b26b6"
+    },
+    "assets/ui/runtime/main_menu_background.svg": {
+      "bytes": 3338,
+      "sha256": "220e5b028f1a45459c19544bfa36c4846d0a01a49a62b9624db14dead2f4c54c"
+    },
+    "assets/ui/runtime/pause_background.svg": {
+      "bytes": 3339,
+      "sha256": "e145fb596c63b6186fd980f58bda4792c1e1d1afc6fea08f7af539e209963ba4"
+    },
+    "assets/ui/runtime/splash_mansoory.svg": {
+      "bytes": 3339,
+      "sha256": "21f7a703b8686fe5b074dcbe37fcc536c90b9a5e8c3319cf83ae30173bf6a1fc"
+    },
+    "assets/ui/runtime/splash_zanabal.svg": {
+      "bytes": 3338,
+      "sha256": "5632bb56c0f219a39267d79a059c66a3f55f26be47b996d407574291be5ab468"
+    }
+  },
+  "deleted_files": [
+    "assets/splash_screen.png",
+    "assets/splash_screen.png.import"
+  ]
+}
