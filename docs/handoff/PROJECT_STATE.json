@@ -1,0 +1,46 @@
+{
+  "project": "Bahrain Brick",
+  "engine": "Godot 4.3",
+  "classification": "historical v1.4 fallback QA; not v15 authority",
+  "frozen_controls": {
+    "commit": "c5548465627942a2889a0bd09f8979c3a29fbcdd",
+    "regression": "28 passed, 0 failed",
+    "integrity_before": "25 checks, 0 failures",
+    "integrity_after": "25 checks, 0 failures"
+  },
+  "graphics": {
+    "branch": "work/bahrain-brick-graphics-integration-v14",
+    "source_commit": "464a8811a818bd6bb9e102566e0a525396b11515",
+    "workflow_run": 29211024651,
+    "workflow_job": 86698628299,
+    "presentation_acceptance": "10 passed, 0 failed",
+    "startup_sequence": [
+      "Zanabal Gaming",
+      "Mansoory Games",
+      "Bahrain Brick main menu"
+    ]
+  },
+  "apk": {
+    "filename": "bahrain_brick_v14.0.3-graphics-qa.apk",
+    "bytes": 191128589,
+    "sha256": "753f9fe86a18da880886a6a6a501067aa3348dcbc8853e8f8a20e216e219ad4d",
+    "package": "com.bahrainbrick.game.qa",
+    "version_name": "1.4.0.3-graphics-qa",
+    "version_code": 1403,
+    "orientation": "sensorLandscape",
+    "direct_download_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-qa.apk",
+    "release_url": "https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/tag/v1.4.0.3-graphics-qa",
+    "release_workflow_run": 29212510806
+  },
+  "v15_authority": {
+    "branch": "audit/v15.0.1-authority",
+    "commit": "796b112802c83ce78f8233e9a215e97c39ca028e",
+    "tree": "26bb58714fa7066c1fd887cd33456553f3739462",
+    "status": "exact bytes unavailable"
+  },
+  "physical_android": {
+    "tested": false,
+    "status": "required before verified playable release"
+  },
+  "release_decision": "BUILD CREATED — RUNTIME VERIFICATION BLOCKED"
+}
