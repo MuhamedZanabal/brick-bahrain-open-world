@@ -7,6 +7,7 @@ on:
     paths:
       - "tools/verify_v15_authority.py"
       - "tools/audit_source_tree.py"
+      - "tools/generate_asset_license_ledger.py"
       - "tools/v15_authority_manifest.json"
       - "tools/tests/**"
       - "docs/audit/**"
@@ -15,6 +16,7 @@ on:
     paths:
       - "tools/verify_v15_authority.py"
       - "tools/audit_source_tree.py"
+      - "tools/generate_asset_license_ledger.py"
       - "tools/v15_authority_manifest.json"
       - "tools/tests/**"
       - "docs/audit/**"
@@ -38,7 +40,7 @@ jobs:
           python-version: "3.13"
 
       - name: Validate Python syntax
-        run: python -m compileall -q tools/verify_v15_authority.py tools/audit_source_tree.py tools/tests
+        run: python -m compileall -q tools/verify_v15_authority.py tools/audit_source_tree.py tools/generate_asset_license_ledger.py tools/tests
 
       - name: Validate authority manifest JSON
         run: python -m json.tool tools/v15_authority_manifest.json >/dev/null
@@ -58,4 +60,21 @@ jobs:
         with:
           name: source-tree-preaudit
           path: reports/source_tree_audit.*
+          if-no-files-found: error
+
+      - name: Generate asset license ledger
+        run: |
+          python tools/generate_asset_license_ledger.py . \
+            --csv-out reports/ASSET_LICENSE_LEDGER.csv \
+            --notices-out reports/THIRD_PARTY_NOTICES.md \
+            --summary-out reports/asset_license_summary.json
+
+      - name: Upload asset license ledger
+        uses: actions/upload-artifact@v4
+        with:
+          name: asset-license-ledger
+          path: |
+            reports/ASSET_LICENSE_LEDGER.csv
+            reports/THIRD_PARTY_NOTICES.md
+            reports/asset_license_summary.json
           if-no-files-found: error
