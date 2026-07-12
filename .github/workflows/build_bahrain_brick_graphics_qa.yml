@@ -3,6 +3,8 @@ name: Build Bahrain Brick Graphics QA
 on:
   push:
     branches: [work/bahrain-brick-graphics-integration-v14]
+  pull_request:
+    branches: [work/bahrain-brick-controls-branding-v14]
   workflow_dispatch:
 
 permissions:
