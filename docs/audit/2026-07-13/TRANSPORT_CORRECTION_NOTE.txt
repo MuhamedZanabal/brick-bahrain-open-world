@@ -1,0 +1,1 @@
+Premium visual v3 validation run 29229708067 failed only because transport chunk files 17-21 were absent. Gameplay source was not reached. Artifact-based patch transport is being substituted; no protected control files are modified.
