@@ -66,7 +66,11 @@ def apply(root: Path) -> dict:
     root = root.resolve()
     normalization_state = _normalize_final_guard_for_checksum_pinned_base(root)
     report = _base_apply(root)
-    post_report = _post.apply(root)
+    full_project_npc_scan_contract = (root / "scenes/world.tscn").is_file()
+    post_report = _post.apply(
+        root,
+        require_npc_scans=full_project_npc_scan_contract,
+    )
 
     world_path = root / _post.WORLD_PATH
     lifecycle_test_path = root / _post.LIFECYCLE_TEST_PATH
@@ -105,6 +109,7 @@ def apply(root: Path) -> dict:
     ]
     report["post_lifecycle_teardown_guard"] = post_report
     report["post_lifecycle_base_normalization"] = normalization_state
+    report["full_project_npc_scan_contract"] = full_project_npc_scan_contract
     report.setdefault("diagnostic_sources", {})[_post.WORLD_PATH] = world_path.read_text(
         encoding="utf-8"
     )
