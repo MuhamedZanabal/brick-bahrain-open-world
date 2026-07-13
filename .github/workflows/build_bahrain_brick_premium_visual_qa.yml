@@ -1,0 +1,152 @@
+name: Build Bahrain Brick Premium Visual QA
+
+on:
+  push:
+    branches: [work/bahrain-brick-premium-visual-v14]
+  pull_request:
+    branches: [baseline/bahrain-brick-v14.0.3-functional-graphics]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+      SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+      APK_NAME: bahrain_brick_v14.0.4-premium-visual-qa.apk
+      PACKAGE_NAME: com.bahrainbrick.game.qa
+    steps:
+      - name: Check out premium visual branch
+        uses: actions/checkout@v4
+
+      - name: Install build and evidence dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3 python3-pil openjdk-17-jdk-headless unzip zip curl ca-certificates coreutils \
+            xvfb ffmpeg libgl1-mesa-dri libglx-mesa0 libx11-6 libxcursor1 \
+            libxinerama1 libxi6 libxrandr2 libxrender1
+          update-alternatives --set java "$JAVA_HOME/bin/java"
+          update-alternatives --set javac "$JAVA_HOME/bin/javac"
+          python3 -m py_compile tools/apply_bahrain_brick_premium_world_overlay.py tools/verify_frozen_controls.py
+
+      - name: Recover checksum-locked integrated v1.4.0.3 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloads baseline/v14 recovery/v14
+          curl -fL --retry 4 --retry-delay 3 "$SOURCE_URL" -o downloads/source.zip
+          echo "$SOURCE_SHA256  downloads/source.zip" | sha256sum -c -
+          unzip -q downloads/source.zip -d baseline/v14
+          unzip -q downloads/source.zip -d recovery/v14
+          test -f baseline/v14/project.godot
+          test -f recovery/v14/project.godot
+
+      - name: Capture matched baseline gameplay-world views
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p baseline/v14/build/premium_visual_evidence/before baseline/v14/build/logs
+          python3 tools/apply_bahrain_brick_premium_world_overlay.py baseline/v14 --evidence-only \
+            --report baseline/v14/build/premium_visual_evidence/BASELINE_EVIDENCE_HARNESS_REPORT.json
+          godot --headless --path baseline/v14 --editor --quit \
+            2>&1 | tee baseline/v14/build/logs/godot-import-before.log
+          set -o pipefail
+          timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" \
+            godot --path baseline/v14 --audio-driver Dummy \
+            --display-driver x11 --rendering-method gl_compatibility \
+            res://scenes/premium_world_visual_evidence.tscn -- \
+            --output=res://build/premium_visual_evidence/before \
+            2>&1 | tee baseline/v14/build/logs/world-evidence-before.log
+          status="${PIPESTATUS[0]}"; set +o pipefail
+          test "$status" -eq 0
+          grep -q 'PREMIUM WORLD VISUAL EVIDENCE COMPLETE' baseline/v14/build/logs/world-evidence-before.log
+
+      - name: Apply premium gameplay-world overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovery/v14/build/reports recovery/v14/build/logs
+          python3 tools/apply_bahrain_brick_premium_world_overlay.py recovery/v14 \
+            --report recovery/v14/build/reports/PREMIUM_WORLD_OVERLAY_REPORT.json \
+            2>&1 | tee recovery/v14/build/logs/premium-world-overlay.log
+          python3 tools/verify_frozen_controls.py recovery/v14 \
+            --json-out recovery/v14/build/reports/FROZEN_CONTROLS_PRE_TEST.json \
+            --markdown-out recovery/v14/build/reports/FROZEN_CONTROLS_PRE_TEST.md
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          path=Path('recovery/v14/export_presets.cfg')
+          text=path.read_text(encoding='utf-8')
+          text,n1=re.subn(r'(?m)^version/code=.*$', 'version/code=1404', text)
+          text,n2=re.subn(r'(?m)^version/name=.*$', 'version/name="1.4.0.4-premium-visual-qa"', text)
+          if (n1,n2)!=(1,1): raise SystemExit(f'version replacement failure {(n1,n2)}')
+          path.write_text(text,encoding='utf-8')
+          PY
+
+      - name: Import premium source and run acceptance suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovery/v14/build/ci/test-user-data/{smoke,controls,presentation,premium}
+          set -o pipefail
+          godot --headless --path recovery/v14 --editor --quit --verbose \
+            2>&1 | tee recovery/v14/build/logs/godot-import-premium.log
+          status="${PIPESTATUS[0]}"; set +o pipefail
+          test "$status" -eq 0
+          if grep -E 'SCRIPT ERROR:|ERROR: Failed to load script|Failed to create an autoload' recovery/v14/build/logs/godot-import-premium.log; then exit 1; fi
+
+          set -o pipefail
+          env XDG_DATA_HOME="$PWD/recovery/v14/build/ci/test-user-data/smoke" \
+            timeout 700 godot --headless --path recovery/v14 --audio-driver Dummy \
+            res://build/ci/runtime_smoke_runner_v14.tscn \
+            2>&1 | tee recovery/v14/build/logs/runtime-smoke-premium.log
+          status="${PIPESTATUS[0]}"; set +o pipefail
+          test "$status" -eq 0
+          grep -q ', 0 failed' recovery/v14/build/logs/runtime-smoke-premium.log
+
+          set -o pipefail
+          env XDG_DATA_HOME="$PWD/recovery/v14/build/ci/test-user-data/controls" \
+            timeout 700 godot --headless --path recovery/v14 --audio-driver Dummy \
+            res://scenes/mobile_input_pipeline_test.tscn \
+            2>&1 | tee recovery/v14/build/logs/mobile-input-regression-premium.log
+          status="${PIPESTATUS[0]}"; set +o pipefail
+          test "$status" -eq 0
+          grep -q '28 passed, 0 failed' recovery/v14/build/logs/mobile-input-regression-premium.log
+
+          set -o pipefail
+          env XDG_DATA_HOME="$PWD/recovery/v14/build/ci/test-user-data/presentation" \
+            timeout 700 godot --headless --path recovery/v14 --audio-driver Dummy \
+            res://scenes/presentation_flow_test.tscn -- --presentation-test \
+            2>&1 | tee recovery/v14/build/logs/presentation-flow-premium.log
+          status="${PIPESTATUS[0]}"; set +o pipefail
+          test "$status" -eq 0
+          grep -q '10 passed, 0 failed' recovery/v14/build/logs/presentation-flow-premium.log
+
+          set -o pipefail
+          env XDG_DATA_HOME="$PWD/recovery/v14/build/ci/test-user-data/premium" \
+            timeout 500 godot --headless --path recovery/v14 --audio-driver Dummy \
+            res://scenes/premium_world_acceptance_test.tscn \
+            2>&1 | tee recovery/v14/build/logs/premium-world-acceptance.log
+          status="${PIPESTATUS[0]}"; set +o pipefail
+          test "$status" -eq 0
+          grep -q '12 passed, 0 failed' recovery/v14/build/logs/premium-world-acceptance.log
+
+      - name: Capture upgraded world and presentation evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p recovery/v14/build/premium_visual_evidence/after \
+                   recovery/v14/build/visual_evidence/startup_frames \
+                   recovery/v14/build/visual²È="25ĞôÈ¤¬q¸œ¤(€€€€€€€€€ÁÉ¥¹Ğ¡©Í½¸¹‘ÕµÁÌ¡É•Á½ÉĞ±¥¹‘•¹ĞôÈ¤¤(€€€€€€€€€Ad((€€€€€€´¹…µ”èI•¡•¬™É½é•¸½¹ÑÉ½±Ì…™Ñ•ÈÉÕ¹Ñ¥µ”Ñ•ÍÑÌ(€€€€€€€Í¡•±°è‰…Í (€€€€€€€ÉÕ¸èğ(€€€€€€€€€Í•Ğ€µ•Õ¼Á¥Á•™…¥°(€€€€€€€€€ÁåÑ¡½¸ÌÑ½½±Ì½Ù•É¥™å}™É½é•¹}½¹ÑÉ½±Ì¹ÁäÉ•½Ù•Éä½ØÄĞp(€€€€€€€€€€€€´µ©Í½¸µ½ÕĞÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½É•Á½ÉÑÌ½I=i9}=9QI=1M}A=MQ}QMP¹©Í½¸p(€€€€€€€€€€€€´µµ…É­‘½İ¸µ½ÕĞÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½É•Á½ÉÑÌ½I=i9}=9QI=1M}A=MQ}QMP¹µ((€€€€€€´¹…µ”èáÁ½ÉĞ…¹¥¹ÍÁ•Ğ¹‘É½¥EA,(€€€€€€€Í¡•±°è‰…Í (€€€€€€€ÉÕ¸èğ(€€€€€€€€€Í•Ğ€µ•Õ¼Á¥Á•™…¥°(€€€€€€€€€-eMQ=I}%Hôˆ‘íIU99I}Q5@è´½ÑµÁô½‰…¡É…¥¸µ‰É¥¬µÁÉ•µ¥Õ´µÅ„ˆìµ­‘¥È€µÀ€ˆ‘-eMQ=I}%Hˆ(€€€€€€€€€-eMQ=I}AQ ôˆ‘-eMQ=I}%H½‘•‰Õœ¹­•åÍÑ½É”ˆìÉ´€µ˜€ˆ‘-eMQ=I}AQ ˆ(€€€€€€€€€­•åÑ½½°€µ•¹­•åÁ…¥È€µ¹½ÁÉ½µÁĞ€µ­•åÍÑ½É”€ˆ‘-eMQ=I}AQ ˆ€µÍÑ½É•Á…ÍÌ…¹‘É½¥p(€€€€€€€€€€€€µ…±¥…Ì…¹‘É½¥‘‘•‰Õ­•ä€µ­•åÁ…ÍÌ…¹‘É½¥€µ­•å…±œIM€µ­•åÍ¥é”€ÈÀĞà€µÙ…±¥‘¥Ñä€ÄÀÀÀÀp(€€€€€€€€€€€€µ‘¹…µ”€‰8õ	…¡É…¥¸	É¥¬AÉ•µ¥Õ´Y¥ÍÕ…°E±<õi…¹…‰…°…µ¥¹œ±õ	 ˆ(€€€€€€€€€ÁåÑ¡½¸Ì€´€ˆ‘-eMQ=I}AQ ˆ€ğğAdœ(€€€€€€€€€™É½´Á…Ñ¡±¥ˆ¥µÁ½ÉĞA…Ñ (€€€€€€€€€¥µÁ½ÉĞÉ”±ÍåÌ(€€€€€€€€€ÀõA…Ñ  É•½Ù•Éä½ØÄĞ½•áÁ½ÉÑ}ÁÉ•Í•ÑÌ¹™œœ¤ìĞõÀ¹É•…‘}Ñ•áĞ ¤ì­•äõA…Ñ ¡ÍåÌ¹…ÉÙlÅt¤¹É•Í½±Ù” ¤¹…Í}Á½Í¥à ¤(€€€€€€€€€Ğ±¸õÉ”¹ÍÕ‰¸¡Èœ ı´¥y­•åÍÑ½É”½‘•‰Õœô¸¨œ±˜­•åÍÑ½É”½‘•‰Õœô‰í­•åôˆœ±Ğ¤(€€€€€€€€€¥˜¸„ôÄèÉ…¥Í”MåÍÑ•µá¥Ğ¡˜­•åÍÑ½É”É•Á±…•µ•¹Ğ½Õ¹Ğõí¹ôœ¤(€€€€€€€€€À¹İÉ¥Ñ•}Ñ•áĞ¡Ğ¤(€€€€€€€€€Ad(€€€€€€€€€½‘½Ğ€´µ¡•…‘±•ÍÌ€´µÁ…Ñ É•½Ù•Éä½ØÄĞ€´µÙ•É‰½Í”€´µ•áÁ½ÉĞµ‘•‰Õœ¹‘É½¥€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆp(€€€€€€€€€€€€Èø˜ÄğÑ•”É•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½…¹‘É½¥µ•áÁ½ÉĞµÁÉ•µ¥Õ´¹±½œ(€€€€€€€€€Ñ•ÍĞ€µÌ€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆ(€€€€€€€€€M-}I==Pôˆ‘í9I=%}M-}I==Pè´‘í9I=%}!=5èµõôˆ(€€€€€€€€€¥˜l€µè€ˆ‘M-}I==PˆtìÑ¡•¸AQ}9%Qôˆ¡™¥¹€½½ÁĞ€½É½½Ğ€½ÕÍÈ½±½…°€½ÕÍÈ½±¥ˆ€µÑåÁ”˜€µÁ…Ñ €œ¨½‰Õ¥±µÑ½½±Ì¼¨½……ÁĞœ€Èø½‘•Ø½¹Õ±°ğÍ½ÉĞ€µXğÑ…¥°€´Ä¤ˆìM-}I==Pôˆ‘íAQ}9%Q””½‰Õ¥±µÑ½½±Ì¼©ôˆì™¤(€€€€€€€€€AQ}	%8ôˆ¡½µµ…¹€µØ……ÁĞñğ™¥¹€ˆ‘M-}I==Pˆ€µÑåÁ”˜€µ¹…µ”……ÁĞğÍ½ÉĞ€µXğÑ…¥°€´Ä¤ˆ(€€€€€€€€€A-M%9I}	%8ôˆ¡½µµ…¹€µØ…Á­Í¥¹•Èñğ™¥¹€ˆ‘M-}I==Pˆ€µÑåÁ”˜€µ¹…µ”…Á­Í¥¹•ÈğÍ½ÉĞ€µXğÑ…¥°€´Ä¤ˆ(€€€€€€€€€i%A1%9}	%8ôˆ¡½µµ…¹€µØé¥Á…±¥¸ñğ™¥¹€ˆ‘M-}I==Pˆ€µÑåÁ”˜€µ¹…µ”é¥Á…±¥¸ğÍ½ÉĞ€µXğÑ…¥°€´Ä¤ˆ(€€€€€€€€€Õ¹é¥À€µĞ€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆ€øÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½…Á¬µé¥Àµ¥¹Ñ•É¥ÑäµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€Í¡„ÈÔÙÍÕ´€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆğÑ•”€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95¹Í¡„ÈÔØˆ(€€€€€€€€€€ˆ‘AQ}	%8ˆ‘ÕµÀ‰…‘¥¹œ€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆğÑ•”É•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½……ÁĞµ‰…‘¥¹œµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€É•À€µÄ€‰Á…­…”è¹…µ”ôœ‘A-}95œÙ•ÉÍ¥½¹½‘”ôœÄĞÀĞœÙ•ÉÍ¥½¹9…µ”ôœÄ¸Ğ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÅ„œˆÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½……ÁĞµ‰…‘¥¹œµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€É•À€µÄ€‰…ÁÁ±¥…Ñ¥½¸µ±…‰•°è	…¡É…¥¸	É¥¬œˆÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½……ÁĞµ‰…‘¥¹œµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€€„É•À€µÄ€…¹‘É½¥¹Á•Éµ¥ÍÍ¥½¸¹I=I}U%<œÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½……ÁĞµ‰…‘¥¹œµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€€ˆ‘AQ}	%8ˆ‘ÕµÀáµ±ÑÉ•”€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆ¹‘É½¥‘5…¹¥™•ÍĞ¹áµ°ğÑ•”É•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½……ÁĞµµ…¹¥™•ÍĞµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€É•À€µÄ€…¹‘É½¥éÍÉ••¹=É¥•¹Ñ…Ñ¥½¸¸¨ Áá‰ğôÄÄ¤œÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½……ÁĞµµ…¹¥™•ÍĞµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€€ˆ‘A-M%9I}	%8ˆÙ•É¥™ä€´µÙ•É‰½Í”€´µÁÉ¥¹Ğµ•ÉÑÌ€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆğÑ•”É•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½…Á­Í¥¹•ÈµÁÉ•µ¥Õ´¹ÑáĞ(€€€€€€€€€€ˆ‘i%A1%9}	%8ˆ€µŒ€µØ€Ğ€‰É•½Ù•Éä½ØÄĞ½‰Õ¥±¼‘A-}95ˆ€øÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì½é¥Á…±¥¸µÁÉ•µ¥Õ´¹ÑáĞ((€€€€€€´¹…µ”èA…­…”Í½ÕÉ”°İ½É­ÍÁ…”…¹•á…Ğµ…¹¥™•ÍÑÌ(€€€€€€€Í¡•±°è‰…Í (€€€€€€€ÉÕ¸èğ(€€€€€€€€€Í•Ğ€µ•Õ¼Á¥Á•™…¥°(€€€€€€€€€ÁåÑ¡½¸Ì€´€ğğAdœ(€€€€€€€€€™É½´Á…Ñ¡±¥ˆ¥µÁ½ÉĞA…Ñ (€€€€€€€€€¥µÁ½ÉĞ¡…Í¡±¥ˆ±©Í½¸±É”±é¥Á™¥±”(€€€€€€€€€É½½ĞõA…Ñ  É•½Ù•Éä½ØÄĞœ¤ì‰Õ¥±õÉ½½Ğ¼‰Õ¥±œì…Á¬õ‰Õ¥±¼‰…¡É…¥¹}‰É¥­}ØÄĞ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÅ„¹…Á¬œ(€€€€€€€€€•áÁ½ÉĞõÉ½½Ğ¼•áÁ½ÉÑ}ÁÉ•Í•ÑÌ¹™œœìÑ•áĞõ•áÁ½ÉĞ¹É•…‘}Ñ•áĞ ¤ìÑ•áĞõÉ”¹ÍÕˆ¡Èœ ı´¥y­•åÍÑ½É”½‘•‰Õœô¸¨œ°­•åÍÑ½É”½‘•‰Õœôˆˆœ±Ñ•áĞ¤ì•áÁ½ÉĞ¹İÉ¥Ñ•}Ñ•áĞ¡Ñ•áĞ¤(€€€€€€€€€‘•˜é¥Á}ÑÉ•”¡½ÕĞ°¥¹±Õ‘•}‰Õ¥±õ…±Í”¤è(€€€€€€€€€€€€€İ¥Ñ é¥Á™¥±”¹i¥Á¥±”¡½ÕĞ°Üœ±é¥Á™¥±”¹i%A}1Q±½µÁÉ•ÍÍ±•Ù•°ôä¤…Ìèè(€€€€€€€€€€€€€€€€€™½ÈÀ¥¸Í½ÉÑ•¡É½½Ğ¹É±½ˆ œ¨œ¤¤è(€€€€€€€€€€€€€€€€€€€€€É•°õÀ¹É•±…Ñ¥Ù•}Ñ¼¡É½½Ğ¤(€€€€€€€€€€€€€€€€€€€€€¥˜¹½ĞÀ¹¥Í}™¥±” ¤½È€œ¹½‘½Ğœ¥¸É•°¹Á…ÉÑÌ½È€œ¹¥Ğœ¥¸É•°¹Á…ÉÑÌè½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€€€¥˜¹½Ğ¥¹±Õ‘•}‰Õ¥±…¹É•°¹Á…ÉÑÍlèÅtôô ‰Õ¥±œ°¤è½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€€€¥˜À¹¹…µ”ôô‘•‰Õœ¹­•åÍÑ½É”œè½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€€€è¹İÉ¥Ñ”¡À±É•°¹…Í}Á½Í¥à ¤¤(€€€€€€€€€Í½ÕÉ”õ‰Õ¥±¼‰…¡É…¥¹}‰É¥­}ØÄĞ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÍ½ÕÉ”¹é¥Àœìé¥Á}ÑÉ•”¡Í½ÕÉ”±…±Í”¤(€€€€€€€€€İ½É­ÍÁ…”õ‰Õ¥±¼‰…¡É…¥¹}‰É¥­}ØÄĞ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µİ½É­ÍÁ…”¹é¥Àœ(€€€€€€€€€İ¥Ñ é¥Á™¥±”¹i¥Á¥±”¡İ½É­ÍÁ…”°Üœ±é¥Á™¥±”¹i%A}1Q±½µÁÉ•ÍÍ±•Ù•°ôä¤…Ìèè(€€€€€€€€€€€€€è¹İÉ¥Ñ”¡Í½ÕÉ”±Í½ÕÉ”¹¹…µ”¤ìè¹İÉ¥Ñ”¡…Á¬±…Á¬¹¹…µ”¤(€€€€€€€€€€€€€™½È™½±‘•È¥¸lÉ•Á½ÉÑÌœ°±½Ìœ°ÁÉ•µ¥Õµ}Ù¥ÍÕ…±}•Ù¥‘•¹”œ°Ù¥ÍÕ…±}•Ù¥‘•¹”tè(€€€€€€€€€€€€€€€€€™½ÈÀ¥¸Í½ÉÑ• ¡‰Õ¥±½™½±‘•È¤¹É±½ˆ œ¨œ¤¤è(€€€€€€€€€€€€€€€€€€€€€¥˜À¹¥Í}™¥±” ¤èè¹İÉ¥Ñ”¡À±˜í™½±‘•Éô½íÀ¹É•±…Ñ¥Ù•}Ñ¼¡‰Õ¥±½™½±‘•È¤¹…Í}Á½Í¥à ¥ôœ¤(€€€€€€€€€‘•˜Í¡„¡À¤èÉ•ÑÕÉ¸¡…Í¡±¥ˆ¹Í¡„ÈÔØ¡À¹É•…‘}‰åÑ•Ì ¤¤¹¡•á‘¥•ÍĞ ¤(€€€€€€€€€™½ÈÀ¥¸m…Á¬±Í½ÕÉ”±İ½É­ÍÁ…•tèÀ¹İ¥Ñ¡}ÍÕ™™¥à¡À¹ÍÕ™™¥à¬œ¹Í¡„ÈÔØœ¤¹İÉ¥Ñ•}Ñ•áĞ¡˜íÍ¡„¡À¥ô€íÀ¹¹…µ•õq¸œ¤(€€€€€€€€€É•Á½ÉĞõì(€€€€€€€€€€€€•Ù¥‘•¹•}±…ÍÌœèYI%%Á…­…”¥¹ÍÁ•Ñ¥½¸…¹¡½ÍÑ•ÉÕ¹Ñ¥µ”œ°(€€€€€€€€€€€€±…ÍÍ¥™¥…Ñ¥½¸œè¡¥ÍÑ½É¥…°ØÄ¸ĞÁÉ•µ¥Õ´µİ½É±Eì¹½ĞØÄÔ…ÕÑ¡½É¥Ñäœ°(€€€€€€€€€€€€Á…­…”œè½´¹‰…¡É…¥¹‰É¥¬¹…µ”¹Å„œ°Ù•ÉÍ¥½¹}¹…µ”œèœÄ¸Ğ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÅ„œ°Ù•ÉÍ¥½¹}½‘”œèÄĞÀĞ°(€€€€€€€€€€€€½É¥•¹Ñ…Ñ¥½¸œèÍ•¹Í½É1…¹‘Í…Á”œ°…ÁÁ}±…‰•°œè	…¡É…¥¸	É¥¬œ°(€€€€€€€€€€€€…Á¬œé…Á¬¹¹…µ”°…Á­}‰åÑ•Ìœé…Á¬¹ÍÑ…Ğ ¤¹ÍÑ}Í¥é”°…Á­}Í¡„ÈÔØœéÍ¡„¡…Á¬¤°(€€€€€€€€€€€€‰…Í•±¥¹•}…Á­}‰åÑ•ÌœèÄäÄÄÈàÔàä°‰…Í•±¥¹•}…Á­}Í¡„ÈÔØœèœÜÔÍ˜å™”àÙ„Äá‘„ààÀààÙ„Ù„Ù„ÔÀÄÀØİ…„ÌÌĞá‘‰ŒààÔÍ”á˜á„ÈÁ”ÈÄÙ”ÈÄå…Ñœ°(€€€€€€€€€€€€…Á­}Í¥é•}‘•±Ñ…}‰åÑ•Ìœé…Á¬¹ÍÑ…Ğ ¤¹ÍÑ}Í¥é”´ÄäÄÄÈàÔàä°(€€€€€€€€€€€€Í½ÕÉ•}é¥ÀœéÍ½ÕÉ”¹¹…µ”°Í½ÕÉ•}Í¡„ÈÔØœéÍ¡„¡Í½ÕÉ”¤°(€€€€€€€€€€€€İ½É­ÍÁ…•}é¥Àœéİ½É­ÍÁ…”¹¹…µ”°İ½É­ÍÁ…•}Í¡„ÈÔØœéÍ¡„¡İ½É­ÍÁ…”¤°(€€€€€€€€€€€€½¹ÑÉ½±}É•É•ÍÍ¥½¸œèœÈàÁ…ÍÍ•°€À™…¥±•œ°ÁÉ•Í•¹Ñ…Ñ¥½¹}É•É•ÍÍ¥½¸œèœÄÀÁ…ÍÍ•°€À™…¥±•œ°(€€€€€€€€€€€€ÁÉ•µ¥Õµ}İ½É±‘}…•ÁÑ…¹”œèœÄÈÁ…ÍÍ•°€À™…¥±•œ°Á¡åÍ¥…±}…¹‘É½¥‘}Ñ•ÍÑ•œé…±Í”°(€€€€€€€€€€€€Í¥¹¥¹œœè•Á¡•µ•É…°E•ÉÑ¥™¥…Ñ”ì¹½ĞÁÉ½‘ÕÑ¥½¸œ°(€€€€€€€€€ô(€€€€€€€€€€¡‰Õ¥±¼É•Á½ÉÑÌœ¼AI5%U5}Y%MU1}	U%1}AI=Y99¹©Í½¸œ¤¹İÉ¥Ñ•}Ñ•áĞ¡©Í½¸¹‘ÕµÁÌ¡É•Á½ÉĞ±¥¹‘•¹ĞôÈ¤¬q¸œ¤(€€€€€€€€€ÁÉ¥¹Ğ¡©Í½¸¹‘ÕµÁÌ¡É•Á½ÉĞ±¥¹‘•¹ĞôÈ¤¤(€€€€€€€€€Ad(€€€€€€€€€Í¡„ÈÔÙÍÕ´É•½Ù•Éä½ØÄĞ½‰Õ¥±½Ù¥ÍÕ…±}•Ù¥‘•¹”¼¨¹µÀĞp(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½Ù¥ÍÕ…±}•Ù¥‘•¹”½ÍÉ••¹Í¡½ÑÌ¼¨¹Á¹œp(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½ÁÉ•µ¥Õµ}Ù¥ÍÕ…±}•Ù¥‘•¹”½½µÁ…É¥Í½¹Ì¼¨¹Á¹œp(€€€€€€€€€€€€øÉ•½Ù•Éä½ØÄĞ½‰Õ¥±½É•Á½ÉÑÌ½Y%9}!-MU5L¹Í¡„ÈÔØ((€€€€€€´¹…µ”èUÁ±½…A,°Í½ÕÉ”°İ½É­ÍÁ…”°•Ù¥‘•¹”…¹É•Á½ÉÑÌ(€€€€€€€¥˜è…±İ…åÌ ¤(€€€€€€€ÕÍ•Ìè…Ñ¥½¹Ì½ÕÁ±½…µ…ÉÑ¥™…ÑØĞ(€€€€€€€İ¥Ñ è(€€€€€€€€€¹…µ”è‰…¡É…¥¸µ‰É¥¬µÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÅ„(€€€€€€€€€É•Ñ•¹Ñ¥½¸µ‘…åÌè€ÌÀ(€€€€€€€€€¥˜µ¹¼µ™¥±•Ìµ™½Õ¹èİ…É¸(€€€€€€€€€Á…Ñ èğ(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½‰…¡É…¥¹}‰É¥­}ØÄĞ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÅ„¹…Á¬¨(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½‰…¡É…¥¹}‰É¥­}ØÄĞ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µÍ½ÕÉ”¹é¥À¨(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½‰…¡É…¥¹}‰É¥­}ØÄĞ¸À¸ĞµÁÉ•µ¥Õ´µÙ¥ÍÕ…°µİ½É­ÍÁ…”¹é¥À¨(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½±½Ì¼¨¨(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½É•Á½ÉÑÌ¼¨¨(€€€€€€€€€€€‰…Í•±¥¹”½ØÄĞ½‰Õ¥±½±½Ì¼¨¨(€€€€€€€€€€€‰…Í•±¥¹”½ØÄĞ½‰Õ¥±½ÁÉ•µ¥Õµ}Ù¥ÍÕ…±}•Ù¥‘•¹”¼¨¨(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½ÁÉ•µ¥Õµ}Ù¥ÍÕ…±}•Ù¥‘•¹”¼¨¨(€€€€€€€€€€€É•½Ù•Éä½ØÄĞ½‰Õ¥±½Ù¥ÍÕ…±}•Ù¥‘•¹”¼¨¨(

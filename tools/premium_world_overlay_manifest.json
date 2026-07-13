@@ -1,0 +1,16 @@
+{
+  "payload_zip_sha256": "6f5f13df926a7813f7b6d9720147f592b7870d8bf078c11e7797f541b1f29351",
+  "payload_zip_bytes": 24289,
+  "files": [
+    {"path":"scenes/premium_world_acceptance_test.tscn","bytes":202,"sha256":"a3d71d01e42dd71516786553baf8b9b80d87cd2ec2830c402dbb75b7e676ed02"},
+    {"path":"scenes/premium_world_visual_evidence.tscn","bytes":202,"sha256":"1e2a30325a33220ed506e13828280b626a45afb009869040b0bb22036fa4cec4"},
+    {"path":"scripts/day_night_cycle.gd","bytes":8038,"sha256":"ec48ed8a233e9972186da27129d24da8af6120345c89fde999e3a7e3176644f3"},
+    {"path":"scripts/hero_district_builder.gd","bytes":37285,"sha256":"da1c15ea89d9abccbbaa8de0c4eb47b45a9316dc4c694cb57a9b166b8dc4494e"},
+    {"path":"scripts/premium_world_materials.gd","bytes":8263,"sha256":"9e8e5c8e61d299008024116240d00054c0d9e70dc2db65e0b1b0afb793cf41d3"},
+    {"path":"scripts/quality_manager.gd","bytes":5978,"sha256":"b575d6ae8b9b10740d3e986e7dcc4812b0957ffe55fd47a3285379f7a7ae8b7d"},
+    {"path":"scripts/weather_system.gd","bytes":6250,"sha256":"7a036f0b0a662e60ad2cb9c7095b1cb0a45d5fb593ee35bc7425a0ca5bbac652"},
+    {"path":"shaders/mobile_waterfront.gdshader","bytes":2396,"sha256":"32e37d0d99daf3cf4b8cdd352db961d5969d8cef05bd3cbb6b38d70cea6af75a"},
+    {"path":"tests/premium_world_acceptance_test.gd","bytes":2236,"sha256":"72c3b0044893d1edd8af002d0e5e53539893d89bff2da373bee94874715a4df9"},
+    {"path":"tests/premium_world_visual_evidence.gd","bytes":7530,"sha256":"2b9b4df537dace8fbd8c696d96a85e8a312212c312d556abba577cf4b2ddf866"}
+  ]
+}
