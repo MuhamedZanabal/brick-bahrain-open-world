@@ -7,6 +7,8 @@ import hashlib
 import gzip
 import io
 import json
+import os
+import shutil
 import subprocess
 import tempfile
 import zipfile
@@ -208,9 +210,26 @@ def apply_v3_patch(project: Path, patch: bytes, expected_files: dict[str, str]) 
     return sorted(expected_files)
 
 
+def _ensure_svg_renderer() -> str:
+    renderer = shutil.which("rsvg-convert")
+    if renderer:
+        return renderer
+    if os.geteuid() != 0:
+        raise SystemExit("rsvg-convert missing and runner lacks permission to install librsvg2-bin")
+    subprocess.run(["apt-get", "update"], check=True)
+    subprocess.run(
+        ["apt-get", "install", "-y", "--no-install-recommends", "librsvg2-bin"],
+        check=True,
+    )
+    renderer = shutil.which("rsvg-convert")
+    if not renderer:
+        raise SystemExit("librsvg2-bin installation completed but rsvg-convert is still unavailable")
+    return renderer
+
+
 def render_svg(source: Path, target: Path, width: int, height: int | None = None) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
-    command = ["rsvg-convert", "-w", str(width)]
+    command = [_ensure_svg_renderer(), "-w", str(width)]
     if height is not None:
         command += ["-h", str(height)]
     command += ["-o", str(target), str(source)]
