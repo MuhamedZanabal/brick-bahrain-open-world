@@ -32,6 +32,14 @@ PAYLOAD_CHUNKS = [
     "part10.b64",
     "part11_13.b64",
 ]
+POST_EXTRACT_REPLACEMENTS = {
+    "scripts/hero_district_builder.gd": [
+        (
+            "\t\tvar material := _materials[\"curb_red\"] if index % 2 == 0 else _materials[\"curb_white\"]",
+            "\t\tvar material: Material = _materials[\"curb_red\"] if index % 2 == 0 else _materials[\"curb_white\"]",
+        ),
+    ],
+}
 EVIDENCE_ONLY = {
     "tests/premium_world_visual_evidence.gd",
     "scenes/premium_world_visual_evidence.tscn",
@@ -97,6 +105,21 @@ def main() -> int:
             target.write_bytes(archive.read(relative))
             changed.append(relative)
 
+    post_extract_patches: list[str] = []
+    if not args.evidence_only:
+        for relative, replacements in POST_EXTRACT_REPLACEMENTS.items():
+            target = project / relative
+            text = target.read_text(encoding="utf-8")
+            for old, new in replacements:
+                count = text.count(old)
+                if count != 1:
+                    raise SystemExit(
+                        f"post-extract replacement count mismatch for {relative}: {count}"
+                    )
+                text = text.replace(old, new)
+            target.write_text(text, encoding="utf-8")
+            post_extract_patches.append(relative)
+
     after = {relative: sha256_file(project / relative) for relative in FROZEN}
     mismatches = [relative for relative in FROZEN if before[relative] != after[relative]]
     if mismatches:
@@ -110,6 +133,7 @@ def main() -> int:
         "payload_chunks": PAYLOAD_CHUNKS,
         "evidence_only": args.evidence_only,
         "overlay_files": changed,
+        "post_extract_patches": post_extract_patches,
         "frozen_controls_unchanged": True,
         "frozen_control_hashes": after,
     }
