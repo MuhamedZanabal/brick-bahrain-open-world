@@ -70,13 +70,22 @@ def apply(root: Path) -> dict:
 
     world_path = root / _post.WORLD_PATH
     lifecycle_test_path = root / _post.LIFECYCLE_TEST_PATH
+    npc_path = root / _post.NPC_PATH
     world_sha = hashlib.sha256(world_path.read_bytes()).hexdigest()
     lifecycle_test_sha = hashlib.sha256(lifecycle_test_path.read_bytes()).hexdigest()
+    npc_sha = hashlib.sha256(npc_path.read_bytes()).hexdigest()
 
     world_result = next(
         item for item in report["corrections"] if item["path"] == _post.WORLD_PATH
     )
     world_result["after_sha256"] = world_sha
+
+    npc_result = next(
+        item for item in report["corrections"] if item["path"] == _post.NPC_PATH
+    )
+    npc_result["after_sha256"] = npc_sha
+    npc_result["states"].extend(post_report["changes"][2]["states"])
+    npc_result["reasons"].extend(post_report["changes"][2]["reasons"])
 
     lifecycle_resource = next(
         item
@@ -102,6 +111,7 @@ def apply(root: Path) -> dict:
     report["diagnostic_sources"][_post.LIFECYCLE_TEST_PATH] = lifecycle_test_path.read_text(
         encoding="utf-8"
     )
+    report["diagnostic_sources"][_post.NPC_PATH] = npc_path.read_text(encoding="utf-8")
     return report
 
 
