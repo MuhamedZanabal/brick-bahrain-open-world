@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-EXPECTED_SOURCE_SHA256="14bcab8635da5033422cd2c13b5d193cbdd7c89877f6eb36bac8f5c78d0aae2c"
+EXPECTED_SOURCE_SHA256="5dd092d7c971ae6afc42cdf499ba3f88a367edf3da17a8f52614f9b73a5f94b8"
 PART_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/premium_validation_v18_run_parts"
 TMP="$(mktemp -t bahrain-brick-premium-validation-v18.XXXXXX.sh)"
 trap 'rm -f "$TMP"' EXIT
