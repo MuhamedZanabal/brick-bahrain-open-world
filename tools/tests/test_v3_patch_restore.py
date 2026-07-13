@@ -16,4 +16,13 @@ class PatchRestorationTests(unittest.TestCase):
   patch=b'diff --git a/a.txt b/a.txt\nnew file mode 100644\n--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+one\n'
   with tempfile.TemporaryDirectory() as tmp:
    with self.assertRaises(RuntimeError): mod.restore_missing_new_files(Path(tmp),patch,{'a.txt':'0'*64},{'a.txt'})
+ def test_isolated_apply_stays_inside_nested_project(self):
+  patch=b'diff --git a/project.godot b/project.godot\n--- a/project.godot\n+++ b/project.godot\n@@ -1 +1 @@\n-old\n+new\n'
+  with tempfile.TemporaryDirectory() as tmp:
+   repo=Path(tmp); __import__('subprocess').run(['git','init','-q'],cwd=repo,check=True)
+   nested=repo/'recovery/v14'; nested.mkdir(parents=True); (nested/'project.godot').write_text('old\n')
+   (repo/'project.godot').write_text('root\n')
+   mod.apply_patch_isolated(nested,patch)
+   self.assertEqual((nested/'project.godot').read_text(),'new\n')
+   self.assertEqual((repo/'project.godot').read_text(),'root\n')
 if __name__=='__main__': unittest.main()
