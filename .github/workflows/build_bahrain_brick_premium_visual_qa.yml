@@ -10,12 +10,135 @@ permissions:
   contents: read
 
 jobs:
-  validation-configuration-guard:
+  build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+      SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+      APK_NAME: bahrain_brick_v14.0.4-premium-visual-qa.apk
+      PACKAGE_NAME: com.bahrainbrick.game.qa
     steps:
-      - name: Fail until the complete corrected validation workflow is committed
+      - name: Check out exact validation head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Record exact repository provenance
         shell: bash
         run: |
-          echo "Validation workflow configuration is being replaced atomically on the premium branch." >&2
-          echo "Do not dispatch this intermediate revision." >&2
-          exit 1
+          set -euo pipefail
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          EVENT_HEAD="${{ github.event.pull_request.head.sha }}"
+          AUTHORITY_SHA="${{ github.event.pull_request.base.sha }}"
+          if [ -n "$EVENT_HEAD" ] && [ "$ACTUAL_HEAD" != "$EVENT_HEAD" ]; then
+            echo "checkout mismatch: expected $EVENT_HEAD, got $ACTUAL_HEAD" >&2
+            exit 1
+          fi
+          if [ -z "$AUTHORITY_SHA" ]; then AUTHORITY_SHA="$ACTUAL_HEAD"; fi
+          {
+            echo "VALIDATION_HEAD_SHA=$ACTUAL_HEAD"
+            echo "PREMIUM_AUTHORITY_SHA=$AUTHORITY_SHA"
+          } >> "$GITHUB_ENV"
+          printf 'validation_head=%s\npremium_authority=%s\n' "$ACTUAL_HEAD" "$AUTHORITY_SHA"
+
+      - name: Install deterministic build dependencies and validate gate tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3 python3-pil openjdk-17-jdk-headless unzip zip curl ca-certificates coreutils \
+            git file binutils xvfb ffmpeg libgl1-mesa-dri libglx-mesa0 libx11-6 libxcursor1 \
+            libxinerama1 libxi6 libxrandr2 libxrender1
+          update-alternatives --set java "$JAVA_HOME/bin/java"
+          update-alternatives --set javac "$JAVA_HOME/bin/javac"
+          python3 -m py_compile \
+            tools/apply_bahrain_brick_premium_world_overlay.py \
+            tools/verify_frozen_controls.py \
+            tools/apply_premium_validation_corrections.py \
+            tools/scan_godot_runtime_errors.py \
+            tools/package_premium_validation_artifacts.py
+          python3 -m unittest \
+            tools/tests/test_scan_godot_runtime_errors.py \
+            tools/tests/test_apply_premium_validation_corrections.py
+          bash -n tools/install_godot_43_templates.sh
+          bash -n tools/run_premium_validation_ci.sh
+
+      - name: Recover and verify checksum-locked functional source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p downloads baseline/v14 recovery/v14
+          curl -fL --retry 4 --retry-delay 3 --connect-timeout 30 "$SOURCE_URL" -o downloads/source.zip
+          test -s downloads/source.zip
+          echo "$SOURCE_SHA256  downloads/source.zip" | sha256sum -c -
+          unzip -t downloads/source.zip > source-archive-integrity.txt
+          unzip -q downloads/source.zip -d baseline/v14
+          unzip -q downloads/source.zip -d recovery/v14
+          test -f baseline/v14/project.godot
+          test -f recovery/v14/project.godot
+
+      - name: Run complete premium validation, Android export and packaging
+        shell: bash
+        run: bash tools/run_premium_validation_ci.sh recovery/v14 baseline/v14
+
+      - name: Upload final APK and binary verification
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-apk
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-qa.apk*
+            recovery/v14/build/reports/APK_METADATA_REPORT.json
+            recovery/v14/build/reports/GODOT_EXPORT_TEMPLATE_REPORT.json
+            recovery/v14/build/logs/aapt-*.txt
+            recovery/v14/build/logs/apksigner-premium.txt
+            recovery/v14/build/logs/zipalign-premium.txt
+            recovery/v14/build/logs/apk-zip-integrity-premium.txt
+
+      - name: Upload integrated source and artwork packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-source-artwork
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-source.zip*
+            recovery/v14/build/bahrain_brick_v14.0.4-runtime-artwork.zip*
+            recovery/v14/build/bahrain_brick_v14.0.4-source-artwork.zip*
+            recovery/v14/build/bahrain_brick_v14.0.4-logo-icon-package.zip*
+
+      - name: Upload workspace, logs, evidence and reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-workspace-evidence
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-workspace.zip*
+            recovery/v14/build/reports/**
+            recovery/v14/build/logs/**
+            recovery/v14/build/premium_visual_evidence/**
+            recovery/v14/build/visual_evidence/**
+
+      - name: Preserve failed-run diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-failed-run-diagnostics
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            source-archive-integrity.txt
+            recovery/v14/build/reports/**
+            recovery/v14/build/logs/**
+            recovery/v14/build/premium_visual_evidence/**
+            recovery/v14/build/visual_evidence/**
