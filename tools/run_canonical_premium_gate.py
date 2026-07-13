@@ -34,10 +34,14 @@ def load_blocks(workflow: Path) -> list[str]:
     return blocks
 
 
-def replace_exactly_once(text: str, old: str, new: str, label: str) -> str:
+def replace_expected(
+    text: str, old: str, new: str, label: str, expected_count: int = 1
+) -> str:
     count = text.count(old)
-    if count != 1:
-        raise SystemExit(f"{label} replacement mismatch: expected 1, found {count}")
+    if count != expected_count:
+        raise SystemExit(
+            f"{label} replacement mismatch: expected {expected_count}, found {count}"
+        )
     return text.replace(old, new)
 
 
@@ -53,17 +57,21 @@ def prepare_release_smoke_harness(project: Path) -> None:
         raise SystemExit(f"release smoke source missing: {source}")
 
     text = source.read_text(encoding="utf-8")
-    text = replace_exactly_once(text, "extends SceneTree", "extends Node", "base type")
-    text = replace_exactly_once(
+    text = replace_expected(text, "extends SceneTree", "extends Node", "base type")
+    text = replace_expected(
         text, "func _initialize() -> void:", "func _ready() -> void:", "entry point"
     )
-    text = replace_exactly_once(
-        text, "\t\tawait process_frame", "\t\tawait get_tree().process_frame", "frame wait"
+    text = replace_expected(
+        text,
+        "\t\tawait process_frame",
+        "\t\tawait get_tree().process_frame",
+        "frame wait",
+        expected_count=2,
     )
-    text = replace_exactly_once(
+    text = replace_expected(
         text, "\troot.add_child(world)", "\tget_tree().root.add_child(world)", "world parent"
     )
-    text = replace_exactly_once(
+    text = replace_expected(
         text,
         "\tquit(1 if _failed > 0 else 0)",
         "\tget_tree().quit(1 if _failed > 0 else 0)",
