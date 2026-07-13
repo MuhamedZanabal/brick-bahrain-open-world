@@ -20,9 +20,28 @@ CORRECTIONS = {
         'remove obsolete reversed product title from the in-world loading overlay',
     )],
 }
+RUNTIME_TEXT_ROOTS = ('scripts', 'scenes', 'assets', 'artwork')
+RUNTIME_TEXT_FILES = ('project.godot', 'export_presets.cfg')
+STALE_TITLES = ('Brick Bahrain', 'BRICK BAHRAIN')
+
 
 def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def runtime_text_paths(root: Path):
+    for relative in RUNTIME_TEXT_FILES:
+        path = root / relative
+        if path.is_file():
+            yield path
+    for folder in RUNTIME_TEXT_ROOTS:
+        base = root / folder
+        if not base.is_dir():
+            continue
+        for path in base.rglob('*'):
+            if path.is_file() and not any(part in {'.godot', 'build'} for part in path.relative_to(root).parts):
+                yield path
+
 
 def apply(root: Path) -> dict:
     results=[]
@@ -31,15 +50,22 @@ def apply(root: Path) -> dict:
         if not path.is_file():
             raise RuntimeError(f'correction target missing: {relative}')
         before=path.read_bytes(); text=before.decode('utf-8')
-        reasons=[]
+        reasons=[]; states=[]
         for old,new,reason in replacements:
-            count=text.count(old)
-            if count != 1:
-                raise RuntimeError(f'correction count mismatch for {relative}: expected 1, found {count}')
-            text=text.replace(old,new); reasons.append(reason)
+            old_count=text.count(old); new_count=text.count(new)
+            if old_count == 1 and new_count == 0:
+                text=text.replace(old,new); states.append('applied')
+            elif old_count == 0 and new_count == 1:
+                states.append('already_satisfied')
+            else:
+                raise RuntimeError(
+                    f'correction state mismatch for {relative}: '
+                    f'old_count={old_count}, new_count={new_count}'
+                )
+            reasons.append(reason)
         path.write_text(text,encoding='utf-8')
         after=path.read_bytes()
-        results.append({'path':relative,'before_sha256':sha(before),'after_sha256':sha(after),'reasons':reasons})
+        results.append({'path':relative,'before_sha256':sha(before),'after_sha256':sha(after),'states':states,'reasons':reasons})
     export=root/'export_presets.cfg'
     text=export.read_text(encoding='utf-8')
     text,n1=re.subn(r'(?m)^version/code=.*$', 'version/code=1404', text)
@@ -47,21 +73,27 @@ def apply(root: Path) -> dict:
     if (n1,n2)!=(1,1):
         raise RuntimeError(f'export version replacement failure: {(n1,n2)}')
     export.write_text(text,encoding='utf-8')
-    stale=[]
-    for path in root.rglob('*'):
-        if not path.is_file() or any(p in {'.git','.godot','build'} for p in path.relative_to(root).parts):
-            continue
+    stale=[]; scanned=[]
+    for path in runtime_text_paths(root):
+        relative=path.relative_to(root).as_posix(); scanned.append(relative)
         try: body=path.read_text(encoding='utf-8')
         except (UnicodeDecodeError,OSError): continue
-        for token in ('Brick Bahrain','BRICK BAHRAIN'):
-            if token in body: stale.append({'path':path.relative_to(root).as_posix(),'token':token})
+        for token in STALE_TITLES:
+            if token in body: stale.append({'path':relative,'token':token})
     if stale:
-        raise RuntimeError(f'obsolete title occurrences remain: {stale}')
-    return {'conclusion':'pass','corrections':results,'obsolete_title_occurrences':stale}
+        raise RuntimeError(f'obsolete runtime title occurrences remain: {stale}')
+    return {'conclusion':'pass','corrections':results,'runtime_text_files_scanned':sorted(set(scanned)),'obsolete_runtime_title_occurrences':stale}
+
 
 def main() -> int:
     p=argparse.ArgumentParser(); p.add_argument('root',type=Path); p.add_argument('--report',type=Path,required=True)
-    a=p.parse_args(); report=apply(a.root.resolve())
+    a=p.parse_args()
+    try:
+        report=apply(a.root.resolve())
+    except Exception as error:
+        a.report.parent.mkdir(parents=True,exist_ok=True)
+        a.report.write_text(json.dumps({'conclusion':'fail','error':str(error)},indent=2)+'\n',encoding='utf-8')
+        raise
     a.report.parent.mkdir(parents=True,exist_ok=True); a.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report,indent=2)); return 0
 
