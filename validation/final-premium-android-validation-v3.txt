@@ -1,0 +1,3 @@
+Validation-only trigger for corrected premium authority 4a8d378673243c83f98d07067d93a9ecf33edf4a.
+The mounted workspace is explicitly registered as a Git safe directory before provenance inspection.
+Do not merge this validation marker.
