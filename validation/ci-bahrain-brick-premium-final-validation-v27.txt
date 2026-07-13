@@ -1,0 +1,4 @@
+Validation-only marker for premium authority d7988f2d179f99f8169705eb7b42acd262cbb6e2.
+Protected world teardown SHA-256 must remain fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc.
+Premium world visual evidence must release vehicle state, player, evidence camera, and world through normal SceneTree frames before process quit.
+Do not merge this validation branch.
