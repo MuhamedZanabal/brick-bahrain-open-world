@@ -1,3 +1,8 @@
+t,n=re.subn(r'(?m)^keystore/debug=.*$',f'keystore/debug="{key}"',t)
+if n!=1: raise SystemExit(f'keystore replacement count={n}')
+p.write_text(t)
+PY
+run_godot android-export-premium godot --headless --path "$ROOT" --verbose --export-debug Android "$ROOT/build/$APK_NAME"
 test -s "$ROOT/build/$APK_NAME"
 SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [[ -z "$SDK_ROOT" ]]; then C="$(find /opt /root /usr/local /usr/lib -type f -path '*/build-tools/*/aapt' 2>/dev/null | sort -V | tail -1)"; SDK_ROOT="${C%%/build-tools/*}"; fi
