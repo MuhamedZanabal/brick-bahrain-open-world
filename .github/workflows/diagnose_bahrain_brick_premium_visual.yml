@@ -3,6 +3,8 @@ name: Diagnose Bahrain Brick Premium Visual
 on:
   push:
     branches: [work/bahrain-brick-premium-visual-v14]
+  pull_request:
+    branches: [baseline/bahrain-brick-v14.0.3-functional-graphics]
   workflow_dispatch:
 
 permissions:
