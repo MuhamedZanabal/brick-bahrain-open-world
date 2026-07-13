@@ -1,0 +1,33 @@
+
+    def test_test_source_may_name_obsolete_title_for_negative_assertion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            tests = root / 'tests'
+            tests.mkdir()
+            (tests / 'premium_test.gd').write_text(
+                'assert(not body.contains("BRICK BAHRAIN"))\n'
+            )
+            report = mod.apply(root)
+            self.assertEqual(report['obsolete_runtime_title_occurrences'], [])
+
+    def test_runtime_stale_title_still_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            (root / 'scripts/other.gd').write_text('var title="Brick Bahrain"\n')
+            with self.assertRaisesRegex(RuntimeError, 'obsolete runtime title'):
+                mod.apply(root)
+
+    def test_missing_world_ready_anchor_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            path = root / 'scripts/world.gd'
+            path.write_text(path.read_text().replace('\t_show_loading_screen()\n', ''))
+            with self.assertRaisesRegex(RuntimeError, 'ready-hook mismatch'):
+                mod.apply(root)
+
+
+if __name__ == '__main__':
+    unittest.main()
