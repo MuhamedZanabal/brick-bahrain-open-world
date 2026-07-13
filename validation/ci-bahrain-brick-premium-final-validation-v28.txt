@@ -1,0 +1,4 @@
+Validation-only marker for premium authority e48340b3bf594f957fe8e6e0b3bbeec3ba226377.
+Protected world teardown SHA-256 must remain fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc.
+Complete source diagnostics must remain in RUNTIME_DEFECT_CORRECTIONS.json while stdout is restricted to scanner-safe hashes, states, paths, and counts.
+Do not merge this validation branch.
