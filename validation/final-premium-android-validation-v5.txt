@@ -1,0 +1,3 @@
+Validation-only trigger for corrected premium authority 3da832d4abfda2a162675466a8c741a7ce9d8800.
+The v3 patch is now applied inside an isolated recovered-project boundary; parent checkout files cannot be targeted.
+Do not merge this validation marker.
