@@ -4,7 +4,7 @@ MODULE=Path(__file__).resolve().parents[1]/'apply_premium_validation_corrections
 spec=importlib.util.spec_from_file_location('corrections',MODULE); mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 
 class CorrectionTests(unittest.TestCase):
-    def fixture(self,root:Path,npc_variant:str='with_default',save_condition:str='if player:'):
+    def fixture(self,root:Path,npc_variant:str='with_default',save_condition:str='if player:',save_shape:str='direct'):
         (root/'scripts').mkdir()
         variants={
             'with_default':'\t\t_anim_player = _model.get_meta("anim_player", null)\n',
@@ -13,9 +13,25 @@ class CorrectionTests(unittest.TestCase):
             'recovered_variable':'\t\t_animation_player = _model.get_meta("anim_player", null) as AnimationPlayer\n',
         }
         (root/'scripts/npc_pedestrian.gd').write_text(variants[npc_variant])
-        (root/'scripts/save_manager.gd').write_text(
-            '\t%s\n\t\tsave_data["player"]["position"] = {\n' % save_condition
-        )
+        if save_shape == 'direct':
+            save_source=(
+                '\t%s\n' % save_condition
+                + '\t\tsave_data["player"]["position"] = {\n'
+                + '\t\t\t"x": player.global_position.x,\n'
+                + '\t\t\t"y": player.global_position.y,\n'
+                + '\t\t\t"z": player.global_position.z,\n'
+                + '\t\t}\n'
+            )
+        elif save_shape == 'staged':
+            save_source=(
+                '\tvar position: Vector3 = Vector3.ZERO\n'
+                + '\t%s\n' % save_condition
+                + '\t\tposition = player.global_position\n'
+                + '\tsave_data["player"]["position"] = _vector_to_dict(position)\n'
+            )
+        else:
+            raise AssertionError(save_shape)
+        (root/'scripts/save_manager.gd').write_text(save_source)
         (root/'scripts/world.gd').write_text('\ttitle.text = "BRICK BAHRAIN"\n')
         (root/'export_presets.cfg').write_text('version/code=1\nversion/name="old"\n')
         (root/'project.godot').write_text('[application]\nconfig/name="Bahrain Brick"\n')
@@ -51,14 +67,21 @@ class CorrectionTests(unittest.TestCase):
             self.assertIn('has_meta("anim_player")',body)
             self.assertIn('as AnimationPlayer',body)
             self.assertNotIn('\n\t\t_anim_player =',body)
-    def test_adds_tree_guard_to_semantic_player_condition(self):
+    def test_adds_tree_guard_to_direct_position_access(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); self.fixture(root,save_condition='if is_instance_valid(player):'); mod.apply(root)
             body=(root/'scripts/save_manager.gd').read_text()
             self.assertIn('if is_instance_valid(player) and player.is_inside_tree():',body)
+    def test_adds_tree_guard_to_recovered_staged_position_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); self.fixture(root,save_condition='if is_instance_valid(player):',save_shape='staged'); mod.apply(root)
+            body=(root/'scripts/save_manager.gd').read_text()
+            self.assertIn('if is_instance_valid(player) and player.is_inside_tree():',body)
+            self.assertIn('position = player.global_position',body)
+            self.assertIn('_vector_to_dict(position)',body)
     def test_save_guard_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); self.fixture(root,save_condition='if player and player.is_inside_tree():'); report=mod.apply(root)
+            root=Path(tmp); self.fixture(root,save_condition='if player and player.is_inside_tree():',save_shape='staged'); report=mod.apply(root)
             save_result=next(item for item in report['corrections'] if item['path']=='scripts/save_manager.gd')
             self.assertEqual(save_result['states'],['already_satisfied'])
     def test_is_idempotent_when_corrections_are_already_satisfied(self):
