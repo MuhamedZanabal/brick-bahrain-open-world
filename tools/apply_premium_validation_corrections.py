@@ -4,14 +4,6 @@ import argparse, hashlib, json, re
 from pathlib import Path
 
 CORRECTIONS = {
-    'scripts/npc_pedestrian.gd': [(
-        (
-            '\t\t_anim_player = _model.get_meta("anim_player", null)',
-            '\t\t_anim_player = _model.get_meta("anim_player")',
-        ),
-        '\t\t_anim_player = _model.get_meta("anim_player") if _model.has_meta("anim_player") else null',
-        'avoid get_meta runtime errors when imported NPC models have no AnimationPlayer metadata',
-    )],
     'scripts/save_manager.gd': [((
         '\tif player:\n\t\tsave_data["player"]["position"] = {',
     ),
@@ -30,6 +22,19 @@ RUNTIME_TEXT_FILES = ('project.godot', 'export_presets.cfg')
 STALE_TITLES = ('Brick Bahrain', 'BRICK BAHRAIN')
 NPC_SCENE_RELATIVE = 'scenes/npc_pedestrian.tscn'
 NPC_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://scripts/npc_pedestrian.gd" id="1_npc"]\n\n[node name="NPCPedestrian" type="CharacterBody3D"]\nscript = ExtResource("1_npc")\n'''
+NPC_UNSAFE_PATTERN = re.compile(
+    r'(?m)^(?P<indent>[ \t]*)_anim_player\s*=\s*'
+    r'_model\.get_meta\(\s*&?["\']anim_player["\']'
+    r'(?:\s*,\s*null)?\s*\)(?:\s+as\s+AnimationPlayer)?\s*$'
+)
+NPC_SAFE_PATTERN = re.compile(
+    r'(?m)^[ \t]*_anim_player\s*=.*_model\.get_meta\(.*anim_player.*\)'
+    r'.*_model\.has_meta\(\s*&?["\']anim_player["\']\s*\).*else\s+null\s*$'
+)
+NPC_SAFE_TEMPLATE = (
+    '{indent}_anim_player = (_model.get_meta("anim_player") as AnimationPlayer) '
+    'if _model.has_meta("anim_player") else null'
+)
 
 
 def sha(data: bytes) -> str:
@@ -71,6 +76,25 @@ def replace_variant(text: str, old_variants: tuple[str, ...], new: str, label: s
     )
 
 
+def correct_npc_anim_player(text: str) -> tuple[str, str]:
+    unsafe = list(NPC_UNSAFE_PATTERN.finditer(text))
+    safe = list(NPC_SAFE_PATTERN.finditer(text))
+    if len(unsafe) == 1 and len(safe) == 0:
+        match = unsafe[0]
+        replacement = NPC_SAFE_TEMPLATE.format(indent=match.group('indent'))
+        return NPC_UNSAFE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
+    if len(unsafe) == 0 and len(safe) == 1:
+        return text, 'already_satisfied'
+    candidates = [
+        line.strip() for line in text.splitlines()
+        if 'anim_player' in line or ('get_meta' in line and '_model' in line)
+    ]
+    raise RuntimeError(
+        'NPC anim_player correction state mismatch: '
+        f'unsafe_count={len(unsafe)}, safe_count={len(safe)}, candidates={candidates}'
+    )
+
+
 def ensure_npc_scene(root: Path) -> dict:
     path = root / NPC_SCENE_RELATIVE
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -94,6 +118,19 @@ def ensure_npc_scene(root: Path) -> dict:
 
 def apply(root: Path) -> dict:
     results=[]
+    npc_path=root/'scripts/npc_pedestrian.gd'
+    if not npc_path.is_file():
+        raise RuntimeError('correction target missing: scripts/npc_pedestrian.gd')
+    npc_before=npc_path.read_bytes(); npc_text=npc_before.decode('utf-8')
+    npc_text,npc_state=correct_npc_anim_player(npc_text)
+    npc_path.write_text(npc_text,encoding='utf-8'); npc_after=npc_path.read_bytes()
+    results.append({
+        'path':'scripts/npc_pedestrian.gd',
+        'before_sha256':sha(npc_before),
+        'after_sha256':sha(npc_after),
+        'states':[npc_state],
+        'reasons':['avoid get_meta runtime errors when imported NPC models have no AnimationPlayer metadata'],
+    })
     for relative, replacements in CORRECTIONS.items():
         path=root/relative
         if not path.is_file():
