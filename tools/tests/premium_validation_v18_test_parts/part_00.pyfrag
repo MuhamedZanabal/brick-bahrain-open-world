@@ -48,7 +48,8 @@ class CorrectionTests(unittest.TestCase):
         (root / 'scripts/save_manager.gd').write_text(save_source)
         (root / 'scripts/world.gd').write_text(
             'extends Node3D\n\n'
-            + 'var player\n\n'
+            + 'var player\n'
+            + 'var _world_ready := false\n\n'
             + 'func _ready() -> void:\n'
             + '\tGameManager.current_state = GameManager.GameState.LOADING\n'
             + '\t_show_loading_screen()\n'
@@ -63,8 +64,5 @@ class CorrectionTests(unittest.TestCase):
             + '\tTouchInput.reset_all()\n'
             + '\tfor lock_name in ["phone", "shop", "chat"]:\n'
             + '\t\tGameManager.release_ui_lock(lock_name)\n\n\n'
-            + 'func _show_loading_screen() -> void:\n'
-            + '\t\tvar title := Label.new()\n'
-            + '\t\ttitle.text = "BRICK BAHRAIN"\n'
-        )
-        (root / 'scripts/npc_manager.gd').write_text(
+            + 'func _process(delta: float) -> void:\n'
+            + '\tif not _world_ready:\n'
