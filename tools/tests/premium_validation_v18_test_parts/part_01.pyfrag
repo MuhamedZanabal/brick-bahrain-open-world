@@ -4,7 +4,22 @@
             + '\t\ttitle.text = "BRICK BAHRAIN"\n'
         )
         (root / 'scripts/npc_manager.gd').write_text(
-            'const NPC_SCENE = preload("res://scenes/npc_pedestrian.tscn")\n'
+            'extends Node3D\n'
+            + 'const NPC_SCENE = preload("res://scenes/npc_pedestrian.tscn")\n'
+            + 'var _player: Node3D\n'
+            + 'var pedestrians: Array[Node] = []\n\n\n'
+            + 'func _refresh_lod() -> void:\n'
+            + '\tif not is_instance_valid(_player):\n'
+            + '\t\t_player = get_tree().get_first_node_in_group("player") as Node3D\n'
+            + '\tif not _player:\n'
+            + '\t\treturn\n'
+            + '\tvar ranked: Array[Dictionary] = []\n'
+            + '\tfor index in range(pedestrians.size()):\n'
+            + '\t\tvar pedestrian := pedestrians[index]\n'
+            + '\t\tif is_instance_valid(pedestrian):\n'
+            + '\t\t\tranked.append({"index": index, "distance": _player.global_position.distance_to(pedestrian.global_position)})\n\n\n'
+            + 'func get_npc_count() -> int:\n'
+            + '\treturn pedestrians.size()\n'
         )
         (root / 'export_presets.cfg').write_text(
             'version/code=1\nversion/name="old"\n'
@@ -33,6 +48,9 @@
             report = mod.apply(root)
             self.assertEqual(report['conclusion'], 'pass')
             self.assertIn('has_meta("anim_player")', (root / 'scripts/npc_pedestrian.gd').read_text())
+            npc_manager = (root / 'scripts/npc_manager.gd').read_text()
+            self.assertIn('not _player.is_inside_tree()', npc_manager)
+            self.assertIn('pedestrian.is_inside_tree()', npc_manager)
             self.assertIn('is_inside_tree()', (root / 'scripts/save_manager.gd').read_text())
             world = (root / 'scripts/world.gd').read_text()
             self.assertIn('Bahrain Brick', world)
