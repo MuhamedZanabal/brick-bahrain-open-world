@@ -218,6 +218,74 @@ def apply(root: Path) -> dict:
     return report
 
 
+def compact_stdout_summary(report: dict) -> dict:
+    """Return a scanner-safe summary; complete source diagnostics stay in the JSON report."""
+    corrections = []
+    for item in report.get("corrections", []):
+        corrections.append(
+            {
+                "path": item.get("path"),
+                "states": item.get("states", []),
+                "before_sha256": item.get("before_sha256"),
+                "after_sha256": item.get("after_sha256"),
+            }
+        )
+
+    generated_resources = []
+    for item in report.get("generated_validation_resources", []):
+        generated_resources.append(
+            {
+                "path": item.get("path"),
+                "state": item.get("state"),
+                "post_correction_state": item.get("post_correction_state"),
+                "sha256": item.get("sha256"),
+                "size_bytes": item.get("size_bytes"),
+            }
+        )
+
+    evidence = report.get("visual_evidence_shutdown_fix", {})
+    inventory = report.get("transform_access_inventory", {})
+    post = report.get("post_lifecycle_teardown_guard", {})
+    return {
+        "conclusion": report.get("conclusion"),
+        "protected_world_exit_actual_sha256": report.get(
+            "protected_world_exit_actual_sha256"
+        ),
+        "protected_world_exit_unchanged": report.get(
+            "protected_world_exit_unchanged"
+        ),
+        "post_lifecycle_base_normalization": report.get(
+            "post_lifecycle_base_normalization"
+        ),
+        "full_project_contract": report.get("full_project_contract"),
+        "corrections": corrections,
+        "generated_validation_resources": generated_resources,
+        "post_lifecycle_teardown_guard": {
+            "conclusion": post.get("conclusion"),
+            "protected_world_exit_unchanged": post.get(
+                "protected_world_exit_unchanged"
+            ),
+            "change_paths": [item.get("path") for item in post.get("changes", [])],
+        },
+        "visual_evidence_shutdown_fix": {
+            "conclusion": evidence.get("conclusion"),
+            "path": evidence.get("path"),
+            "state": evidence.get("state"),
+            "required": evidence.get("required"),
+            "before_sha256": evidence.get("before_sha256"),
+            "after_sha256": evidence.get("after_sha256"),
+            "size_bytes": evidence.get("size_bytes"),
+        },
+        "transform_access_inventory": {
+            "entry_count": inventory.get("entry_count", 0),
+            "file_count": inventory.get("file_count", 0),
+            "teardown_source_file_count": len(
+                inventory.get("teardown_source_snapshots", {})
+            ),
+        },
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
@@ -242,7 +310,7 @@ def main() -> int:
         raise
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(report, indent=2))
+    print(json.dumps(compact_stdout_summary(report), indent=2))
     return 0
 
 
