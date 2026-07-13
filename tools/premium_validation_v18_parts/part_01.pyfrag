@@ -1,0 +1,110 @@
+    r'(?m)^[ \t]*(?:_animation_player|_anim_player)\s*=.*_model\.get_meta\(.*anim_player.*\)'
+    r'.*_model\.has_meta\(\s*&?["\']anim_player["\']\s*\).*else\s+null\s*$'
+)
+NPC_SAFE_TEMPLATE = (
+    '{indent}{variable} = (_model.get_meta("anim_player") as AnimationPlayer) '
+    'if _model.has_meta("anim_player") else null'
+)
+SAVE_CONDITION_PATTERN = re.compile(r'^(?P<indent>[ \t]*)if\s+(?P<condition>.+):\s*$')
+SAVE_TREE_GUARD_PATTERN = re.compile(r'\bplayer\.is_inside_tree\s*\(\s*\)')
+PLAYER_GLOBAL_POSITION_PATTERN = re.compile(r'\bplayer\.global_position\b')
+
+WORLD_TITLE_PATTERN = re.compile(
+    r'(?m)^(?P<indent>[ \t]*)title\.text\s*=\s*"(?P<title>BRICK BAHRAIN|Bahrain Brick)"\s*$'
+)
+WORLD_READY_ANCHOR = '\t_show_loading_screen()\n\tcall_deferred("_load_step_environment")'
+WORLD_READY_PATCHED = '\t_show_loading_screen()\n\t_install_world_lifecycle_guard()\n\tcall_deferred("_load_step_environment")'
+WORLD_LIFECYCLE_BLOCK = '''func _install_world_lifecycle_guard() -> void:\n\tif not child_exiting_tree.is_connected(_on_world_child_exiting_tree):\n\t\tchild_exiting_tree.connect(_on_world_child_exiting_tree)\n\n\nfunc _on_world_child_exiting_tree(node: Node) -> void:\n\tif node != player or not node is Node3D:\n\t\treturn\n\tvar active_player := node as Node3D\n\tif not active_player.is_inside_tree():\n\t\treturn\n\tSaveManager.set_position(active_player.global_position)\n\tplayer = null\n\n\n'''
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def function_block(text: str, name: str) -> str:
+    match = re.search(rf'(?ms)^func {re.escape(name)}\b.*?(?=^func |\Z)', text)
+    if not match:
+        raise RuntimeError(f'missing function: {name}')
+    return match.group(0).rstrip() + '\n'
+
+
+def function_sha(text: str, name: str) -> str:
+    return sha(function_block(text, name).encode('utf-8'))
+
+
+def verify_protected_world_exit(text: str) -> str:
+    actual = function_sha(text, '_exit_tree')
+    if actual != PROTECTED_WORLD_EXIT_SHA256:
+        raise RuntimeError(
+            'protected world teardown hash mismatch: '
+            f'expected={PROTECTED_WORLD_EXIT_SHA256}, actual={actual}, '
+            f'prohibited_guarded_hash={PROHIBITED_WORLD_EXIT_SHA256}'
+        )
+    return actual
+
+
+def indentation_width(line: str) -> int:
+    leading = line[:len(line) - len(line.lstrip(' \t'))]
+    return len(leading.expandtabs(4))
+
+
+def runtime_text_paths(root: Path):
+    for relative in RUNTIME_TEXT_FILES:
+        path = root / relative
+        if path.is_file():
+            yield path
+    for folder in RUNTIME_TEXT_ROOTS:
+        base = root / folder
+        if not base.is_dir():
+            continue
+        for path in base.rglob('*'):
+            if path.is_file() and not any(
+                part in {'.godot', 'build'} for part in path.relative_to(root).parts
+            ):
+                yield path
+
+
+def exact_pattern(value: str) -> re.Pattern[str]:
+    return re.compile(r'(?m)^' + re.escape(value) + r'$')
+
+
+def replace_variant(
+    text: str,
+    old_variants: tuple[str, ...],
+    new: str,
+    label: str,
+) -> tuple[str, str]:
+    old_patterns = {old: exact_pattern(old) for old in old_variants}
+    old_counts = {old: len(pattern.findall(text)) for old, pattern in old_patterns.items()}
+    total_old = sum(old_counts.values())
+    new_pattern = exact_pattern(new)
+    new_count = len(new_pattern.findall(text))
+    if total_old == 1 and new_count == 0:
+        selected = next(old for old, count in old_counts.items() if count == 1)
+        return old_patterns[selected].sub(lambda _match: new, text, count=1), 'applied'
+    if total_old == 0 and new_count == 1:
+        return text, 'already_satisfied'
+    raise RuntimeError(
+        f'correction state mismatch for {label}: '
+        f'old_counts={old_counts}, new_count={new_count}'
+    )
+
+
+def correct_npc_anim_player(text: str) -> tuple[str, str]:
+    unsafe = list(NPC_UNSAFE_PATTERN.finditer(text))
+    safe = list(NPC_SAFE_PATTERN.finditer(text))
+    if len(unsafe) == 1 and len(safe) == 0:
+        match = unsafe[0]
+        replacement = NPC_SAFE_TEMPLATE.format(
+            indent=match.group('indent'),
+            variable=match.group('variable'),
+        )
+        return NPC_UNSAFE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
+    if len(unsafe) == 0 and len(safe) == 1:
+        return text, 'already_satisfied'
+    candidates = [
+        line.strip() for line in text.splitlines()
+        if 'anim_player' in line or ('get_meta' in line and '_model' in line)
+    ]
+    raise RuntimeError(
+        'NPC anim_player correction state mismatch: '
