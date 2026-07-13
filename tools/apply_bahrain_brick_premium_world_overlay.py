@@ -46,6 +46,14 @@ EVIDENCE_ONLY = {
     "tests/premium_world_visual_evidence.gd",
     "scenes/premium_world_visual_evidence.tscn",
 }
+POST_V3_REPLACEMENTS = {
+    "scripts/ui_theme.gd": [
+        (
+            "\t\tbutton.icon_max_width = 30",
+            "\t\tbutton.add_theme_constant_override(\"icon_max_width\", 30)",
+        ),
+    ],
+}
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -210,6 +218,25 @@ def apply_v3_patch(project: Path, patch: bytes, expected_files: dict[str, str]) 
     return sorted(expected_files)
 
 
+def apply_post_v3_replacements(project: Path) -> list[str]:
+    changed: list[str] = []
+    for relative, replacements in POST_V3_REPLACEMENTS.items():
+        target = project / relative
+        if not target.is_file():
+            raise SystemExit(f"post-v3 correction target missing: {relative}")
+        text = target.read_text(encoding="utf-8")
+        for old, new in replacements:
+            count = text.count(old)
+            if count != 1:
+                raise SystemExit(
+                    f"post-v3 replacement count mismatch for {relative}: {count}"
+                )
+            text = text.replace(old, new)
+        target.write_text(text, encoding="utf-8")
+        changed.append(relative)
+    return changed
+
+
 def _replace_expected(
     text: str, old: str, new: str, label: str, expected_count: int = 1
 ) -> str:
@@ -342,12 +369,14 @@ def main() -> int:
     changed = apply_v2_overlay(project, v2_payload, args.evidence_only)
     v3_files: list[str] = []
     generated: list[str] = []
+    post_v3_fixes: list[str] = []
     if not args.evidence_only:
         v3_patch, v3_manifest = load_v3_patch_and_manifest(tools)
         v3_files = apply_v3_patch(project, v3_patch, v3_manifest)
+        post_v3_fixes = apply_post_v3_replacements(project)
         generated = generate_binary_artwork(project)
         generated += prepare_release_smoke_harness(project)
-        changed = sorted(set(changed + v3_files + generated))
+        changed = sorted(set(changed + v3_files + post_v3_fixes + generated))
 
     after = {relative: sha256_file(project / relative) for relative in FROZEN}
     mismatches = [relative for relative in FROZEN if before[relative] != after[relative]]
@@ -368,6 +397,7 @@ def main() -> int:
         "evidence_only": args.evidence_only,
         "overlay_files": changed,
         "v3_patched_files": v3_files,
+        "post_v3_compatibility_fixes": post_v3_fixes,
         "generated_binary_artwork": generated,
         "frozen_controls_unchanged": True,
         "frozen_control_hashes": after,
