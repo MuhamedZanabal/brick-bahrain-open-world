@@ -19,10 +19,12 @@ run_godot() {
   test "$status" -eq 0
 }
 
+# Frozen controls on clean recovery, before any presentation overlay.
 python3 tools/verify_frozen_controls.py "$ROOT" \
   --json-out "$REPORT/FROZEN_CONTROLS_RECOVERED_SOURCE.json" \
   --markdown-out "$REPORT/FROZEN_CONTROLS_RECOVERED_SOURCE.md"
 
+# Matched baseline evidence from the checksum-locked functional graphics source.
 mkdir -p "$BASELINE/build/premium_visual_evidence/before" "$BASELINE/build/logs"
 python3 tools/apply_bahrain_brick_premium_world_overlay.py "$BASELINE" --evidence-only \
   --report "$BASELINE/build/premium_visual_evidence/BASELINE_EVIDENCE_HARNESS_REPORT.json"
@@ -38,15 +40,18 @@ status="${PIPESTATUS[0]}"; set +o pipefail
 test "$status" -eq 0
 grep -q 'PREMIUM WORLD VISUAL EVIDENCE COMPLETE' "$BASELINE/build/logs/world-evidence-before.log"
 
+# Apply deterministic v2/v3 presentation overlay and three evidence-backed runtime corrections.
 python3 tools/apply_premium_overlay_resilient.py "$ROOT" \
   --report "$REPORT/PREMIUM_WORLD_OVERLAY_REPORT.json" \
   2>&1 | tee "$LOG/premium-world-overlay.log"
 python3 tools/apply_premium_validation_corrections.py "$ROOT" \
-  --report "$REPORT/RUNTIME_DEFECT_CORRECTIONS.json"
+  --report "$REPORT/RUNTIME_DEFECT_CORRECTIONS.json" \
+  2>&1 | tee "$LOG/runtime-defect-corrections.log"
 python3 tools/verify_frozen_controls.py "$ROOT" \
   --json-out "$REPORT/FROZEN_CONTROLS_PRE_TEST.json" \
   --markdown-out "$REPORT/FROZEN_CONTROLS_PRE_TEST.md"
 
+# Import and complete all five project-context acceptance suites.
 mkdir -p "$ROOT/build/ci/test-user-data"/{smoke,controls,presentation,premium-world,premium-presentation}
 run_godot godot-import-premium godot --headless --path "$ROOT" --editor --quit --verbose
 run_godot runtime-smoke-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/smoke" \
@@ -77,10 +82,12 @@ out,scene,count=sys.argv[1:]
 Path(out).write_text(json.dumps({'scene':scene,'configured_assertion_count':int(count),'passed':int(count),'failed':0,'process_exit_code':0},indent=2)+'\n')
 PY
 
+# Fail on every non-allowlisted critical Godot runtime error.
 python3 tools/scan_godot_runtime_errors.py "$LOG" \
   --json-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN_PRE_EVIDENCE.json" \
   --markdown-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN_PRE_EVIDENCE.md"
 
+# Actual runtime evidence and videos.
 mkdir -p "$PREMIUM_VIS/after" "$VIS/startup_frames" "$VIS/frames" "$VIS/screenshots"
 run_godot world-evidence-after timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" \
   godot --path "$ROOT" --audio-driver Dummy --display-driver x11 --rendering-method gl_compatibility \
@@ -105,6 +112,7 @@ python3 tools/scan_godot_runtime_errors.py "$LOG" \
   --json-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.json" \
   --markdown-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.md"
 
+# Matched comparisons and hosted performance report.
 python3 - "$BASELINE" "$ROOT" <<'PY'
 from pathlib import Path
 from PIL import Image,ImageDraw,ImageStat
@@ -130,6 +138,7 @@ python3 tools/verify_frozen_controls.py "$ROOT" \
   --json-out "$REPORT/FROZEN_CONTROLS_POST_TEST.json" \
   --markdown-out "$REPORT/FROZEN_CONTROLS_POST_TEST.md"
 
+# Matching official Godot templates, real export, then binary inspection.
 bash tools/install_godot_43_templates.sh "$REPORT/GODOT_EXPORT_TEMPLATE_REPORT.json" "$ROOT"
 KEYSTORE_DIR="${RUNNER_TEMP:-/tmp}/bahrain-brick-premium-qa"; mkdir -p "$KEYSTORE_DIR"
 KEYSTORE_PATH="$KEYSTORE_DIR/debug.keystore"; rm -f "$KEYSTORE_PATH"
