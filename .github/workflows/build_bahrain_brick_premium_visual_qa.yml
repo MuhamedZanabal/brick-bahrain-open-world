@@ -74,13 +74,16 @@ jobs:
           update-alternatives --set javac "$JAVA_HOME/bin/javac"
           python3 -m py_compile \
             tools/apply_bahrain_brick_premium_world_overlay.py \
+            tools/apply_premium_overlay_resilient.py \
+            tools/v3_patch_restore.py \
             tools/verify_frozen_controls.py \
             tools/apply_premium_validation_corrections.py \
             tools/scan_godot_runtime_errors.py \
             tools/package_premium_validation_artifacts.py
           python3 -m unittest \
             tools/tests/test_scan_godot_runtime_errors.py \
-            tools/tests/test_apply_premium_validation_corrections.py
+            tools/tests/test_apply_premium_validation_corrections.py \
+            tools/tests/test_v3_patch_restore.py
           bash -n tools/install_godot_43_templates.sh
           bash -n tools/run_premium_validation_ci.sh
 
