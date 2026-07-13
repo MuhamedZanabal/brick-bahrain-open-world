@@ -1,0 +1,110 @@
+        text = text.replace(exit_anchor, WORLD_LIFECYCLE_BLOCK + exit_anchor, 1)
+        lifecycle_state = 'applied'
+    elif lifecycle_count == 1:
+        lifecycle_state = 'already_satisfied'
+    else:
+        raise RuntimeError(
+            'world lifecycle coordinator mismatch: '
+            f'block_count={lifecycle_count}, exit_anchor_count={text.count(exit_anchor)}'
+        )
+
+    protected_after = verify_protected_world_exit(text)
+    if protected_before != protected_after:
+        raise RuntimeError(
+            f'protected world teardown changed unexpectedly: before={protected_before}, after={protected_after}'
+        )
+    return text, [ready_state, lifecycle_state], protected_after
+
+
+def ensure_exact_resource(root: Path, relative: str, content: str, reason: str) -> dict:
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        if not path.is_file():
+            raise RuntimeError(f'resource path is not a file: {relative}')
+        existing = path.read_text(encoding='utf-8')
+        if existing == content:
+            state = 'already_satisfied'
+        else:
+            path.write_text(content, encoding='utf-8')
+            state = 'replaced'
+    else:
+        path.write_text(content, encoding='utf-8')
+        state = 'generated'
+    if path.read_text(encoding='utf-8') != content:
+        raise RuntimeError(f'deterministic resource verification failed: {relative}')
+    return {
+        'path': relative,
+        'state': state,
+        'sha256': sha(path.read_bytes()),
+        'size_bytes': path.stat().st_size,
+        'reason': reason,
+    }
+
+
+def ensure_npc_scene(root: Path) -> dict:
+    path = root / NPC_SCENE_RELATIVE
+    if path.exists() and path.is_file():
+        existing = path.read_text(encoding='utf-8')
+        if existing != NPC_SCENE_CONTENT and (
+            'res://scripts/npc_pedestrian.gd' not in existing
+            or 'type="CharacterBody3D"' not in existing
+        ):
+            raise RuntimeError(f'existing NPC scene is incompatible: {NPC_SCENE_RELATIVE}')
+    return ensure_exact_resource(
+        root,
+        NPC_SCENE_RELATIVE,
+        NPC_SCENE_CONTENT,
+        'provide one deterministic project-loadable NPCPedestrian scene for NPCManager preload',
+    )
+
+
+def collect_diagnostic_sources(root: Path) -> dict[str, str]:
+    sources: dict[str, str] = {}
+    for relative in DIAGNOSTIC_SOURCE_PATHS:
+        path = root / relative
+        if not path.is_file():
+            continue
+        try:
+            sources[relative] = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            sources[relative] = f'<non-UTF-8 file sha256={sha(path.read_bytes())}>'
+    return sources
+
+
+def apply(root: Path) -> dict:
+    results: list[dict] = []
+
+    npc_path = root / 'scripts/npc_pedestrian.gd'
+    if not npc_path.is_file():
+        raise RuntimeError('correction target missing: scripts/npc_pedestrian.gd')
+    before = npc_path.read_bytes()
+    text, state = correct_npc_anim_player(before.decode('utf-8'))
+    npc_path.write_text(text, encoding='utf-8')
+    after = npc_path.read_bytes()
+    results.append({
+        'path': 'scripts/npc_pedestrian.gd',
+        'before_sha256': sha(before),
+        'after_sha256': sha(after),
+        'states': [state],
+        'reasons': [
+            'avoid get_meta runtime errors when imported NPC models have no AnimationPlayer metadata'
+        ],
+    })
+
+    save_path = root / 'scripts/save_manager.gd'
+    if not save_path.is_file():
+        raise RuntimeError('correction target missing: scripts/save_manager.gd')
+    before = save_path.read_bytes()
+    text, state = correct_save_position_guard(before.decode('utf-8'))
+    save_path.write_text(text, encoding='utf-8')
+    after = save_path.read_bytes()
+    results.append({
+        'path': 'scripts/save_manager.gd',
+        'before_sha256': sha(before),
+        'after_sha256': sha(after),
+        'states': [state],
+        'reasons': [
+            'avoid save-manager transform access after the player has left the SceneTree'
+        ],
+    })
