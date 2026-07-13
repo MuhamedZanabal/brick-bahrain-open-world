@@ -1,7 +1,32 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 import hashlib
+import os
+import subprocess
+import tempfile
 from pathlib import Path
+
+
+def apply_patch_isolated(project: Path, patch: bytes) -> None:
+    project = project.resolve()
+    env = os.environ.copy()
+    env["GIT_CEILING_DIRECTORIES"] = str(project.parent.resolve())
+    with tempfile.NamedTemporaryFile(prefix="bahrain-brick-v3-", suffix=".patch") as handle:
+        handle.write(patch)
+        handle.flush()
+        subprocess.run(
+            ["git", "apply", "--check", "--unsafe-paths", handle.name],
+            cwd=project,
+            env=env,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "apply", "--unsafe-paths", "--whitespace=nowarn", handle.name],
+            cwd=project,
+            env=env,
+            check=True,
+        )
+
 
 def extract_new_file(patch:bytes,relative:str)->bytes:
     text=patch.decode('utf-8')
@@ -23,6 +48,7 @@ def extract_new_file(patch:bytes,relative:str)->bytes:
     data='\n'.join(output).encode('utf-8')
     if output and not no_newline: data+=b'\n'
     return data
+
 
 def restore_missing_new_files(project:Path,patch:bytes,expected:dict[str,str],new_paths:set[str])->list[str]:
     restored=[]
