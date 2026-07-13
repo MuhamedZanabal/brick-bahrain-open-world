@@ -130,7 +130,6 @@ def patch_world_parent_guard(text: str) -> tuple[str, str]:
             "protected world teardown hash mismatch before parent-tree correction: "
             f"expected={PROTECTED_WORLD_EXIT_SHA256}, actual={protected_before}"
         )
-
     callback = function_block(text, "_on_world_child_exiting_tree")
     unsafe_count = callback.count(UNSAFE_PARENT_LINE)
     safe_count = callback.count(SAFE_PARENT_LINE)
@@ -147,7 +146,6 @@ def patch_world_parent_guard(text: str) -> tuple[str, str]:
             "world parent-tree guard mismatch: "
             f"unsafe_count={unsafe_count}, safe_count={safe_count}"
         )
-
     protected_after = protected_world_exit_sha(text)
     if protected_after != PROTECTED_WORLD_EXIT_SHA256:
         raise RuntimeError(
@@ -170,12 +168,7 @@ def patch_whole_world_teardown_test(text: str) -> tuple[str, str]:
     )
 
 
-def replace_exact_function(
-    text: str,
-    name: str,
-    unsafe: str,
-    safe: str,
-) -> tuple[str, str]:
+def replace_exact_function(text: str, name: str, unsafe: str, safe: str) -> tuple[str, str]:
     block = function_block(text, name)
     if block == unsafe:
         if text.count(block) != 1:
@@ -189,32 +182,34 @@ def replace_exact_function(
     )
 
 
-def patch_npc_cross_node_scans(text: str) -> tuple[str, list[str]]:
+def patch_npc_cross_node_scans(
+    text: str,
+    require_npc_scans: bool = True,
+) -> tuple[str, list[str]]:
+    has_vehicle_scan = re.search(r"(?m)^func _scan_for_fast_vehicles\b", text) is not None
+    has_player_scan = re.search(r"(?m)^func _scan_for_player\b", text) is not None
+    if not require_npc_scans and not has_vehicle_scan and not has_player_scan:
+        return text, ["not_applicable_reduced_fixture", "not_applicable_reduced_fixture"]
+    if not has_vehicle_scan or not has_player_scan:
+        raise RuntimeError(
+            "complete project is missing required NPC pedestrian scan functions: "
+            f"vehicle_scan={has_vehicle_scan}, player_scan={has_player_scan}"
+        )
     text, vehicle_state = replace_exact_function(
-        text,
-        "_scan_for_fast_vehicles",
-        NPC_FAST_SCAN_UNSAFE,
-        NPC_FAST_SCAN_SAFE,
+        text, "_scan_for_fast_vehicles", NPC_FAST_SCAN_UNSAFE, NPC_FAST_SCAN_SAFE
     )
     text, player_state = replace_exact_function(
-        text,
-        "_scan_for_player",
-        NPC_PLAYER_SCAN_UNSAFE,
-        NPC_PLAYER_SCAN_SAFE,
+        text, "_scan_for_player", NPC_PLAYER_SCAN_UNSAFE, NPC_PLAYER_SCAN_SAFE
     )
     return text, [vehicle_state, player_state]
 
 
-def apply(root: Path) -> dict:
+def apply(root: Path, require_npc_scans: bool = True) -> dict:
     root = root.resolve()
     world_path = root / WORLD_PATH
     test_path = root / LIFECYCLE_TEST_PATH
     npc_path = root / NPC_PATH
-    for relative, path in (
-        (WORLD_PATH, world_path),
-        (LIFECYCLE_TEST_PATH, test_path),
-        (NPC_PATH, npc_path),
-    ):
+    for relative, path in ((WORLD_PATH, world_path), (LIFECYCLE_TEST_PATH, test_path), (NPC_PATH, npc_path)):
         if not path.is_file():
             raise RuntimeError(f"missing correction target: {relative}")
 
@@ -229,7 +224,9 @@ def apply(root: Path) -> dict:
     test_after = test_path.read_bytes()
 
     npc_before = npc_path.read_bytes()
-    npc_text, npc_states = patch_npc_cross_node_scans(npc_before.decode("utf-8"))
+    npc_text, npc_states = patch_npc_cross_node_scans(
+        npc_before.decode("utf-8"), require_npc_scans=require_npc_scans
+    )
     npc_path.write_text(npc_text, encoding="utf-8")
     npc_after = npc_path.read_bytes()
 
@@ -245,26 +242,21 @@ def apply(root: Path) -> dict:
         "protected_world_exit_expected_sha256": PROTECTED_WORLD_EXIT_SHA256,
         "protected_world_exit_actual_sha256": protected_actual,
         "protected_world_exit_unchanged": True,
+        "full_project_npc_scan_contract": require_npc_scans,
         "changes": [
             {
                 "path": WORLD_PATH,
                 "state": world_state,
                 "before_sha256": sha256(world_before),
                 "after_sha256": sha256(world_after),
-                "reason": (
-                    "avoid reading a child global transform when the parent world has already left "
-                    "the SceneTree; reuse the position cached during normal world processing"
-                ),
+                "reason": "avoid child transform reads after the parent world leaves the SceneTree",
             },
             {
                 "path": LIFECYCLE_TEST_PATH,
                 "state": test_state,
                 "before_sha256": sha256(test_before),
                 "after_sha256": sha256(test_after),
-                "reason": (
-                    "exercise whole-world teardown while the active player remains attached, "
-                    "without changing the configured 12-assertion lifecycle count"
-                ),
+                "reason": "exercise whole-world teardown with the active player still attached",
             },
             {
                 "path": NPC_PATH,
@@ -272,7 +264,7 @@ def apply(root: Path) -> dict:
                 "before_sha256": sha256(npc_before),
                 "after_sha256": sha256(npc_after),
                 "reasons": [
-                    "reject invalid or detached vehicle nodes before pedestrian danger-scan transform reads",
+                    "reject invalid or detached vehicles before pedestrian danger-scan transform reads",
                     "reject an invalid or detached player before pedestrian greeting-scan transform reads",
                 ],
             },
@@ -285,7 +277,7 @@ def main() -> int:
     parser.add_argument("root", type=Path)
     parser.add_argument("--report", type=Path, required=True)
     args = parser.parse_args()
-    report = apply(args.root)
+    report = apply(args.root, require_npc_scans=True)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2))
