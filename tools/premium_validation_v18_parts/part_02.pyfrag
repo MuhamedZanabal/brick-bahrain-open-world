@@ -1,3 +1,96 @@
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def function_block(text: str, name: str) -> str:
+    match = re.search(rf'(?ms)^func {re.escape(name)}\b.*?(?=^func |\Z)', text)
+    if not match:
+        raise RuntimeError(f'missing function: {name}')
+    return match.group(0).rstrip() + '\n'
+
+
+def function_sha(text: str, name: str) -> str:
+    return sha(function_block(text, name).encode('utf-8'))
+
+
+def verify_protected_world_exit(text: str) -> str:
+    actual = function_sha(text, '_exit_tree')
+    if actual != PROTECTED_WORLD_EXIT_SHA256:
+        raise RuntimeError(
+            'protected world teardown hash mismatch: '
+            f'expected={PROTECTED_WORLD_EXIT_SHA256}, actual={actual}, '
+            f'prohibited_guarded_hash={PROHIBITED_WORLD_EXIT_SHA256}'
+        )
+    return actual
+
+
+def indentation_width(line: str) -> int:
+    leading = line[:len(line) - len(line.lstrip(' \t'))]
+    return len(leading.expandtabs(4))
+
+
+def runtime_text_paths(root: Path):
+    for relative in RUNTIME_TEXT_FILES:
+        path = root / relative
+        if path.is_file():
+            yield path
+    for folder in RUNTIME_TEXT_ROOTS:
+        base = root / folder
+        if not base.is_dir():
+            continue
+        for path in base.rglob('*'):
+            if path.is_file() and not any(
+                part in {'.godot', 'build'} for part in path.relative_to(root).parts
+            ):
+                yield path
+
+
+def exact_pattern(value: str) -> re.Pattern[str]:
+    return re.compile(r'(?m)^' + re.escape(value) + r'$')
+
+
+def replace_variant(
+    text: str,
+    old_variants: tuple[str, ...],
+    new: str,
+    label: str,
+) -> tuple[str, str]:
+    old_patterns = {old: exact_pattern(old) for old in old_variants}
+    old_counts = {old: len(pattern.findall(text)) for old, pattern in old_patterns.items()}
+    total_old = sum(old_counts.values())
+    new_pattern = exact_pattern(new)
+    new_count = len(new_pattern.findall(text))
+    if total_old == 1 and new_count == 0:
+        selected = next(old for old, count in old_counts.items() if count == 1)
+        return old_patterns[selected].sub(lambda _match: new, text, count=1), 'applied'
+    if total_old == 0 and new_count == 1:
+        return text, 'already_satisfied'
+    raise RuntimeError(
+        f'correction state mismatch for {label}: '
+        f'old_counts={old_counts}, new_count={new_count}'
+    )
+
+
+def correct_npc_anim_player(text: str) -> tuple[str, str]:
+    unsafe = list(NPC_UNSAFE_PATTERN.finditer(text))
+    safe = list(NPC_SAFE_PATTERN.finditer(text))
+    if len(unsafe) == 1 and len(safe) == 0:
+        match = unsafe[0]
+        replacement = NPC_SAFE_TEMPLATE.format(
+            indent=match.group('indent'),
+            variable=match.group('variable'),
+        )
+        return NPC_UNSAFE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
+    if len(unsafe) == 0 and len(safe) == 1:
+        return text, 'already_satisfied'
+    candidates = [
+        line.strip() for line in text.splitlines()
+        if 'anim_player' in line or ('get_meta' in line and '_model' in line)
+    ]
+    raise RuntimeError(
+        'NPC anim_player correction state mismatch: '
         f'unsafe_count={len(unsafe)}, safe_count={len(safe)}, candidates={candidates}'
     )
 
@@ -34,77 +127,3 @@ def correct_save_position_guard(text: str) -> tuple[str, str]:
             if width < access_width and stripped.startswith('func '):
                 break
         if guard_index is None:
-            contexts.append([
-                line.rstrip('\r\n')
-                for line in lines[max(0, access_index - 4):min(len(lines), access_index + 3)]
-            ])
-        else:
-            guard_indices.append(guard_index)
-    if contexts:
-        raise RuntimeError(
-            f'player global-position access has no enclosing player guard: contexts={contexts}'
-        )
-    unique_guards = sorted(set(guard_indices))
-    if len(unique_guards) != 1:
-        guard_lines = [lines[index].rstrip('\r\n') for index in unique_guards]
-        access_lines = [lines[index].strip() for index in access_indices]
-        raise RuntimeError(
-            'player global-position accesses do not share one guard: '
-            f'guards={guard_lines}, accesses={access_lines}'
-        )
-    guard_index = unique_guards[0]
-    raw_guard = lines[guard_index].rstrip('\r\n')
-    match = SAVE_CONDITION_PATTERN.fullmatch(raw_guard)
-    if match is None:
-        raise RuntimeError(f'invalid player guard syntax: {raw_guard}')
-    condition = match.group('condition').strip()
-    if SAVE_TREE_GUARD_PATTERN.search(condition):
-        return text, 'already_satisfied'
-    newline = (
-        '\r\n' if lines[guard_index].endswith('\r\n')
-        else '\n' if lines[guard_index].endswith('\n')
-        else ''
-    )
-    lines[guard_index] = (
-        f'{match.group("indent")}if {condition} and player.is_inside_tree():' + newline
-    )
-    return ''.join(lines), 'applied'
-
-
-def correct_world_title(text: str) -> tuple[str, str]:
-    matches = list(WORLD_TITLE_PATTERN.finditer(text))
-    if len(matches) != 1:
-        candidates = [
-            line.strip() for line in text.splitlines()
-            if 'title.text' in line or 'BRICK BAHRAIN' in line or 'Bahrain Brick' in line
-        ]
-        raise RuntimeError(
-            'world title correction mismatch: '
-            f'match_count={len(matches)}, candidates={candidates}'
-        )
-    match = matches[0]
-    if match.group('title') == 'Bahrain Brick':
-        return text, 'already_satisfied'
-    replacement = f'{match.group("indent")}title.text = "Bahrain Brick"'
-    return WORLD_TITLE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
-
-
-def correct_world_lifecycle(text: str) -> tuple[str, list[str], str]:
-    protected_before = verify_protected_world_exit(text)
-
-    ready_old_count = text.count(WORLD_READY_ANCHOR)
-    ready_new_count = text.count(WORLD_READY_PATCHED)
-    if ready_old_count == 1 and ready_new_count == 0:
-        text = text.replace(WORLD_READY_ANCHOR, WORLD_READY_PATCHED, 1)
-        ready_state = 'applied'
-    elif ready_old_count == 0 and ready_new_count == 1:
-        ready_state = 'already_satisfied'
-    else:
-        raise RuntimeError(
-            'world lifecycle ready-hook mismatch: '
-            f'old_count={ready_old_count}, new_count={ready_new_count}'
-        )
-
-    lifecycle_count = text.count(WORLD_LIFECYCLE_BLOCK)
-    exit_anchor = 'func _exit_tree() -> void:\n'
-    if lifecycle_count == 0 and text.count(exit_anchor) == 1:
