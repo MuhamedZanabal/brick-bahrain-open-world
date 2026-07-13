@@ -1,3 +1,36 @@
+            self.fixture(root)
+            path = root / 'scripts/world.gd'
+            path.write_text(path.read_text().replace(
+                '\t\ttitle.text = "BRICK BAHRAIN"',
+                '\ttitle.text = "Bahrain Brick"',
+            ))
+            report = mod.apply(root)
+            world_result = next(item for item in report['corrections'] if item['path'] == 'scripts/world.gd')
+            self.assertEqual(world_result['states'][0], 'already_satisfied')
+            self.assertEqual(self.protected_hash(root), mod.PROTECTED_WORLD_EXIT_SHA256)
+
+    def test_repairs_recovered_get_meta_variant_without_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, 'without_default')
+            mod.apply(root)
+            body = (root / 'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('has_meta("anim_player")', body)
+            self.assertNotIn('get_meta("anim_player")\n', body)
+
+    def test_repairs_typed_string_name_variant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, 'typed_cast')
+            mod.apply(root)
+            body = (root / 'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('_anim_player =', body)
+            self.assertIn('has_meta("anim_player")', body)
+            self.assertIn('as AnimationPlayer', body)
+
+    def test_repairs_actual_recovered_animation_player_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
             self.fixture(root, 'recovered_variable')
             mod.apply(root)
             body = (root / 'scripts/npc_pedestrian.gd').read_text()
@@ -31,40 +64,3 @@
                 body,
             )
             self.assertIn('position = player.global_position', body)
-            self.assertIn('_vector_to_dict(position)', body)
-
-    def test_save_guard_is_idempotent(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self.fixture(
-                root,
-                save_condition='if player and player.is_inside_tree():',
-                save_shape='staged',
-            )
-            report = mod.apply(root)
-            save_result = next(item for item in report['corrections'] if item['path'] == 'scripts/save_manager.gd')
-            self.assertEqual(save_result['states'], ['already_satisfied'])
-
-    def test_compatible_noncanonical_npc_scene_is_replaced(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self.fixture(root)
-            (root / 'scenes').mkdir()
-            (root / 'scenes/npc_pedestrian.tscn').write_text(
-                mod.NPC_SCENE_CONTENT + 'metadata/test_only = true\n'
-            )
-            report = mod.apply(root)
-            self.assertEqual(
-                (root / 'scenes/npc_pedestrian.tscn').read_text(),
-                mod.NPC_SCENE_CONTENT,
-            )
-            self.assertEqual(report['generated_runtime_resources'][0]['state'], 'replaced')
-
-    def test_incompatible_existing_npc_scene_fails_closed(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self.fixture(root)
-            (root / 'scenes').mkdir()
-            (root / 'scenes/npc_pedestrian.tscn').write_text('invalid\n')
-            with self.assertRaisesRegex(RuntimeError, 'incompatible'):
-                mod.apply(root)
