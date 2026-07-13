@@ -1,0 +1,2 @@
+Artifact transport branch for premium visual v3 patch and manifest.
+Source commit: 998106cce3485f711cff1e9ef2f59c4133349e21
