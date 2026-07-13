@@ -4,13 +4,21 @@ import argparse, hashlib, json, re
 from pathlib import Path
 
 CORRECTIONS = {
-    'scripts/world.gd': [((
-        '\t\ttitle.text = "BRICK BAHRAIN"',
-        '\ttitle.text = "BRICK BAHRAIN"',
-    ),
-        '\ttitle.text = "Bahrain Brick"',
-        'remove obsolete reversed product title from the in-world loading overlay',
-    )],
+    'scripts/world.gd': [
+        ((
+            '\t\ttitle.text = "BRICK BAHRAIN"',
+            '\ttitle.text = "BRICK BAHRAIN"',
+        ),
+            '\ttitle.text = "Bahrain Brick"',
+            'remove obsolete reversed product title from the in-world loading overlay',
+        ),
+        ((
+            '\t\tif player and player is Node3D:\n\t\t\tSaveManager.set_position((player as Node3D).global_position)',
+        ),
+            '\t\tif player and player is Node3D and player.is_inside_tree():\n\t\t\tSaveManager.set_position((player as Node3D).global_position)',
+            'avoid reading player global_position after the player has left the SceneTree during world teardown',
+        ),
+    ],
 }
 RUNTIME_TEXT_ROOTS = ('scripts', 'scenes', 'assets', 'artwork')
 RUNTIME_TEXT_FILES = ('project.godot', 'export_presets.cfg')
@@ -18,11 +26,8 @@ STALE_TITLES = ('Brick Bahrain', 'BRICK BAHRAIN')
 NPC_SCENE_RELATIVE = 'scenes/npc_pedestrian.tscn'
 NPC_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://scripts/npc_pedestrian.gd" id="1_npc"]\n\n[node name="NPCPedestrian" type="CharacterBody3D"]\nscript = ExtResource("1_npc")\n'''
 DIAGNOSTIC_SOURCE_PATHS = (
-    'scripts/save_manager.gd',
-    'scripts/world.gd',
-    'scripts/npc_manager.gd',
-    'scripts/npc_pedestrian.gd',
-    'scenes/npc_pedestrian.tscn',
+    'scripts/save_manager.gd', 'scripts/world.gd', 'scripts/npc_manager.gd',
+    'scripts/npc_pedestrian.gd', 'scenes/npc_pedestrian.tscn',
     'tests/premium_presentation_acceptance_test.gd',
     'scenes/premium_presentation_acceptance_test.tscn',
 )
@@ -79,13 +84,10 @@ def replace_variant(text: str, old_variants: tuple[str, ...], new: str, label: s
     new_count = len(new_pattern.findall(text))
     if total_old == 1 and new_count == 0:
         selected = next(old for old, count in old_counts.items() if count == 1)
-        return old_patterns[selected].sub(lambda _match: new, text, count=1), 'applied'
+        return old_patterns[selected].sub(lambda _m: new, text, count=1), 'applied'
     if total_old == 0 and new_count == 1:
         return text, 'already_satisfied'
-    raise RuntimeError(
-        f'correction state mismatch for {label}: '
-        f'old_counts={old_counts}, new_count={new_count}'
-    )
+    raise RuntimeError(f'correction state mismatch for {label}: old_counts={old_counts}, new_count={new_count}')
 
 
 def correct_npc_anim_player(text: str) -> tuple[str, str]:
@@ -93,38 +95,20 @@ def correct_npc_anim_player(text: str) -> tuple[str, str]:
     safe = list(NPC_SAFE_PATTERN.finditer(text))
     if len(unsafe) == 1 and len(safe) == 0:
         match = unsafe[0]
-        replacement = NPC_SAFE_TEMPLATE.format(
-            indent=match.group('indent'),
-            variable=match.group('variable'),
-        )
-        return NPC_UNSAFE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
+        replacement = NPC_SAFE_TEMPLATE.format(indent=match.group('indent'), variable=match.group('variable'))
+        return NPC_UNSAFE_PATTERN.sub(lambda _m: replacement, text, count=1), 'applied'
     if len(unsafe) == 0 and len(safe) == 1:
         return text, 'already_satisfied'
-    candidates = [
-        line.strip() for line in text.splitlines()
-        if 'anim_player' in line or ('get_meta' in line and '_model' in line)
-    ]
-    raise RuntimeError(
-        'NPC anim_player correction state mismatch: '
-        f'unsafe_count={len(unsafe)}, safe_count={len(safe)}, candidates={candidates}'
-    )
+    candidates = [line.strip() for line in text.splitlines() if 'anim_player' in line or ('get_meta' in line and '_model' in line)]
+    raise RuntimeError(f'NPC anim_player correction state mismatch: unsafe_count={len(unsafe)}, safe_count={len(safe)}, candidates={candidates}')
 
 
 def correct_save_position_guard(text: str) -> tuple[str, str]:
     lines = text.splitlines(keepends=True)
-    access_indices = [
-        index for index, line in enumerate(lines)
-        if PLAYER_GLOBAL_POSITION_PATTERN.search(line)
-    ]
+    access_indices = [i for i, line in enumerate(lines) if PLAYER_GLOBAL_POSITION_PATTERN.search(line)]
     if not access_indices:
-        candidates = [
-            line.strip() for line in lines
-            if 'position' in line and ('player' in line or 'save_data' in line)
-        ]
-        raise RuntimeError(
-            'player global-position access missing: '
-            f'candidates={candidates}'
-        )
+        candidates = [line.strip() for line in lines if 'position' in line and ('player' in line or 'save_data' in line)]
+        raise RuntimeError(f'player global-position access missing: candidates={candidates}')
     guard_indices: list[int] = []
     contexts: list[list[str]] = []
     for access_index in access_indices:
@@ -143,22 +127,16 @@ def correct_save_position_guard(text: str) -> tuple[str, str]:
             if width < access_width and stripped.startswith('func '):
                 break
         if guard_index is None:
-            contexts.append([
-                line.rstrip('\r\n')
-                for line in lines[max(0, access_index - 4):min(len(lines), access_index + 3)]
-            ])
+            contexts.append([line.rstrip('\r\n') for line in lines[max(0, access_index - 4):min(len(lines), access_index + 3)]])
         else:
             guard_indices.append(guard_index)
     if contexts:
         raise RuntimeError(f'player global-position access has no enclosing player guard: contexts={contexts}')
     unique_guards = sorted(set(guard_indices))
     if len(unique_guards) != 1:
-        guard_lines = [lines[index].rstrip('\r\n') for index in unique_guards]
-        access_lines = [lines[index].strip() for index in access_indices]
-        raise RuntimeError(
-            'player global-position accesses do not share one guard: '
-            f'guards={guard_lines}, accesses={access_lines}'
-        )
+        guard_lines = [lines[i].rstrip('\r\n') for i in unique_guards]
+        access_lines = [lines[i].strip() for i in access_indices]
+        raise RuntimeError(f'player global-position accesses do not share one guard: guards={guard_lines}, accesses={access_lines}')
     guard_index = unique_guards[0]
     raw_guard = lines[guard_index].rstrip('\r\n')
     match = SAVE_CONDITION_PATTERN.fullmatch(raw_guard)
@@ -168,16 +146,13 @@ def correct_save_position_guard(text: str) -> tuple[str, str]:
     if SAVE_TREE_GUARD_PATTERN.search(condition):
         return text, 'already_satisfied'
     newline = '\r\n' if lines[guard_index].endswith('\r\n') else '\n' if lines[guard_index].endswith('\n') else ''
-    lines[guard_index] = (
-        f'{match.group("indent")}if {condition} and player.is_inside_tree():' + newline
-    )
+    lines[guard_index] = f'{match.group("indent")}if {condition} and player.is_inside_tree():' + newline
     return ''.join(lines), 'applied'
 
 
 def ensure_npc_scene(root: Path) -> dict:
     path = root / NPC_SCENE_RELATIVE
     path.parent.mkdir(parents=True, exist_ok=True)
-    state: str
     if path.exists():
         if not path.is_file():
             raise RuntimeError(f'NPC scene path is not a file: {NPC_SCENE_RELATIVE}')
@@ -185,21 +160,14 @@ def ensure_npc_scene(root: Path) -> dict:
         if text == NPC_SCENE_CONTENT:
             state = 'already_satisfied'
         elif 'res://scripts/npc_pedestrian.gd' in text and 'type="CharacterBody3D"' in text:
-            path.write_text(NPC_SCENE_CONTENT, encoding='utf-8')
-            state = 'replaced'
+            path.write_text(NPC_SCENE_CONTENT, encoding='utf-8'); state = 'replaced'
         else:
             raise RuntimeError(f'existing NPC scene is incompatible: {NPC_SCENE_RELATIVE}')
     else:
-        path.write_text(NPC_SCENE_CONTENT, encoding='utf-8')
-        state = 'generated'
+        path.write_text(NPC_SCENE_CONTENT, encoding='utf-8'); state = 'generated'
     if path.read_text(encoding='utf-8') != NPC_SCENE_CONTENT:
         raise RuntimeError(f'canonical NPC scene verification failed: {NPC_SCENE_RELATIVE}')
-    return {
-        'path': NPC_SCENE_RELATIVE,
-        'state': state,
-        'sha256': sha(path.read_bytes()),
-        'reason': 'provide one deterministic project-loadable NPCPedestrian scene for NPCManager preload',
-    }
+    return {'path': NPC_SCENE_RELATIVE, 'state': state, 'sha256': sha(path.read_bytes()), 'reason': 'provide one deterministic project-loadable NPCPedestrian scene for NPCManager preload'}
 
 
 def collect_diagnostic_sources(root: Path) -> dict[str, str]:
@@ -216,53 +184,41 @@ def collect_diagnostic_sources(root: Path) -> dict[str, str]:
 
 
 def apply(root: Path) -> dict:
-    results=[]
-    npc_path=root/'scripts/npc_pedestrian.gd'
+    results = []
+    npc_path = root / 'scripts/npc_pedestrian.gd'
     if not npc_path.is_file():
         raise RuntimeError('correction target missing: scripts/npc_pedestrian.gd')
-    npc_before=npc_path.read_bytes(); npc_text=npc_before.decode('utf-8')
-    npc_text,npc_state=correct_npc_anim_player(npc_text)
-    npc_path.write_text(npc_text,encoding='utf-8'); npc_after=npc_path.read_bytes()
-    results.append({
-        'path':'scripts/npc_pedestrian.gd',
-        'before_sha256':sha(npc_before),
-        'after_sha256':sha(npc_after),
-        'states':[npc_state],
-        'reasons':['avoid get_meta runtime errors when imported NPC models have no AnimationPlayer metadata'],
-    })
-    save_path=root/'scripts/save_manager.gd'
+    before = npc_path.read_bytes(); text = before.decode('utf-8')
+    text, state = correct_npc_anim_player(text); npc_path.write_text(text, encoding='utf-8'); after = npc_path.read_bytes()
+    results.append({'path':'scripts/npc_pedestrian.gd','before_sha256':sha(before),'after_sha256':sha(after),'states':[state],'reasons':['avoid get_meta runtime errors when imported NPC models have no AnimationPlayer metadata']})
+
+    save_path = root / 'scripts/save_manager.gd'
     if not save_path.is_file():
         raise RuntimeError('correction target missing: scripts/save_manager.gd')
-    save_before=save_path.read_bytes(); save_text=save_before.decode('utf-8')
-    save_text,save_state=correct_save_position_guard(save_text)
-    save_path.write_text(save_text,encoding='utf-8'); save_after=save_path.read_bytes()
-    results.append({
-        'path':'scripts/save_manager.gd',
-        'before_sha256':sha(save_before),
-        'after_sha256':sha(save_after),
-        'states':[save_state],
-        'reasons':['avoid global-transform access after the player has left the SceneTree during teardown save'],
-    })
+    before = save_path.read_bytes(); text = before.decode('utf-8')
+    text, state = correct_save_position_guard(text); save_path.write_text(text, encoding='utf-8'); after = save_path.read_bytes()
+    results.append({'path':'scripts/save_manager.gd','before_sha256':sha(before),'after_sha256':sha(after),'states':[state],'reasons':['avoid global-transform access after the player has left the SceneTree during teardown save']})
+
     for relative, replacements in CORRECTIONS.items():
-        path=root/relative
+        path = root / relative
         if not path.is_file():
             raise RuntimeError(f'correction target missing: {relative}')
-        before=path.read_bytes(); text=before.decode('utf-8')
-        reasons=[]; states=[]
-        for old_variants,new,reason in replacements:
-            text,state=replace_variant(text,old_variants,new,relative)
+        before = path.read_bytes(); text = before.decode('utf-8'); reasons=[]; states=[]
+        for old_variants, new, reason in replacements:
+            text, state = replace_variant(text, old_variants, new, relative)
             states.append(state); reasons.append(reason)
-        path.write_text(text,encoding='utf-8')
-        after=path.read_bytes()
+        path.write_text(text, encoding='utf-8'); after = path.read_bytes()
         results.append({'path':relative,'before_sha256':sha(before),'after_sha256':sha(after),'states':states,'reasons':reasons})
-    generated_resources=[ensure_npc_scene(root)]
-    export=root/'export_presets.cfg'
-    text=export.read_text(encoding='utf-8')
-    text,n1=re.subn(r'(?m)^version/code=.*$', 'version/code=1404', text)
-    text,n2=re.subn(r'(?m)^version/name=.*$', 'version/name="1.4.0.4-premium-visual-qa"', text)
-    if (n1,n2)!=(1,1):
+
+    generated_resources = [ensure_npc_scene(root)]
+    export = root / 'export_presets.cfg'
+    text = export.read_text(encoding='utf-8')
+    text, n1 = re.subn(r'(?m)^version/code=.*$', 'version/code=1404', text)
+    text, n2 = re.subn(r'(?m)^version/name=.*$', 'version/name="1.4.0.4-premium-visual-qa"', text)
+    if (n1, n2) != (1, 1):
         raise RuntimeError(f'export version replacement failure: {(n1,n2)}')
-    export.write_text(text,encoding='utf-8')
+    export.write_text(text, encoding='utf-8')
+
     stale=[]; scanned=[]
     for path in runtime_text_paths(root):
         relative=path.relative_to(root).as_posix(); scanned.append(relative)
@@ -272,14 +228,7 @@ def apply(root: Path) -> dict:
             if token in body: stale.append({'path':relative,'token':token})
     if stale:
         raise RuntimeError(f'obsolete runtime title occurrences remain: {stale}')
-    return {
-        'conclusion':'pass',
-        'corrections':results,
-        'generated_runtime_resources':generated_resources,
-        'runtime_text_files_scanned':sorted(set(scanned)),
-        'obsolete_runtime_title_occurrences':stale,
-        'diagnostic_sources':collect_diagnostic_sources(root),
-    }
+    return {'conclusion':'pass','corrections':results,'generated_runtime_resources':generated_resources,'runtime_text_files_scanned':sorted(set(scanned)),'obsolete_runtime_title_occurrences':stale,'diagnostic_sources':collect_diagnostic_sources(root)}
 
 
 def main() -> int:
@@ -291,7 +240,9 @@ def main() -> int:
         a.report.parent.mkdir(parents=True,exist_ok=True)
         a.report.write_text(json.dumps({'conclusion':'fail','error_type':type(error).__name__,'error':str(error)},indent=2)+'\n',encoding='utf-8')
         raise
-    a.report.parent.mkdir(parents=True,exist_ok=True); a.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
+    a.report.parent.mkdir(parents=True,exist_ok=True)
+    a.report.write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     print(json.dumps(report,indent=2)); return 0
+
 
 if __name__=='__main__': raise SystemExit(main())
