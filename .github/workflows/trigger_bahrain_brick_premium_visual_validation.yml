@@ -1,0 +1,155 @@
+name: Trigger Bahrain Brick Premium Visual Validation
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+      SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+      APK_NAME: bahrain_brick_v14.0.4-premium-visual-qa.apk
+      PACKAGE_NAME: com.bahrainbrick.game.qa
+    steps:
+      - name: Check out validation merge
+        uses: actions/checkout@v4
+
+      - name: Bootstrap canonical gate runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3
+
+      - name: Execute canonical premium visual CI shell gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          workflow = Path('.github/workflows/build_bahrain_brick_premium_visual_qa.yml')
+          lines = workflow.read_text(encoding='utf-8').splitlines()
+          blocks = []
+          index = 0
+          while index < len(lines):
+              if lines[index].startswith('        run: |'):
+                  index += 1
+                  block = []
+                  while index < len(lines):
+                      line = lines[index]
+                      if line.startswith('          '):
+                          block.append(line[10:])
+                          index += 1
+                          continue
+                      if not line.strip():
+                          block.append('')
+                          index += 1
+                          continue
+                      break
+                  blocks.append('\n'.join(block).rstrip() + '\n')
+                  continue
+              index += 1
+
+          if len(blocks) != 10:
+              raise SystemExit(f'expected 10 canonical shell gates, found {len(blocks)}')
+
+          diagnostics = Path('validation-diagnostics')
+          diagnostics.mkdir(parents=True, exist_ok=True)
+          for number, script in enumerate(blocks, 1):
+              script_path = diagnostics / f'gate-{number:02d}.sh'
+              log_path = diagnostics / f'gate-{number:02d}.log'
+              script_path.write_text(script, encoding='utf-8')
+              print(f'::group::Canonical shell gate {number}/{len(blocks)}')
+              with log_path.open('w', encoding='utf-8') as log:
+                  process = subprocess.Popen(
+                      ['bash', '-lc', script],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT,
+                      text=True,
+                      bufsize=1,
+                  )
+                  assert process.stdout is not None
+                  for line in process.stdout:
+                      print(line, end='')
+                      log.write(line)
+                  returncode = process.wait()
+              print('::endgroup::')
+              if returncode != 0:
+                  (diagnostics / 'FAILED_GATE.txt').write_text(
+                      f'gate={number}\nreturncode={returncode}\nscript={script_path}\nlog={log_path}\n',
+                      encoding='utf-8',
+                  )
+                  raise SystemExit(returncode)
+          (diagnostics / 'ALL_GATES_PASSED.txt').write_text('10 canonical gates passed\n', encoding='utf-8')
+          PY
+
+      - name: Publish validation failure diagnostics
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const root = 'validation-diagnostics';
+            let body = '## Premium visual validation failure\n\n';
+            if (!fs.existsSync(root)) {
+              body += '`validation-diagnostics` was not created; failure occurred before the canonical gate runner initialized.\n';
+            } else {
+              const failedPath = path.join(root, 'FAILED_GATE.txt');
+              const failed = fs.existsSync(failedPath) ? fs.readFileSync(failedPath, 'utf8') : 'FAILED_GATE.txt missing';
+              const match = failed.match(/gate=(\d+)/);
+              const gate = match ? match[1].padStart(2, '0') : null;
+              body += `**Failure metadata**\n\n\`\`\`text\n${failed}\`\`\`\n\n`;
+              if (gate) {
+                const logPath = path.join(root, `gate-${gate}.log`);
+                const scriptPath = path.join(root, `gate-${gate}.sh`);
+                if (fs.existsSync(logPath)) {
+                  const lines = fs.readFileSync(logPath, 'utf8').split('\n');
+                  const tail = lines.slice(-160).join('\n');
+                  body += `**Gate ${gate} log tail**\n\n\`\`\`text\n${tail.slice(-45000)}\n\`\`\`\n\n`;
+                }
+                if (fs.existsSync(scriptPath)) {
+                  const script = fs.readFileSync(scriptPath, 'utf8');
+                  body += `**Gate ${gate} script**\n\n\`\`\`bash\n${script.slice(0,12000)}\n\`\`\`\n`;
+                }
+              }
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body.slice(0, 60000),
+            });
+
+      - name: Upload premium APK, source, workspace, evidence and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-visual-qa
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-qa.apk*
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-source.zip*
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-workspace.zip*
+            recovery/v14/build/logs/**
+            recovery/v14/build/reports/**
+            baseline/v14/build/logs/**
+            baseline/v14/build/premium_visual_evidence/**
+            recovery/v14/build/premium_visual_evidence/**
+            recovery/v14/build/visual_evidence/**
+            validation-diagnostics/**
