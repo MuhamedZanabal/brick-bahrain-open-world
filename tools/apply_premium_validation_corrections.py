@@ -4,12 +4,6 @@ import argparse, hashlib, json, re
 from pathlib import Path
 
 CORRECTIONS = {
-    'scripts/save_manager.gd': [((
-        '\tif player:\n\t\tsave_data["player"]["position"] = {',
-    ),
-        '\tif player and player.is_inside_tree():\n\t\tsave_data["player"]["position"] = {',
-        'avoid global-transform access after the player has left the SceneTree during teardown save',
-    )],
     'scripts/world.gd': [((
         '\ttitle.text = "BRICK BAHRAIN"',
     ),
@@ -35,6 +29,12 @@ NPC_SAFE_TEMPLATE = (
     '{indent}{variable} = (_model.get_meta("anim_player") as AnimationPlayer) '
     'if _model.has_meta("anim_player") else null'
 )
+SAVE_POSITION_ASSIGNMENT_PATTERN = re.compile(
+    r'^[ \t]*save_data\s*\[\s*["\']player["\']\s*\]\s*'
+    r'\[\s*["\']position["\']\s*\]\s*=\s*\{\s*$'
+)
+SAVE_CONDITION_PATTERN = re.compile(r'^(?P<indent>[ \t]*)if\s+(?P<condition>.+):\s*$')
+SAVE_TREE_GUARD_PATTERN = re.compile(r'\bplayer\.is_inside_tree\s*\(\s*\)')
 
 
 def sha(data: bytes) -> str:
@@ -98,6 +98,42 @@ def correct_npc_anim_player(text: str) -> tuple[str, str]:
     )
 
 
+def correct_save_position_guard(text: str) -> tuple[str, str]:
+    lines = text.splitlines(keepends=True)
+    assignment_indices = [
+        index for index, line in enumerate(lines)
+        if SAVE_POSITION_ASSIGNMENT_PATTERN.fullmatch(line.rstrip('\r\n'))
+    ]
+    if len(assignment_indices) != 1:
+        candidates = [
+            line.strip() for line in lines
+            if 'save_data' in line and ('position' in line or 'global_position' in line)
+        ]
+        raise RuntimeError(
+            'save position assignment mismatch: '
+            f'assignment_count={len(assignment_indices)}, candidates={candidates}'
+        )
+    assignment_index = assignment_indices[0]
+    condition_index = assignment_index - 1
+    while condition_index >= 0 and not lines[condition_index].strip():
+        condition_index -= 1
+    if condition_index < 0:
+        raise RuntimeError('save position assignment has no preceding condition')
+    condition_line = lines[condition_index].rstrip('\r\n')
+    match = SAVE_CONDITION_PATTERN.fullmatch(condition_line)
+    if not match or not re.search(r'\bplayer\b', match.group('condition')):
+        context = [line.rstrip('\r\n') for line in lines[max(0, condition_index - 2):assignment_index + 2]]
+        raise RuntimeError(f'save position guard is not a player condition: context={context}')
+    condition = match.group('condition').strip()
+    if SAVE_TREE_GUARD_PATTERN.search(condition):
+        return text, 'already_satisfied'
+    newline = '\r\n' if lines[condition_index].endswith('\r\n') else '\n' if lines[condition_index].endswith('\n') else ''
+    lines[condition_index] = (
+        f'{match.group("indent")}if {condition} and player.is_inside_tree():' + newline
+    )
+    return ''.join(lines), 'applied'
+
+
 def ensure_npc_scene(root: Path) -> dict:
     path = root / NPC_SCENE_RELATIVE
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -133,6 +169,19 @@ def apply(root: Path) -> dict:
         'after_sha256':sha(npc_after),
         'states':[npc_state],
         'reasons':['avoid get_meta runtime errors when imported NPC models have no AnimationPlayer metadata'],
+    })
+    save_path=root/'scripts/save_manager.gd'
+    if not save_path.is_file():
+        raise RuntimeError('correction target missing: scripts/save_manager.gd')
+    save_before=save_path.read_bytes(); save_text=save_before.decode('utf-8')
+    save_text,save_state=correct_save_position_guard(save_text)
+    save_path.write_text(save_text,encoding='utf-8'); save_after=save_path.read_bytes()
+    results.append({
+        'path':'scripts/save_manager.gd',
+        'before_sha256':sha(save_before),
+        'after_sha256':sha(save_after),
+        'states':[save_state],
+        'reasons':['avoid global-transform access after the player has left the SceneTree during teardown save'],
     })
     for relative, replacements in CORRECTIONS.items():
         path=root/relative
