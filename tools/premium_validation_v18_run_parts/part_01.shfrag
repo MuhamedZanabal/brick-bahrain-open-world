@@ -1,11 +1,3 @@
-grep -q '28 passed, 0 failed' "$LOG/mobile-input-regression-premium.log"
-run_godot presentation-flow-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/presentation" \
-  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy \
-  res://scenes/presentation_flow_test.tscn -- --presentation-test
-grep -q '10 passed, 0 failed' "$LOG/presentation-flow-premium.log"
-run_godot premium-world-acceptance env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/premium-world" \
-  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy res://scenes/premium_world_acceptance_test.tscn
-grep -q '12 passed, 0 failed' "$LOG/premium-world-acceptance.log"
 PREMIUM_PRESENTATION_SCENE='res://scenes/premium_presentation_acceptance_test.tscn'
 test -f "$ROOT/scenes/premium_presentation_acceptance_test.tscn"
 run_godot premium-presentation-acceptance env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/premium-presentation" \
@@ -25,13 +17,13 @@ LIFECYCLE_SCENE='res://scenes/world_lifecycle_guard_test.tscn'
 test -f "$ROOT/scenes/world_lifecycle_guard_test.tscn"
 run_godot world-lifecycle-guard env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/lifecycle" \
   timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy "$LIFECYCLE_SCENE"
-grep -q 'World lifecycle guard complete: 10 passed, 0 failed' "$LOG/world-lifecycle-guard.log"
+grep -q 'World lifecycle guard complete: 12 passed, 0 failed' "$LOG/world-lifecycle-guard.log"
 ! grep -Fq 'Condition "!is_inside_tree()" is true. Returning: Transform3D()' "$LOG/world-lifecycle-guard.log"
 python3 - "$REPORT/WORLD_LIFECYCLE_GUARD_RESULT.json" "$LIFECYCLE_SCENE" <<'PY'
 import json,sys
 from pathlib import Path
 out,scene=sys.argv[1:]
-Path(out).write_text(json.dumps({'scene':scene,'configured_assertion_count':10,'passed':10,'failed':0,'process_exit_code':0,'protected_world_exit_sha256':'fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc'},indent=2)+'\n')
+Path(out).write_text(json.dumps({'scene':scene,'configured_assertion_count':12,'passed':12,'failed':0,'process_exit_code':0,'protected_world_exit_sha256':'fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc'},indent=2)+'\n')
 PY
 
 RESOURCE_REPEAT_SCENE='res://scenes/world_resource_repeat_test.tscn'
@@ -58,3 +50,5 @@ run_godot world-evidence-after timeout 1500 xvfb-run -a -s "-screen 0 1280x720x2
   res://scenes/premium_world_visual_evidence.tscn -- --output=res://build/premium_visual_evidence/after
 grep -q 'PREMIUM WORLD VISUAL EVIDENCE COMPLETE' "$LOG/world-evidence-after.log"
 run_godot presentation-visual-premium timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path "$ROOT" --audio-driver Dummy --display-driver x11 --rendering-method gl_compatibility \
+  res://scenes/presentation_visual_evidence.tscn -- --presentation-test
