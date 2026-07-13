@@ -363,6 +363,11 @@ def main() -> int:
     if not (project / "project.godot").is_file():
         raise SystemExit("project.godot missing")
     tools = Path(__file__).resolve().parent
+    github_env = os.environ.get("GITHUB_ENV", "")
+    if github_env:
+        repo_root = tools.parent.resolve().as_posix()
+        with Path(github_env).open("a", encoding="utf-8") as env_file:
+            env_file.write(f"PYTHONPATH={repo_root}\n")
     before = {relative: sha256_file(project / relative) for relative in FROZEN}
 
     v2_payload = load_v2_payload(tools)
