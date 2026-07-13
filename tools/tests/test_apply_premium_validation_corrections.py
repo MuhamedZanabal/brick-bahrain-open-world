@@ -6,12 +6,12 @@ spec=importlib.util.spec_from_file_location('corrections',MODULE); mod=importlib
 class CorrectionTests(unittest.TestCase):
     def fixture(self,root:Path,npc_variant:str='with_default'):
         (root/'scripts').mkdir()
-        npc_line=(
-            '\t\t_anim_player = _model.get_meta("anim_player", null)\n'
-            if npc_variant=='with_default'
-            else '\t\t_anim_player = _model.get_meta("anim_player")\n'
-        )
-        (root/'scripts/npc_pedestrian.gd').write_text(npc_line)
+        variants={
+            'with_default':'\t\t_anim_player = _model.get_meta("anim_player", null)\n',
+            'without_default':'\t\t_anim_player = _model.get_meta("anim_player")\n',
+            'typed_cast':'    _anim_player = _model.get_meta(&"anim_player") as AnimationPlayer\n',
+        }
+        (root/'scripts/npc_pedestrian.gd').write_text(variants[npc_variant])
         (root/'scripts/save_manager.gd').write_text('\tif player:\n\t\tsave_data["player"]["position"] = {\n')
         (root/'scripts/world.gd').write_text('\ttitle.text = "BRICK BAHRAIN"\n')
         (root/'export_presets.cfg').write_text('version/code=1\nversion/name="old"\n')
@@ -33,6 +33,12 @@ class CorrectionTests(unittest.TestCase):
             body=(root/'scripts/npc_pedestrian.gd').read_text()
             self.assertIn('has_meta("anim_player")',body)
             self.assertNotIn('get_meta("anim_player")\n',body)
+    def test_repairs_typed_string_name_variant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); self.fixture(root,'typed_cast'); mod.apply(root)
+            body=(root/'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('has_meta("anim_player")',body)
+            self.assertIn('as AnimationPlayer',body)
     def test_is_idempotent_when_corrections_are_already_satisfied(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); self.fixture(root); mod.apply(root); report=mod.apply(root)
