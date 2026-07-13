@@ -33,6 +33,7 @@ class CorrectionTests(unittest.TestCase):
             raise AssertionError(save_shape)
         (root/'scripts/save_manager.gd').write_text(save_source)
         (root/'scripts/world.gd').write_text('\ttitle.text = "BRICK BAHRAIN"\n')
+        (root/'scripts/npc_manager.gd').write_text('const NPC_SCENE = preload("res://scenes/npc_pedestrian.tscn")\n')
         (root/'export_presets.cfg').write_text('version/code=1\nversion/name="old"\n')
         (root/'project.godot').write_text('[application]\nconfig/name="Bahrain Brick"\n')
     def test_applies_exact_corrections_and_generates_missing_npc_scene(self):
@@ -44,8 +45,10 @@ class CorrectionTests(unittest.TestCase):
             self.assertIn('Bahrain Brick',(root/'scripts/world.gd').read_text())
             scene=root/'scenes/npc_pedestrian.tscn'
             self.assertTrue(scene.is_file())
-            self.assertIn('res://scripts/npc_pedestrian.gd',scene.read_text())
+            self.assertEqual(scene.read_text(),mod.NPC_SCENE_CONTENT)
             self.assertEqual(report['generated_runtime_resources'][0]['state'],'generated')
+            self.assertIn('scripts/save_manager.gd',report['diagnostic_sources'])
+            self.assertIn('scenes/npc_pedestrian.tscn',report['diagnostic_sources'])
     def test_repairs_recovered_get_meta_variant_without_default(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); self.fixture(root,'without_default'); mod.apply(root)
@@ -89,6 +92,15 @@ class CorrectionTests(unittest.TestCase):
             root=Path(tmp); self.fixture(root,'recovered_variable'); mod.apply(root); report=mod.apply(root)
             self.assertTrue(all(item['states']==['already_satisfied'] for item in report['corrections']))
             self.assertEqual(report['generated_runtime_resources'][0]['state'],'already_satisfied')
+    def test_compatible_noncanonical_npc_scene_is_replaced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); self.fixture(root); (root/'scenes').mkdir()
+            (root/'scenes/npc_pedestrian.tscn').write_text(
+                mod.NPC_SCENE_CONTENT + 'metadata/test_only = true\n'
+            )
+            report=mod.apply(root)
+            self.assertEqual((root/'scenes/npc_pedestrian.tscn').read_text(),mod.NPC_SCENE_CONTENT)
+            self.assertEqual(report['generated_runtime_resources'][0]['state'],'replaced')
     def test_incompatible_existing_npc_scene_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); self.fixture(root); (root/'scenes').mkdir(); (root/'scenes/npc_pedestrian.tscn').write_text('invalid\n')
