@@ -80,6 +80,7 @@ jobs:
             tools/apply_premium_validation_corrections.py \
             tools/apply_post_lifecycle_teardown_guards.py \
             tools/apply_visual_evidence_shutdown_fix.py \
+            tools/generate_premium_comparison_report.py \
             tools/scan_godot_runtime_errors.py \
             tools/package_premium_validation_artifacts.py
           python3 -m unittest \
@@ -88,6 +89,7 @@ jobs:
             tools/tests/test_apply_post_lifecycle_teardown_guards.py \
             tools/tests/test_apply_visual_evidence_shutdown_fix.py \
             tools/tests/test_correction_stdout_summary.py \
+            tools/tests/test_generate_premium_comparison_report.py \
             tools/tests/test_v3_patch_restore.py
           bash -n tools/install_godot_43_templates.sh
           bash -n tools/run_premium_validation_ci.sh
@@ -160,6 +162,8 @@ jobs:
           path: |
             validation-diagnostics/**
             source-archive-integrity.txt
+            baseline/v14/build/logs/**
+            baseline/v14/build/premium_visual_evidence/**
             recovery/v14/build/reports/**
             recovery/v14/build/logs/**
             recovery/v14/build/premium_visual_evidence/**
