@@ -1,0 +1,3 @@
+Premium authority: 3fd3dc3effff3cdfe0c35173a53f9e02c6ee9f3b
+Purpose: validate guarded world teardown player transform access.
+Do not merge this validation branch.
