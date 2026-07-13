@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import zipfile
 from pathlib import Path
 
 
@@ -92,6 +93,28 @@ def prepare_release_smoke_harness(project: Path) -> None:
     )
 
 
+def package_applied_source_snapshot(project: Path) -> None:
+    """Persist the exact post-overlay source needed for diagnosis and review."""
+    reports = project / "build/reports"
+    reports.mkdir(parents=True, exist_ok=True)
+    output = reports / "APPLIED_SOURCE_SNAPSHOT.zip"
+    roots = ["scripts", "scenes", "tests", "shaders"]
+    standalone = ["project.godot", "export_presets.cfg"]
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+        for root_name in roots:
+            root = project / root_name
+            if not root.is_dir():
+                continue
+            for path in sorted(root.rglob("*")):
+                if path.is_file():
+                    archive.write(path, path.relative_to(project).as_posix())
+        for name in standalone:
+            path = project / name
+            if path.is_file():
+                archive.write(path, name)
+    print(f"Applied source snapshot: {output} ({output.stat().st_size} bytes)")
+
+
 def normalize_gate_script(gate: int, script: str) -> str:
     if gate == 5:
         occurrence_count = script.count(MISSING_RELEASE_SMOKE_SCENE)
@@ -100,6 +123,14 @@ def normalize_gate_script(gate: int, script: str) -> str:
                 "gate 5 smoke reference mismatch: "
                 f"expected one {MISSING_RELEASE_SMOKE_SCENE!r}, found {occurrence_count}"
             )
+    if gate == 7:
+        script = replace_expected(
+            script,
+            "—",
+            "-",
+            "Pillow-safe comparison label",
+            expected_count=4,
+        )
     return script
 
 
@@ -150,6 +181,9 @@ def main() -> int:
             encoding="utf-8",
         )
         return returncode
+
+    if number == 4:
+        package_applied_source_snapshot(Path("recovery/v14"))
 
     (diagnostics / f"GATE_{number:02d}_PASSED.txt").write_text(
         f"canonical gate {number} passed\n", encoding="utf-8"
