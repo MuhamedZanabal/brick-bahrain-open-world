@@ -1,0 +1,6 @@
+Bahrain Brick premium visual validation v21
+Premium authority: 0a8b71d268737f34a925f09794a294d4463d4374
+Protected world teardown SHA-256: fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc
+Purpose: validate detached-player and detached-pedestrian LOD guards during world evidence teardown.
+Targeted correction tests: 21 passed, 0 failed.
+Do not merge this validation-only branch.
