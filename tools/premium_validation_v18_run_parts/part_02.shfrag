@@ -1,0 +1,60 @@
+  godot --path "$ROOT" --audio-driver Dummy --display-driver x11 --rendering-method gl_compatibility \
+  res://scenes/presentation_visual_evidence.tscn -- --presentation-test
+grep -q 'presentation visual evidence complete' "$LOG/presentation-visual-premium.log"
+run_godot mobile-input-visual-premium timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path "$ROOT" --audio-driver Dummy --display-driver x11 --rendering-method gl_compatibility \
+  res://scenes/mobile_input_visual_evidence.tscn
+grep -q 'rendered control evidence complete' "$LOG/mobile-input-visual-premium.log"
+ffmpeg -y -framerate 15 -i "$VIS/startup_frames/frame_%04d.png" \
+  -vf 'scale=1280:-2:flags=lanczos' -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p \
+  "$VIS/bahrain_brick_v14.0.4_startup.mp4" >/dev/null 2>&1
+ffmpeg -y -framerate 12 -i "$VIS/frames/frame_%04d.png" \
+  -vf 'scale=1280:-2:flags=lanczos' -c:v libx264 -preset medium -crf 22 -pix_fmt yuv420p \
+  "$VIS/bahrain_brick_v14.0.4_gameplay.mp4" >/dev/null 2>&1
+
+python3 tools/scan_godot_runtime_errors.py "$LOG" \
+  --json-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.json" \
+  --markdown-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.md"
+
+# Matched comparisons and hosted performance report.
+python3 - "$BASELINE" "$ROOT" <<'PY'
+from pathlib import Path
+from PIL import Image,ImageDraw,ImageStat
+import json,sys
+baseline,root=map(Path,sys.argv[1:])
+before=baseline/'build/premium_visual_evidence/before'; after=root/'build/premium_visual_evidence/after'
+out=root/'build/premium_visual_evidence/comparisons'; out.mkdir(parents=True,exist_ok=True)
+names=['city_road','waterfront','building_area','daylight','player_character','vehicle','hud_walking','hud_vehicle']
+metrics=[]
+for name in names:
+ b=Image.open(before/f'{name}.png').convert('RGB'); a=Image.open(after/f'{name}.png').convert('RGB')
+ if b.size!=(1280,720) or a.size!=(1280,720): raise SystemExit(f'bad dimensions {name}: {b.size}/{a.size}')
+ c=Image.new('RGB',(2560,760),(18,18,22)); c.paste(b,(0,40)); c.paste(a,(1280,40)); d=ImageDraw.Draw(c)
+ d.text((20,12),f'BEFORE — v1.4.0.3 — {name}',fill='white'); d.text((1300,12),f'AFTER — v1.4.0.4 — {name}',fill='white'); c.save(out/f'{name}_before_after.png',optimize=True)
+ def stat(im):
+  s=im.resize((160,90)); px=list(s.getdata()); total=len(px)
+  return {'mean_luminance':round(sum(ImageStat.Stat(s).mean)/3,3),'near_white_ratio':round(sum(1 for r,g,b in px if min(r,g,b)>246)/total,6),'near_black_ratio':round(sum(1 for r,g,b in px if max(r,g,b)<12)/total,6)}
+ metrics.append({'view':name,'before':stat(b),'after':stat(a)})
+report={'classification':'hosted GL Compatibility/software rendering; not physical Android performance','views':metrics,'baseline_runtime':json.loads((before/'PREMIUM_WORLD_VISUAL_EVIDENCE.json').read_text()),'premium_runtime':json.loads((after/'PREMIUM_WORLD_VISUAL_EVIDENCE.json').read_text()),'physical_android_tested':False}
+(root/'build/reports/PREMIUM_VISUAL_COMPARISON_AND_PERFORMANCE.json').write_text(json.dumps(report,indent=2)+'\n')
+PY
+python3 tools/verify_frozen_controls.py "$ROOT" \
+  --json-out "$REPORT/FROZEN_CONTROLS_POST_TEST.json" \
+  --markdown-out "$REPORT/FROZEN_CONTROLS_POST_TEST.md"
+
+# Matching official Godot templates, real export, then binary inspection.
+bash tools/install_godot_43_templates.sh "$REPORT/GODOT_EXPORT_TEMPLATE_REPORT.json" "$ROOT"
+KEYSTORE_DIR="${RUNNER_TEMP:-/tmp}/bahrain-brick-premium-qa"; mkdir -p "$KEYSTORE_DIR"
+KEYSTORE_PATH="$KEYSTORE_DIR/debug.keystore"; rm -f "$KEYSTORE_PATH"
+keytool -genkeypair -noprompt -keystore "$KEYSTORE_PATH" -storepass android -alias androiddebugkey \
+  -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname 'CN=Bahrain Brick Premium Visual QA,O=Zanabal Gaming,C=BH'
+python3 - "$ROOT/export_presets.cfg" "$KEYSTORE_PATH" <<'PY'
+from pathlib import Path
+import re,sys
+p=Path(sys.argv[1]); t=p.read_text(); key=Path(sys.argv[2]).resolve().as_posix()
+t,n=re.subn(r'(?m)^keystore/debug=.*$',f'keystore/debug="{key}"',t)
+if n!=1: raise SystemExit(f'keystore replacement count={n}')
+p.write_text(t)
+PY
+run_godot android-export-premium godot --headless --path "$ROOT" --verbose --export-debug Android "$ROOT/build/$APK_NAME"
