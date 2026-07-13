@@ -95,6 +95,48 @@ def correct_npc_anim_player(text: str) -> tuple[str, str]:
     )
 
 
+def correct_npc_manager_lod_guard(text: str) -> tuple[str, list[str]]:
+    block = function_block(text, '_refresh_lod')
+    unsafe_player_count = block.count(NPC_MANAGER_UNSAFE_PLAYER_GUARD)
+    safe_player_count = block.count(NPC_MANAGER_SAFE_PLAYER_GUARD)
+    if unsafe_player_count == 1 and safe_player_count == 0:
+        block = block.replace(
+            NPC_MANAGER_UNSAFE_PLAYER_GUARD,
+            NPC_MANAGER_SAFE_PLAYER_GUARD,
+            1,
+        )
+        player_state = 'applied'
+    elif unsafe_player_count == 0 and safe_player_count == 1:
+        player_state = 'already_satisfied'
+    else:
+        raise RuntimeError(
+            'NPC manager player LOD guard mismatch: '
+            f'unsafe_count={unsafe_player_count}, safe_count={safe_player_count}'
+        )
+
+    unsafe_pedestrian_count = block.count(NPC_MANAGER_UNSAFE_PEDESTRIAN_GUARD)
+    safe_pedestrian_count = block.count(NPC_MANAGER_SAFE_PEDESTRIAN_GUARD)
+    if unsafe_pedestrian_count == 1 and safe_pedestrian_count == 0:
+        block = block.replace(
+            NPC_MANAGER_UNSAFE_PEDESTRIAN_GUARD,
+            NPC_MANAGER_SAFE_PEDESTRIAN_GUARD,
+            1,
+        )
+        pedestrian_state = 'applied'
+    elif unsafe_pedestrian_count == 0 and safe_pedestrian_count == 1:
+        pedestrian_state = 'already_satisfied'
+    else:
+        raise RuntimeError(
+            'NPC manager pedestrian LOD guard mismatch: '
+            f'unsafe_count={unsafe_pedestrian_count}, safe_count={safe_pedestrian_count}'
+        )
+
+    original = function_block(text, '_refresh_lod')
+    if text.count(original) != 1:
+        raise RuntimeError('NPC manager _refresh_lod block is not unique')
+    return text.replace(original, block, 1), [player_state, pedestrian_state]
+
+
 def correct_save_position_guard(text: str) -> tuple[str, str]:
     lines = text.splitlines(keepends=True)
     access_indices = [
