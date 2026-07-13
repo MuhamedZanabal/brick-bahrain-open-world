@@ -83,6 +83,24 @@ def apply(root: Path) -> dict:
         ],
     })
 
+    npc_manager_path = root / 'scripts/npc_manager.gd'
+    if not npc_manager_path.is_file():
+        raise RuntimeError('correction target missing: scripts/npc_manager.gd')
+    before = npc_manager_path.read_bytes()
+    text, states = correct_npc_manager_lod_guard(before.decode('utf-8'))
+    npc_manager_path.write_text(text, encoding='utf-8')
+    after = npc_manager_path.read_bytes()
+    results.append({
+        'path': 'scripts/npc_manager.gd',
+        'before_sha256': sha(before),
+        'after_sha256': sha(after),
+        'states': states,
+        'reasons': [
+            'avoid detached-player global-position access during LOD refresh at world teardown',
+            'avoid detached-pedestrian global-position access during LOD ranking at world teardown',
+        ],
+    })
+
     save_path = root / 'scripts/save_manager.gd'
     if not save_path.is_file():
         raise RuntimeError('correction target missing: scripts/save_manager.gd')
