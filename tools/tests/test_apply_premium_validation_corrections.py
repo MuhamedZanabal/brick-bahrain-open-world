@@ -10,6 +10,7 @@ class CorrectionTests(unittest.TestCase):
             'with_default':'\t\t_anim_player = _model.get_meta("anim_player", null)\n',
             'without_default':'\t\t_anim_player = _model.get_meta("anim_player")\n',
             'typed_cast':'    _anim_player = _model.get_meta(&"anim_player") as AnimationPlayer\n',
+            'recovered_variable':'\t\t_animation_player = _model.get_meta("anim_player", null) as AnimationPlayer\n',
         }
         (root/'scripts/npc_pedestrian.gd').write_text(variants[npc_variant])
         (root/'scripts/save_manager.gd').write_text('\tif player:\n\t\tsave_data["player"]["position"] = {\n')
@@ -37,11 +38,20 @@ class CorrectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); self.fixture(root,'typed_cast'); mod.apply(root)
             body=(root/'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('_anim_player =',body)
             self.assertIn('has_meta("anim_player")',body)
             self.assertIn('as AnimationPlayer',body)
+    def test_repairs_actual_recovered_animation_player_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); self.fixture(root,'recovered_variable'); mod.apply(root)
+            body=(root/'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('_animation_player =',body)
+            self.assertIn('has_meta("anim_player")',body)
+            self.assertIn('as AnimationPlayer',body)
+            self.assertNotIn('\n\t\t_anim_player =',body)
     def test_is_idempotent_when_corrections_are_already_satisfied(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); self.fixture(root); mod.apply(root); report=mod.apply(root)
+            root=Path(tmp); self.fixture(root,'recovered_variable'); mod.apply(root); report=mod.apply(root)
             self.assertTrue(all(item['states']==['already_satisfied'] for item in report['corrections']))
             self.assertEqual(report['generated_runtime_resources'][0]['state'],'already_satisfied')
     def test_incompatible_existing_npc_scene_fails_closed(self):
