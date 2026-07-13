@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,hashlib,importlib.util,json,subprocess,tempfile
-from v3_patch_restore import restore_missing_new_files
+import argparse,hashlib,importlib.util,json
+from v3_patch_restore import apply_patch_isolated, restore_missing_new_files
 from pathlib import Path
 
 MODULE_PATH=Path(__file__).resolve().parent/'apply_bahrain_brick_premium_world_overlay.py'
@@ -19,10 +19,7 @@ def apply_v3(project:Path,patch:bytes,expected:dict[str,str])->tuple[list[str],l
         if target.exists():
             if not target.is_file(): raise RuntimeError(f'new-file collision is not a file: {relative}')
             target.unlink(); collisions.append(relative)
-    with tempfile.NamedTemporaryFile(prefix='bahrain-brick-v3-',suffix='.patch') as handle:
-        handle.write(patch); handle.flush()
-        subprocess.run(['git','apply','--check','--unsafe-paths',handle.name],cwd=project,check=True)
-        subprocess.run(['git','apply','--unsafe-paths','--whitespace=nowarn',handle.name],cwd=project,check=True)
+    apply_patch_isolated(project, patch)
     restored=restore_missing_new_files(project,patch,expected,set(base._v3_new_file_paths(patch)))
     for relative,digest in sorted(expected.items()):
         target=project/relative
