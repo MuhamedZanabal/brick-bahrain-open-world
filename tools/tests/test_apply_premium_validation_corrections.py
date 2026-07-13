@@ -4,7 +4,7 @@ MODULE=Path(__file__).resolve().parents[1]/'apply_premium_validation_corrections
 spec=importlib.util.spec_from_file_location('corrections',MODULE); mod=importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
 
 class CorrectionTests(unittest.TestCase):
-    def fixture(self,root:Path,npc_variant:str='with_default'):
+    def fixture(self,root:Path,npc_variant:str='with_default',save_condition:str='if player:'):
         (root/'scripts').mkdir()
         variants={
             'with_default':'\t\t_anim_player = _model.get_meta("anim_player", null)\n',
@@ -13,7 +13,9 @@ class CorrectionTests(unittest.TestCase):
             'recovered_variable':'\t\t_animation_player = _model.get_meta("anim_player", null) as AnimationPlayer\n',
         }
         (root/'scripts/npc_pedestrian.gd').write_text(variants[npc_variant])
-        (root/'scripts/save_manager.gd').write_text('\tif player:\n\t\tsave_data["player"]["position"] = {\n')
+        (root/'scripts/save_manager.gd').write_text(
+            '\t%s\n\t\tsave_data["player"]["position"] = {\n' % save_condition
+        )
         (root/'scripts/world.gd').write_text('\ttitle.text = "BRICK BAHRAIN"\n')
         (root/'export_presets.cfg').write_text('version/code=1\nversion/name="old"\n')
         (root/'project.godot').write_text('[application]\nconfig/name="Bahrain Brick"\n')
@@ -49,6 +51,16 @@ class CorrectionTests(unittest.TestCase):
             self.assertIn('has_meta("anim_player")',body)
             self.assertIn('as AnimationPlayer',body)
             self.assertNotIn('\n\t\t_anim_player =',body)
+    def test_adds_tree_guard_to_semantic_player_condition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); self.fixture(root,save_condition='if is_instance_valid(player):'); mod.apply(root)
+            body=(root/'scripts/save_manager.gd').read_text()
+            self.assertIn('if is_instance_valid(player) and player.is_inside_tree():',body)
+    def test_save_guard_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); self.fixture(root,save_condition='if player and player.is_inside_tree():'); report=mod.apply(root)
+            save_result=next(item for item in report['corrections'] if item['path']=='scripts/save_manager.gd')
+            self.assertEqual(save_result['states'],['already_satisfied'])
     def test_is_idempotent_when_corrections_are_already_satisfied(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); self.fixture(root,'recovered_variable'); mod.apply(root); report=mod.apply(root)
