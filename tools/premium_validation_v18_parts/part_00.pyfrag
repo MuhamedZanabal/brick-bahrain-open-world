@@ -30,10 +30,10 @@ WORLD_RESOURCE_REPEAT_TEST_RELATIVE = 'tests/world_resource_repeat_test.gd'
 WORLD_RESOURCE_REPEAT_TEST_CONTENT = '''extends Node
 
 const RESOURCE_PATHS := [
-\t["NPC scene", "res://scenes/npc_pedestrian.tscn"],
-\t["NPC manager script", "res://scripts/npc_manager.gd"],
-\t["world script", "res://scripts/world.gd"],
-\t["world scene", "res://scenes/world.tscn"],
+	["NPC scene", "res://scenes/npc_pedestrian.tscn"],
+	["NPC manager script", "res://scripts/npc_manager.gd"],
+	["world script", "res://scripts/world.gd"],
+	["world scene", "res://scenes/world.tscn"],
 ]
 
 var passed := 0
@@ -41,41 +41,41 @@ var failed := 0
 
 
 func _ready() -> void:
-\tprocess_mode = Node.PROCESS_MODE_ALWAYS
-\tcall_deferred("_run")
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	call_deferred("_run")
 
 
 func _check(condition: bool, label: String) -> void:
-\tif condition:
-\t\tpassed += 1
-\t\tprint("[PASS] " + label)
-\telse:
-\t\tfailed += 1
-\t\tpush_error("[FAIL] " + label)
+	if condition:
+		passed += 1
+		print("[PASS] " + label)
+	else:
+		failed += 1
+		push_error("[FAIL] " + label)
 
 
 func _run() -> void:
-\t_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present before repeated loads")
-\t_check(FileAccess.get_file_as_bytes("res://scenes/npc_pedestrian.tscn").size() > 0, "NPC scene remains nonempty before repeated loads")
+	_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present before repeated loads")
+	_check(FileAccess.get_file_as_bytes("res://scenes/npc_pedestrian.tscn").size() > 0, "NPC scene remains nonempty before repeated loads")
 
-\tfor cycle in range(3):
-\t\tfor item in RESOURCE_PATHS:
-\t\t\tvar resource = ResourceLoader.load(item[1], "", ResourceLoader.CACHE_MODE_IGNORE)
-\t\t\t_check(resource != null, "%s loads in delayed cycle %d" % [item[0], cycle + 1])
-\t\tvar npc_scene = ResourceLoader.load("res://scenes/npc_pedestrian.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
-\t\tvar npc_instance = npc_scene.instantiate() if npc_scene else null
-\t\t_check(npc_instance is CharacterBody3D, "NPC scene instantiates in delayed cycle %d" % [cycle + 1])
-\t\tif npc_instance:
-\t\t\tnpc_instance.free()
-\t\tvar world_scene = ResourceLoader.load("res://scenes/world.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
-\t\tvar world_instance = world_scene.instantiate() if world_scene else null
-\t\t_check(world_instance is Node3D, "world scene instantiates in delayed cycle %d" % [cycle + 1])
-\t\tif world_instance:
-\t\t\tworld_instance.free()
+	for cycle in range(3):
+		for item in RESOURCE_PATHS:
+			var resource = ResourceLoader.load(item[1], "", ResourceLoader.CACHE_MODE_IGNORE)
+			_check(resource != null, "%s loads in delayed cycle %d" % [item[0], cycle + 1])
+		var npc_scene = ResourceLoader.load("res://scenes/npc_pedestrian.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+		var npc_instance = npc_scene.instantiate() if npc_scene else null
+		_check(npc_instance is CharacterBody3D, "NPC scene instantiates in delayed cycle %d" % [cycle + 1])
+		if npc_instance:
+			npc_instance.free()
+		var world_scene = ResourceLoader.load("res://scenes/world.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+		var world_instance = world_scene.instantiate() if world_scene else null
+		_check(world_instance is Node3D, "world scene instantiates in delayed cycle %d" % [cycle + 1])
+		if world_instance:
+			world_instance.free()
 
-\t_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present after repeated cleanup")
-\tprint("World resource repeat complete: %d passed, %d failed" % [passed, failed])
-\tget_tree().quit(0 if failed == 0 else 5)
+	_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present after repeated cleanup")
+	print("World resource repeat complete: %d passed, %d failed" % [passed, failed])
+	get_tree().quit(0 if failed == 0 else 5)
 '''
 
 WORLD_RESOURCE_REPEAT_SCENE_RELATIVE = 'scenes/world_resource_repeat_test.tscn'
