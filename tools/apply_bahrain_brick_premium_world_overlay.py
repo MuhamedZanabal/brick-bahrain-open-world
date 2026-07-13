@@ -151,7 +151,37 @@ def apply_v2_overlay(project: Path, payload: bytes, evidence_only: bool) -> list
     return changed
 
 
+def _v3_new_file_paths(patch: bytes) -> list[str]:
+    try:
+        text = patch.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SystemExit(f"premium v3 patch UTF-8 validation failed: {exc}") from exc
+    current: str | None = None
+    new_files: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("diff --git a/") and " b/" in line:
+            current = line.split(" b/", 1)[0][len("diff --git a/"):]
+        elif line.startswith("new file mode "):
+            if not current:
+                raise SystemExit("premium v3 patch new-file header missing path")
+            new_files.append(current)
+    return new_files
+
+
 def apply_v3_patch(project: Path, patch: bytes, expected_files: dict[str, str]) -> list[str]:
+    collisions: list[str] = []
+    for relative in _v3_new_file_paths(patch):
+        if relative not in expected_files:
+            raise SystemExit(f"premium v3 new file absent from manifest: {relative}")
+        target = project / relative
+        if target.exists():
+            if not target.is_file():
+                raise SystemExit(f"premium v3 new-file collision is not a file: {relative}")
+            target.unlink()
+            collisions.append(relative)
+    if collisions:
+        print(json.dumps({"replaced_v2_runtime_assets": collisions}, indent=2))
+
     with tempfile.NamedTemporaryFile(prefix="bahrain-brick-v3-", suffix=".patch") as handle:
         handle.write(patch)
         handle.flush()
