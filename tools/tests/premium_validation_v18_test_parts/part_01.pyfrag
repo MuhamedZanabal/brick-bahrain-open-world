@@ -1,3 +1,9 @@
+            + '\t\treturn\n\n\n'
+            + 'func _show_loading_screen() -> void:\n'
+            + '\t\tvar title := Label.new()\n'
+            + '\t\ttitle.text = "BRICK BAHRAIN"\n'
+        )
+        (root / 'scripts/npc_manager.gd').write_text(
             'const NPC_SCENE = preload("res://scenes/npc_pedestrian.tscn")\n'
         )
         (root / 'export_presets.cfg').write_text(
@@ -32,7 +38,9 @@
             self.assertIn('Bahrain Brick', world)
             self.assertIn('_install_world_lifecycle_guard()', world)
             self.assertIn('child_exiting_tree.connect(_on_world_child_exiting_tree)', world)
-            self.assertIn('SaveManager.set_position(active_player.global_position)', world)
+            self.assertIn('_cache_active_player_position()', world)
+            self.assertIn('_last_valid_player_position = active_player.global_position', world)
+            self.assertIn('SaveManager.set_position(_last_valid_player_position)', world)
             self.assertIn('player = null', world)
             self.assertEqual(self.protected_hash(root), mod.PROTECTED_WORLD_EXIT_SHA256)
             self.assertTrue(report['protected_world_exit_unchanged'])
@@ -52,19 +60,3 @@
             self.assertEqual(self.protected_hash(root), mod.PROHIBITED_WORLD_EXIT_SHA256)
             with self.assertRaisesRegex(RuntimeError, 'protected world teardown hash mismatch'):
                 mod.apply(root)
-
-    def test_world_lifecycle_correction_is_idempotent(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self.fixture(root)
-            mod.apply(root)
-            first = (root / 'scripts/world.gd').read_bytes()
-            report = mod.apply(root)
-            second = (root / 'scripts/world.gd').read_bytes()
-            self.assertEqual(first, second)
-            world_result = next(item for item in report['corrections'] if item['path'] == 'scripts/world.gd')
-            self.assertEqual(world_result['states'][1:], ['already_satisfied', 'already_satisfied'])
-            self.assertEqual(self.protected_hash(root), mod.PROTECTED_WORLD_EXIT_SHA256)
-
-    def test_lifecycle_source_is_narrow_to_active_player(self):
-        source = mod.WORLD_LIFECYCLE_BLOCK
