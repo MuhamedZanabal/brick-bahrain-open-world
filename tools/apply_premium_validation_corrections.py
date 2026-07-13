@@ -23,16 +23,16 @@ STALE_TITLES = ('Brick Bahrain', 'BRICK BAHRAIN')
 NPC_SCENE_RELATIVE = 'scenes/npc_pedestrian.tscn'
 NPC_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://scripts/npc_pedestrian.gd" id="1_npc"]\n\n[node name="NPCPedestrian" type="CharacterBody3D"]\nscript = ExtResource("1_npc")\n'''
 NPC_UNSAFE_PATTERN = re.compile(
-    r'(?m)^(?P<indent>[ \t]*)_anim_player\s*=\s*'
+    r'(?m)^(?P<indent>[ \t]*)(?P<variable>_animation_player|_anim_player)\s*=\s*'
     r'_model\.get_meta\(\s*&?["\']anim_player["\']'
     r'(?:\s*,\s*null)?\s*\)(?:\s+as\s+AnimationPlayer)?\s*$'
 )
 NPC_SAFE_PATTERN = re.compile(
-    r'(?m)^[ \t]*_anim_player\s*=.*_model\.get_meta\(.*anim_player.*\)'
+    r'(?m)^[ \t]*(?:_animation_player|_anim_player)\s*=.*_model\.get_meta\(.*anim_player.*\)'
     r'.*_model\.has_meta\(\s*&?["\']anim_player["\']\s*\).*else\s+null\s*$'
 )
 NPC_SAFE_TEMPLATE = (
-    '{indent}_anim_player = (_model.get_meta("anim_player") as AnimationPlayer) '
+    '{indent}{variable} = (_model.get_meta("anim_player") as AnimationPlayer) '
     'if _model.has_meta("anim_player") else null'
 )
 
@@ -81,7 +81,10 @@ def correct_npc_anim_player(text: str) -> tuple[str, str]:
     safe = list(NPC_SAFE_PATTERN.finditer(text))
     if len(unsafe) == 1 and len(safe) == 0:
         match = unsafe[0]
-        replacement = NPC_SAFE_TEMPLATE.format(indent=match.group('indent'))
+        replacement = NPC_SAFE_TEMPLATE.format(
+            indent=match.group('indent'),
+            variable=match.group('variable'),
+        )
         return NPC_UNSAFE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
     if len(unsafe) == 0 and len(safe) == 1:
         return text, 'already_satisfied'
