@@ -1,0 +1,3 @@
+Validation-only trigger for Bahrain Brick premium visual Android QA.
+Premium authority: fe9103918fb1482c05c6f5644d2b08d55e77222b
+Do not merge this marker.
