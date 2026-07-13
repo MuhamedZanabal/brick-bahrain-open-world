@@ -1,0 +1,3 @@
+Validation-only trigger for corrected premium authority 00a6ccc50caa9b23a70398da6854218fa7f2ebde.
+Runtime branding checks are scoped to actual product surfaces and preserve diagnostic output on failure.
+Do not merge this validation marker.
