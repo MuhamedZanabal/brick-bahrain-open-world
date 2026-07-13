@@ -87,6 +87,7 @@ jobs:
             tools/tests/test_apply_premium_validation_corrections.py \
             tools/tests/test_apply_post_lifecycle_teardown_guards.py \
             tools/tests/test_apply_visual_evidence_shutdown_fix.py \
+            tools/tests/test_correction_stdout_summary.py \
             tools/tests/test_v3_patch_restore.py
           bash -n tools/install_godot_43_templates.sh
           bash -n tools/run_premium_validation_ci.sh
