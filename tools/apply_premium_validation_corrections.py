@@ -5,6 +5,7 @@ from pathlib import Path
 
 CORRECTIONS = {
     'scripts/world.gd': [((
+        '\t\ttitle.text = "BRICK BAHRAIN"',
         '\ttitle.text = "BRICK BAHRAIN"',
     ),
         '\ttitle.text = "Bahrain Brick"',
@@ -29,16 +30,17 @@ NPC_SAFE_TEMPLATE = (
     '{indent}{variable} = (_model.get_meta("anim_player") as AnimationPlayer) '
     'if _model.has_meta("anim_player") else null'
 )
-SAVE_POSITION_ASSIGNMENT_PATTERN = re.compile(
-    r'^[ \t]*save_data\s*\[\s*["\']player["\']\s*\]\s*'
-    r'\[\s*["\']position["\']\s*\]\s*=\s*\{\s*$'
-)
 SAVE_CONDITION_PATTERN = re.compile(r'^(?P<indent>[ \t]*)if\s+(?P<condition>.+):\s*$')
 SAVE_TREE_GUARD_PATTERN = re.compile(r'\bplayer\.is_inside_tree\s*\(\s*\)')
+PLAYER_GLOBAL_POSITION_PATTERN = re.compile(r'\bplayer\.global_position\b')
 
 
 def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def indentation_width(line: str) -> int:
+    return len(line) - len(line.lstrip(' \t')) if '\t' not in line[:len(line)-len(line.lstrip(' \t'))] else len(line[:len(line)-len(line.lstrip(' \t'))].expandtabs(4))
 
 
 def runtime_text_paths(root: Path):
@@ -100,35 +102,63 @@ def correct_npc_anim_player(text: str) -> tuple[str, str]:
 
 def correct_save_position_guard(text: str) -> tuple[str, str]:
     lines = text.splitlines(keepends=True)
-    assignment_indices = [
+    access_indices = [
         index for index, line in enumerate(lines)
-        if SAVE_POSITION_ASSIGNMENT_PATTERN.fullmatch(line.rstrip('\r\n'))
+        if PLAYER_GLOBAL_POSITION_PATTERN.search(line)
     ]
-    if len(assignment_indices) != 1:
+    if not access_indices:
         candidates = [
             line.strip() for line in lines
-            if 'save_data' in line and ('position' in line or 'global_position' in line)
+            if 'position' in line and ('player' in line or 'save_data' in line)
         ]
         raise RuntimeError(
-            'save position assignment mismatch: '
-            f'assignment_count={len(assignment_indices)}, candidates={candidates}'
+            'player global-position access missing: '
+            f'candidates={candidates}'
         )
-    assignment_index = assignment_indices[0]
-    condition_index = assignment_index - 1
-    while condition_index >= 0 and not lines[condition_index].strip():
-        condition_index -= 1
-    if condition_index < 0:
-        raise RuntimeError('save position assignment has no preceding condition')
-    condition_line = lines[condition_index].rstrip('\r\n')
-    match = SAVE_CONDITION_PATTERN.fullmatch(condition_line)
-    if not match or not re.search(r'\bplayer\b', match.group('condition')):
-        context = [line.rstrip('\r\n') for line in lines[max(0, condition_index - 2):assignment_index + 2]]
-        raise RuntimeError(f'save position guard is not a player condition: context={context}')
+    guard_indices: list[int] = []
+    contexts: list[list[str]] = []
+    for access_index in access_indices:
+        access_width = indentation_width(lines[access_index])
+        guard_index = None
+        for index in range(access_index - 1, -1, -1):
+            raw = lines[index].rstrip('\r\n')
+            stripped = raw.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            width = indentation_width(raw)
+            match = SAVE_CONDITION_PATTERN.fullmatch(raw)
+            if match and width < access_width and re.search(r'\bplayer\b', match.group('condition')):
+                guard_index = index
+                break
+            if width < access_width and stripped.startswith('func '):
+                break
+        if guard_index is None:
+            contexts.append([
+                line.rstrip('\r\n')
+                for line in lines[max(0, access_index - 4):min(len(lines), access_index + 3)]
+            ])
+        else:
+            guard_indices.append(guard_index)
+    if contexts:
+        raise RuntimeError(f'player global-position access has no enclosing player guard: contexts={contexts}')
+    unique_guards = sorted(set(guard_indices))
+    if len(unique_guards) != 1:
+        guard_lines = [lines[index].rstrip('\r\n') for index in unique_guards]
+        access_lines = [lines[index].strip() for index in access_indices]
+        raise RuntimeError(
+            'player global-position accesses do not share one guard: '
+            f'guards={guard_lines}, accesses={access_lines}'
+        )
+    guard_index = unique_guards[0]
+    raw_guard = lines[guard_index].rstrip('\r\n')
+    match = SAVE_CONDITION_PATTERN.fullmatch(raw_guard)
+    if match is None:
+        raise RuntimeError(f'invalid player guard syntax: {raw_guard}')
     condition = match.group('condition').strip()
     if SAVE_TREE_GUARD_PATTERN.search(condition):
         return text, 'already_satisfied'
-    newline = '\r\n' if lines[condition_index].endswith('\r\n') else '\n' if lines[condition_index].endswith('\n') else ''
-    lines[condition_index] = (
+    newline = '\r\n' if lines[guard_index].endswith('\r\n') else '\n' if lines[guard_index].endswith('\n') else ''
+    lines[guard_index] = (
         f'{match.group("indent")}if {condition} and player.is_inside_tree():' + newline
     )
     return ''.join(lines), 'applied'
