@@ -1,0 +1,4 @@
+Validation-only marker for premium authority 62b23901ce286acd27d87ae6e86136e173ab7d83.
+Protected world teardown SHA-256 must remain fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc.
+Complete projects must strictly patch detached pedestrian player and vehicle transform scans; reduced unit fixtures are identified separately.
+Do not merge this validation branch.
