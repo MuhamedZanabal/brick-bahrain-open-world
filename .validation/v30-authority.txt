@@ -1,0 +1,2 @@
+premium_authority=e26ec912db5c10d071a8e120010bdb5a9a136f17
+purpose=absolute Android export destination
