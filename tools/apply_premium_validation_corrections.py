@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the checksum-pinned v18 correction set, apply final teardown guards, and preserve source-backed transform diagnostics."""
+"""Assemble checksum-pinned corrections, apply teardown fixes, and preserve source diagnostics."""
 from __future__ import annotations
 
 import argparse
@@ -35,12 +35,25 @@ for _name, _value in _assembled.items():
         globals()[_name] = _value
 _base_apply = _assembled["apply"]
 
-_POST_MODULE = Path(__file__).with_name("apply_post_lifecycle_teardown_guards.py")
-_post_spec = importlib.util.spec_from_file_location("post_lifecycle_teardown_guards", _POST_MODULE)
-if _post_spec is None or _post_spec.loader is None:
-    raise RuntimeError(f"unable to load post-lifecycle guard module: {_POST_MODULE}")
-_post = importlib.util.module_from_spec(_post_spec)
-_post_spec.loader.exec_module(_post)
+
+def _load_module(name: str, filename: str):
+    path = Path(__file__).with_name(filename)
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"unable to load validation correction module: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_post = _load_module(
+    "post_lifecycle_teardown_guards",
+    "apply_post_lifecycle_teardown_guards.py",
+)
+_evidence = _load_module(
+    "visual_evidence_shutdown_fix",
+    "apply_visual_evidence_shutdown_fix.py",
+)
 
 TRANSFORM_TOKENS = ("global_position", "global_transform", "get_global_transform")
 TEARDOWN_TOKENS = (
@@ -139,10 +152,14 @@ def apply(root: Path) -> dict:
     root = root.resolve()
     normalization_state = _normalize_final_guard_for_checksum_pinned_base(root)
     report = _base_apply(root)
-    full_project_npc_scan_contract = (root / "scenes/world.tscn").is_file()
+    full_project_contract = (root / "scenes/world.tscn").is_file()
     post_report = _post.apply(
         root,
-        require_npc_scans=full_project_npc_scan_contract,
+        require_npc_scans=full_project_contract,
+    )
+    evidence_report = _evidence.apply(
+        root,
+        require_evidence=full_project_contract,
     )
 
     world_path = root / _post.WORLD_PATH
@@ -181,8 +198,9 @@ def apply(root: Path) -> dict:
         "protected_world_exit_unchanged"
     ]
     report["post_lifecycle_teardown_guard"] = post_report
+    report["visual_evidence_shutdown_fix"] = evidence_report
     report["post_lifecycle_base_normalization"] = normalization_state
-    report["full_project_npc_scan_contract"] = full_project_npc_scan_contract
+    report["full_project_contract"] = full_project_contract
     report.setdefault("diagnostic_sources", {})[_post.WORLD_PATH] = world_path.read_text(
         encoding="utf-8"
     )
@@ -191,10 +209,10 @@ def apply(root: Path) -> dict:
     )
     report["diagnostic_sources"][_post.NPC_PATH] = npc_path.read_text(encoding="utf-8")
 
-    evidence_path = root / "tests/premium_world_visual_evidence.gd"
+    evidence_path = root / _evidence.EVIDENCE_PATH
     if evidence_path.is_file():
-        report["diagnostic_sources"][evidence_path.relative_to(root).as_posix()] = (
-            evidence_path.read_text(encoding="utf-8")
+        report["diagnostic_sources"][_evidence.EVIDENCE_PATH] = evidence_path.read_text(
+            encoding="utf-8"
         )
     report["transform_access_inventory"] = collect_transform_access_inventory(root)
     return report
