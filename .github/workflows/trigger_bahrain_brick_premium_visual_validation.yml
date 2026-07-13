@@ -1,0 +1,83 @@
+name: Trigger Bahrain Brick Premium Visual Validation
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+      SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+      APK_NAME: bahrain_brick_v14.0.4-premium-visual-qa.apk
+      PACKAGE_NAME: com.bahrainbrick.game.qa
+    steps:
+      - name: Check out validation merge
+        uses: actions/checkout@v4
+
+      - name: Execute canonical premium visual CI shell gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          workflow = Path('.github/workflows/build_bahrain_brick_premium_visual_qa.yml')
+          lines = workflow.read_text(encoding='utf-8').splitlines()
+          blocks = []
+          index = 0
+          while index < len(lines):
+              if lines[index].startswith('        run: |'):
+                  index += 1
+                  block = []
+                  while index < len(lines):
+                      line = lines[index]
+                      if line.startswith('          '):
+                          block.append(line[10:])
+                          index += 1
+                          continue
+                      if not line.strip():
+                          block.append('')
+                          index += 1
+                          continue
+                      break
+                  blocks.append('\n'.join(block).rstrip() + '\n')
+                  continue
+              index += 1
+
+          if len(blocks) != 10:
+              raise SystemExit(f'expected 10 canonical shell gates, found {len(blocks)}')
+
+          for number, script in enumerate(blocks, 1):
+              print(f'::group::Canonical shell gate {number}/{len(blocks)}')
+              subprocess.run(['bash', '-lc', script], check=True)
+              print('::endgroup::')
+          PY
+
+      - name: Upload premium APK, source, workspace, evidence and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-visual-qa
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-qa.apk*
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-source.zip*
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-workspace.zip*
+            recovery/v14/build/logs/**
+            recovery/v14/build/reports/**
+            baseline/v14/build/logs/**
+            baseline/v14/build/premium_visual_evidence/**
+            recovery/v14/build/premium_visual_evidence/**
+            recovery/v14/build/visual_evidence/**
