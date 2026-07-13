@@ -58,10 +58,34 @@ jobs:
           if len(blocks) != 10:
               raise SystemExit(f'expected 10 canonical shell gates, found {len(blocks)}')
 
+          diagnostics = Path('validation-diagnostics')
+          diagnostics.mkdir(parents=True, exist_ok=True)
           for number, script in enumerate(blocks, 1):
+              script_path = diagnostics / f'gate-{number:02d}.sh'
+              log_path = diagnostics / f'gate-{number:02d}.log'
+              script_path.write_text(script, encoding='utf-8')
               print(f'::group::Canonical shell gate {number}/{len(blocks)}')
-              subprocess.run(['bash', '-lc', script], check=True)
+              with log_path.open('w', encoding='utf-8') as log:
+                  process = subprocess.Popen(
+                      ['bash', '-lc', script],
+                      stdout=subprocess.PIPE,
+                      stderr=subprocess.STDOUT,
+                      text=True,
+                      bufsize=1,
+                  )
+                  assert process.stdout is not None
+                  for line in process.stdout:
+                      print(line, end='')
+                      log.write(line)
+                  returncode = process.wait()
               print('::endgroup::')
+              if returncode != 0:
+                  (diagnostics / 'FAILED_GATE.txt').write_text(
+                      f'gate={number}\nreturncode={returncode}\nscript={script_path}\nlog={log_path}\n',
+                      encoding='utf-8',
+                  )
+                  raise SystemExit(returncode)
+          (diagnostics / 'ALL_GATES_PASSED.txt').write_text('10 canonical gates passed\n', encoding='utf-8')
           PY
 
       - name: Upload premium APK, source, workspace, evidence and reports
@@ -81,3 +105,4 @@ jobs:
             baseline/v14/build/premium_visual_evidence/**
             recovery/v14/build/premium_visual_evidence/**
             recovery/v14/build/visual_evidence/**
+            validation-diagnostics/**
