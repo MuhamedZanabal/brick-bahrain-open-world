@@ -42,8 +42,29 @@ _post = importlib.util.module_from_spec(_post_spec)
 _post_spec.loader.exec_module(_post)
 
 
+def _normalize_final_guard_for_checksum_pinned_base(root: Path) -> str:
+    """Restore only the base block's unprotected line before its idempotence check."""
+    world_path = root / _post.WORLD_PATH
+    if not world_path.is_file():
+        return "not_present"
+    text = world_path.read_text(encoding="utf-8")
+    safe_count = text.count(_post.SAFE_PARENT_LINE)
+    unsafe_count = text.count(_post.UNSAFE_PARENT_LINE)
+    if safe_count == 1 and unsafe_count == 0:
+        text = text.replace(_post.SAFE_PARENT_LINE, _post.UNSAFE_PARENT_LINE, 1)
+        world_path.write_text(text, encoding="utf-8")
+        return "normalized"
+    if safe_count == 0:
+        return "not_required"
+    raise RuntimeError(
+        "final lifecycle guard normalization mismatch: "
+        f"safe_count={safe_count}, unsafe_count={unsafe_count}"
+    )
+
+
 def apply(root: Path) -> dict:
     root = root.resolve()
+    normalization_state = _normalize_final_guard_for_checksum_pinned_base(root)
     report = _base_apply(root)
     post_report = _post.apply(root)
 
@@ -56,8 +77,6 @@ def apply(root: Path) -> dict:
         item for item in report["corrections"] if item["path"] == _post.WORLD_PATH
     )
     world_result["after_sha256"] = world_sha
-    world_result["states"].append(post_report["changes"][0]["state"])
-    world_result["reasons"].append(post_report["changes"][0]["reason"])
 
     lifecycle_resource = next(
         item
@@ -76,6 +95,7 @@ def apply(root: Path) -> dict:
         "protected_world_exit_unchanged"
     ]
     report["post_lifecycle_teardown_guard"] = post_report
+    report["post_lifecycle_base_normalization"] = normalization_state
     report.setdefault("diagnostic_sources", {})[_post.WORLD_PATH] = world_path.read_text(
         encoding="utf-8"
     )
