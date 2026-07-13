@@ -1,0 +1,110 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+from pathlib import Path
+
+PROTECTED_WORLD_EXIT_SHA256 = 'fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc'
+PROHIBITED_WORLD_EXIT_SHA256 = '37ec2e0643ec3ff2a187fb37d4bb7a7710eebe57d386551d560bc9b9305d31f4'
+
+RUNTIME_TEXT_ROOTS = ('scripts', 'scenes', 'assets', 'artwork')
+RUNTIME_TEXT_FILES = ('project.godot', 'export_presets.cfg')
+STALE_TITLES = ('Brick Bahrain', 'BRICK BAHRAIN')
+
+NPC_SCENE_RELATIVE = 'scenes/npc_pedestrian.tscn'
+NPC_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://scripts/npc_pedestrian.gd" id="1_npc"]\n\n[node name="NPCPedestrian" type="CharacterBody3D"]\nscript = ExtResource("1_npc")\n'''
+
+WORLD_LIFECYCLE_FIXTURE_RELATIVE = 'tests/world_lifecycle_guard_fixture.gd'
+WORLD_LIFECYCLE_FIXTURE_CONTENT = '''extends "res://scripts/world.gd"\n\n\nfunc _ready() -> void:\n\t_install_world_lifecycle_guard()\n'''
+
+WORLD_LIFECYCLE_TEST_RELATIVE = 'tests/world_lifecycle_guard_test.gd'
+WORLD_LIFECYCLE_TEST_CONTENT = '''extends Node\n\nconst WORLD_FIXTURE = preload("res://tests/world_lifecycle_guard_fixture.gd")\n\nvar passed := 0\nvar failed := 0\n\n\nfunc _ready() -> void:\n\tprocess_mode = Node.PROCESS_MODE_ALWAYS\n\tcall_deferred("_run")\n\n\nfunc _check(condition: bool, label: String) -> void:\n\tif condition:\n\t\tpassed += 1\n\t\tprint("[PASS] " + label)\n\telse:\n\t\tfailed += 1\n\t\tpush_error("[FAIL] " + label)\n\n\nfunc _run() -> void:\n\tvar previous_state = GameManager.current_state\n\tGameManager.current_state = GameManager.GameState.IN_WORLD\n\n\tvar world = WORLD_FIXTURE.new()\n\tworld.name = "LifecycleWorldA"\n\tadd_child(world)\n\tawait get_tree().process_frame\n\tworld._install_world_lifecycle_guard()\n\tvar callback := Callable(world, "_on_world_child_exiting_tree")\n\t_check(world.child_exiting_tree.is_connected(callback), "world lifecycle coordinator connected")\n\t_check(world.child_exiting_tree.get_connections().size() == 1, "repeated lifecycle installation is idempotent")\n\n\tvar player := CharacterBody3D.new()\n\tplayer.name = "LifecyclePlayerA"\n\tworld.player = player\n\tworld.add_child(player)\n\tawait get_tree().process_frame\n\tvar first_position := Vector3(12.5, 2.25, -8.75)\n\tplayer.global_position = first_position\n\t_check(player.is_inside_tree(), "active player transform is valid before exit")\n\n\tvar non_player := Node3D.new()\n\tnon_player.name = "NonPlayerChild"\n\tworld.add_child(non_player)\n\tawait get_tree().process_frame\n\tworld.remove_child(non_player)\n\tawait get_tree().process_frame\n\t_check(world.player == player, "non-player child exit preserves active player reference")\n\n\tworld.remove_child(player)\n\tawait get_tree().process_frame\n\t_check(world.player == null, "active player reference is cleared before world teardown")\n\t_check(SaveManager.get_position().is_equal_approx(first_position), "first valid player position is cached")\n\n\tvar replacement := CharacterBody3D.new()\n\treplacement.name = "LifecyclePlayerB"\n\tworld.player = replacement\n\tworld.add_child(replacement)\n\tawait get_tree().process_frame\n\tvar replacement_position := Vector3(-31.0, 4.5, 19.25)\n\treplacement.global_position = replacement_position\n\tworld.remove_child(replacement)\n\tawait get_tree().process_frame\n\t_check(world.player == null, "replacement player exit clears only the replacement reference")\n\t_check(SaveManager.get_position().is_equal_approx(replacement_position), "replacement position supersedes the earlier cached position")\n\n\tplayer.queue_free()\n\treplacement.queue_free()\n\tnon_player.queue_free()\n\tworld.queue_free()\n\tawait get_tree().process_frame\n\tawait get_tree().process_frame\n\t_check(not is_instance_valid(world), "first world unload completes without a persistent callback")\n\n\tvar world_two = WORLD_FIXTURE.new()\n\tworld_two.name = "LifecycleWorldB"\n\tadd_child(world_two)\n\tawait get_tree().process_frame\n\tworld_two._install_world_lifecycle_guard()\n\tworld_two._install_world_lifecycle_guard()\n\tvar second_player := CharacterBody3D.new()\n\tsecond_player.name = "LifecyclePlayerC"\n\tworld_two.player = second_player\n\tworld_two.add_child(second_player)\n\tawait get_tree().process_frame\n\tvar second_position := Vector3(6.0, 3.0, 44.0)\n\tsecond_player.global_position = second_position\n\tworld_two.remove_child(second_player)\n\tawait get_tree().process_frame\n\t_check(world_two.player == null and SaveManager.get_position().is_equal_approx(second_position), "repeated world cycle remains single-shot and captures the latest position")\n\tsecond_player.queue_free()\n\tworld_two.queue_free()\n\tawait get_tree().process_frame\n\n\tGameManager.current_state = previous_state\n\tprint("World lifecycle guard complete: %d passed, %d failed" % [passed, failed])\n\tget_tree().quit(0 if failed == 0 else 4)\n'''
+
+WORLD_LIFECYCLE_SCENE_RELATIVE = 'scenes/world_lifecycle_guard_test.tscn'
+WORLD_LIFECYCLE_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://tests/world_lifecycle_guard_test.gd" id="1_test"]\n\n[node name="WorldLifecycleGuardTest" type="Node"]\nscript = ExtResource("1_test")\n'''
+
+WORLD_RESOURCE_REPEAT_TEST_RELATIVE = 'tests/world_resource_repeat_test.gd'
+WORLD_RESOURCE_REPEAT_TEST_CONTENT = '''extends Node
+
+const RESOURCE_PATHS := [
+\t["NPC scene", "res://scenes/npc_pedestrian.tscn"],
+\t["NPC manager script", "res://scripts/npc_manager.gd"],
+\t["world script", "res://scripts/world.gd"],
+\t["world scene", "res://scenes/world.tscn"],
+]
+
+var passed := 0
+var failed := 0
+
+
+func _ready() -> void:
+\tprocess_mode = Node.PROCESS_MODE_ALWAYS
+\tcall_deferred("_run")
+
+
+func _check(condition: bool, label: String) -> void:
+\tif condition:
+\t\tpassed += 1
+\t\tprint("[PASS] " + label)
+\telse:
+\t\tfailed += 1
+\t\tpush_error("[FAIL] " + label)
+
+
+func _run() -> void:
+\t_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present before repeated loads")
+\t_check(FileAccess.get_file_as_bytes("res://scenes/npc_pedestrian.tscn").size() > 0, "NPC scene remains nonempty before repeated loads")
+
+\tfor cycle in range(3):
+\t\tfor item in RESOURCE_PATHS:
+\t\t\tvar resource = ResourceLoader.load(item[1], "", ResourceLoader.CACHE_MODE_IGNORE)
+\t\t\t_check(resource != null, "%s loads in delayed cycle %d" % [item[0], cycle + 1])
+\t\tvar npc_scene = ResourceLoader.load("res://scenes/npc_pedestrian.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+\t\tvar npc_instance = npc_scene.instantiate() if npc_scene else null
+\t\t_check(npc_instance is CharacterBody3D, "NPC scene instantiates in delayed cycle %d" % [cycle + 1])
+\t\tif npc_instance:
+\t\t\tnpc_instance.free()
+\t\tvar world_scene = ResourceLoader.load("res://scenes/world.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+\t\tvar world_instance = world_scene.instantiate() if world_scene else null
+\t\t_check(world_instance is Node3D, "world scene instantiates in delayed cycle %d" % [cycle + 1])
+\t\tif world_instance:
+\t\t\tworld_instance.free()
+
+\t_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present after repeated cleanup")
+\tprint("World resource repeat complete: %d passed, %d failed" % [passed, failed])
+\tget_tree().quit(0 if failed == 0 else 5)
+'''
+
+WORLD_RESOURCE_REPEAT_SCENE_RELATIVE = 'scenes/world_resource_repeat_test.tscn'
+WORLD_RESOURCE_REPEAT_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/world_resource_repeat_test.gd" id="1_test"]
+
+[node name="WorldResourceRepeatTest" type="Node"]
+script = ExtResource("1_test")
+'''
+
+DIAGNOSTIC_SOURCE_PATHS = (
+    'scripts/save_manager.gd',
+    'scripts/world.gd',
+    'scripts/npc_manager.gd',
+    'scripts/npc_pedestrian.gd',
+    'scenes/npc_pedestrian.tscn',
+    WORLD_LIFECYCLE_FIXTURE_RELATIVE,
+    WORLD_LIFECYCLE_TEST_RELATIVE,
+    WORLD_LIFECYCLE_SCENE_RELATIVE,
+    WORLD_RESOURCE_REPEAT_TEST_RELATIVE,
+    WORLD_RESOURCE_REPEAT_SCENE_RELATIVE,
+    'tests/premium_presentation_acceptance_test.gd',
+    'scenes/premium_presentation_acceptance_test.tscn',
+)
+
+NPC_UNSAFE_PATTERN = re.compile(
+    r'(?m)^(?P<indent>[ \t]*)(?P<variable>_animation_player|_anim_player)\s*=\s*'
+    r'_model\.get_meta\(\s*&?["\']anim_player["\']'
+    r'(?:\s*,\s*null)?\s*\)(?:\s+as\s+AnimationPlayer)?\s*$'
+)
+NPC_SAFE_PATTERN = re.compile(
