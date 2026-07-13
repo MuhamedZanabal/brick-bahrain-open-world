@@ -50,13 +50,19 @@ def runtime_text_paths(root: Path):
                 yield path
 
 
+def exact_pattern(value: str) -> re.Pattern[str]:
+    return re.compile(r'(?m)^' + re.escape(value) + r'$')
+
+
 def replace_variant(text: str, old_variants: tuple[str, ...], new: str, label: str) -> tuple[str, str]:
-    old_counts = {old: text.count(old) for old in old_variants}
+    old_patterns = {old: exact_pattern(old) for old in old_variants}
+    old_counts = {old: len(pattern.findall(text)) for old, pattern in old_patterns.items()}
     total_old = sum(old_counts.values())
-    new_count = text.count(new)
+    new_pattern = exact_pattern(new)
+    new_count = len(new_pattern.findall(text))
     if total_old == 1 and new_count == 0:
         selected = next(old for old, count in old_counts.items() if count == 1)
-        return text.replace(selected, new), 'applied'
+        return old_patterns[selected].sub(lambda _match: new, text, count=1), 'applied'
     if total_old == 0 and new_count == 1:
         return text, 'already_satisfied'
     raise RuntimeError(
