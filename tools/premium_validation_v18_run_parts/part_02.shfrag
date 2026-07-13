@@ -14,28 +14,11 @@ python3 tools/scan_godot_runtime_errors.py "$LOG" \
   --json-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.json" \
   --markdown-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.md"
 
-# Matched comparisons and hosted performance report.
-python3 - "$BASELINE" "$ROOT" <<'PY'
-from pathlib import Path
-from PIL import Image,ImageDraw,ImageStat
-import json,sys
-baseline,root=map(Path,sys.argv[1:])
-before=baseline/'build/premium_visual_evidence/before'; after=root/'build/premium_visual_evidence/after'
-out=root/'build/premium_visual_evidence/comparisons'; out.mkdir(parents=True,exist_ok=True)
-names=['city_road','waterfront','building_area','daylight','player_character','vehicle','hud_walking','hud_vehicle']
-metrics=[]
-for name in names:
- b=Image.open(before/f'{name}.png').convert('RGB'); a=Image.open(after/f'{name}.png').convert('RGB')
- if b.size!=(1280,720) or a.size!=(1280,720): raise SystemExit(f'bad dimensions {name}: {b.size}/{a.size}')
- c=Image.new('RGB',(2560,760),(18,18,22)); c.paste(b,(0,40)); c.paste(a,(1280,40)); d=ImageDraw.Draw(c)
- d.text((20,12),f'BEFORE — v1.4.0.3 — {name}',fill='white'); d.text((1300,12),f'AFTER — v1.4.0.4 — {name}',fill='white'); c.save(out/f'{name}_before_after.png',optimize=True)
- def stat(im):
-  s=im.resize((160,90)); px=list(s.getdata()); total=len(px)
-  return {'mean_luminance':round(sum(ImageStat.Stat(s).mean)/3,3),'near_white_ratio':round(sum(1 for r,g,b in px if min(r,g,b)>246)/total,6),'near_black_ratio':round(sum(1 for r,g,b in px if max(r,g,b)<12)/total,6)}
- metrics.append({'view':name,'before':stat(b),'after':stat(a)})
-report={'classification':'hosted GL Compatibility/software rendering; not physical Android performance','views':metrics,'baseline_runtime':json.loads((before/'PREMIUM_WORLD_VISUAL_EVIDENCE.json').read_text()),'premium_runtime':json.loads((after/'PREMIUM_WORLD_VISUAL_EVIDENCE.json').read_text()),'physical_android_tested':False}
-(root/'build/reports/PREMIUM_VISUAL_COMPARISON_AND_PERFORMANCE.json').write_text(json.dumps(report,indent=2)+'\n')
-PY
+# Matched comparisons and hosted performance report with exact input diagnostics.
+python3 tools/generate_premium_comparison_report.py "$BASELINE" "$ROOT" \
+  --report "$REPORT/PREMIUM_VISUAL_COMPARISON_AND_PERFORMANCE.json" \
+  --diagnostic "$REPORT/PREMIUM_VISUAL_COMPARISON_DIAGNOSTIC.json" \
+  2>&1 | tee "$LOG/premium-visual-comparison.log"
 python3 tools/verify_frozen_controls.py "$ROOT" \
   --json-out "$REPORT/FROZEN_CONTROLS_POST_TEST.json" \
   --markdown-out "$REPORT/FROZEN_CONTROLS_POST_TEST.md"
