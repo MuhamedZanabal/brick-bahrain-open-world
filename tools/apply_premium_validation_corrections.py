@@ -17,6 +17,15 @@ RUNTIME_TEXT_FILES = ('project.godot', 'export_presets.cfg')
 STALE_TITLES = ('Brick Bahrain', 'BRICK BAHRAIN')
 NPC_SCENE_RELATIVE = 'scenes/npc_pedestrian.tscn'
 NPC_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://scripts/npc_pedestrian.gd" id="1_npc"]\n\n[node name="NPCPedestrian" type="CharacterBody3D"]\nscript = ExtResource("1_npc")\n'''
+DIAGNOSTIC_SOURCE_PATHS = (
+    'scripts/save_manager.gd',
+    'scripts/world.gd',
+    'scripts/npc_manager.gd',
+    'scripts/npc_pedestrian.gd',
+    'scenes/npc_pedestrian.tscn',
+    'tests/premium_presentation_acceptance_test.gd',
+    'scenes/premium_presentation_acceptance_test.tscn',
+)
 NPC_UNSAFE_PATTERN = re.compile(
     r'(?m)^(?P<indent>[ \t]*)(?P<variable>_animation_player|_anim_player)\s*=\s*'
     r'_model\.get_meta\(\s*&?["\']anim_player["\']'
@@ -40,7 +49,8 @@ def sha(data: bytes) -> str:
 
 
 def indentation_width(line: str) -> int:
-    return len(line) - len(line.lstrip(' \t')) if '\t' not in line[:len(line)-len(line.lstrip(' \t'))] else len(line[:len(line)-len(line.lstrip(' \t'))].expandtabs(4))
+    leading = line[:len(line) - len(line.lstrip(' \t'))]
+    return len(leading.expandtabs(4))
 
 
 def runtime_text_paths(root: Path):
@@ -167,22 +177,42 @@ def correct_save_position_guard(text: str) -> tuple[str, str]:
 def ensure_npc_scene(root: Path) -> dict:
     path = root / NPC_SCENE_RELATIVE
     path.parent.mkdir(parents=True, exist_ok=True)
+    state: str
     if path.exists():
         if not path.is_file():
             raise RuntimeError(f'NPC scene path is not a file: {NPC_SCENE_RELATIVE}')
         text = path.read_text(encoding='utf-8')
-        if 'res://scripts/npc_pedestrian.gd' not in text or 'type="CharacterBody3D"' not in text:
+        if text == NPC_SCENE_CONTENT:
+            state = 'already_satisfied'
+        elif 'res://scripts/npc_pedestrian.gd' in text and 'type="CharacterBody3D"' in text:
+            path.write_text(NPC_SCENE_CONTENT, encoding='utf-8')
+            state = 'replaced'
+        else:
             raise RuntimeError(f'existing NPC scene is incompatible: {NPC_SCENE_RELATIVE}')
-        state = 'already_satisfied'
     else:
         path.write_text(NPC_SCENE_CONTENT, encoding='utf-8')
         state = 'generated'
+    if path.read_text(encoding='utf-8') != NPC_SCENE_CONTENT:
+        raise RuntimeError(f'canonical NPC scene verification failed: {NPC_SCENE_RELATIVE}')
     return {
         'path': NPC_SCENE_RELATIVE,
         'state': state,
         'sha256': sha(path.read_bytes()),
-        'reason': 'satisfy the recovered NPCManager preload with the real NPCPedestrian script',
+        'reason': 'provide one deterministic project-loadable NPCPedestrian scene for NPCManager preload',
     }
+
+
+def collect_diagnostic_sources(root: Path) -> dict[str, str]:
+    sources: dict[str, str] = {}
+    for relative in DIAGNOSTIC_SOURCE_PATHS:
+        path = root / relative
+        if not path.is_file():
+            continue
+        try:
+            sources[relative] = path.read_text(encoding='utf-8')
+        except UnicodeDecodeError:
+            sources[relative] = f'<non-UTF-8 file sha256={sha(path.read_bytes())}>'
+    return sources
 
 
 def apply(root: Path) -> dict:
@@ -248,6 +278,7 @@ def apply(root: Path) -> dict:
         'generated_runtime_resources':generated_resources,
         'runtime_text_files_scanned':sorted(set(scanned)),
         'obsolete_runtime_title_occurrences':stale,
+        'diagnostic_sources':collect_diagnostic_sources(root),
     }
 
 
