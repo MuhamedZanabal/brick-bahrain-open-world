@@ -210,6 +210,60 @@ def apply_v3_patch(project: Path, patch: bytes, expected_files: dict[str, str]) 
     return sorted(expected_files)
 
 
+def _replace_expected(
+    text: str, old: str, new: str, label: str, expected_count: int = 1
+) -> str:
+    count = text.count(old)
+    if count != expected_count:
+        raise SystemExit(
+            f"{label} replacement mismatch: expected {expected_count}, found {count}"
+        )
+    return text.replace(old, new)
+
+
+def prepare_release_smoke_harness(project: Path) -> list[str]:
+    source = project / "tests/runtime_smoke_test_v14.gd"
+    if not source.is_file():
+        raise SystemExit(f"release smoke source missing: {source}")
+    text = source.read_text(encoding="utf-8")
+    text = _replace_expected(text, "extends SceneTree", "extends Node", "smoke base type")
+    text = _replace_expected(
+        text, "func _initialize() -> void:", "func _ready() -> void:", "smoke entry point"
+    )
+    text = _replace_expected(
+        text,
+        "\t\tawait process_frame",
+        "\t\tawait get_tree().process_frame",
+        "smoke frame wait",
+        expected_count=2,
+    )
+    text = _replace_expected(
+        text, "\troot.add_child(world)", "\tget_tree().root.add_child(world)", "smoke world parent"
+    )
+    text = _replace_expected(
+        text,
+        "\tquit(1 if _failed > 0 else 0)",
+        "\tget_tree().quit(1 if _failed > 0 else 0)",
+        "smoke exit",
+    )
+    harness_dir = project / "build/ci"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    script_path = harness_dir / "runtime_smoke_runner_v14.gd"
+    scene_path = harness_dir / "runtime_smoke_runner_v14.tscn"
+    script_path.write_text(text, encoding="utf-8")
+    scene_path.write_text(
+        '[gd_scene load_steps=2 format=3]\n\n'
+        '[ext_resource type="Script" path="res://build/ci/runtime_smoke_runner_v14.gd" id="1_smoke"]\n\n'
+        '[node name="RuntimeSmokeRunnerV14" type="Node"]\n'
+        'script = ExtResource("1_smoke")\n',
+        encoding="utf-8",
+    )
+    return [
+        script_path.relative_to(project).as_posix(),
+        scene_path.relative_to(project).as_posix(),
+    ]
+
+
 def _ensure_svg_renderer() -> str:
     renderer = shutil.which("rsvg-convert")
     if renderer:
@@ -292,6 +346,7 @@ def main() -> int:
         v3_patch, v3_manifest = load_v3_patch_and_manifest(tools)
         v3_files = apply_v3_patch(project, v3_patch, v3_manifest)
         generated = generate_binary_artwork(project)
+        generated += prepare_release_smoke_harness(project)
         changed = sorted(set(changed + v3_files + generated))
 
     after = {relative: sha256_file(project / relative) for relative in FROZEN}
