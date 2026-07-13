@@ -21,7 +21,25 @@ FROZEN = [
     "tests/mobile_input_visual_evidence.gd",
     "scenes/mobile_input_visual_evidence.tscn",
 ]
-PAYLOAD_FILE = "premium_world_overlay.b64"
+PAYLOAD_CHUNKS = [
+    "part01.b64",
+    "part02.b64",
+    "part03.b64",
+    "part04.b64",
+    "part05_07.b64",
+    "part08.b64",
+    "part09.b64",
+    "part10.b64",
+    "part11_13.b64",
+]
+POST_EXTRACT_REPLACEMENTS = {
+    "scripts/hero_district_builder.gd": [
+        (
+            "\t\tvar material := _materials[\"curb_red\"] if index % 2 == 0 else _materials[\"curb_white\"]",
+            "\t\tvar material: Material = _materials[\"curb_red\"] if index % 2 == 0 else _materials[\"curb_white\"]",
+        ),
+    ],
+}
 EVIDENCE_ONLY = {
     "tests/premium_world_visual_evidence.gd",
     "scenes/premium_world_visual_evidence.tscn",
@@ -37,10 +55,12 @@ def sha256_file(path: Path) -> str:
 
 
 def load_payload() -> bytes:
-    payload_path = Path(__file__).resolve().parent / PAYLOAD_FILE
-    if not payload_path.is_file():
-        raise SystemExit(f"premium payload missing: {PAYLOAD_FILE}")
-    encoded = payload_path.read_text(encoding="utf-8").strip()
+    payload_dir = Path(__file__).resolve().parent / "premium_payload_v2"
+    chunks = [payload_dir / name for name in PAYLOAD_CHUNKS]
+    missing = [path.name for path in chunks if not path.is_file()]
+    if missing:
+        raise SystemExit(f"premium payload chunks missing: {missing}")
+    encoded = "".join(chunk.read_text(encoding="utf-8").strip() for chunk in chunks)
     try:
         decoded = base64.b64decode(encoded, validate=True)
     except Exception as exc:
@@ -85,6 +105,21 @@ def main() -> int:
             target.write_bytes(archive.read(relative))
             changed.append(relative)
 
+    post_extract_patches: list[str] = []
+    if not args.evidence_only:
+        for relative, replacements in POST_EXTRACT_REPLACEMENTS.items():
+            target = project / relative
+            text = target.read_text(encoding="utf-8")
+            for old, new in replacements:
+                count = text.count(old)
+                if count != 1:
+                    raise SystemExit(
+                        f"post-extract replacement count mismatch for {relative}: {count}"
+                    )
+                text = text.replace(old, new)
+            target.write_text(text, encoding="utf-8")
+            post_extract_patches.append(relative)
+
     after = {relative: sha256_file(project / relative) for relative in FROZEN}
     mismatches = [relative for relative in FROZEN if before[relative] != after[relative]]
     if mismatches:
@@ -95,9 +130,10 @@ def main() -> int:
         "classification": "premium world overlay on historical v1.4 fallback; not v15 authority",
         "base_integrated_source_sha256": EXPECTED_SOURCE_SHA256,
         "payload_sha256": EXPECTED_PAYLOAD_SHA256,
-        "payload_file": PAYLOAD_FILE,
+        "payload_chunks": PAYLOAD_CHUNKS,
         "evidence_only": args.evidence_only,
         "overlay_files": changed,
+        "post_extract_patches": post_extract_patches,
         "frozen_controls_unchanged": True,
         "frozen_control_hashes": after,
     }
