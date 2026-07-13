@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="${1:-recovery/v14}"
+BASELINE="${2:-baseline/v14}"
+APK_NAME="${APK_NAME:-bahrain_brick_v14.0.4-premium-visual-qa.apk}"
+PACKAGE_NAME="${PACKAGE_NAME:-com.bahrainbrick.game.qa}"
+LOG="$ROOT/build/logs"
+REPORT="$ROOT/build/reports"
+VIS="$ROOT/build/visual_evidence"
+PREMIUM_VIS="$ROOT/build/premium_visual_evidence"
+mkdir -p "$LOG" "$REPORT" "$VIS" "$PREMIUM_VIS"
+
+run_godot() {
+  local name="$1"; shift
+  set -o pipefail
+  "$@" 2>&1 | tee "$LOG/$name.log"
+  local status="${PIPESTATUS[0]}"
+  test "$status" -eq 0
+}
+
+# Frozen controls on clean recovery, before any presentation overlay.
+python3 tools/verify_frozen_controls.py "$ROOT" \
+  --json-out "$REPORT/FROZEN_CONTROLS_RECOVERED_SOURCE.json" \
+  --markdown-out "$REPORT/FROZEN_CONTROLS_RECOVERED_SOURCE.md"
+
+# Matched baseline evidence from the checksum-locked functional graphics source.
+mkdir -p "$BASELINE/build/premium_visual_evidence/before" "$BASELINE/build/logs"
+python3 tools/apply_bahrain_brick_premium_world_overlay.py "$BASELINE" --evidence-only \
+  --report "$BASELINE/build/premium_visual_evidence/BASELINE_EVIDENCE_HARNESS_REPORT.json"
+godot --headless --path "$BASELINE" --editor --quit \
+  2>&1 | tee "$BASELINE/build/logs/godot-import-before.log"
+set -o pipefail
+timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path "$BASELINE" --audio-driver Dummy --display-driver x11 \
+  --rendering-method gl_compatibility res://scenes/premium_world_visual_evidence.tscn -- \
+  --output=res://build/premium_visual_evidence/before \
+  2>&1 | tee "$BASELINE/build/logs/world-evidence-before.log"
+status="${PIPESTATUS[0]}"
+test "$status" -eq 0
+grep -q 'PREMIUM WORLD VISUAL EVIDENCE COMPLETE' "$BASELINE/build/logs/world-evidence-before.log"
+
+# Apply deterministic v2/v3 presentation overlay and evidence-backed runtime corrections.
+python3 tools/apply_premium_overlay_resilient.py "$ROOT" \
+  --report "$REPORT/PREMIUM_WORLD_OVERLAY_REPORT.json" \
+  2>&1 | tee "$LOG/premium-world-overlay.log"
+python3 tools/apply_premium_validation_corrections.py "$ROOT" \
+  --report "$REPORT/RUNTIME_DEFECT_CORRECTIONS.json" \
+  2>&1 | tee "$LOG/runtime-defect-corrections.log"
+python3 tools/verify_frozen_controls.py "$ROOT" \
+  --json-out "$REPORT/FROZEN_CONTROLS_PRE_TEST.json" \
+  --markdown-out "$REPORT/FROZEN_CONTROLS_PRE_TEST.md"
+
+# Import and complete all five project-context acceptance suites plus lifecycle/resource gates.
+mkdir -p "$ROOT/build/ci/test-user-data"/{smoke,controls,presentation,premium-world,premium-presentation,lifecycle,resource-repeat}
+run_godot godot-import-premium godot --headless --path "$ROOT" --editor --quit --verbose
+run_godot runtime-smoke-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/smoke" \
+  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy res://build/ci/runtime_smoke_runner_v14.tscn
+grep -q '43 passed, 0 failed' "$LOG/runtime-smoke-premium.log"
+run_godot mobile-input-regression-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/controls" \
+  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy res://scenes/mobile_input_pipeline_test.tscn
+grep -q '28 passed, 0 failed' "$LOG/mobile-input-regression-premium.log"
+run_godot presentation-flow-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/presentation" \
+  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy \
+  res://scenes/presentation_flow_test.tscn -- --presentation-test
+grep -q '10 passed, 0 failed' "$LOG/presentation-flow-premium.log"
+run_godot premium-world-acceptance env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/premium-world" \
+  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy res://scenes/premium_world_acceptance_test.tscn
+grep -q '12 passed, 0 failed' "$LOG/premium-world-acceptance.log"

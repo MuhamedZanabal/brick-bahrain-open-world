@@ -1,0 +1,36 @@
+grep -q 'presentation visual evidence complete' "$LOG/presentation-visual-premium.log"
+run_godot mobile-input-visual-premium timeout 1200 xvfb-run -a -s "-screen 0 1280x720x24" \
+  godot --path "$ROOT" --audio-driver Dummy --display-driver x11 --rendering-method gl_compatibility \
+  res://scenes/mobile_input_visual_evidence.tscn
+grep -q 'rendered control evidence complete' "$LOG/mobile-input-visual-premium.log"
+ffmpeg -y -framerate 15 -i "$VIS/startup_frames/frame_%04d.png" \
+  -vf 'scale=1280:-2:flags=lanczos' -c:v libx264 -preset medium -crf 21 -pix_fmt yuv420p \
+  "$VIS/bahrain_brick_v14.0.4_startup.mp4" >/dev/null 2>&1
+ffmpeg -y -framerate 12 -i "$VIS/frames/frame_%04d.png" \
+  -vf 'scale=1280:-2:flags=lanczos' -c:v libx264 -preset medium -crf 22 -pix_fmt yuv420p \
+  "$VIS/bahrain_brick_v14.0.4_gameplay.mp4" >/dev/null 2>&1
+
+python3 tools/scan_godot_runtime_errors.py "$LOG" \
+  --json-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.json" \
+  --markdown-out "$REPORT/CRITICAL_RUNTIME_ERROR_SCAN.md"
+
+# Matched comparisons and hosted performance report with exact input diagnostics.
+python3 tools/generate_premium_comparison_report.py "$BASELINE" "$ROOT" \
+  --report "$REPORT/PREMIUM_VISUAL_COMPARISON_AND_PERFORMANCE.json" \
+  --diagnostic "$REPORT/PREMIUM_VISUAL_COMPARISON_DIAGNOSTIC.json" \
+  2>&1 | tee "$LOG/premium-visual-comparison.log"
+python3 tools/verify_frozen_controls.py "$ROOT" \
+  --json-out "$REPORT/FROZEN_CONTROLS_POST_TEST.json" \
+  --markdown-out "$REPORT/FROZEN_CONTROLS_POST_TEST.md"
+
+# Matching official Godot templates, real export, then binary inspection.
+bash tools/install_godot_43_templates.sh "$REPORT/GODOT_EXPORT_TEMPLATE_REPORT.json" "$ROOT"
+KEYSTORE_DIR="${RUNNER_TEMP:-/tmp}/bahrain-brick-premium-qa"; mkdir -p "$KEYSTORE_DIR"
+KEYSTORE_PATH="$KEYSTORE_DIR/debug.keystore"; rm -f "$KEYSTORE_PATH"
+keytool -genkeypair -noprompt -keystore "$KEYSTORE_PATH" -storepass android -alias androiddebugkey \
+  -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname 'CN=Bahrain Brick Premium Visual QA,O=Zanabal Gaming,C=BH'
+python3 - "$ROOT/export_presets.cfg" "$KEYSTORE_PATH" <<'PY'
+from pathlib import Path
+import re,sys
+p=Path(sys.argv[1]); t=p.read_text(); key=Path(sys.argv[2]).resolve().as_posix()

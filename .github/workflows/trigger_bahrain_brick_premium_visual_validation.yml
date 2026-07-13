@@ -1,0 +1,132 @@
+name: Trigger Bahrain Brick Premium Visual Validation
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+      SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+      APK_NAME: bahrain_brick_v14.0.4-premium-visual-qa.apk
+      PACKAGE_NAME: com.bahrainbrick.game.qa
+    steps:
+      - name: Check out validation merge
+        uses: actions/checkout@v4
+
+      - name: Bootstrap canonical gate runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends python3
+          python3 -m py_compile tools/run_canonical_premium_gate.py
+
+      - name: Gate 01 — Install build and evidence dependencies
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 1
+
+      - name: Gate 02 — Recover checksum-locked integrated source
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 2
+
+      - name: Gate 03 — Capture matched baseline world views
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 3
+
+      - name: Gate 04 — Apply premium world overlay and freeze controls
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 4
+
+      - name: Gate 05 — Import source and run all acceptance suites
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 5
+
+      - name: Gate 06 — Capture upgraded world and presentation evidence
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 6
+
+      - name: Gate 07 — Generate comparisons and performance report
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 7
+
+      - name: Gate 08 — Recheck frozen controls
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 8
+
+      - name: Gate 09 — Export and inspect Android QA APK
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 9
+
+      - name: Gate 10 — Package source, workspace and manifests
+        shell: bash
+        run: python3 tools/run_canonical_premium_gate.py 10
+
+      - name: Publish validation failure diagnostics
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const root = 'validation-diagnostics';
+            let body = '## Premium visual validation failure\n\n';
+            if (!fs.existsSync(root)) {
+              body += '`validation-diagnostics` was not created; failure occurred before the canonical gate runner initialized.\n';
+            } else {
+              const failedPath = path.join(root, 'FAILED_GATE.txt');
+              const failed = fs.existsSync(failedPath) ? fs.readFileSync(failedPath, 'utf8') : 'FAILED_GATE.txt missing';
+              const match = failed.match(/gate=(\d+)/);
+              const gate = match ? match[1].padStart(2, '0') : null;
+              body += `**Failure metadata**\n\n\`\`\`text\n${failed}\`\`\`\n\n`;
+              if (gate) {
+                const logPath = path.join(root, `gate-${gate}.log`);
+                const scriptPath = path.join(root, `gate-${gate}.sh`);
+                if (fs.existsSync(logPath)) {
+                  const lines = fs.readFileSync(logPath, 'utf8').split('\n');
+                  const tail = lines.slice(-180).join('\n');
+                  body += `**Gate ${gate} log tail**\n\n\`\`\`text\n${tail.slice(-45000)}\n\`\`\`\n\n`;
+                }
+                if (fs.existsSync(scriptPath)) {
+                  const script = fs.readFileSync(scriptPath, 'utf8');
+                  body += `**Gate ${gate} script**\n\n\`\`\`bash\n${script.slice(0,12000)}\n\`\`\`\n`;
+                }
+              }
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body.slice(0, 60000),
+            });
+
+      - name: Upload premium APK, source, workspace, evidence and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-visual-qa
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-qa.apk*
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-source.zip*
+            recovery/v14/build/bahrain_brick_v14.0.4-premium-visual-workspace.zip*
+            recovery/v14/build/logs/**
+            recovery/v14/build/reports/**
+            baseline/v14/build/logs/**
+            baseline/v14/build/premium_visual_evidence/**
+            recovery/v14/build/premium_visual_evidence/**
+            recovery/v14/build/visual_evidence/**
+            validation-diagnostics/**

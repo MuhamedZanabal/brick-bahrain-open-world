@@ -1,0 +1,113 @@
+            'connect the unprotected parent child-exit lifecycle coordinator',
+            'refresh the last valid player transform during normal world processing',
+            'capture or reuse the latest valid player position and clear the stale reference before protected teardown',
+        ],
+        'protected_function': 'scripts/world.gd::_exit_tree',
+        'protected_function_sha256_before': protected_before,
+        'protected_function_sha256_after': protected_after,
+        'protected_function_unchanged': protected_before == protected_after == PROTECTED_WORLD_EXIT_SHA256,
+    })
+
+    generated_runtime_resources = [ensure_npc_scene(root)]
+    generated_validation_resources = [
+        ensure_exact_resource(
+            root,
+            WORLD_LIFECYCLE_FIXTURE_RELATIVE,
+            WORLD_LIFECYCLE_FIXTURE_CONTENT,
+            'minimal inherited world fixture that executes the real unprotected lifecycle coordinator',
+        ),
+        ensure_exact_resource(
+            root,
+            WORLD_LIFECYCLE_TEST_RELATIVE,
+            WORLD_LIFECYCLE_TEST_CONTENT,
+            'exercise player exit, non-player exit, replacement, idempotence and repeated world cycles',
+        ),
+        ensure_exact_resource(
+            root,
+            WORLD_LIFECYCLE_SCENE_RELATIVE,
+            WORLD_LIFECYCLE_SCENE_CONTENT,
+            'project-context Godot scene for protected-compliant lifecycle validation',
+        ),
+        ensure_exact_resource(
+            root,
+            WORLD_RESOURCE_REPEAT_TEST_RELATIVE,
+            WORLD_RESOURCE_REPEAT_TEST_CONTENT,
+            'repeat delayed NPC/world resource loading and instantiation after presentation validation',
+        ),
+        ensure_exact_resource(
+            root,
+            WORLD_RESOURCE_REPEAT_SCENE_RELATIVE,
+            WORLD_RESOURCE_REPEAT_SCENE_CONTENT,
+            'project-context scene for repeated delayed NPC/world resource validation',
+        ),
+    ]
+
+    export = root / 'export_presets.cfg'
+    text = export.read_text(encoding='utf-8')
+    text, n1 = re.subn(r'(?m)^version/code=.*$', 'version/code=1404', text)
+    text, n2 = re.subn(
+        r'(?m)^version/name=.*$',
+        'version/name="1.4.0.4-premium-visual-qa"',
+        text,
+    )
+    if (n1, n2) != (1, 1):
+        raise RuntimeError(f'export version replacement failure: {(n1, n2)}')
+    export.write_text(text, encoding='utf-8')
+
+    stale: list[dict] = []
+    scanned: list[str] = []
+    for path in runtime_text_paths(root):
+        relative = path.relative_to(root).as_posix()
+        scanned.append(relative)
+        try:
+            body = path.read_text(encoding='utf-8')
+        except (UnicodeDecodeError, OSError):
+            continue
+        for token in STALE_TITLES:
+            if token in body:
+                stale.append({'path': relative, 'token': token})
+    if stale:
+        raise RuntimeError(f'obsolete runtime title occurrences remain: {stale}')
+
+    final_world = world_path.read_text(encoding='utf-8')
+    final_protected_hash = verify_protected_world_exit(final_world)
+    return {
+        'conclusion': 'pass',
+        'corrections': results,
+        'generated_runtime_resources': generated_runtime_resources,
+        'generated_validation_resources': generated_validation_resources,
+        'runtime_text_files_scanned': sorted(set(scanned)),
+        'obsolete_runtime_title_occurrences': stale,
+        'protected_world_exit_expected_sha256': PROTECTED_WORLD_EXIT_SHA256,
+        'protected_world_exit_actual_sha256': final_protected_hash,
+        'protected_world_exit_unchanged': final_protected_hash == PROTECTED_WORLD_EXIT_SHA256,
+        'diagnostic_sources': collect_diagnostic_sources(root),
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('root', type=Path)
+    parser.add_argument('--report', type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        report = apply(args.root.resolve())
+    except Exception as error:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(
+            json.dumps({
+                'conclusion': 'fail',
+                'error_type': type(error).__name__,
+                'error': str(error),
+            }, indent=2) + '\n',
+            encoding='utf-8',
+        )
+        raise
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    args.report.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+    print(json.dumps(report, indent=2))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

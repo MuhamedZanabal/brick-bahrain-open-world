@@ -1,0 +1,57 @@
+
+    def test_world_lifecycle_correction_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            mod.apply(root)
+            first = (root / 'scripts/world.gd').read_bytes()
+            report = mod.apply(root)
+            second = (root / 'scripts/world.gd').read_bytes()
+            self.assertEqual(first, second)
+            world_result = next(item for item in report['corrections'] if item['path'] == 'scripts/world.gd')
+            self.assertEqual(world_result['states'][1:], ['already_satisfied'] * 4)
+            self.assertEqual(self.protected_hash(root), mod.PROTECTED_WORLD_EXIT_SHA256)
+
+    def test_lifecycle_source_is_narrow_to_active_player(self):
+        source = mod.WORLD_LIFECYCLE_BLOCK
+        self.assertIn('if node != player or not node is Node3D:', source)
+        self.assertIn('func _cache_active_player_position() -> void:', source)
+        self.assertIn('if active_player.is_inside_tree():', source)
+        self.assertIn('_last_valid_player_position = active_player.global_position', source)
+        self.assertIn('SaveManager.set_position(_last_valid_player_position)', source)
+        self.assertIn('player = null', source)
+        self.assertNotIn('SaveManager.save_game', source)
+
+    def test_lifecycle_test_covers_required_safety_properties(self):
+        source = mod.WORLD_LIFECYCLE_TEST_CONTENT
+        required = [
+            'non-player child exit preserves active player reference',
+            'active player reference is cleared before world teardown',
+            'first valid player position is cached',
+            'replacement player exit clears only the replacement reference',
+            'repeated lifecycle installation is idempotent',
+            'detached player fallback clears the stale world reference',
+            'detached player fallback reuses the latest valid cached position',
+            'repeated world cycle remains single-shot after fallback reconnect',
+        ]
+        for text in required:
+            self.assertIn(text, source)
+        self.assertIn('World lifecycle guard complete: %d passed, %d failed', source)
+
+    def test_resource_repeat_test_covers_delayed_load_requirements(self):
+        source = mod.WORLD_RESOURCE_REPEAT_TEST_CONTENT
+        for path in [
+            'res://scenes/npc_pedestrian.tscn',
+            'res://scripts/npc_manager.gd',
+            'res://scripts/world.gd',
+            'res://scenes/world.tscn',
+        ]:
+            self.assertIn(path, source)
+        self.assertIn('for cycle in range(3):', source)
+        self.assertIn('CACHE_MODE_IGNORE', source)
+        self.assertIn('NPC scene remains present after repeated cleanup', source)
+        self.assertIn('World resource repeat complete: %d passed, %d failed', source)
+
+    def test_already_correct_single_indent_world_title_is_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)

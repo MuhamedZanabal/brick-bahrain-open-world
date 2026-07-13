@@ -1,0 +1,68 @@
+from pathlib import Path
+import hashlib
+import importlib.util
+import re
+import tempfile
+import unittest
+
+MODULE = Path(__file__).resolve().parents[1] / 'apply_premium_validation_corrections.py'
+spec = importlib.util.spec_from_file_location('corrections', MODULE)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+
+class CorrectionTests(unittest.TestCase):
+    def fixture(
+        self,
+        root: Path,
+        npc_variant: str = 'with_default',
+        save_condition: str = 'if player:',
+        save_shape: str = 'direct',
+    ) -> None:
+        (root / 'scripts').mkdir()
+        variants = {
+            'with_default': '\t\t_anim_player = _model.get_meta("anim_player", null)\n',
+            'without_default': '\t\t_anim_player = _model.get_meta("anim_player")\n',
+            'typed_cast': '    _anim_player = _model.get_meta(&"anim_player") as AnimationPlayer\n',
+            'recovered_variable': '\t\t_animation_player = _model.get_meta("anim_player", null) as AnimationPlayer\n',
+        }
+        (root / 'scripts/npc_pedestrian.gd').write_text(variants[npc_variant])
+        if save_shape == 'direct':
+            save_source = (
+                '\t%s\n' % save_condition
+                + '\t\tsave_data["player"]["position"] = {\n'
+                + '\t\t\t"x": player.global_position.x,\n'
+                + '\t\t\t"y": player.global_position.y,\n'
+                + '\t\t\t"z": player.global_position.z,\n'
+                + '\t\t}\n'
+            )
+        elif save_shape == 'staged':
+            save_source = (
+                '\tvar position: Vector3 = Vector3.ZERO\n'
+                + '\t%s\n' % save_condition
+                + '\t\tposition = player.global_position\n'
+                + '\tsave_data["player"]["position"] = _vector_to_dict(position)\n'
+            )
+        else:
+            raise AssertionError(save_shape)
+        (root / 'scripts/save_manager.gd').write_text(save_source)
+        (root / 'scripts/world.gd').write_text(
+            'extends Node3D\n\n'
+            + 'var player\n'
+            + 'var _world_ready := false\n\n'
+            + 'func _ready() -> void:\n'
+            + '\tGameManager.current_state = GameManager.GameState.LOADING\n'
+            + '\t_show_loading_screen()\n'
+            + '\tcall_deferred("_load_step_environment")\n\n\n'
+            + 'func _exit_tree() -> void:\n'
+            + '\tif GameManager.current_state == GameManager.GameState.IN_WORLD:\n'
+            + '\t\tif player and player is Node3D:\n'
+            + '\t\t\tSaveManager.set_position((player as Node3D).global_position)\n'
+            + '\t\tSaveManager.save_game("world exit")\n'
+            + '\tRadioSystem.stop_radio()\n'
+            + '\tChatManager.set_world_active(false)\n'
+            + '\tTouchInput.reset_all()\n'
+            + '\tfor lock_name in ["phone", "shop", "chat"]:\n'
+            + '\t\tGameManager.release_ui_lock(lock_name)\n\n\n'
+            + 'func _process(delta: float) -> void:\n'
+            + '\tif not _world_ready:\n'

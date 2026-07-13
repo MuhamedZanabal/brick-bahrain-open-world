@@ -1,0 +1,171 @@
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def function_block(text: str, name: str) -> str:
+    match = re.search(rf'(?ms)^func {re.escape(name)}\b.*?(?=^func |\Z)', text)
+    if not match:
+        raise RuntimeError(f'missing function: {name}')
+    return match.group(0).rstrip() + '\n'
+
+
+def function_sha(text: str, name: str) -> str:
+    return sha(function_block(text, name).encode('utf-8'))
+
+
+def verify_protected_world_exit(text: str) -> str:
+    actual = function_sha(text, '_exit_tree')
+    if actual != PROTECTED_WORLD_EXIT_SHA256:
+        raise RuntimeError(
+            'protected world teardown hash mismatch: '
+            f'expected={PROTECTED_WORLD_EXIT_SHA256}, actual={actual}, '
+            f'prohibited_guarded_hash={PROHIBITED_WORLD_EXIT_SHA256}'
+        )
+    return actual
+
+
+def indentation_width(line: str) -> int:
+    leading = line[:len(line) - len(line.lstrip(' \t'))]
+    return len(leading.expandtabs(4))
+
+
+def runtime_text_paths(root: Path):
+    for relative in RUNTIME_TEXT_FILES:
+        path = root / relative
+        if path.is_file():
+            yield path
+    for folder in RUNTIME_TEXT_ROOTS:
+        base = root / folder
+        if not base.is_dir():
+            continue
+        for path in base.rglob('*'):
+            if path.is_file() and not any(
+                part in {'.godot', 'build'} for part in path.relative_to(root).parts
+            ):
+                yield path
+
+
+def exact_pattern(value: str) -> re.Pattern[str]:
+    return re.compile(r'(?m)^' + re.escape(value) + r'$')
+
+
+def replace_variant(
+    text: str,
+    old_variants: tuple[str, ...],
+    new: str,
+    label: str,
+) -> tuple[str, str]:
+    old_patterns = {old: exact_pattern(old) for old in old_variants}
+    old_counts = {old: len(pattern.findall(text)) for old, pattern in old_patterns.items()}
+    total_old = sum(old_counts.values())
+    new_pattern = exact_pattern(new)
+    new_count = len(new_pattern.findall(text))
+    if total_old == 1 and new_count == 0:
+        selected = next(old for old, count in old_counts.items() if count == 1)
+        return old_patterns[selected].sub(lambda _match: new, text, count=1), 'applied'
+    if total_old == 0 and new_count == 1:
+        return text, 'already_satisfied'
+    raise RuntimeError(
+        f'correction state mismatch for {label}: '
+        f'old_counts={old_counts}, new_count={new_count}'
+    )
+
+
+def correct_npc_anim_player(text: str) -> tuple[str, str]:
+    unsafe = list(NPC_UNSAFE_PATTERN.finditer(text))
+    safe = list(NPC_SAFE_PATTERN.finditer(text))
+    if len(unsafe) == 1 and len(safe) == 0:
+        match = unsafe[0]
+        replacement = NPC_SAFE_TEMPLATE.format(
+            indent=match.group('indent'),
+            variable=match.group('variable'),
+        )
+        return NPC_UNSAFE_PATTERN.sub(lambda _match: replacement, text, count=1), 'applied'
+    if len(unsafe) == 0 and len(safe) == 1:
+        return text, 'already_satisfied'
+    candidates = [
+        line.strip() for line in text.splitlines()
+        if 'anim_player' in line or ('get_meta' in line and '_model' in line)
+    ]
+    raise RuntimeError(
+        'NPC anim_player correction state mismatch: '
+        f'unsafe_count={len(unsafe)}, safe_count={len(safe)}, candidates={candidates}'
+    )
+
+
+def correct_npc_manager_lod_guard(text: str) -> tuple[str, list[str]]:
+    block = function_block(text, '_refresh_lod')
+    unsafe_player_count = block.count(NPC_MANAGER_UNSAFE_PLAYER_GUARD)
+    safe_player_count = block.count(NPC_MANAGER_SAFE_PLAYER_GUARD)
+    if unsafe_player_count == 1 and safe_player_count == 0:
+        block = block.replace(
+            NPC_MANAGER_UNSAFE_PLAYER_GUARD,
+            NPC_MANAGER_SAFE_PLAYER_GUARD,
+            1,
+        )
+        player_state = 'applied'
+    elif unsafe_player_count == 0 and safe_player_count == 1:
+        player_state = 'already_satisfied'
+    else:
+        raise RuntimeError(
+            'NPC manager player LOD guard mismatch: '
+            f'unsafe_count={unsafe_player_count}, safe_count={safe_player_count}'
+        )
+
+    unsafe_pedestrian_count = block.count(NPC_MANAGER_UNSAFE_PEDESTRIAN_GUARD)
+    safe_pedestrian_count = block.count(NPC_MANAGER_SAFE_PEDESTRIAN_GUARD)
+    if unsafe_pedestrian_count == 1 and safe_pedestrian_count == 0:
+        block = block.replace(
+            NPC_MANAGER_UNSAFE_PEDESTRIAN_GUARD,
+            NPC_MANAGER_SAFE_PEDESTRIAN_GUARD,
+            1,
+        )
+        pedestrian_state = 'applied'
+    elif unsafe_pedestrian_count == 0 and safe_pedestrian_count == 1:
+        pedestrian_state = 'already_satisfied'
+    else:
+        raise RuntimeError(
+            'NPC manager pedestrian LOD guard mismatch: '
+            f'unsafe_count={unsafe_pedestrian_count}, safe_count={safe_pedestrian_count}'
+        )
+
+    original = function_block(text, '_refresh_lod')
+    if text.count(original) != 1:
+        raise RuntimeError('NPC manager _refresh_lod block is not unique')
+    return text.replace(original, block, 1), [player_state, pedestrian_state]
+
+
+def correct_save_position_guard(text: str) -> tuple[str, str]:
+    lines = text.splitlines(keepends=True)
+    access_indices = [
+        index for index, line in enumerate(lines)
+        if PLAYER_GLOBAL_POSITION_PATTERN.search(line)
+    ]
+    if not access_indices:
+        candidates = [
+            line.strip() for line in lines
+            if 'position' in line and ('player' in line or 'save_data' in line)
+        ]
+        raise RuntimeError(
+            f'player global-position access missing: candidates={candidates}'
+        )
+    guard_indices: list[int] = []
+    contexts: list[list[str]] = []
+    for access_index in access_indices:
+        access_width = indentation_width(lines[access_index])
+        guard_index = None
+        for index in range(access_index - 1, -1, -1):
+            raw = lines[index].rstrip('\r\n')
+            stripped = raw.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            width = indentation_width(raw)
+            match = SAVE_CONDITION_PATTERN.fullmatch(raw)
+            if match and width < access_width and re.search(r'\bplayer\b', match.group('condition')):
+                guard_index = index
+                break
+            if width < access_width and stripped.startswith('func '):
+                break
+        if guard_index is None:

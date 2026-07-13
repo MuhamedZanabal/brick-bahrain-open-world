@@ -1,0 +1,80 @@
+            + '\t\treturn\n\n\n'
+            + 'func _show_loading_screen() -> void:\n'
+            + '\t\tvar title := Label.new()\n'
+            + '\t\ttitle.text = "BRICK BAHRAIN"\n'
+        )
+        (root / 'scripts/npc_manager.gd').write_text(
+            'extends Node3D\n'
+            + 'const NPC_SCENE = preload("res://scenes/npc_pedestrian.tscn")\n'
+            + 'var _player: Node3D\n'
+            + 'var pedestrians: Array[Node] = []\n\n\n'
+            + 'func _refresh_lod() -> void:\n'
+            + '\tif not is_instance_valid(_player):\n'
+            + '\t\t_player = get_tree().get_first_node_in_group("player") as Node3D\n'
+            + '\tif not _player:\n'
+            + '\t\treturn\n'
+            + '\tvar ranked: Array[Dictionary] = []\n'
+            + '\tfor index in range(pedestrians.size()):\n'
+            + '\t\tvar pedestrian := pedestrians[index]\n'
+            + '\t\tif is_instance_valid(pedestrian):\n'
+            + '\t\t\tranked.append({"index": index, "distance": _player.global_position.distance_to(pedestrian.global_position)})\n\n\n'
+            + 'func get_npc_count() -> int:\n'
+            + '\treturn pedestrians.size()\n'
+        )
+        (root / 'export_presets.cfg').write_text(
+            'version/code=1\nversion/name="old"\n'
+        )
+        (root / 'project.godot').write_text(
+            '[application]\nconfig/name="Bahrain Brick"\n'
+        )
+
+    def protected_hash(self, root: Path) -> str:
+        text = (root / 'scripts/world.gd').read_text()
+        return mod.function_sha(text, '_exit_tree')
+
+    def test_protected_fixture_matches_frozen_authority(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            self.assertEqual(
+                self.protected_hash(root),
+                mod.PROTECTED_WORLD_EXIT_SHA256,
+            )
+
+    def test_applies_unprotected_corrections_and_generates_resources(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            report = mod.apply(root)
+            self.assertEqual(report['conclusion'], 'pass')
+            self.assertIn('has_meta("anim_player")', (root / 'scripts/npc_pedestrian.gd').read_text())
+            npc_manager = (root / 'scripts/npc_manager.gd').read_text()
+            self.assertIn('not _player.is_inside_tree()', npc_manager)
+            self.assertIn('pedestrian.is_inside_tree()', npc_manager)
+            self.assertIn('is_inside_tree()', (root / 'scripts/save_manager.gd').read_text())
+            world = (root / 'scripts/world.gd').read_text()
+            self.assertIn('Bahrain Brick', world)
+            self.assertIn('_install_world_lifecycle_guard()', world)
+            self.assertIn('child_exiting_tree.connect(_on_world_child_exiting_tree)', world)
+            self.assertIn('_cache_active_player_position()', world)
+            self.assertIn('_last_valid_player_position = active_player.global_position', world)
+            self.assertIn('SaveManager.set_position(_last_valid_player_position)', world)
+            self.assertIn('player = null', world)
+            self.assertEqual(self.protected_hash(root), mod.PROTECTED_WORLD_EXIT_SHA256)
+            self.assertTrue(report['protected_world_exit_unchanged'])
+            self.assertEqual(len(report['generated_validation_resources']), 5)
+
+    def test_prohibited_protected_mutation_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            path = root / 'scripts/world.gd'
+            text = path.read_text().replace(
+                'if player and player is Node3D:',
+                'if player and player is Node3D and player.is_inside_tree():',
+                1,
+            )
+            path.write_text(text)
+            self.assertEqual(self.protected_hash(root), mod.PROHIBITED_WORLD_EXIT_SHA256)
+            with self.assertRaisesRegex(RuntimeError, 'protected world teardown hash mismatch'):
+                mod.apply(root)

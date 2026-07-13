@@ -1,0 +1,57 @@
+name: Diagnose Bahrain Brick Premium Visual
+
+on:
+  push:
+    branches: [work/bahrain-brick-premium-visual-v14]
+  pull_request:
+    branches: [baseline/bahrain-brick-v14.0.3-functional-graphics]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose-baseline-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    container:
+      image: barichello/godot-ci:4.3
+    env:
+      LIBGL_ALWAYS_SOFTWARE: "1"
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+      SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install diagnostic dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update >/dev/null
+          apt-get install -y --no-install-recommends python3 unzip curl ca-certificates xvfb libgl1-mesa-dri libglx-mesa0 libx11-6 libxcursor1 libxinerama1 libxi6 libxrandr2 libxrender1 >/dev/null
+
+      - name: Run baseline evidence diagnostics
+        shell: bash
+        run: |
+          set -u
+          mkdir -p downloads baseline/v14 build/diagnostics
+          curl -fsSL --retry 4 "$SOURCE_URL" -o downloads/source.zip
+          echo "$SOURCE_SHA256  downloads/source.zip" | sha256sum -c - > build/diagnostics/source-check.txt 2>&1
+          unzip -q downloads/source.zip -d baseline/v14
+          python3 tools/apply_bahrain_brick_premium_world_overlay.py baseline/v14 --evidence-only --report build/diagnostics/evidence-overlay.json > build/diagnostics/overlay.log 2>&1
+          godot --headless --path baseline/v14 --editor --quit > build/diagnostics/import.log 2>&1
+          import_status=$?
+          timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" godot --path baseline/v14 --audio-driver Dummy --display-driver x11 --rendering-method gl_compatibility res://scenes/premium_world_visual_evidence.tscn -- --output=res://build/premium_visual_evidence/before > build/diagnostics/runtime.log 2>&1
+          runtime_status=$?
+          printf 'import_status=%s\nruntime_status=%s\n' "$import_status" "$runtime_status" > build/diagnostics/status.txt
+          grep -nE 'SCRIPT ERROR|Parse Error|ERROR:|premium evidence|PREMIUM WORLD|Invalid|failed|Failed' build/diagnostics/import.log build/diagnostics/runtime.log > build/diagnostics/filtered-errors.txt || true
+          exit "$runtime_status"
+
+      - name: Upload diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-premium-visual-diagnostics
+          retention-days: 7
+          if-no-files-found: error
+          path: build/diagnostics/**

@@ -1,0 +1,96 @@
+            self.fixture(root)
+            path = root / 'scripts/world.gd'
+            path.write_text(path.read_text().replace(
+                '\t\ttitle.text = "BRICK BAHRAIN"',
+                '\ttitle.text = "Bahrain Brick"',
+            ))
+            report = mod.apply(root)
+            world_result = next(item for item in report['corrections'] if item['path'] == 'scripts/world.gd')
+            self.assertEqual(world_result['states'][0], 'already_satisfied')
+            self.assertEqual(self.protected_hash(root), mod.PROTECTED_WORLD_EXIT_SHA256)
+
+    def test_repairs_recovered_get_meta_variant_without_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, 'without_default')
+            mod.apply(root)
+            body = (root / 'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('has_meta("anim_player")', body)
+            self.assertNotIn('get_meta("anim_player")\n', body)
+
+    def test_repairs_typed_string_name_variant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, 'typed_cast')
+            mod.apply(root)
+            body = (root / 'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('_anim_player =', body)
+            self.assertIn('has_meta("anim_player")', body)
+            self.assertIn('as AnimationPlayer', body)
+
+    def test_repairs_actual_recovered_animation_player_variable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, 'recovered_variable')
+            mod.apply(root)
+            body = (root / 'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('_animation_player =', body)
+            self.assertIn('has_meta("anim_player")', body)
+            self.assertNotIn('\n\t\t_anim_player =', body)
+
+    def test_npc_manager_lod_guard_rejects_detached_nodes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            mod.apply(root)
+            body = (root / 'scripts/npc_manager.gd').read_text()
+            self.assertIn('if not _player or not _player.is_inside_tree():', body)
+            self.assertIn('_player = null', body)
+            self.assertIn(
+                'if is_instance_valid(pedestrian) and pedestrian.is_inside_tree():',
+                body,
+            )
+            refresh = mod.function_block(body, '_refresh_lod')
+            self.assertNotIn('\tif not _player:\n\t\treturn', refresh)
+
+    def test_npc_manager_lod_guard_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            mod.apply(root)
+            first = (root / 'scripts/npc_manager.gd').read_bytes()
+            report = mod.apply(root)
+            second = (root / 'scripts/npc_manager.gd').read_bytes()
+            self.assertEqual(first, second)
+            result = next(
+                item for item in report['corrections']
+                if item['path'] == 'scripts/npc_manager.gd'
+            )
+            self.assertEqual(result['states'], ['already_satisfied', 'already_satisfied'])
+
+    def test_adds_tree_guard_to_direct_save_position_access(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, save_condition='if is_instance_valid(player):')
+            mod.apply(root)
+            body = (root / 'scripts/save_manager.gd').read_text()
+            self.assertIn(
+                'if is_instance_valid(player) and player.is_inside_tree():',
+                body,
+            )
+
+    def test_adds_tree_guard_to_recovered_staged_position_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(
+                root,
+                save_condition='if is_instance_valid(player):',
+                save_shape='staged',
+            )
+            mod.apply(root)
+            body = (root / 'scripts/save_manager.gd').read_text()
+            self.assertIn(
+                'if is_instance_valid(player) and player.is_inside_tree():',
+                body,
+            )
+            self.assertIn('position = player.global_position', body)

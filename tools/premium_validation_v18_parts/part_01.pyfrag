@@ -1,0 +1,117 @@
+
+WORLD_LIFECYCLE_SCENE_RELATIVE = 'scenes/world_lifecycle_guard_test.tscn'
+WORLD_LIFECYCLE_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]\n\n[ext_resource type="Script" path="res://tests/world_lifecycle_guard_test.gd" id="1_test"]\n\n[node name="WorldLifecycleGuardTest" type="Node"]\nscript = ExtResource("1_test")\n'''
+
+WORLD_RESOURCE_REPEAT_TEST_RELATIVE = 'tests/world_resource_repeat_test.gd'
+WORLD_RESOURCE_REPEAT_TEST_CONTENT = '''extends Node
+
+const RESOURCE_PATHS := [
+	["NPC scene", "res://scenes/npc_pedestrian.tscn"],
+	["NPC manager script", "res://scripts/npc_manager.gd"],
+	["world script", "res://scripts/world.gd"],
+	["world scene", "res://scenes/world.tscn"],
+]
+
+var passed := 0
+var failed := 0
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	call_deferred("_run")
+
+
+func _check(condition: bool, label: String) -> void:
+	if condition:
+		passed += 1
+		print("[PASS] " + label)
+	else:
+		failed += 1
+		push_error("[FAIL] " + label)
+
+
+func _run() -> void:
+	_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present before repeated loads")
+	_check(FileAccess.get_file_as_bytes("res://scenes/npc_pedestrian.tscn").size() > 0, "NPC scene remains nonempty before repeated loads")
+
+	for cycle in range(3):
+		for item in RESOURCE_PATHS:
+			var resource = ResourceLoader.load(item[1], "", ResourceLoader.CACHE_MODE_IGNORE)
+			_check(resource != null, "%s loads in delayed cycle %d" % [item[0], cycle + 1])
+		var npc_scene = ResourceLoader.load("res://scenes/npc_pedestrian.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+		var npc_instance = npc_scene.instantiate() if npc_scene else null
+		_check(npc_instance is CharacterBody3D, "NPC scene instantiates in delayed cycle %d" % [cycle + 1])
+		if npc_instance:
+			npc_instance.free()
+		var world_scene = ResourceLoader.load("res://scenes/world.tscn", "", ResourceLoader.CACHE_MODE_IGNORE) as PackedScene
+		var world_instance = world_scene.instantiate() if world_scene else null
+		_check(world_instance is Node3D, "world scene instantiates in delayed cycle %d" % [cycle + 1])
+		if world_instance:
+			world_instance.free()
+
+	_check(FileAccess.file_exists("res://scenes/npc_pedestrian.tscn"), "NPC scene remains present after repeated cleanup")
+	print("World resource repeat complete: %d passed, %d failed" % [passed, failed])
+	get_tree().quit(0 if failed == 0 else 5)
+'''
+
+WORLD_RESOURCE_REPEAT_SCENE_RELATIVE = 'scenes/world_resource_repeat_test.tscn'
+WORLD_RESOURCE_REPEAT_SCENE_CONTENT = '''[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/world_resource_repeat_test.gd" id="1_test"]
+
+[node name="WorldResourceRepeatTest" type="Node"]
+script = ExtResource("1_test")
+'''
+
+DIAGNOSTIC_SOURCE_PATHS = (
+    'scripts/save_manager.gd',
+    'scripts/world.gd',
+    'scripts/npc_manager.gd',
+    'scripts/npc_pedestrian.gd',
+    'scenes/npc_pedestrian.tscn',
+    WORLD_LIFECYCLE_FIXTURE_RELATIVE,
+    WORLD_LIFECYCLE_TEST_RELATIVE,
+    WORLD_LIFECYCLE_SCENE_RELATIVE,
+    WORLD_RESOURCE_REPEAT_TEST_RELATIVE,
+    WORLD_RESOURCE_REPEAT_SCENE_RELATIVE,
+    'tests/premium_presentation_acceptance_test.gd',
+    'scenes/premium_presentation_acceptance_test.tscn',
+)
+
+NPC_UNSAFE_PATTERN = re.compile(
+    r'(?m)^(?P<indent>[ \t]*)(?P<variable>_animation_player|_anim_player)\s*=\s*'
+    r'_model\.get_meta\(\s*&?["\']anim_player["\']'
+    r'(?:\s*,\s*null)?\s*\)(?:\s+as\s+AnimationPlayer)?\s*$'
+)
+NPC_SAFE_PATTERN = re.compile(
+    r'(?m)^[ \t]*(?:_animation_player|_anim_player)\s*=.*_model\.get_meta\(.*anim_player.*\)'
+    r'.*_model\.has_meta\(\s*&?["\']anim_player["\']\s*\).*else\s+null\s*$'
+)
+NPC_SAFE_TEMPLATE = (
+    '{indent}{variable} = (_model.get_meta("anim_player") as AnimationPlayer) '
+    'if _model.has_meta("anim_player") else null'
+)
+NPC_MANAGER_UNSAFE_PLAYER_GUARD = '\tif not _player:\n\t\treturn'
+NPC_MANAGER_SAFE_PLAYER_GUARD = (
+    '\tif not _player or not _player.is_inside_tree():\n'
+    '\t\t_player = null\n'
+    '\t\treturn'
+)
+NPC_MANAGER_UNSAFE_PEDESTRIAN_GUARD = '\t\tif is_instance_valid(pedestrian):'
+NPC_MANAGER_SAFE_PEDESTRIAN_GUARD = (
+    '\t\tif is_instance_valid(pedestrian) and pedestrian.is_inside_tree():'
+)
+SAVE_CONDITION_PATTERN = re.compile(r'^(?P<indent>[ \t]*)if\s+(?P<condition>.+):\s*$')
+SAVE_TREE_GUARD_PATTERN = re.compile(r'\bplayer\.is_inside_tree\s*\(\s*\)')
+PLAYER_GLOBAL_POSITION_PATTERN = re.compile(r'\bplayer\.global_position\b')
+
+WORLD_TITLE_PATTERN = re.compile(
+    r'(?m)^(?P<indent>[ \t]*)title\.text\s*=\s*"(?P<title>BRICK BAHRAIN|Bahrain Brick)"\s*$'
+)
+WORLD_STATE_ANCHOR = 'func _ready() -> void:\n'
+WORLD_LIFECYCLE_STATE_BLOCK = '''var _last_valid_player_position := Vector3.ZERO\nvar _has_last_valid_player_position := false\n\n\n'''
+WORLD_READY_ANCHOR = '\t_show_loading_screen()\n\tcall_deferred("_load_step_environment")'
+WORLD_READY_PATCHED = '\t_show_loading_screen()\n\t_install_world_lifecycle_guard()\n\tcall_deferred("_load_step_environment")'
+WORLD_PROCESS_ANCHOR = 'func _process(delta: float) -> void:\n\tif not _world_ready:'
+WORLD_PROCESS_PATCHED = 'func _process(delta: float) -> void:\n\t_cache_active_player_position()\n\tif not _world_ready:'
+WORLD_LIFECYCLE_BLOCK = '''func _install_world_lifecycle_guard() -> void:\n\tif not child_exiting_tree.is_connected(_on_world_child_exiting_tree):\n\t\tchild_exiting_tree.connect(_on_world_child_exiting_tree)\n\n\nfunc _cache_active_player_position() -> void:\n\tif player == null or not player is Node3D:\n\t\treturn\n\tvar active_player := player as Node3D\n\tif not active_player.is_inside_tree():\n\t\treturn\n\t_last_valid_player_position = active_player.global_position\n\t_has_last_valid_player_position = true\n\n\nfunc _on_world_child_exiting_tree(node: Node) -> void:\n\tif node != player or not node is Node3D:\n\t\treturn\n\tvar active_player := node as Node3D\n\tif active_player.is_inside_tree():\n\t\t_last_valid_player_position = active_player.global_position\n\t\t_has_last_valid_player_position = true\n\tif _has_last_valid_player_position:\n\t\tSaveManager.set_position(_last_valid_player_position)\n\tplayer = null\n\n\n'''
