@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-EXPECTED_SOURCE_SHA256 = "47221a13cd3b7f1fab4ad2882aba3381b80bf21eacf6be957474407e0e88799c"
+EXPECTED_SOURCE_SHA256 = "c4641fee88ab9403b80b069593a7fd7c938f79e74cd8dd3894c63fe2ff3df604"
 PARTS = tuple(Path(__file__).with_name("premium_validation_v18_test_parts") / f"part_{index:02d}.pyfrag" for index in range(5))
 missing = [path.as_posix() for path in PARTS if not path.is_file()]
 if missing:
