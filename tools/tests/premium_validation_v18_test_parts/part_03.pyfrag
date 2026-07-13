@@ -1,0 +1,70 @@
+            self.fixture(root, 'recovered_variable')
+            mod.apply(root)
+            body = (root / 'scripts/npc_pedestrian.gd').read_text()
+            self.assertIn('_animation_player =', body)
+            self.assertIn('has_meta("anim_player")', body)
+            self.assertNotIn('\n\t\t_anim_player =', body)
+
+    def test_adds_tree_guard_to_direct_save_position_access(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root, save_condition='if is_instance_valid(player):')
+            mod.apply(root)
+            body = (root / 'scripts/save_manager.gd').read_text()
+            self.assertIn(
+                'if is_instance_valid(player) and player.is_inside_tree():',
+                body,
+            )
+
+    def test_adds_tree_guard_to_recovered_staged_position_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(
+                root,
+                save_condition='if is_instance_valid(player):',
+                save_shape='staged',
+            )
+            mod.apply(root)
+            body = (root / 'scripts/save_manager.gd').read_text()
+            self.assertIn(
+                'if is_instance_valid(player) and player.is_inside_tree():',
+                body,
+            )
+            self.assertIn('position = player.global_position', body)
+            self.assertIn('_vector_to_dict(position)', body)
+
+    def test_save_guard_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(
+                root,
+                save_condition='if player and player.is_inside_tree():',
+                save_shape='staged',
+            )
+            report = mod.apply(root)
+            save_result = next(item for item in report['corrections'] if item['path'] == 'scripts/save_manager.gd')
+            self.assertEqual(save_result['states'], ['already_satisfied'])
+
+    def test_compatible_noncanonical_npc_scene_is_replaced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            (root / 'scenes').mkdir()
+            (root / 'scenes/npc_pedestrian.tscn').write_text(
+                mod.NPC_SCENE_CONTENT + 'metadata/test_only = true\n'
+            )
+            report = mod.apply(root)
+            self.assertEqual(
+                (root / 'scenes/npc_pedestrian.tscn').read_text(),
+                mod.NPC_SCENE_CONTENT,
+            )
+            self.assertEqual(report['generated_runtime_resources'][0]['state'], 'replaced')
+
+    def test_incompatible_existing_npc_scene_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.fixture(root)
+            (root / 'scenes').mkdir()
+            (root / 'scenes/npc_pedestrian.tscn').write_text('invalid\n')
+            with self.assertRaisesRegex(RuntimeError, 'incompatible'):
+                mod.apply(root)
