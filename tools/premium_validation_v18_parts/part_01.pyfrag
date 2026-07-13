@@ -91,6 +91,16 @@ NPC_SAFE_TEMPLATE = (
     '{indent}{variable} = (_model.get_meta("anim_player") as AnimationPlayer) '
     'if _model.has_meta("anim_player") else null'
 )
+NPC_MANAGER_UNSAFE_PLAYER_GUARD = '\tif not _player:\n\t\treturn'
+NPC_MANAGER_SAFE_PLAYER_GUARD = (
+    '\tif not _player or not _player.is_inside_tree():\n'
+    '\t\t_player = null\n'
+    '\t\treturn'
+)
+NPC_MANAGER_UNSAFE_PEDESTRIAN_GUARD = '\t\tif is_instance_valid(pedestrian):'
+NPC_MANAGER_SAFE_PEDESTRIAN_GUARD = (
+    '\t\tif is_instance_valid(pedestrian) and pedestrian.is_inside_tree():'
+)
 SAVE_CONDITION_PATTERN = re.compile(r'^(?P<indent>[ \t]*)if\s+(?P<condition>.+):\s*$')
 SAVE_TREE_GUARD_PATTERN = re.compile(r'\bplayer\.is_inside_tree\s*\(\s*\)')
 PLAYER_GLOBAL_POSITION_PATTERN = re.compile(r'\bplayer\.global_position\b')
