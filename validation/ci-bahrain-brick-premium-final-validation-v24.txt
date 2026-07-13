@@ -1,0 +1,4 @@
+Validation-only marker for premium authority 261ac7449a871b54e7b08392b36c8a3f3b594303.
+Protected world teardown SHA-256 must remain fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc.
+Pedestrian player and vehicle transform scans must reject detached nodes before cross-node transform reads.
+Do not merge this validation branch.
