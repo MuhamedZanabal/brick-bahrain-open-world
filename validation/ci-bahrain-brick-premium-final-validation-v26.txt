@@ -1,0 +1,4 @@
+Validation-only marker for premium authority 7181e44e6a78756bb9ddb831947c86f214b69f94.
+Protected world teardown SHA-256 must remain fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc.
+The correction report must persist every GDScript global transform access and teardown-bearing source, including the premium world visual-evidence harness.
+Do not merge this validation branch.
