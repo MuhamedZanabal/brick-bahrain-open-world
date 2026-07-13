@@ -38,7 +38,7 @@ status="${PIPESTATUS[0]}"; set +o pipefail
 test "$status" -eq 0
 grep -q 'PREMIUM WORLD VISUAL EVIDENCE COMPLETE' "$BASELINE/build/logs/world-evidence-before.log"
 
-python3 tools/apply_bahrain_brick_premium_world_overlay.py "$ROOT" \
+python3 tools/apply_premium_overlay_resilient.py "$ROOT" \
   --report "$REPORT/PREMIUM_WORLD_OVERLAY_REPORT.json" \
   2>&1 | tee "$LOG/premium-world-overlay.log"
 python3 tools/apply_premium_validation_corrections.py "$ROOT" \
