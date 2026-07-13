@@ -6,6 +6,10 @@ import subprocess
 from pathlib import Path
 
 
+MISSING_RELEASE_SMOKE_SCENE = "res://build/ci/runtime_smoke_runner_v14.tscn"
+RELEASE_SMOKE_SCRIPT = "--script res://tests/runtime_smoke_test_v14.gd"
+
+
 def load_blocks(workflow: Path) -> list[str]:
     lines = workflow.read_text(encoding="utf-8").splitlines()
     blocks: list[str] = []
@@ -31,6 +35,19 @@ def load_blocks(workflow: Path) -> list[str]:
     return blocks
 
 
+def normalize_gate_script(gate: int, script: str) -> str:
+    """Resolve CI-only references that are intentionally absent from the release source ZIP."""
+    if gate == 5:
+        occurrence_count = script.count(MISSING_RELEASE_SMOKE_SCENE)
+        if occurrence_count != 1:
+            raise SystemExit(
+                "gate 5 smoke reference mismatch: "
+                f"expected one {MISSING_RELEASE_SMOKE_SCENE!r}, found {occurrence_count}"
+            )
+        script = script.replace(MISSING_RELEASE_SMOKE_SCENE, RELEASE_SMOKE_SCRIPT)
+    return script
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("gate", type=int)
@@ -50,7 +67,7 @@ def main() -> int:
     diagnostics = Path("validation-diagnostics")
     diagnostics.mkdir(parents=True, exist_ok=True)
     number = args.gate
-    script = blocks[number - 1]
+    script = normalize_gate_script(number, blocks[number - 1])
     script_path = diagnostics / f"gate-{number:02d}.sh"
     log_path = diagnostics / f"gate-{number:02d}.log"
     script_path.write_text(script, encoding="utf-8")
