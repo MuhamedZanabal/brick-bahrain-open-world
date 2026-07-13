@@ -58,3 +58,11 @@ run_godot runtime-smoke-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user
 grep -q '43 passed, 0 failed' "$LOG/runtime-smoke-premium.log"
 run_godot mobile-input-regression-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/controls" \
   timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy res://scenes/mobile_input_pipeline_test.tscn
+grep -q '28 passed, 0 failed' "$LOG/mobile-input-regression-premium.log"
+run_godot presentation-flow-premium env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/presentation" \
+  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy \
+  res://scenes/presentation_flow_test.tscn -- --presentation-test
+grep -q '10 passed, 0 failed' "$LOG/presentation-flow-premium.log"
+run_godot premium-world-acceptance env XDG_DATA_HOME="$PWD/$ROOT/build/ci/test-user-data/premium-world" \
+  timeout 700 godot --headless --path "$ROOT" --audio-driver Dummy res://scenes/premium_world_acceptance_test.tscn
+grep -q '12 passed, 0 failed' "$LOG/premium-world-acceptance.log"
