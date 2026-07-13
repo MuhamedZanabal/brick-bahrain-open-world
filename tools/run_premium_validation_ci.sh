@@ -15,7 +15,6 @@ run_godot() {
   set -o pipefail
   "$@" 2>&1 | tee "$LOG/$name.log"
   local status="${PIPESTATUS[0]}"
-  set +o pipefail
   test "$status" -eq 0
 }
 
@@ -36,11 +35,11 @@ timeout 1500 xvfb-run -a -s "-screen 0 1280x720x24" \
   --rendering-method gl_compatibility res://scenes/premium_world_visual_evidence.tscn -- \
   --output=res://build/premium_visual_evidence/before \
   2>&1 | tee "$BASELINE/build/logs/world-evidence-before.log"
-status="${PIPESTATUS[0]}"; set +o pipefail
+status="${PIPESTATUS[0]}"
 test "$status" -eq 0
 grep -q 'PREMIUM WORLD VISUAL EVIDENCE COMPLETE' "$BASELINE/build/logs/world-evidence-before.log"
 
-# Apply deterministic v2/v3 presentation overlay and three evidence-backed runtime corrections.
+# Apply deterministic v2/v3 presentation overlay and evidence-backed runtime corrections.
 python3 tools/apply_premium_overlay_resilient.py "$ROOT" \
   --report "$REPORT/PREMIUM_WORLD_OVERLAY_REPORT.json" \
   2>&1 | tee "$LOG/premium-world-overlay.log"
