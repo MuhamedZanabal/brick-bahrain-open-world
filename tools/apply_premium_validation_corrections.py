@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Assemble the checksum-pinned v18 correction set, then apply final teardown guards."""
+"""Assemble the checksum-pinned v18 correction set, apply final teardown guards, and preserve source-backed transform diagnostics."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 EXPECTED_SOURCE_SHA256 = "ff164b38033828bb42133cdafae092271132920c83c189908b0b03ca9c10cb89"
@@ -41,6 +42,18 @@ if _post_spec is None or _post_spec.loader is None:
 _post = importlib.util.module_from_spec(_post_spec)
 _post_spec.loader.exec_module(_post)
 
+TRANSFORM_TOKENS = ("global_position", "global_transform", "get_global_transform")
+TEARDOWN_TOKENS = (
+    "_exit_tree",
+    "NOTIFICATION_EXIT_TREE",
+    "tree_exiting",
+    "tree_exited",
+    "child_exiting_tree",
+    "queue_free",
+    "free()",
+    "get_tree().quit",
+)
+
 
 def _normalize_final_guard_for_checksum_pinned_base(root: Path) -> str:
     """Restore only the base block's unprotected line before its idempotence check."""
@@ -60,6 +73,66 @@ def _normalize_final_guard_for_checksum_pinned_base(root: Path) -> str:
         "final lifecycle guard normalization mismatch: "
         f"safe_count={safe_count}, unsafe_count={unsafe_count}"
     )
+
+
+def _function_for_line(lines: list[str], line_index: int) -> str:
+    for index in range(line_index, -1, -1):
+        match = re.match(r"^func\s+([A-Za-z0-9_]+)\b", lines[index])
+        if match:
+            return match.group(1)
+    return "<top-level>"
+
+
+def collect_transform_access_inventory(root: Path) -> dict:
+    entries: list[dict] = []
+    source_snapshots: dict[str, str] = {}
+    teardown_sources: dict[str, str] = {}
+    for base_name in ("scripts", "tests"):
+        base = root / base_name
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob("*.gd")):
+            if any(part in {".godot", "build"} for part in path.relative_to(root).parts):
+                continue
+            relative = path.relative_to(root).as_posix()
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            lines = text.splitlines()
+            matched = False
+            for line_index, line in enumerate(lines):
+                tokens = [token for token in TRANSFORM_TOKENS if token in line]
+                if not tokens:
+                    continue
+                matched = True
+                start = max(0, line_index - 4)
+                end = min(len(lines), line_index + 5)
+                entries.append(
+                    {
+                        "path": relative,
+                        "function": _function_for_line(lines, line_index),
+                        "line": line_index + 1,
+                        "tokens": tokens,
+                        "text": line.strip(),
+                        "context_start_line": start + 1,
+                        "context": [
+                            {"line": idx + 1, "text": lines[idx]}
+                            for idx in range(start, end)
+                        ],
+                    }
+                )
+            if matched:
+                source_snapshots[relative] = text
+            if any(token in text for token in TEARDOWN_TOKENS):
+                teardown_sources[relative] = text
+    return {
+        "entry_count": len(entries),
+        "file_count": len(source_snapshots),
+        "entries": entries,
+        "source_snapshots": source_snapshots,
+        "teardown_source_snapshots": teardown_sources,
+    }
 
 
 def apply(root: Path) -> dict:
@@ -117,6 +190,13 @@ def apply(root: Path) -> dict:
         encoding="utf-8"
     )
     report["diagnostic_sources"][_post.NPC_PATH] = npc_path.read_text(encoding="utf-8")
+
+    evidence_path = root / "tests/premium_world_visual_evidence.gd"
+    if evidence_path.is_file():
+        report["diagnostic_sources"][evidence_path.relative_to(root).as_posix()] = (
+            evidence_path.read_text(encoding="utf-8")
+        )
+    report["transform_access_inventory"] = collect_transform_access_inventory(root)
     return report
 
 
