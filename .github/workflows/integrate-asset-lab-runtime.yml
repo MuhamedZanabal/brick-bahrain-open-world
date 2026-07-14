@@ -1,0 +1,178 @@
+name: Integrate verified Asset Lab runtime families
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - scripts/asset_lab_runtime.gd
+      - scenes/world.tscn
+      - tests/test_asset_lab_runtime_integration.py
+      - .github/workflows/integrate-asset-lab-runtime.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ASSET_SCAFFOLD_COMMIT: b7702d7a371b38ff712352ab5de7179fe962b86b
+  ASSET_BUNDLE_SHA256: 89c73b89ac65402fa193fd5d6f608bd000f4116bfcfa60140c090b6751ee4735
+  ASSET_HEAD: f9bb1f8d5aca1d8547fd1cc67f570573b9e9f727
+  ASSET_REF: work/bahrain-brick-complete-asset-system-v1
+  BLENDER_VERSION: '4.3.2'
+  GODOT_VERSION: '4.3'
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact integration branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: work/bahrain-brick-asset-lab-integration-v1
+          fetch-depth: 0
+
+      - name: Verify frozen controls before asset writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/asset_lab
+          python3 tools/verify_frozen_controls.py . --json-out build/asset_lab/FROZEN_CONTROLS_PRE.json --markdown-out build/asset_lab/FROZEN_CONTROLS_PRE.md
+          grep -q '"checks": 25' build/asset_lab/FROZEN_CONTROLS_PRE.json
+          grep -q '"failures": \[\]' build/asset_lab/FROZEN_CONTROLS_PRE.json
+
+      - name: Fetch and verify public checksum-pinned asset authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/asset_lab/downloads
+          bundle=build/asset_lab/downloads/bahrain-brick-assets-runtime-v1-f9bb1f8.bundle
+          url="https://raw.githubusercontent.com/MuhamedZanabal/Bahrain_bricks_Assets/${ASSET_SCAFFOLD_COMMIT}/authority/bahrain-brick-assets-runtime-v1-f9bb1f8.bundle"
+          curl --fail --location --retry 5 --proto '=https' "$url" --output "$bundle"
+          test "$(stat -c '%s' "$bundle")" = '660172'
+          echo "${ASSET_BUNDLE_SHA256}  ${bundle}" | sha256sum -c -
+          git bundle verify "$bundle" 2>&1 | tee build/asset_lab/asset-bundle-verification.log
+          test "$(git bundle list-heads "$bundle" "refs/heads/${ASSET_REF}" | awk '{print $1}')" = "${ASSET_HEAD}"
+          git clone --branch "${ASSET_REF}" "$bundle" build/asset_lab/authority
+          test "$(git -C build/asset_lab/authority rev-parse HEAD)" = "${ASSET_HEAD}"
+
+      - name: Install official pinned Blender and Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/asset_lab
+          blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          blender_base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 5 --proto '=https' "${blender_base}/${blender_archive}" --output "${blender_archive}"
+          curl --fail --location --retry 5 --proto '=https' "${blender_base}/blender-${BLENDER_VERSION}.sha256" --output blender.sha256
+          grep " ${blender_archive}$" blender.sha256 | sha256sum -c -
+          tar -xf "${blender_archive}"
+          echo "BLENDER=${PWD}/blender-${BLENDER_VERSION}-linux-x64/blender" >> "${GITHUB_ENV}"
+          sha256sum "${blender_archive}" > blender-archive.sha256
+          godot_base="https://github.com/godotengine/godot/releases/download/4.3-stable"
+          godot_archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl --fail --location --retry 5 --proto '=https' "${godot_base}/SHA512-SUMS.txt" --output godot-SHA512-SUMS.txt
+          curl --fail --location --retry 5 --proto '=https' "${godot_base}/${godot_archive}" --output "${godot_archive}"
+          grep " ${godot_archive}$" godot-SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "${godot_archive}" -d godot-bin
+          echo "GODOT=${PWD}/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "${GITHUB_ENV}"
+          sha512sum "${godot_archive}" > godot-editor.sha512
+
+      - name: Generate verified runtime derivatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          authority=build/asset_lab/authority
+          "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_villa_kit.py" -- --output-dir build/asset_lab/generated/villas --seed 1405 --profile balanced --asset-id all --report build/asset_lab/generated/villas/generation-report.json
+          "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_clean_room_replacements.py" -- --output-dir build/asset_lab/generated/clean_room --seed 1405 --report build/asset_lab/generated/clean_room/generation-report.json
+          test "$(find build/asset_lab/generated/villas -name '*.glb' | wc -l)" = '54'
+          test "$(find build/asset_lab/generated/clean_room -name '*.glb' | wc -l)" = '63'
+          test "$(find build/asset_lab/generated/clean_room -name '*.gdshader' | wc -l)" = '1'
+
+      - name: Install Balanced LOD0 into production destinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/environment/architecture/villas assets/environment/architecture/commercial assets/environment/architecture/waterfront
+          mkdir -p assets/vehicles/clean_room assets/environment/vegetation assets/props/street assets/environment/roads assets/shaders
+          cp build/asset_lab/generated/villas/balanced/*_lod0.glb assets/environment/architecture/villas/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_building_block_01_lod0.glb assets/environment/architecture/commercial/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_skyscraper_tower_01_lod0.glb assets/environment/architecture/waterfront/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_vehicle_sedan_01_lod0.glb assets/vehicles/clean_room/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_date_palm_01_lod0.glb assets/environment/vegetation/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_shade_tree_01_lod0.glb assets/environment/vegetation/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_desert_planter_01_lod0.glb assets/props/street/
+          cp build/asset_lab/generated/clean_room/balanced/bh_cr_road_straight_01_lod0.glb assets/environment/roads/
+          cp build/asset_lab/generated/clean_room/shader/bh_cr_mobile_toon_shader_01.gdshader assets/shaders/
+          test "$(find assets/environment/architecture/villas -name 'bh_villa_*_lod0.glb' | wc -l)" = '18'
+
+      - name: Validate real scene integration and Godot imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests.test_asset_lab_runtime_integration -v 2>&1 | tee build/asset_lab/runtime-integration-tests.log
+          "${GODOT}" --headless --editor --path . --import --quit 2>&1 | tee build/asset_lab/godot-game-import.log
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' build/asset_lab/godot-game-import.log
+          grep -q 'node name="AssetLab"' scenes/world.tscn
+          grep -q '"VillaDistrict"' scripts/asset_lab_runtime.gd
+
+      - name: Build first-family runtime usage map
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root=Path('.')
+          rows=[]
+          for path in sorted((root/'assets/environment/architecture/villas').glob('bh_villa_*_lod0.glb')):
+              rows.append([path.stem.removesuffix('_lod0'),str(path),'res://scenes/world.tscn','World/AssetLab/VillaDistrict','1','balanced','0','simplified_box','integrated_runtime'])
+          clean=[
+              ('bh_quarantine_generic_buildings','bh_cr_building_block_01','assets/environment/architecture/commercial/bh_cr_building_block_01_lod0.glb','World/AssetLab/CommercialDistrict'),
+              ('inherited_generic_skyscrapers','bh_cr_skyscraper_tower_01','assets/environment/architecture/waterfront/bh_cr_skyscraper_tower_01_lod0.glb','World/AssetLab/WaterfrontDistrict'),
+              ('inherited_generic_cars','bh_cr_vehicle_sedan_01','assets/vehicles/clean_room/bh_cr_vehicle_sedan_01_lod0.glb','World/AssetLab/CommercialDistrict'),
+              ('bh_quarantine_palms','bh_cr_date_palm_01','assets/environment/vegetation/bh_cr_date_palm_01_lod0.glb','World/AssetLab/WaterfrontDistrict'),
+              ('bh_quarantine_trees','bh_cr_shade_tree_01','assets/environment/vegetation/bh_cr_shade_tree_01_lod0.glb','World/AssetLab/TraditionalDistrict'),
+              ('bh_quarantine_nature_props','bh_cr_desert_planter_01','assets/props/street/bh_cr_desert_planter_01_lod0.glb','World/AssetLab/SouqDistrict'),
+              ('bh_quarantine_roads','bh_cr_road_straight_01','assets/environment/roads/bh_cr_road_straight_01_lod0.glb','World/AssetLab/RoadNetwork'),
+              ('inherited_flexible_toon','bh_cr_mobile_toon_shader_01','assets/shaders/bh_cr_mobile_toon_shader_01.gdshader','World/AssetLab'),
+          ]
+          for original,replacement,path,node in clean:
+              rows.append([original+'->'+replacement,path,'res://scenes/world.tscn',node,'1','balanced' if path.endswith('.glb') else 'shared_mobile','0' if path.endswith('.glb') else 'n/a','simplified_box' if path.endswith('.glb') else 'n/a','integrated_canonicalized'])
+          out=root/'docs/asset_lab/RUNTIME_USAGE_MAP_FIRST_FAMILIES.csv'
+          out.parent.mkdir(parents=True,exist_ok=True)
+          with out.open('w',newline='',encoding='utf-8') as f:
+              w=csv.writer(f,lineterminator='\n')
+              w.writerow(['asset_id','destination_resource','scene_path','node_path','instance_count','quality_profile','lod','collision','disposition'])
+              w.writerows(rows)
+          assert len(rows)==26
+          PY
+
+      - name: Verify frozen controls after integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_frozen_controls.py . --json-out build/asset_lab/FROZEN_CONTROLS_POST.json --markdown-out build/asset_lab/FROZEN_CONTROLS_POST.md
+          grep -q '"checks": 25' build/asset_lab/FROZEN_CONTROLS_POST.json
+          grep -q '"failures": \[\]' build/asset_lab/FROZEN_CONTROLS_POST.json
+
+      - name: Commit verified first-family runtime integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/environment/architecture/villas assets/environment/architecture/commercial assets/environment/architecture/waterfront
+          git add assets/vehicles/clean_room assets/environment/vegetation assets/props/street assets/environment/roads assets/shaders
+          git add docs/asset_lab/RUNTIME_USAGE_MAP_FIRST_FAMILIES.csv
+          git commit -m 'build: integrate verified villa and clean-room runtime assets'
+          git push origin HEAD:work/bahrain-brick-asset-lab-integration-v1
+
+      - name: Upload integration evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: game-first-family-integration-evidence
+          path: build/asset_lab/
+          if-no-files-found: error
+          retention-days: 30
