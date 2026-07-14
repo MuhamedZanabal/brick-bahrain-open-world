@@ -149,12 +149,18 @@ jobs:
           find build/generators/run-b -name '*.glb' -printf '%P\n' | LC_ALL=C sort > build/generators/run-b.paths
           diff -u build/generators/run-a.paths build/generators/run-b.paths
           : > build/generators/GENERATOR_FAMILIES_SHA256SUMS.txt
+          : > build/generators/GENERATOR_FAMILIES_MISMATCHES.txt
+          mismatch_count=0
           while IFS= read -r relative; do
             a="$(sha256sum "build/generators/run-a/${relative}" | cut -d' ' -f1)"
             b="$(sha256sum "build/generators/run-b/${relative}" | cut -d' ' -f1)"
-            test "$a" = "$b"
+            if [[ "$a" != "$b" ]]; then
+              printf '%s  run-a=%s  run-b=%s\n' "$relative" "$a" "$b" | tee -a build/generators/GENERATOR_FAMILIES_MISMATCHES.txt
+              mismatch_count=$((mismatch_count + 1))
+            fi
             printf '%s  %s\n' "$a" "$relative" >> build/generators/GENERATOR_FAMILIES_SHA256SUMS.txt
           done < build/generators/run-a.paths
+          test "$mismatch_count" = '0'
           mapfile -t glbs < <(find build/generators/run-a -name '*.glb' | LC_ALL=C sort)
           python3 build/generators/authority/tools/validate_glb.py "${glbs[@]}" > build/generators/GENERATOR_FAMILIES_GLB_VALIDATION.json
           grep -q '"validated": 24' build/generators/GENERATOR_FAMILIES_GLB_VALIDATION.json
@@ -237,11 +243,15 @@ jobs:
           git push origin HEAD:work/bahrain-brick-asset-lab-integration-v1
 
       - name: Upload complete generator-family evidence
+        if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: generator-family-integration-evidence
           path: |
             build/generators/GENERATOR_FAMILIES_SHA256SUMS.txt
+            build/generators/GENERATOR_FAMILIES_MISMATCHES.txt
+            build/generators/run-a.paths
+            build/generators/run-b.paths
             build/generators/GENERATOR_FAMILIES_GLB_VALIDATION.json
             build/generators/determinism-result.txt
             build/generators/runtime-integration-tests.log
