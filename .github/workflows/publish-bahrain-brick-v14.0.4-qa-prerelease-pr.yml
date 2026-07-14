@@ -1,0 +1,36 @@
+name: Publish Bahrain Brick v14.0.4 QA Pre-release via PR
+
+on:
+  pull_request:
+    branches:
+      - ci/bahrain-brick-premium-final-validation-20260713-v30
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+  actions: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: publish-bahrain-brick-v14.0.4-qa-prerelease
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.head_ref == 'release/bahrain-brick-v14.0.4-qa-publication-20260714' && github.event.pull_request.head.repo.full_name == github.repository
+    name: Verify and publish frozen QA APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out publication branch
+        uses: actions/checkout@v4
+
+      - name: Publish and independently verify QA pre-release
+        shell: bash
+        run: bash tools/publish_bahrain_brick_v14_0_4_qa_release.sh
