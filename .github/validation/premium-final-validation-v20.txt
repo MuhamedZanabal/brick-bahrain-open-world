@@ -1,0 +1,6 @@
+Bahrain Brick premium visual validation v20
+Premium authority: 055671955997efa31551e2d64e9e22f486e65d9b
+Protected world teardown SHA-256: fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc
+Purpose: validate cached last-valid player position during detached whole-world teardown without modifying protected controls.
+Targeted correction tests: 19 passed, 0 failed.
+Do not merge this validation-only branch.
