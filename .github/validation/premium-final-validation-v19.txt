@@ -1,0 +1,5 @@
+Bahrain Brick premium visual validation v19
+Premium authority: 929fb26ef2b2b29a0c3d6808d7e8f2ee9ad1d8b8
+Protected world teardown SHA-256: fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc
+Purpose: validate exact lifecycle/test/runner fragments and external player lifecycle coordination.
+Do not merge this validation-only branch.
