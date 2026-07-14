@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "docs" / "assets" / "ASSET_MASTER_MANIFEST.csv"
 FAMILIES = ("traditional", "souq", "waterfront")
