@@ -1,0 +1,27 @@
+{
+  "source_commit": "84ac94399262f71f29bf65dd553cd7729d87cce0",
+  "total_records": 98,
+  "accounted_records": 98,
+  "silent_omissions": 0,
+  "unexplained_records": 0,
+  "integration_states": {
+    "INTEGRATED_RUNTIME": 0,
+    "INTEGRATED_PIPELINE": 0,
+    "INTEGRATED_SOURCE_MASTER": 0,
+    "INTEGRATED_CANONICALIZED": 0,
+    "BLOCKED": 98
+  },
+  "blocking_classes": {
+    "PROJECT_OWNED_PENDING_and_runtime_derivative_missing": 81,
+    "third_party_quarantined_provenance": 8,
+    "generator_ready_without_generated_runtime_derivative": 9
+  },
+  "generated_matrix": {
+    "records": 98,
+    "csv_sha256": "fffabe54e4dc45bfad6c7135c5696a2740ea1afca7b304a264d944ca1c7371e1",
+    "json_sha256": "d8184560696ff97a722b2797b61105ee224119f7bf4d3dac00ad71cb2e0ec87d"
+  },
+  "authority_report_sha256": "3649cd43b665221f34d8ac53df86538021212a5d464c101879ea270301b3b83c",
+  "head_tracked_ledger_sha256": "4817e09f23cf953b4e4e5be546c942d627503ba538f8b7ee49d3df8c8f725722",
+  "classification": "ASSET AUTHORITY OR LICENSING BLOCKED"
+}

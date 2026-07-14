@@ -1,0 +1,26 @@
+{
+  "repository": "bahrain-brick-assets",
+  "branch": "work/bahrain-brick-complete-asset-system-v1",
+  "head": "84ac94399262f71f29bf65dd553cd7729d87cce0",
+  "commit_count": 21,
+  "tracked_files": 160,
+  "asset_records": 98,
+  "unit_tests": "passed",
+  "manifest_validation": "passed",
+  "signing_scan": "passed",
+  "python_compile": "passed",
+  "working_tree_clean": true,
+  "zip": {
+    "path": "/mnt/data/bahrain-brick-assets-phase5-asset-lab.zip",
+    "bytes": 658587,
+    "sha256": "080ca867fd22cdcffb7a8457c83927698766ee59c49e3c78e0fef503b22a20c8"
+  },
+  "bundle": {
+    "path": "/mnt/data/bahrain-brick-assets-phase5-asset-lab.bundle",
+    "bytes": 623404,
+    "sha256": "98e3964a1c84200c8d764116bc027678de0019fc6481ca41825ed606aa2a9c41"
+  },
+  "godot_runtime": "not_run",
+  "android_benchmark": "not_run",
+  "game_repository_modified": false
+}
