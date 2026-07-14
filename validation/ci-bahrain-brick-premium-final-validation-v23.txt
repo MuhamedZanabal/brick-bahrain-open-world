@@ -1,0 +1,4 @@
+Validation-only marker for premium authority fca532875a531729e02017a225575091572476b2.
+Protected world teardown SHA-256 must remain fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc.
+Final parent-tree teardown guard and checksum-pinned base idempotence are mandatory.
+Do not merge this validation branch.
