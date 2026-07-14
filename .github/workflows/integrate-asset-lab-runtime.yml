@@ -23,6 +23,8 @@ env:
   ASSET_REF: work/bahrain-brick-complete-asset-system-v1
   BLENDER_VERSION: '4.3.2'
   GODOT_VERSION: '4.3'
+  GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
 
 jobs:
   integrate:
@@ -36,12 +38,23 @@ jobs:
           ref: work/bahrain-brick-asset-lab-integration-v1
           fetch-depth: 0
 
+      - name: Recover checksum-locked frozen gameplay source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/asset_lab/downloads build/asset_lab/game
+          curl --fail --location --retry 5 --proto '=https' "${GAME_SOURCE_URL}" --output build/asset_lab/downloads/game-source.zip
+          echo "${GAME_SOURCE_SHA256}  build/asset_lab/downloads/game-source.zip" | sha256sum -c -
+          unzip -tq build/asset_lab/downloads/game-source.zip
+          unzip -q build/asset_lab/downloads/game-source.zip -d build/asset_lab/game
+          test -f build/asset_lab/game/project.godot
+
       - name: Verify frozen controls before asset writes
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/asset_lab
-          python3 tools/verify_frozen_controls.py . --json-out build/asset_lab/FROZEN_CONTROLS_PRE.json --markdown-out build/asset_lab/FROZEN_CONTROLS_PRE.md
+          python3 tools/verify_frozen_controls.py build/asset_lab/game --json-out build/asset_lab/FROZEN_CONTROLS_PRE.json --markdown-out build/asset_lab/FROZEN_CONTROLS_PRE.md
           grep -q '"checks": 25' build/asset_lab/FROZEN_CONTROLS_PRE.json
           grep -q '"failures": \[\]' build/asset_lab/FROZEN_CONTROLS_PRE.json
 
@@ -114,8 +127,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest tests.test_asset_lab_runtime_integration -v 2>&1 | tee build/asset_lab/runtime-integration-tests.log
-          "${GODOT}" --headless --editor --path . --import --quit 2>&1 | tee build/asset_lab/godot-game-import.log
+          cp -a assets/. build/asset_lab/game/assets/
+          cp scripts/asset_lab_runtime.gd build/asset_lab/game/scripts/asset_lab_runtime.gd
+          cp scenes/world.tscn build/asset_lab/game/scenes/world.tscn
+          cp tests/test_asset_lab_runtime_integration.py build/asset_lab/game/tests/test_asset_lab_runtime_integration.py
+          (cd build/asset_lab/game && python3 -m unittest tests.test_asset_lab_runtime_integration -v) 2>&1 | tee build/asset_lab/runtime-integration-tests.log
+          "${GODOT}" --headless --editor --path build/asset_lab/game --import --quit 2>&1 | tee build/asset_lab/godot-game-import.log
           ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' build/asset_lab/godot-game-import.log
           grep -q 'node name="AssetLab"' scenes/world.tscn
           grep -q '"VillaDistrict"' scripts/asset_lab_runtime.gd
@@ -156,7 +173,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/verify_frozen_controls.py . --json-out build/asset_lab/FROZEN_CONTROLS_POST.json --markdown-out build/asset_lab/FROZEN_CONTROLS_POST.md
+          python3 tools/verify_frozen_controls.py build/asset_lab/game --json-out build/asset_lab/FROZEN_CONTROLS_POST.json --markdown-out build/asset_lab/FROZEN_CONTROLS_POST.md
           grep -q '"checks": 25' build/asset_lab/FROZEN_CONTROLS_POST.json
           grep -q '"failures": \[\]' build/asset_lab/FROZEN_CONTROLS_POST.json
 
