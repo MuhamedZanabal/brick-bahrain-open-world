@@ -7,16 +7,30 @@ on:
     paths:
       - 'asset_lab/bootstrap/asset-lab-integration-bootstrap.tar.gz'
       - '.github/workflows/bootstrap_asset_lab_integration.yml'
+  pull_request:
+    branches:
+      - work/bahrain-brick-premium-visual-v14
+    types:
+      - opened
+      - synchronize
+      - reopened
+    paths:
+      - 'asset_lab/bootstrap/asset-lab-integration-bootstrap.tar.gz'
+      - '.github/workflows/bootstrap_asset_lab_integration.yml'
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   bootstrap:
+    if: github.event_name == 'push' || (github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: work/bahrain-brick-asset-lab-integration-v1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
