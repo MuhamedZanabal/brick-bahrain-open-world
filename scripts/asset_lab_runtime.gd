@@ -24,46 +24,75 @@ const VILLA_ASSETS = [
     "res://assets/environment/architecture/villas/bh_villa_driveway_01_lod0.glb",
 ]
 
+const TRADITIONAL_ASSETS = [
+    "res://assets/environment/architecture/traditional/bh_traditional_party_wall_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_timber_door_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_projecting_window_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_alley_arch_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_parapet_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_courtyard_hint_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_shop_bay_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_shade_canopy_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_roof_tank_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_ac_screen_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_vent_panel_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_traditional_lamp_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_bench_01_lod0.glb",
+    "res://assets/environment/architecture/traditional/bh_traditional_utility_cable_01_lod0.glb",
+]
+
+const SOUQ_ASSETS = [
+    "res://assets/environment/architecture/souq/bh_souq_shop_gold_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_spice_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_tailor_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_perfume_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_electronics_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_fabric_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_toy_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_grocery_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_cafe_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_bakery_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shop_souvenir_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_awning_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_display_table_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_crate_set_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_covered_passage_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_delivery_door_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_shutter_01_lod0.glb",
+    "res://assets/environment/architecture/souq/bh_souq_sign_panel_01_lod0.glb",
+]
+
+const WATERFRONT_ASSETS = [
+    "res://assets/environment/architecture/waterfront/bh_waterfront_promenade_10m_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_promenade_20m_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_curve_15deg_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_curve_30deg_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_curve_45deg_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_marina_edge_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_railing_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_bench_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_palm_planter_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_cafe_terrace_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_water_stair_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_hotel_dropoff_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_tower_a_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_tower_b_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_tower_c_01_lod0.glb",
+    "res://assets/environment/architecture/waterfront/bh_waterfront_skyline_silhouette_01_lod0.glb",
+]
+
 const CLEAN_ROOM_ASSETS = [
-    {
-        "path": "res://assets/environment/architecture/commercial/bh_cr_building_block_01_lod0.glb",
-        "district": "CommercialDistrict",
-    },
-    {
-        "path": "res://assets/environment/architecture/waterfront/bh_cr_skyscraper_tower_01_lod0.glb",
-        "district": "WaterfrontDistrict",
-    },
-    {
-        "path": "res://assets/vehicles/clean_room/bh_cr_vehicle_sedan_01_lod0.glb",
-        "district": "CommercialDistrict",
-    },
-    {
-        "path": "res://assets/environment/vegetation/bh_cr_date_palm_01_lod0.glb",
-        "district": "WaterfrontDistrict",
-    },
-    {
-        "path": "res://assets/environment/vegetation/bh_cr_shade_tree_01_lod0.glb",
-        "district": "TraditionalDistrict",
-    },
-    {
-        "path": "res://assets/props/street/bh_cr_desert_planter_01_lod0.glb",
-        "district": "SouqDistrict",
-    },
-    {
-        "path": "res://assets/environment/roads/bh_cr_road_straight_01_lod0.glb",
-        "district": "RoadNetwork",
-    },
+    {"path": "res://assets/environment/architecture/commercial/bh_cr_building_block_01_lod0.glb", "district": "CommercialDistrict"},
+    {"path": "res://assets/environment/architecture/waterfront/bh_cr_skyscraper_tower_01_lod0.glb", "district": "WaterfrontDistrict"},
+    {"path": "res://assets/vehicles/clean_room/bh_cr_vehicle_sedan_01_lod0.glb", "district": "CommercialDistrict"},
+    {"path": "res://assets/environment/vegetation/bh_cr_date_palm_01_lod0.glb", "district": "WaterfrontDistrict"},
+    {"path": "res://assets/environment/vegetation/bh_cr_shade_tree_01_lod0.glb", "district": "TraditionalDistrict"},
+    {"path": "res://assets/props/street/bh_cr_desert_planter_01_lod0.glb", "district": "SouqDistrict"},
+    {"path": "res://assets/environment/roads/bh_cr_road_straight_01_lod0.glb", "district": "RoadNetwork"},
 ]
 
 const CLEAN_ROOM_SHADER := "res://assets/shaders/bh_cr_mobile_toon_shader_01.gdshader"
-const DISTRICTS = [
-    "VillaDistrict",
-    "TraditionalDistrict",
-    "SouqDistrict",
-    "WaterfrontDistrict",
-    "CommercialDistrict",
-    "RoadNetwork",
-]
+const DISTRICTS = ["VillaDistrict", "TraditionalDistrict", "SouqDistrict", "WaterfrontDistrict", "CommercialDistrict", "RoadNetwork"]
 
 
 func _ready() -> void:
@@ -71,12 +100,10 @@ func _ready() -> void:
         var district := Node3D.new()
         district.name = district_name
         add_child(district)
-
-    _instantiate_family(
-        get_node("VillaDistrict") as Node3D,
-        VILLA_ASSETS,
-        Vector3(-92.0, 0.0, 74.0)
-    )
+    _instantiate_family(get_node("VillaDistrict") as Node3D, VILLA_ASSETS, Vector3(-92.0, 0.0, 74.0))
+    _instantiate_family(get_node("TraditionalDistrict") as Node3D, TRADITIONAL_ASSETS, _district_origin("TraditionalDistrict"))
+    _instantiate_family(get_node("SouqDistrict") as Node3D, SOUQ_ASSETS, _district_origin("SouqDistrict"))
+    _instantiate_family(get_node("WaterfrontDistrict") as Node3D, WATERFRONT_ASSETS, _district_origin("WaterfrontDistrict"))
     _instantiate_clean_room_assets()
     _load_mobile_shader()
     print("BAHRAIN BRICK GAME ASSET LAB READY")
@@ -91,8 +118,7 @@ func _instantiate_clean_room_assets() -> void:
     for index in CLEAN_ROOM_ASSETS.size():
         var record: Dictionary = CLEAN_ROOM_ASSETS[index]
         var district := get_node(str(record["district"])) as Node3D
-        var district_origin := _district_origin(str(record["district"]))
-        _instantiate_verified_scene(district, str(record["path"]), district_origin, index)
+        _instantiate_verified_scene(district, str(record["path"]), _district_origin(str(record["district"])), index)
 
 
 func _instantiate_verified_scene(parent: Node3D, path: String, origin: Vector3, index: int) -> void:
