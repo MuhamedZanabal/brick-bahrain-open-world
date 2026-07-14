@@ -1,0 +1,242 @@
+name: Integrate verified roads props and commercial families
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - tools/asset_lab/generate_commercial_modules.py
+      - scripts/asset_lab_runtime.gd
+      - tests/test_asset_lab_runtime_integration.py
+      - .github/workflows/integrate-generator-families.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ASSET_SCAFFOLD_COMMIT: b7702d7a371b38ff712352ab5de7179fe962b86b
+  ASSET_BUNDLE_SHA256: 89c73b89ac65402fa193fd5d6f608bd000f4116bfcfa60140c090b6751ee4735
+  ASSET_HEAD: f9bb1f8d5aca1d8547fd1cc67f570573b9e9f727
+  ASSET_REF: work/bahrain-brick-complete-asset-system-v1
+  BLENDER_VERSION: '4.3.2'
+  GODOT_VERSION: '4.3'
+  GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+
+jobs:
+  integrate_generators:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    steps:
+      - name: Check out exact integration branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: work/bahrain-brick-asset-lab-integration-v1
+          fetch-depth: 0
+
+      - name: Recover checksum-locked frozen gameplay source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/generators/downloads build/generators/game
+          curl --fail --location --retry 5 --proto '=https' "${GAME_SOURCE_URL}" --output build/generators/downloads/game-source.zip
+          echo "${GAME_SOURCE_SHA256}  build/generators/downloads/game-source.zip" | sha256sum -c -
+          unzip -tq build/generators/downloads/game-source.zip
+          unzip -q build/generators/downloads/game-source.zip -d build/generators/game
+          test -f build/generators/game/project.godot
+
+      - name: Verify frozen controls before generator execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_frozen_controls.py build/generators/game --json-out build/generators/FROZEN_CONTROLS_PRE.json --markdown-out build/generators/FROZEN_CONTROLS_PRE.md
+          grep -q '"checks": 25' build/generators/FROZEN_CONTROLS_PRE.json
+          grep -q '"failures": \[\]' build/generators/FROZEN_CONTROLS_PRE.json
+
+      - name: Fetch public authority and verify all 24 records
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle=build/generators/downloads/bahrain-brick-assets-runtime-v1-f9bb1f8.bundle
+          url="https://raw.githubusercontent.com/MuhamedZanabal/Bahrain_bricks_Assets/${ASSET_SCAFFOLD_COMMIT}/authority/bahrain-brick-assets-runtime-v1-f9bb1f8.bundle"
+          curl --fail --location --retry 5 --proto '=https' "$url" --output "$bundle"
+          test "$(stat -c '%s' "$bundle")" = '660172'
+          echo "${ASSET_BUNDLE_SHA256}  ${bundle}" | sha256sum -c -
+          git bundle verify "$bundle" 2>&1 | tee build/generators/asset-bundle-verification.log
+          test "$(git bundle list-heads "$bundle" "refs/heads/${ASSET_REF}" | awk '{print $1}')" = "${ASSET_HEAD}"
+          git clone --branch "${ASSET_REF}" "$bundle" build/generators/authority
+          test "$(git -C build/generators/authority rev-parse HEAD)" = "${ASSET_HEAD}"
+          cp tools/asset_lab/generate_commercial_modules.py build/generators/authority/tools/blender/generate_commercial_modules.py
+          test "$(python3 tools/asset_lab/generate_commercial_modules.py --list-assets | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')" = '4'
+          python3 - <<'PY'
+          import csv
+          with open('build/generators/authority/docs/assets/ASSET_MASTER_MANIFEST.csv',newline='',encoding='utf-8') as f:
+              rows=list(csv.DictReader(f))
+          pending=[r for r in rows if r['integration_status'] in ('generator_or_spec_ready','procedural_script_ready')]
+          assert len(pending)==24, len(pending)
+          assert len({r['asset_id'] for r in pending})==24
+          PY
+
+      - name: Install official pinned Blender and Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/generators
+          blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          blender_base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 5 --proto '=https' "${blender_base}/${blender_archive}" --output "${blender_archive}"
+          curl --fail --location --retry 5 --proto '=https' "${blender_base}/blender-${BLENDER_VERSION}.sha256" --output blender.sha256
+          ! head -c 256 "${blender_archive}" | grep -Eiq '<!doctype|<html|access denied|error'
+          grep " ${blender_archive}$" blender.sha256 | sha256sum -c -
+          tar -xf "${blender_archive}"
+          echo "BLENDER=${PWD}/blender-${BLENDER_VERSION}-linux-x64/blender" >> "${GITHUB_ENV}"
+          godot_base="https://github.com/godotengine/godot/releases/download/4.3-stable"
+          godot_archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl --fail --location --retry 5 --proto '=https' "${godot_base}/SHA512-SUMS.txt" --output godot-SHA512-SUMS.txt
+          curl --fail --location --retry 5 --proto '=https' "${godot_base}/${godot_archive}" --output "${godot_archive}"
+          grep " ${godot_archive}$" godot-SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "${godot_archive}" -d godot-bin
+          echo "GODOT=${PWD}/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "${GITHUB_ENV}"
+
+      - name: Execute all 17 source generators twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          authority="${GITHUB_WORKSPACE}/build/generators/authority"
+          run_pass() {
+            local out="$1"
+            mkdir -p "$out/roads" "$out/street" "$out/commercial"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_road_module.py" -- --output "$out/roads"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_kerb_module.py" -- --output "$out/roads"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_intersection_modules.py" -- --output "$out/roads"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_roundabout_module.py" -- --output "$out/roads"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_pedestrian_crossing.py" -- --output "$out/roads"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_highway_modules.py" -- --output-dir "$out/roads" --variant all
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_sidewalk_modules.py" -- --output-dir "$out/roads" --variant all
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_drainage_channel.py" -- --output-dir "$out/roads"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_bollard.py" -- --output "$out/street"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_streetlamp.py" -- --output "$out/street"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_traffic_signal.py" -- --output "$out/street"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_crash_barrier.py" -- --output "$out/street"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_bus_shelter.py" -- --output "$out/street"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_direction_sign_frame.py" -- --output-dir "$out/street"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_supermarket_checkout.py" -- --output-dir "$out/commercial"
+            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_commercial_modules.py" -- --output-dir "$out/commercial"
+          }
+          run_pass build/generators/run-a
+          run_pass build/generators/run-b
+          test "$(find build/generators/run-a/roads -name '*.glb' | wc -l)" = '13'
+          test "$(find build/generators/run-a/street -name '*.glb' | wc -l)" = '6'
+          test "$(find build/generators/run-a/commercial -name '*.glb' | wc -l)" = '5'
+          test "$(find build/generators/run-a -name '*.glb' | wc -l)" = '24'
+          test "$(find build/generators/run-b -name '*.glb' | wc -l)" = '24'
+
+      - name: Verify 24 deterministic outputs and GLB structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          find build/generators/run-a -name '*.glb' -printf '%P\n' | LC_ALL=C sort > build/generators/run-a.paths
+          find build/generators/run-b -name '*.glb' -printf '%P\n' | LC_ALL=C sort > build/generators/run-b.paths
+          diff -u build/generators/run-a.paths build/generators/run-b.paths
+          : > build/generators/GENERATOR_FAMILIES_SHA256SUMS.txt
+          while IFS= read -r relative; do
+            a="$(sha256sum "build/generators/run-a/${relative}" | cut -d' ' -f1)"
+            b="$(sha256sum "build/generators/run-b/${relative}" | cut -d' ' -f1)"
+            test "$a" = "$b"
+            printf '%s  %s\n' "$a" "$relative" >> build/generators/GENERATOR_FAMILIES_SHA256SUMS.txt
+          done < build/generators/run-a.paths
+          mapfile -t glbs < <(find build/generators/run-a -name '*.glb' | LC_ALL=C sort)
+          python3 build/generators/authority/tools/validate_glb.py "${glbs[@]}" > build/generators/GENERATOR_FAMILIES_GLB_VALIDATION.json
+          grep -q '"validated": 24' build/generators/GENERATOR_FAMILIES_GLB_VALIDATION.json
+          echo 'DETERMINISM: 24/24 generator-family GLB hashes identical; procedural generators 9/9 executed' | tee build/generators/determinism-result.txt
+
+      - name: Install runtime derivatives into game destinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/environment/roads assets/props/street assets/environment/architecture/commercial
+          cp build/generators/run-a/roads/*.glb assets/environment/roads/
+          cp build/generators/run-a/street/*.glb assets/props/street/
+          cp build/generators/run-a/commercial/*.glb assets/environment/architecture/commercial/
+          test "$(find assets/environment/roads -name 'bh_*' -name '*.glb' | wc -l)" -ge '14'
+          test "$(find assets/props/street -name 'bh_*' -name '*.glb' | wc -l)" -ge '7'
+          test "$(find assets/environment/architecture/commercial -name 'bh_*' -name '*.glb' | wc -l)" -ge '6'
+
+      - name: Validate full 98-record runtime scene in Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a assets/. build/generators/game/assets/
+          cp scripts/asset_lab_runtime.gd build/generators/game/scripts/asset_lab_runtime.gd
+          cp tests/test_asset_lab_runtime_integration.py build/generators/game/tests/test_asset_lab_runtime_integration.py
+          (cd build/generators/game && python3 -m unittest tests.test_asset_lab_runtime_integration -v) 2>&1 | tee build/generators/runtime-integration-tests.log
+          "${GODOT}" --headless --editor --path build/generators/game --import --quit 2>&1 | tee build/generators/godot-game-import.log
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' build/generators/godot-game-import.log
+
+      - name: Complete the 98-record runtime usage map
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root=Path('.')
+          source=root/'docs/asset_lab/RUNTIME_USAGE_MAP.csv'
+          with source.open(newline='',encoding='utf-8') as f:
+              reader=csv.reader(f); header=next(reader); rows=list(reader)
+          groups=[
+              ('assets/environment/roads','World/AssetLab/RoadNetwork'),
+              ('assets/props/street','World/AssetLab/StreetPropSpawner'),
+              ('assets/environment/architecture/commercial','World/AssetLab/CommercialDistrict'),
+          ]
+          existing={row[0] for row in rows}
+          expected_new=[]
+          for directory,node in groups:
+              for path in sorted((root/directory).glob('*.glb')):
+                  asset_id=path.stem.removesuffix('_lod0')
+                  if asset_id.startswith('bh_cr_') or asset_id in existing:
+                      continue
+                  expected_new.append(asset_id)
+                  rows.append([asset_id,str(path),'res://scenes/world.tscn',node,'1','shared_mobile','0','simplified_box','integrated_runtime'])
+          assert len(expected_new)==24, (len(expected_new), expected_new)
+          assert len(rows)==98, len(rows)
+          ids=[row[0] for row in rows]
+          assert len(ids)==len(set(ids))
+          with source.open('w',newline='',encoding='utf-8') as f:
+              writer=csv.writer(f,lineterminator='\n'); writer.writerow(header); writer.writerows(rows)
+          PY
+
+      - name: Verify frozen controls after complete integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_frozen_controls.py build/generators/game --json-out build/generators/FROZEN_CONTROLS_POST.json --markdown-out build/generators/FROZEN_CONTROLS_POST.md
+          grep -q '"checks": 25' build/generators/FROZEN_CONTROLS_POST.json
+          grep -q '"failures": \[\]' build/generators/FROZEN_CONTROLS_POST.json
+
+      - name: Commit verified remaining runtime families
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/environment/roads assets/props/street assets/environment/architecture/commercial
+          git add docs/asset_lab/RUNTIME_USAGE_MAP.csv
+          git commit -m 'build: integrate verified roads props and commercial assets'
+          git push origin HEAD:work/bahrain-brick-asset-lab-integration-v1
+
+      - name: Upload complete generator-family evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: generator-family-integration-evidence
+          path: |
+            build/generators/GENERATOR_FAMILIES_SHA256SUMS.txt
+            build/generators/GENERATOR_FAMILIES_GLB_VALIDATION.json
+            build/generators/determinism-result.txt
+            build/generators/runtime-integration-tests.log
+            build/generators/godot-game-import.log
+            build/generators/FROZEN_CONTROLS_PRE.json
+            build/generators/FROZEN_CONTROLS_POST.json
+          if-no-files-found: error
+          retention-days: 30

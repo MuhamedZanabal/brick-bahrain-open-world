@@ -29,6 +29,20 @@ class AssetLabRuntimeIntegrationTests(unittest.TestCase):
         ):
             self.assertIn(replacement, runtime)
 
+    def test_runtime_declares_all_24_remaining_generator_records(self):
+        runtime = (ROOT / "scripts" / "asset_lab_runtime.gd").read_text(encoding="utf-8")
+        self.assertEqual(runtime.count("res://assets/environment/roads/bh_"), 14)
+        self.assertEqual(runtime.count("res://assets/props/street/bh_prop_"), 6)
+        commercial = (
+            "bh_supermarket_storefront_a_01.glb",
+            "bh_supermarket_shelf_1m_01.glb",
+            "bh_cafe_storefront_karak_a_01.glb",
+            "bh_cafe_table_chair_set_a_01.glb",
+            "bh_prop_supermarket_checkout_a_01.glb",
+        )
+        for asset in commercial:
+            self.assertIn(asset, runtime)
+
     def test_runtime_does_not_reference_protected_controls(self):
         runtime = (ROOT / "scripts" / "asset_lab_runtime.gd").read_text(encoding="utf-8").lower()
         for protected in ("touchinput", "touch_input", "player_controller", "joystick", "camera_touch", "hud"):

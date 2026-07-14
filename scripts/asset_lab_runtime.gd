@@ -81,6 +81,39 @@ const WATERFRONT_ASSETS = [
     "res://assets/environment/architecture/waterfront/bh_waterfront_skyline_silhouette_01_lod0.glb",
 ]
 
+const ROAD_ASSETS = [
+    "res://assets/environment/roads/bh_road_two_lane_straight_20m_01.glb",
+    "res://assets/environment/roads/bh_kerb_standard_straight_4m_01.glb",
+    "res://assets/environment/roads/bh_road_intersection_four_way_20m_01.glb",
+    "res://assets/environment/roads/bh_road_intersection_t_20m_01.glb",
+    "res://assets/environment/roads/bh_road_roundabout_compact_24m_01.glb",
+    "res://assets/environment/roads/bh_road_crossing_zebra_8m_01.glb",
+    "res://assets/environment/roads/bh_road_highway_six_lane_straight_40m_01.glb",
+    "res://assets/environment/roads/bh_road_highway_curve_40m_01.glb",
+    "res://assets/environment/roads/bh_road_highway_slip_road_30m_01.glb",
+    "res://assets/environment/roads/bh_road_highway_exit_40m_01.glb",
+    "res://assets/environment/roads/bh_sidewalk_commercial_straight_4m_01.glb",
+    "res://assets/environment/roads/bh_sidewalk_driveway_cut_4m_01.glb",
+    "res://assets/environment/roads/bh_drainage_channel_straight_4m_01.glb",
+]
+
+const STREET_PROP_ASSETS = [
+    "res://assets/props/street/bh_prop_street_bollard_a_01.glb",
+    "res://assets/props/street/bh_prop_streetlamp_prom_a_01.glb",
+    "res://assets/props/street/bh_prop_traffic_signal_a_01.glb",
+    "res://assets/props/street/bh_prop_crash_barrier_4m_01.glb",
+    "res://assets/props/street/bh_prop_bus_shelter_a_01.glb",
+    "res://assets/props/street/bh_prop_direction_sign_frame_a_01.glb",
+]
+
+const COMMERCIAL_ASSETS = [
+    "res://assets/environment/architecture/commercial/bh_supermarket_storefront_a_01.glb",
+    "res://assets/environment/architecture/commercial/bh_supermarket_shelf_1m_01.glb",
+    "res://assets/environment/architecture/commercial/bh_cafe_storefront_karak_a_01.glb",
+    "res://assets/environment/architecture/commercial/bh_cafe_table_chair_set_a_01.glb",
+    "res://assets/environment/architecture/commercial/bh_prop_supermarket_checkout_a_01.glb",
+]
+
 const CLEAN_ROOM_ASSETS = [
     {"path": "res://assets/environment/architecture/commercial/bh_cr_building_block_01_lod0.glb", "district": "CommercialDistrict"},
     {"path": "res://assets/environment/architecture/waterfront/bh_cr_skyscraper_tower_01_lod0.glb", "district": "WaterfrontDistrict"},
@@ -92,7 +125,7 @@ const CLEAN_ROOM_ASSETS = [
 ]
 
 const CLEAN_ROOM_SHADER := "res://assets/shaders/bh_cr_mobile_toon_shader_01.gdshader"
-const DISTRICTS = ["VillaDistrict", "TraditionalDistrict", "SouqDistrict", "WaterfrontDistrict", "CommercialDistrict", "RoadNetwork"]
+const DISTRICTS = ["VillaDistrict", "TraditionalDistrict", "SouqDistrict", "WaterfrontDistrict", "CommercialDistrict", "RoadNetwork", "StreetPropSpawner"]
 
 
 func _ready() -> void:
@@ -104,6 +137,9 @@ func _ready() -> void:
     _instantiate_family(get_node("TraditionalDistrict") as Node3D, TRADITIONAL_ASSETS, _district_origin("TraditionalDistrict"))
     _instantiate_family(get_node("SouqDistrict") as Node3D, SOUQ_ASSETS, _district_origin("SouqDistrict"))
     _instantiate_family(get_node("WaterfrontDistrict") as Node3D, WATERFRONT_ASSETS, _district_origin("WaterfrontDistrict"))
+    _instantiate_family(get_node("RoadNetwork") as Node3D, ROAD_ASSETS, _district_origin("RoadNetwork"))
+    _instantiate_family(get_node("StreetPropSpawner") as Node3D, STREET_PROP_ASSETS, _district_origin("StreetPropSpawner"))
+    _instantiate_family(get_node("CommercialDistrict") as Node3D, COMMERCIAL_ASSETS, _district_origin("CommercialDistrict"))
     _instantiate_clean_room_assets()
     _load_mobile_shader()
     print("BAHRAIN BRICK GAME ASSET LAB READY")
@@ -163,5 +199,7 @@ func _district_origin(district_name: String) -> Vector3:
             return Vector3(42.0, 0.0, 62.0)
         "RoadNetwork":
             return Vector3(0.0, 0.0, 24.0)
+        "StreetPropSpawner":
+            return Vector3(18.0, 0.0, 12.0)
         _:
             return Vector3.ZERO
