@@ -1,0 +1,210 @@
+name: Publish Bahrain Brick v14.0.4 QA Pre-release
+
+on:
+  push:
+    branches:
+      - release/bahrain-brick-v14.0.4-qa-publication-20260714
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: publish-bahrain-brick-v14.0.4-qa-prerelease
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Verify and publish frozen QA APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARTIFACT_ID: "8295853465"
+      APK_NAME: "bahrain_brick_v14.0.4-premium-visual-qa.apk"
+      APK_SHA256: "7e32e81f005f300fca115e39f2962c9cac3c9835d34ac15d4bece2f86655bf65"
+      TAG_NAME: "v14.0.4-premium-visual-qa"
+      VALIDATION_SHA: "83dd98013e75785c0101fa9501c461fc807cc342"
+      PREMIUM_SHA: "e26ec912db5c10d071a8e120010bdb5a9a136f17"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Confirm publication authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${GITHUB_SHA}"
+          echo "Repository: ${GITHUB_REPOSITORY}"
+          echo "Workflow source: ${GITHUB_SHA}"
+          echo "Frozen validation head: ${VALIDATION_SHA}"
+          echo "Frozen premium authority: ${PREMIUM_SHA}"
+
+      - name: Detect existing immutable QA release
+        id: release_state
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "Release ${TAG_NAME} already exists; it will be verified but not replaced or modified."
+          else
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Download exact successful-workflow artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact release-assets
+          curl --fail-with-body --location --retry 3 \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            --output artifact.zip
+          unzip -q artifact.zip -d artifact
+
+      - name: Locate and verify frozen APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' matches < <(find artifact -type f -name "${APK_NAME}" -print0)
+          if [ "${#matches[@]}" -ne 1 ]; then
+            echo "Expected exactly one ${APK_NAME}; found ${#matches[@]}." >&2
+            find artifact -maxdepth 5 -type f -print >&2
+            exit 1
+          fi
+          cp -- "${matches[0]}" "release-assets/${APK_NAME}"
+          actual="$(sha256sum "release-assets/${APK_NAME}" | awk '{print $1}')"
+          if [ "${actual}" != "${APK_SHA256}" ]; then
+            echo "APK SHA-256 mismatch: expected ${APK_SHA256}, got ${actual}." >&2
+            exit 1
+          fi
+          printf '%s  %s\n' "${APK_SHA256}" "${APK_NAME}" > release-assets/APK_SHA256.txt
+          metadata="$(find artifact -type f -path '*/reports/APK_METADATA_REPORT.json' -print -quit)"
+          if [ -n "${metadata}" ]; then
+            cp "${metadata}" release-assets/APK_METADATA_REPORT.json
+          fi
+          sha256sum release-assets/*
+
+      - name: Write QA pre-release notes
+        if: steps.release_state.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > release-notes.md <<'EOF'
+          # Bahrain Brick v14.0.4 Premium Visual QA
+
+          **Classification:** WORLD UPGRADE COMPLETE — PHYSICAL DEVICE TEST PENDING
+
+          This is a public **QA pre-release** solely for physical Android testing. It is not a production release and is not production-signed.
+
+          ## Frozen authority
+
+          - Premium authority: `e26ec912db5c10d071a8e120010bdb5a9a136f17`
+          - Validation head: `83dd98013e75785c0101fa9501c461fc807cc342`
+          - Successful workflow: `29292680122`
+          - Successful job: `86959477146`
+          - APK: `bahrain_brick_v14.0.4-premium-visual-qa.apk`
+          - APK SHA-256: `7e32e81f005f300fca115e39f2962c9cac3c9835d34ac15d4bece2f86655bf65`
+
+          ## Mandatory test rule
+
+          Verify the downloaded APK SHA-256 before installation. Do not treat any physical-device result as valid when the hash differs.
+
+          ## Release boundaries
+
+          - Ephemeral QA certificate
+          - Debug/QA build
+          - Physical-device validation pending
+          - PR #55 remains unmerged
+          - No production signing authorization
+          - No production-release authorization
+          EOF
+
+      - name: Create immutable QA pre-release and upload assets
+        if: steps.release_state.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${TAG_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${VALIDATION_SHA}" \
+            --title "Bahrain Brick v14.0.4 Premium Visual QA — Physical Test Candidate" \
+            --notes-file release-notes.md \
+            --prerelease \
+            release-assets/*
+
+      - name: Verify published release metadata and remote asset bytes
+        id: verify_release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf published-download
+          mkdir -p published-download
+          gh release view "${TAG_NAME}" --repo "${GITHUB_REPOSITORY}" --json isPrerelease,isDraft,tagName,url,assets > published-release.json
+          gh release download "${TAG_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --pattern "${APK_NAME}" \
+            --pattern "APK_SHA256.txt" \
+            --dir published-download
+          remote_sha="$(sha256sum "published-download/${APK_NAME}" | awk '{print $1}')"
+          if [ "${remote_sha}" != "${APK_SHA256}" ]; then
+            echo "Published APK SHA-256 mismatch: expected ${APK_SHA256}, got ${remote_sha}." >&2
+            exit 1
+          fi
+          grep -Fqx "${APK_SHA256}  ${APK_NAME}" published-download/APK_SHA256.txt
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path('published-release.json').read_text())
+          expected_tag = os.environ['TAG_NAME']
+          expected_apk = os.environ['APK_NAME']
+          assert data['tagName'] == expected_tag, data
+          assert data['isPrerelease'] is True, data
+          assert data['isDraft'] is False, data
+          assets = {asset['name']: asset for asset in data.get('assets', [])}
+          assert expected_apk in assets, assets
+          assert 'APK_SHA256.txt' in assets, assets
+          release_url = data['url']
+          apk_url = assets[expected_apk].get('url') or f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/releases/download/{expected_tag}/{expected_apk}"
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f"release_url={release_url}\n")
+              output.write(f"apk_url={apk_url}\n")
+          print(release_url)
+          print(apk_url)
+          PY
+
+      - name: Report verified public QA release to PR 55
+        env:
+          RELEASE_URL: ${{ steps.verify_release.outputs.release_url }}
+          APK_URL: ${{ steps.verify_release.outputs.apk_url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          marker='<!-- bahrain-brick-v14.0.4-qa-release -->'
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          cat > release-comment.md <<EOF
+          ${marker}
+          ## Verified public QA pre-release
+
+          - Release: ${RELEASE_URL}
+          - Direct APK: ${APK_URL}
+          - APK SHA-256: \`${APK_SHA256}\`
+          - Tag: \`${TAG_NAME}\`
+          - Target validation head: \`${VALIDATION_SHA}\`
+          - Verification workflow: ${run_url}
+          - Remote release asset re-downloaded and SHA-256 verified: **PASS**
+
+          This remains a QA physical-test candidate. PR #55 is unmerged; production signing and production publication remain unauthorized.
+          EOF
+          comment_id="$(gh api --paginate "/repos/${GITHUB_REPOSITORY}/issues/55/comments" --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | head -n 1)"
+          jq -n --rawfile body release-comment.md '{body: $body}' > release-comment.json
+          if [ -n "${comment_id}" ]; then
+            gh api --method PATCH "/repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" --input release-comment.json >/dev/null
+          else
+            gh api --method POST "/repos/${GITHUB_REPOSITORY}/issues/55/comments" --input release-comment.json >/dev/null
+          fi
