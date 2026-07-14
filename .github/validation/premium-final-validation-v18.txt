@@ -1,0 +1,5 @@
+Bahrain Brick premium visual validation v18
+Premium authority: 391af575f6abecfdbdd93c6057015aa130e1c9da
+Protected world teardown SHA-256: fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc
+Purpose: validate the external child-exit lifecycle coordinator without modifying protected controls.
+Do not merge this validation-only branch.
