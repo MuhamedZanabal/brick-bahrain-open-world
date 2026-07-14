@@ -11,6 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class BlenderScriptLauncherTests(unittest.TestCase):
+    def test_traffic_signal_override_uses_deterministic_mobile_primitives(self):
+        source = (ROOT / "tools/asset_lab/generate_traffic_signal.py").read_text(encoding="utf-8")
+        self.assertNotIn("primitive_uv_sphere_add", source)
+        for lens in ("red", "amber", "green"):
+            self.assertIn(f"bh_prop_traffic_signal_a_01_{lens}", source)
+
     def test_launcher_adds_target_directory_and_preserves_arguments(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)

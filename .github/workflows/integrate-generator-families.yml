@@ -5,6 +5,7 @@ on:
     branches: [work/bahrain-brick-asset-lab-integration-v1]
     paths:
       - tools/asset_lab/generate_commercial_modules.py
+      - tools/asset_lab/generate_traffic_signal.py
       - tools/asset_lab/blender_script_launcher.py
       - tests/test_blender_script_launcher.py
       - scripts/asset_lab_runtime.gd
@@ -70,6 +71,7 @@ jobs:
           git clone --branch "${ASSET_REF}" "$bundle" build/generators/authority
           test "$(git -C build/generators/authority rev-parse HEAD)" = "${ASSET_HEAD}"
           cp tools/asset_lab/generate_commercial_modules.py build/generators/authority/tools/blender/generate_commercial_modules.py
+          cp tools/asset_lab/generate_traffic_signal.py build/generators/authority/tools/blender/generate_traffic_signal.py
           test "$(python3 tools/asset_lab/generate_commercial_modules.py --list-assets | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))')" = '4'
           python3 - <<'PY'
           import csv
