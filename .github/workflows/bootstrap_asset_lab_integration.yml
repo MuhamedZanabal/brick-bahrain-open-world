@@ -40,8 +40,8 @@ jobs:
           set -euo pipefail
           archive='asset_lab/bootstrap/asset-lab-integration-bootstrap.tar.gz'
           test -f "$archive"
-          test "$(stat -c '%s' "$archive")" = '14150'
-          echo 'e794e3d1042fcbbfcd4669b85a6b9c4d7e4bfb424a3481d15c8774eeb3f274a4  asset_lab/bootstrap/asset-lab-integration-bootstrap.tar.gz' | sha256sum -c -
+          test "$(stat -c '%s' "$archive")" = '14163'
+          echo '88f676930147856971337bcea62b67e574e8e6971618302e4b6c113c5a3d13fd  asset_lab/bootstrap/asset-lab-integration-bootstrap.tar.gz' | sha256sum -c -
       - name: Inspect and extract reviewed bootstrap safely
         shell: bash
         run: |
@@ -62,6 +62,13 @@ jobs:
                   if not member.isfile():
                       raise SystemExit(f'non-file bootstrap member: {member.name}')
               handle.extractall('.')
+
+          workflow = Path('.github/workflows/validate_asset_lab_authority.yml')
+          text = workflow.read_text(encoding='utf-8')
+          guard = "    if: github.actor != 'github-actions[bot]'\n"
+          if text.count(guard) != 1:
+              raise SystemExit('expected exactly one obsolete actor guard')
+          workflow.write_text(text.replace(guard, ''), encoding='utf-8')
           print('BOOTSTRAP_ARCHIVE_SAFETY: PASS')
           PY
       - name: Install authority-test dependency
