@@ -8,6 +8,9 @@ on:
       - scenes/world.tscn
       - tests/test_asset_lab_runtime_integration.py
       - .github/workflows/integrate-asset-lab-runtime.yml
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +26,7 @@ env:
 
 jobs:
   integrate:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
