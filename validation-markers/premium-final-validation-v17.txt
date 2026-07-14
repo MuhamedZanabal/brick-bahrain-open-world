@@ -1,0 +1,3 @@
+Premium authority: 1c358e42e65d0c9de43171c317f422eecf584579
+Purpose: validate world teardown transform guard and corrected unit fixture.
+Do not merge this validation branch.
