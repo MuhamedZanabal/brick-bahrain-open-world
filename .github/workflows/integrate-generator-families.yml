@@ -5,6 +5,8 @@ on:
     branches: [work/bahrain-brick-asset-lab-integration-v1]
     paths:
       - tools/asset_lab/generate_commercial_modules.py
+      - tools/asset_lab/blender_script_launcher.py
+      - tests/test_blender_script_launcher.py
       - scripts/asset_lab_runtime.gd
       - tests/test_asset_lab_runtime_integration.py
       - .github/workflows/integrate-generator-families.yml
@@ -99,30 +101,37 @@ jobs:
           unzip -q "${godot_archive}" -d godot-bin
           echo "GODOT=${PWD}/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "${GITHUB_ENV}"
 
-      - name: Execute all 17 source generators twice
+      - name: Execute all 16 source generators twice
         shell: bash
         run: |
           set -euo pipefail
           authority="${GITHUB_WORKSPACE}/build/generators/authority"
+          launcher="${GITHUB_WORKSPACE}/tools/asset_lab/blender_script_launcher.py"
+          run_gen() {
+            local script="$1"
+            shift
+            BAHRAIN_BRICK_BLENDER_SCRIPT="${authority}/tools/blender/${script}" \
+              "${BLENDER}" --background --factory-startup --python "$launcher" -- "$@"
+          }
           run_pass() {
             local out="$1"
             mkdir -p "$out/roads" "$out/street" "$out/commercial"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_road_module.py" -- --output "$out/roads"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_kerb_module.py" -- --output "$out/roads"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_intersection_modules.py" -- --output "$out/roads"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_roundabout_module.py" -- --output "$out/roads"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_pedestrian_crossing.py" -- --output "$out/roads"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_highway_modules.py" -- --output-dir "$out/roads" --variant all
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_sidewalk_modules.py" -- --output-dir "$out/roads" --variant all
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_drainage_channel.py" -- --output-dir "$out/roads"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_bollard.py" -- --output "$out/street"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_streetlamp.py" -- --output "$out/street"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_traffic_signal.py" -- --output "$out/street"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_crash_barrier.py" -- --output "$out/street"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_bus_shelter.py" -- --output "$out/street"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_direction_sign_frame.py" -- --output-dir "$out/street"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_supermarket_checkout.py" -- --output-dir "$out/commercial"
-            PYTHONPATH="${authority}/tools/blender" "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_commercial_modules.py" -- --output-dir "$out/commercial"
+            run_gen generate_road_module.py --output "$out/roads"
+            run_gen generate_kerb_module.py --output "$out/roads"
+            run_gen generate_intersection_modules.py --output "$out/roads"
+            run_gen generate_roundabout_module.py --output "$out/roads"
+            run_gen generate_pedestrian_crossing.py --output "$out/roads"
+            run_gen generate_highway_modules.py --output-dir "$out/roads" --variant all
+            run_gen generate_sidewalk_modules.py --output-dir "$out/roads" --variant all
+            run_gen generate_drainage_channel.py --output-dir "$out/roads"
+            run_gen generate_bollard.py --output "$out/street"
+            run_gen generate_streetlamp.py --output "$out/street"
+            run_gen generate_traffic_signal.py --output "$out/street"
+            run_gen generate_crash_barrier.py --output "$out/street"
+            run_gen generate_bus_shelter.py --output "$out/street"
+            run_gen generate_direction_sign_frame.py --output-dir "$out/street"
+            run_gen generate_supermarket_checkout.py --output-dir "$out/commercial"
+            run_gen generate_commercial_modules.py --output-dir "$out/commercial"
           }
           run_pass build/generators/run-a
           run_pass build/generators/run-b
@@ -171,6 +180,7 @@ jobs:
           cp scripts/asset_lab_runtime.gd build/generators/game/scripts/asset_lab_runtime.gd
           cp tests/test_asset_lab_runtime_integration.py build/generators/game/tests/test_asset_lab_runtime_integration.py
           (cd build/generators/game && python3 -m unittest tests.test_asset_lab_runtime_integration -v) 2>&1 | tee build/generators/runtime-integration-tests.log
+          python3 -m unittest tests.test_blender_script_launcher -v
           "${GODOT}" --headless --editor --path build/generators/game --import --quit 2>&1 | tee build/generators/godot-game-import.log
           ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' build/generators/godot-game-import.log
 
