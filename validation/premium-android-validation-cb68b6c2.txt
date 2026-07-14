@@ -1,0 +1,3 @@
+Validation-only trigger for corrected premium authority cb68b6c2960c8e656442ca64ac87f6cefa5c88fe.
+The semantic NPC metadata correction now preserves the recovered `_animation_player` variable and typed AnimationPlayer cast.
+Do not merge this validation marker.
