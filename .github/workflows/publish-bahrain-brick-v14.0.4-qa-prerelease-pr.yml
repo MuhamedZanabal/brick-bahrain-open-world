@@ -33,4 +33,28 @@ jobs:
 
       - name: Publish and independently verify QA pre-release
         shell: bash
-        run: bash tools/publish_bahrain_brick_v14_0_4_qa_release.sh
+        run: |
+          set -o pipefail
+          bash tools/publish_bahrain_brick_v14_0_4_qa_release.sh 2>&1 | tee "${RUNNER_TEMP}/qa-publication.log"
+
+      - name: Report failure diagnostics to publication PR
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          log_file="${RUNNER_TEMP}/qa-publication.log"
+          {
+            echo '<!-- bahrain-brick-v14.0.4-qa-publication-failure -->'
+            echo '## QA pre-release publication failure'
+            echo
+            echo "Workflow: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo '```text'
+            if [ -f "${log_file}" ]; then
+              tail -n 100 "${log_file}"
+            else
+              echo 'Publication log was not created.'
+            fi
+            echo '```'
+          } > failure-comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --repo "${GITHUB_REPOSITORY}" --body-file failure-comment.md
