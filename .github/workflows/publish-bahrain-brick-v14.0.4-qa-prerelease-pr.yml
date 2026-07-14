@@ -13,7 +13,7 @@ permissions:
   contents: write
   actions: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 
 concurrency:
   group: publish-bahrain-brick-v14.0.4-qa-prerelease
@@ -37,6 +37,15 @@ jobs:
           set -o pipefail
           bash tools/publish_bahrain_brick_v14_0_4_qa_release.sh 2>&1 | tee "${RUNNER_TEMP}/qa-publication.log"
 
+      - name: Upload failure diagnostic log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-publication-failure-${{ github.run_id }}
+          path: ${{ runner.temp }}/qa-publication.log
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Report failure diagnostics to publication PR
         if: failure()
         shell: bash
@@ -57,4 +66,5 @@ jobs:
             fi
             echo '```'
           } > failure-comment.md
-          gh pr comment "${{ github.event.pull_request.number }}" --repo "${GITHUB_REPOSITORY}" --body-file failure-comment.md
+          jq -n --rawfile body failure-comment.md '{body: $body}' > failure-comment.json
+          gh api --method POST "/repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" --input failure-comment.json >/dev/null
