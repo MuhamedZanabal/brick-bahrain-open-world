@@ -11,10 +11,14 @@ on:
       - tools/asset_lab/generate_golden_master_textures.py
       - tools/asset_lab/generate_golden_masters.py
       - tools/asset_lab/generate_golden_masters_v2.py
+      - tools/asset_lab/render_golden_master_contact_sheets.py
+      - tools/asset_lab/evaluate_golden_master_gate.py
       - tests/test_golden_master_contract.py
       - tests/test_golden_master_materials.py
       - tests/test_golden_master_texture_plan.py
       - tests/test_golden_master_generation_plan.py
+      - tests/test_golden_master_render_plan.py
+      - tests/test_golden_master_gate.py
   pull_request:
     branches:
       - work/bahrain-brick-premium-visual-v14
@@ -48,12 +52,14 @@ jobs:
             tools/asset_lab/golden_master_materials.py \
             tools/asset_lab/generate_golden_master_textures.py \
             tools/asset_lab/generate_golden_masters.py \
-            tools/asset_lab/generate_golden_masters_v2.py
+            tools/asset_lab/generate_golden_masters_v2.py \
+            tools/asset_lab/render_golden_master_contact_sheets.py \
+            tools/asset_lab/evaluate_golden_master_gate.py
 
   generate:
     needs: contract
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 55
     env:
       BLENDER_VERSION: 4.3.2
     steps:
@@ -68,7 +74,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/downloads build/golden-masters build/golden-textures build/reports
+          mkdir -p build/downloads build/golden-masters build/golden-textures build/golden-renders build/reports
           cd build/downloads
           archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
           base="https://download.blender.org/release/Blender4.3"
@@ -153,13 +159,67 @@ jobs:
           PY
           find build/golden-masters -type f -name '*.glb' -print0 | sort -z | xargs -0 sha256sum > build/reports/GOLDEN_MASTER_SHA256SUMS.txt
           find build/golden-textures -type f -name '*.png' -print0 | sort -z | xargs -0 sha256sum > build/reports/GOLDEN_MASTER_TEXTURE_SHA256SUMS.txt
-      - name: Upload golden-master technical evidence
+      - name: Render 15 textured evidence views
+        shell: bash
+        run: |
+          set -euo pipefail
+          BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
+          "$BLENDER" --background --factory-startup \
+            --python tools/asset_lab/render_golden_master_contact_sheets.py -- \
+            render \
+            --input-root build/golden-masters \
+            --output-root build/golden-renders \
+            --report build/reports/GOLDEN_MASTER_RENDER_VIEWS.json
+      - name: Compose and validate five contact sheets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/asset_lab/render_golden_master_contact_sheets.py \
+            compose \
+            --view-report build/reports/GOLDEN_MASTER_RENDER_VIEWS.json \
+            --output-root build/golden-renders \
+            --report build/reports/GOLDEN_MASTER_CONTACT_SHEETS.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          views=json.loads(Path('build/reports/GOLDEN_MASTER_RENDER_VIEWS.json').read_text())
+          sheets=json.loads(Path('build/reports/GOLDEN_MASTER_CONTACT_SHEETS.json').read_text())
+          assert views['view_count']==15 and len(views['renders'])==15, views
+          assert sheets['contact_sheet_count']==5 and len(sheets['contact_sheets'])==5, sheets
+          assert len(list(Path('build/golden-renders/views').glob('*.png')))==15
+          assert len(list(Path('build/golden-renders/contact-sheets').glob('*.png')))==5
+          assert all(Path(record['path']).stat().st_size > 10000 for record in sheets['contact_sheets'])
+          PY
+      - name: Record intentionally closed pre-runtime gate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          from tools.asset_lab.evaluate_golden_master_gate import evaluate_evidence
+          technical=json.loads(Path('build/reports/GOLDEN_MASTER_TECHNICAL_VALIDATION.json').read_text())
+          sheets=json.loads(Path('build/reports/GOLDEN_MASTER_CONTACT_SHEETS.json').read_text())['contact_sheets']
+          evidence={
+              'technical_validation':technical,
+              'contact_sheets':sheets,
+              'protected_authority':{'passed':False},
+              'godot_import':{'passed':False,'imported_assets':[]},
+              'android_runtime':{'passed':False,'landscape':False,'visible_assets':[]},
+              'android_screenshots':[],
+              'art_approvals':[],
+          }
+          report=evaluate_evidence(evidence)
+          assert report['mass_regeneration_allowed'] is False
+          Path('build/reports/GOLDEN_MASTER_GATE_REPORT.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Upload golden-master technical and visual evidence
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: bahrain-brick-golden-masters-${{ github.run_id }}
           path: |
             build/golden-masters
             build/golden-textures
+            build/golden-renders
             build/reports
           if-no-files-found: error
           retention-days: 30
