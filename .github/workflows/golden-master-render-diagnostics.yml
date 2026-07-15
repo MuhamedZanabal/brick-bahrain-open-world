@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
-          "$BLENDER" --background --factory-startup \
+          "$BLENDER" --background --factory-startup --python-exit-code 1 \
             --python tools/asset_lab/render_golden_master_contact_sheets.py -- \
             render \
             --input-root build/golden-masters \
