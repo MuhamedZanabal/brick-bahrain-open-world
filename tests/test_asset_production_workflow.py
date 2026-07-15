@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/asset-production-ci.yml"
-
+DRIVER = ROOT / "tools/asset_lab/run_asset_production_ci.sh"
 
 class AssetProductionWorkflowTests(unittest.TestCase):
     def test_workflow_pins_authorities_and_toolchains(self):
@@ -18,38 +18,31 @@ class AssetProductionWorkflowTests(unittest.TestCase):
             "ANDROID_PLATFORM: android-34",
             "ANDROID_BUILD_TOOLS: 34.0.0",
             "GLTF_VALIDATOR_VERSION: 2.0.0-dev.3.10",
+            "PACKAGE_NAME: com.bahrainbrick.game.qa",
+            "VERSION_CODE: '1404'",
+            "VERSION_NAME: 1.4.0.4-premium-visual-qa",
         ):
             self.assertIn(value, text)
 
-    def test_workflow_contains_required_execution_chain(self):
-        text = WORKFLOW.read_text(encoding="utf-8")
+    def test_driver_contains_required_execution_chain(self):
+        text = DRIVER.read_text(encoding="utf-8")
         ordered = [
-            "Verify exact integration ancestry",
-            "Recover checksum-locked game source",
-            "Protected-control pre-check",
-            "Verify corrected asset source integrity",
-            "Run corrected asset repository tests",
-            "Generate deterministic validation cube twice",
-            "Require deterministic cube GLB bytes",
-            "Run Khronos glTF Validator",
-            "Run independent cube contract validator",
-            "Run production asset generators",
-            "Run clean Godot import",
-            "Run gameplay regression suites",
-            "Protected-control post-check",
-            "Export Android APK",
-            "Validate Android APK",
-            "Upload production evidence",
+            "Verify exact integration ancestry", "Recover checksum-locked game source",
+            "Protected-control pre-check", "Verify corrected asset source integrity",
+            "Run corrected asset repository tests", "Generate deterministic validation cube twice",
+            "Require deterministic cube GLB bytes", "Run Khronos glTF Validator",
+            "Run independent cube contract validator", "Run production asset generators",
+            "Run clean Godot import", "Run gameplay regression suites",
+            "Protected-control post-check", "Export Android APK", "Validate Android APK",
         ]
         positions = [text.index(item) for item in ordered]
         self.assertEqual(positions, sorted(positions))
 
-    def test_workflow_does_not_mutate_or_merge(self):
-        text = WORKFLOW.read_text(encoding="utf-8")
+    def test_workflow_and_driver_do_not_mutate_or_merge(self):
+        text = WORKFLOW.read_text(encoding="utf-8") + DRIVER.read_text(encoding="utf-8")
         self.assertIn("contents: read", text)
         for forbidden in ("git push", "gh pr merge", "force: true", "contents: write"):
             self.assertNotIn(forbidden, text)
-
 
 if __name__ == "__main__":
     unittest.main()
