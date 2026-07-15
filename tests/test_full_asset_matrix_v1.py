@@ -52,8 +52,8 @@ class FullAssetMatrixPlanTests(unittest.TestCase):
             observed.setdefault(item["asset_id"], set()).add((item["profile"], item["lod"]))
         expected = {
             (profile, lod)
-            for profile in self.module.QUALITY_PROFILES
-            for lod in self.module.LOD_LEVELS
+            for profile in self.module.PROFILES
+            for lod in self.module.LODS
         }
         self.assertEqual(len(observed), 48)
         self.assertTrue(all(matrix == expected for matrix in observed.values()))
@@ -70,8 +70,8 @@ class FullAssetMatrixPlanTests(unittest.TestCase):
 
     def test_generator_inherits_approved_v31_material_and_collision_authority(self):
         text = MODULE_PATH.read_text(encoding="utf-8")
-        self.assertIn("gm_v31.install_v31(texture_dir)", text)
-        self.assertIn("_enforce_collision_policy", text)
+        self.assertIn("v31.install_v31(texture_dir)", text)
+        self.assertIn("_remove_non_lod0_collision", text)
         self.assertIn('GENERATOR_VERSION = "bahrain-brick-full-matrix-v1"', text)
         for master in (
             "bh_traditional_projecting_window_01",
