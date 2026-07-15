@@ -1,0 +1,92 @@
+name: Golden Master Render Diagnostics
+
+on:
+  push:
+    branches: [work/bahrain-brick-golden-master-batch1-v1]
+    paths:
+      - .github/workflows/golden-master-render-diagnostics.yml
+      - tools/asset_lab/render_golden_master_contact_sheets.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      BLENDER_VERSION: 4.3.2
+      SOURCE_ARTIFACT_ID: "8352033245"
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+      - name: Recover successful V2 GLB artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build build/reports build/golden-renders build/downloads
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > build/downloads/source-artifact.zip
+          unzip -tq build/downloads/source-artifact.zip
+          unzip -q build/downloads/source-artifact.zip -d build
+          test "$(find build/golden-masters -type f -name '*.glb' | wc -l)" -eq 45
+      - name: Install checksum-verified Blender and Pillow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          cd build/downloads
+          archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$archive" -o "$archive"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/blender-${BLENDER_VERSION}.sha256" -o blender.sha256
+          grep " $archive$" blender.sha256 | sha256sum -c -
+          tar -xf "$archive"
+      - name: Reproduce 15-view render boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
+          "$BLENDER" --background --factory-startup \
+            --python tools/asset_lab/render_golden_master_contact_sheets.py -- \
+            render \
+            --input-root build/golden-masters \
+            --output-root build/golden-renders \
+            --report build/reports/GOLDEN_MASTER_RENDER_VIEWS.json \
+            2>&1 | tee build/reports/BLENDER_RENDER.log
+          find build/golden-renders/views -type f -name '*.png' -printf '%p %s\n' | sort | tee build/reports/RENDERED_VIEW_FILES.txt
+      - name: Reproduce composition with complete diagnostics
+        id: compose
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/asset_lab/render_golden_master_contact_sheets.py \
+            compose \
+            --view-report build/reports/GOLDEN_MASTER_RENDER_VIEWS.json \
+            --output-root build/golden-renders \
+            --report build/reports/GOLDEN_MASTER_CONTACT_SHEETS.json \
+            2>&1 | tee build/reports/CONTACT_SHEET_COMPOSE.log
+          status=${PIPESTATUS[0]}
+          printf '%s\n' "$status" > build/reports/CONTACT_SHEET_COMPOSE_EXIT_CODE.txt
+          find build/golden-renders -type f -printf '%p %s\n' | sort > build/reports/RENDER_OUTPUT_INVENTORY.txt
+          exit "$status"
+      - name: Upload diagnostics regardless of failure
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: golden-master-render-diagnostics-${{ github.run_id }}
+          path: |
+            build/golden-renders
+            build/reports
+          if-no-files-found: error
+          retention-days: 30
+      - name: Require composition success after evidence upload
+        if: always()
+        shell: bash
+        run: test '${{ steps.compose.outcome }}' = 'success'
