@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/asset-production-ci.yml"
 DRIVER = ROOT / "tools/asset_lab/run_asset_production_ci.sh"
+REGRESSIONS = ROOT / "tools/asset_lab/run_game_regressions.sh"
 
 
 class AssetProductionWorkflowTests(unittest.TestCase):
@@ -44,13 +45,17 @@ class AssetProductionWorkflowTests(unittest.TestCase):
         positions = [text.index(item) for item in ordered]
         self.assertEqual(positions, sorted(positions))
 
-
     def test_driver_refreshes_godot_class_cache_after_overlay(self):
         text = DRIVER.read_text(encoding="utf-8")
         self.assertIn("class_name PremiumWorldMaterials", text)
         self.assertIn("godot-post-overlay-import.log", text)
         self.assertLess(text.index("Apply verified premium validation overlay"), text.index("Run post-overlay Godot import"))
         self.assertLess(text.index("Run post-overlay Godot import"), text.index("Run gameplay regression suites"))
+
+    def test_regression_alternative_success_messages_use_extended_regex(self):
+        text = REGRESSIONS.read_text(encoding="utf-8")
+        self.assertIn("grep -Eq 'World lifecycle guard complete: 12 passed, 0 failed|12 passed, 0 failed'", text)
+        self.assertIn("grep -Eq 'World resource repeat complete: 21 passed, 0 failed|21 passed, 0 failed'", text)
 
     def test_generated_validation_evidence_paths_are_unique(self):
         text = DRIVER.read_text(encoding="utf-8")
