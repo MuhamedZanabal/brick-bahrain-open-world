@@ -103,14 +103,19 @@ jobs:
             platform-tools
             platforms;${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
-      - name: Provision deterministic SVG renderer
+      - name: Provision deterministic SVG and Python imaging dependencies
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends librsvg2-bin
+          python3 -m venv build/asset-production/venv
+          build/asset-production/venv/bin/python -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          echo "$PWD/build/asset-production/venv/bin" >> "$GITHUB_PATH"
           rsvg-convert --version | tee build/asset-production/reports/RSVG_CONVERT_VERSION.txt
           dpkg-query -W -f='${Package} ${Version}\n' librsvg2-bin | tee build/asset-production/reports/LIBRSVG_PACKAGE_VERSION.txt
+          build/asset-production/venv/bin/python -c 'from PIL import __version__; print(__version__)' | tee build/asset-production/reports/PILLOW_VERSION.txt
+          grep -q '^12.3.0$' build/asset-production/reports/PILLOW_VERSION.txt
       - name: Run complete production chain
         shell: bash
         run: |

@@ -23,6 +23,7 @@ class AssetProductionWorkflowTests(unittest.TestCase):
             "VERSION_CODE: '1404'",
             "VERSION_NAME: 1.4.0.4-premium-visual-qa",
             "librsvg2-bin",
+            "Pillow==12.3.0",
             "Stage checksum-pinned generator dependencies",
         ):
             self.assertIn(value, text)
