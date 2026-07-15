@@ -59,10 +59,11 @@ class GoldenMasterRuntimeContractTests(unittest.TestCase):
     def test_quality_selector_contains_bidirectional_hysteresis(self):
         source = QUALITY_PATH.read_text(encoding="utf-8")
         self.assertIn("class_name GoldenMasterQuality", source)
-        self.assertIn("lod0_max_m + hysteresis", source)
-        self.assertIn("lod0_max_m - hysteresis", source)
-        self.assertIn("lod1_max_m + hysteresis", source)
-        self.assertIn("lod1_max_m - hysteresis", source)
+        self.assertIn("lod0_limit + hysteresis", source)
+        self.assertIn("lod0_limit - hysteresis", source)
+        self.assertIn("lod1_limit + hysteresis", source)
+        self.assertIn("lod1_limit - hysteresis", source)
+        self.assertIn("maxf(lod1_max_m, lod0_limit + 0.01)", source)
         self.assertNotIn("rand", source.lower())
 
     def test_lod_instance_loads_manifest_paths_without_material_override(self):
