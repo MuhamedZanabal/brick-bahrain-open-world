@@ -10,6 +10,7 @@ on:
       - tools/asset_lab/golden_master_materials.py
       - tools/asset_lab/generate_golden_master_textures.py
       - tools/asset_lab/generate_golden_masters.py
+      - tools/asset_lab/generate_golden_masters_v2.py
       - tests/test_golden_master_contract.py
       - tests/test_golden_master_materials.py
       - tests/test_golden_master_texture_plan.py
@@ -46,7 +47,8 @@ jobs:
             tools/asset_lab/golden_master_contract.py \
             tools/asset_lab/golden_master_materials.py \
             tools/asset_lab/generate_golden_master_textures.py \
-            tools/asset_lab/generate_golden_masters.py
+            tools/asset_lab/generate_golden_masters.py \
+            tools/asset_lab/generate_golden_masters_v2.py
 
   generate:
     needs: contract
@@ -89,8 +91,7 @@ jobs:
           set -euo pipefail
           BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
           "$BLENDER" --background --factory-startup \
-            --python tools/asset_lab/generate_golden_masters.py -- \
-            generate \
+            --python tools/asset_lab/generate_golden_masters_v2.py -- \
             --seed 1405 \
             --texture-dir build/golden-textures \
             --output-dir build/golden-masters \
@@ -105,6 +106,7 @@ jobs:
           report=json.loads(Path('build/reports/GOLDEN_MASTER_GENERATION.json').read_text())
           texture_report=json.loads(Path('build/reports/GOLDEN_MASTER_TEXTURES.json').read_text())
           outputs=report['outputs']
+          assert report['generator_version']=='bahrain-brick-golden-master-v2', report
           assert texture_report['texture_count']==24, texture_report
           assert len(list(Path('build/golden-textures').rglob('*_albedo.png')))==24
           assert report['source_asset_count']==5, report
