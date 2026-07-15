@@ -3,6 +3,10 @@
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import render_golden_master_contact_sheets as renderer
 
 _ORIGINAL_SETUP = renderer._setup_scene
