@@ -103,6 +103,8 @@ jobs:
             platform-tools
             platforms;${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+            emulator
+            system-images;android-34;google_apis;x86_64
       - name: Provision deterministic SVG and Python imaging dependencies
         shell: bash
         run: |
@@ -123,6 +125,16 @@ jobs:
           set -o pipefail
           bash tools/asset_lab/run_asset_production_ci.sh 2>&1 | tee build/asset-production/logs/production-driver.log
           test "${PIPESTATUS[0]}" -eq 0
+      - name: Run Android API 34 emulator validation
+        timeout-minutes: 25
+        shell: bash
+        run: |
+          bash tools/asset_lab/run_android_emulator_validation.sh \
+            build/asset-production/artifacts/${APK_NAME} \
+            ${PACKAGE_NAME} \
+            build/asset-production/reports \
+            build/asset-production/logs \
+            build/asset-production/artifacts
       - name: Build final evidence inventory
         if: always()
         shell: bash
