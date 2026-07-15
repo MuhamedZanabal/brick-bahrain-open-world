@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3 uid="uid://bworld01"]
 
 [ext_resource type="Script" path="res://scripts/world.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/asset_lab_runtime.gd" id="2_asset_lab"]
+[ext_resource type="Script" path="res://scripts/full_asset_matrix_runtime.gd" id="2_asset_lab"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1")
