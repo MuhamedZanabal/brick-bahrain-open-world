@@ -1,0 +1,42 @@
+name: Correct asset production PR SHA contract
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths: [.github/workflows/patch-asset-production-pr-sha.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: work/bahrain-brick-asset-lab-integration-v1
+      - name: Apply exact PR head contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          driver=Path('tools/asset_lab/run_asset_production_ci.sh')
+          text=driver.read_text()
+          old='test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"'
+          new='test "$(git rev-parse HEAD)" = "${EXPECTED_INTEGRATION_SHA}"'
+          if text.count(old) != 1: raise SystemExit(f'driver replacement count={text.count(old)}')
+          driver.write_text(text.replace(old,new))
+
+          workflow=Path('.github/workflows/asset-production-ci.yml')
+          text=workflow.read_text()
+          anchor='  EXPECTED_CHECKPOINT: 5383c376df40f2a427fc5f739cac0ad23584de35\n'
+          addition=anchor + '  EXPECTED_INTEGRATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}\n'
+          if text.count(anchor) != 1: raise SystemExit(f'workflow anchor count={text.count(anchor)}')
+          workflow.write_text(text.replace(anchor,addition))
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/asset_lab/run_asset_production_ci.sh .github/workflows/asset-production-ci.yml
+          git commit -m 'fix(ci): verify exact PR head SHA'
+          git push origin HEAD:work/bahrain-brick-asset-lab-integration-v1
