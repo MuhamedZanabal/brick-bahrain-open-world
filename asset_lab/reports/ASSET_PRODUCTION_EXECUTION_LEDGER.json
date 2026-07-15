@@ -20,12 +20,23 @@
     "game_repository": "MuhamedZanabal/brick-bahrain-open-world",
     "integration_branch": "work/bahrain-brick-asset-lab-integration-v1",
     "integration_head_at_checkpoint": "b76b8fd2c67bfee07862abd7a6a0243c39d23048",
-    "integration_pr": {"draft": true, "merged": false, "number": 57, "state": "open"},
+    "integration_pr": {
+      "draft": true,
+      "merged": false,
+      "number": 57,
+      "state": "open"
+    },
     "lineage": {
       "asset": "corrective commit is direct descendant of asset authority; authority commit unchanged",
       "game": "frozen authority is exact merge base; integration head 20 commits ahead and 0 behind at audit"
     },
-    "premium_validation_pr": {"draft": true, "merged": false, "mutation": "prohibited", "number": 55, "state": "open"},
+    "premium_validation_pr": {
+      "draft": true,
+      "merged": false,
+      "mutation": "prohibited",
+      "number": 55,
+      "state": "open"
+    },
     "protected_controls": {
       "baseline_commit": "c5548465627942a2889a0bd09f8979c3a29fbcdd",
       "expected_sha256": {
@@ -48,25 +59,88 @@
       "final_direct_recheck_required": true,
       "method": "Exact immutable lineage: frozen authority is current-head merge base and complete compare contains zero protected paths.",
       "required_snippets": {
-        "scripts/hud.gd": ["root.mouse_filter = Control.MOUSE_FILTER_IGNORE", "joystick.name = \"MovementJoystick\"", "_walking_controls.visible = true", "_vehicle_controls.visible = false", "_walking_controls.visible = not in_vehicle", "_vehicle_controls.visible = in_vehicle"],
-        "scripts/player_controller.gd": ["var touch_vector: Vector2 = TouchInput.movement", "move_and_slide()", "\"is_local\": is_local"],
-        "scripts/world.gd": ["TouchInput.reset_all()"]
+        "scripts/hud.gd": [
+          "root.mouse_filter = Control.MOUSE_FILTER_IGNORE",
+          "joystick.name = \"MovementJoystick\"",
+          "_walking_controls.visible = true",
+          "_vehicle_controls.visible = false",
+          "_walking_controls.visible = not in_vehicle",
+          "_vehicle_controls.visible = in_vehicle"
+        ],
+        "scripts/player_controller.gd": [
+          "var touch_vector: Vector2 = TouchInput.movement",
+          "move_and_slide()",
+          "\"is_local\": is_local"
+        ],
+        "scripts/world.gd": [
+          "TouchInput.reset_all()"
+        ]
       },
       "verification": "MATCH_BY_IMMUTABLE_LINEAGE"
     }
   },
   "ci_runs_at_integration_head": [
-    {"conclusion": "action_required", "jobs_created": 0, "retry_result": "not attempted; protected PR #55 workflow remains unchanged", "run_id": 29377365831, "workflow": "Build Bahrain Brick Premium Visual QA"},
-    {"conclusion": "action_required", "jobs_created": 0, "retry_result": "403 This workflow run cannot be retried", "run_id": 29377365827, "workflow": "Integrate verified Asset Lab runtime families"},
-    {"conclusion": "action_required", "jobs_created": 0, "retry_result": "not attempted; diagnostic trigger only", "run_id": 29377365835, "workflow": "Trigger Bahrain Brick Premium Visual Validation"}
+    {
+      "conclusion": "action_required",
+      "jobs_created": 0,
+      "retry_result": "not attempted; protected PR #55 workflow remains unchanged",
+      "run_id": 29377365831,
+      "workflow": "Build Bahrain Brick Premium Visual QA"
+    },
+    {
+      "conclusion": "action_required",
+      "jobs_created": 0,
+      "retry_result": "403 This workflow run cannot be retried",
+      "run_id": 29377365827,
+      "workflow": "Integrate verified Asset Lab runtime families"
+    },
+    {
+      "conclusion": "action_required",
+      "jobs_created": 0,
+      "retry_result": "not attempted; diagnostic trigger only",
+      "run_id": 29377365835,
+      "workflow": "Trigger Bahrain Brick Premium Visual Validation"
+    }
   ],
   "classification": "PRODUCTION TOOLCHAIN / CI EXECUTION BLOCKED",
   "completion_claim": false,
-  "confirmed_defect": {"classification": "SOURCE-INTEGRITY LEDGER INVALID — 40 FAILED ENTRIES", "commit": "d59efb98b9c06ceb754d95e8ce83853442f46f41", "pr": 3, "state": "CORRECTED_ON_DESCENDANT_DRAFT_PR"},
-  "next_tasks": ["persist this checkpoint to game integration branch", "add pinned production CI workflow and cube pipeline", "resolve exact GitHub pre-job action_required cause", "execute cube through Android export"],
-  "protected_controls": {"expected_checks": 25, "modified_protected_paths": 0, "post_result": "pending production CI", "pre_result": "verified from frozen authority definition and lineage; executable CI recheck pending"},
+  "confirmed_defect": {
+    "classification": "SOURCE-INTEGRITY LEDGER INVALID — 40 FAILED ENTRIES",
+    "commit": "d59efb98b9c06ceb754d95e8ce83853442f46f41",
+    "pr": 3,
+    "state": "CORRECTED_ON_DESCENDANT_DRAFT_PR"
+  },
+  "next_tasks": [
+    "persist this checkpoint to game integration branch",
+    "add pinned production CI workflow and cube pipeline",
+    "resolve exact GitHub pre-job action_required cause",
+    "execute cube through Android export"
+  ],
+  "protected_controls": {
+    "expected_checks": 25,
+    "modified_protected_paths": 0,
+    "post_result": "pending production CI",
+    "pre_result": "verified from frozen authority definition and lineage; executable CI recheck pending"
+  },
   "schema_version": "2.0.0",
-  "task_ledger": {"path": "asset_lab/reports/ASSET_PRODUCTION_TASK_MATRIX.csv", "records": 467, "status_counts": {"BLOCKED": 7, "COMPLETE": 20, "NOT_APPLICABLE": 1, "NOT_STARTED": 437, "READY": 2}},
+  "task_ledger": {
+    "path": "asset_lab/reports/ASSET_PRODUCTION_TASK_MATRIX.csv",
+    "records": 467,
+    "status_counts": {
+      "BLOCKED": 7,
+      "COMPLETE": 20,
+      "NOT_APPLICABLE": 1,
+      "NOT_STARTED": 437,
+      "READY": 2
+    }
+  },
   "updated_at_utc": "2026-07-15T01:41:10.134030+00:00",
-  "validated_asset_repository": {"corrected_ledger_entries": 161, "integrity_failures": 0, "manifest_records": 98, "python_compile": "passed", "python_tests_passed": 20, "signing_scan": "passed"}
+  "validated_asset_repository": {
+    "corrected_ledger_entries": 161,
+    "integrity_failures": 0,
+    "manifest_records": 98,
+    "python_compile": "passed",
+    "python_tests_passed": 20,
+    "signing_scan": "passed"
+  }
 }
