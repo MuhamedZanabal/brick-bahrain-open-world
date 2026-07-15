@@ -73,7 +73,7 @@ jobs:
             --package "system-images;android-34;google_apis;x86_64" --device "pixel_7"
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee build/reports/EMULATOR_LIST_AVDS.txt
           grep -qx 'golden_master_api34' build/reports/EMULATOR_LIST_AVDS.txt
-      - name: Run bounded nonimmersive Vulkan validation
+      - name: Run pre-rotated nonimmersive Vulkan validation
         id: emulator
         continue-on-error: true
         shell: bash
@@ -101,6 +101,29 @@ jobs:
             sleep 2
           done
           test "$BOOTED" -eq 1
+
+          "$ADB" shell settings put system accelerometer_rotation 0
+          "$ADB" shell settings put system user_rotation 1
+          "$ADB" shell wm user-rotation lock 1
+          STABLE_ROTATION_SAMPLES=0
+          for attempt in $(seq 1 90); do
+            "$ADB" shell dumpsys window displays > build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS.txt
+            if grep -q 'mDisplayRotation=ROTATION_90' build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS.txt \
+              && grep -q '2400 x 1080' build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS.txt; then
+              STABLE_ROTATION_SAMPLES=$((STABLE_ROTATION_SAMPLES + 1))
+            else
+              STABLE_ROTATION_SAMPLES=0
+            fi
+            if [ "$STABLE_ROTATION_SAMPLES" -ge 5 ]; then
+              break
+            fi
+            sleep 1
+          done
+          test "$STABLE_ROTATION_SAMPLES" -ge 5
+          sleep 5
+          "$ADB" shell dumpsys window displays > build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS_STABLE.txt
+          grep -q 'mDisplayRotation=ROTATION_90' build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS_STABLE.txt
+
           "$ADB" install -r build/bahrain_brick_golden_master_nonimmersive_vulkan_qa.apk | tee build/reports/ADB_INSTALL.txt
           "$ADB" logcat -c
           "$ADB" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 | tee build/reports/ADB_LAUNCH.txt
@@ -130,7 +153,7 @@ jobs:
           extrema=ImageStat.Stat(image).extrema
           assert sum(1 for low,high in extrema if high-low > 40) >= 2, extrema
           Path('build/reports/ANDROID_RUNTIME_VALIDATION.json').write_text(
-              json.dumps({'passed':True,'renderer':'mobile_vulkan','orientation':'landscape','immersive':False,'package':'com.brickbahrain.goldenmasterqa','profile':'balanced','visible_assets':5,'dimensions':[width,height],'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},indent=2,sort_keys=True)+'\n'
+              json.dumps({'passed':True,'renderer':'mobile_vulkan','orientation':'pre_rotated_landscape','immersive':False,'package':'com.brickbahrain.goldenmasterqa','profile':'balanced','visible_assets':5,'dimensions':[width,height],'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},indent=2,sort_keys=True)+'\n'
           )
           PY
           if grep -E 'SCRIPT ERROR|Parse Error|GOLDEN_MASTER_PREVIEW_FAILED|FATAL EXCEPTION|Fatal signal|Condition "configured" is true|Singleton for Time already exists' build/reports/ANDROID_LOGCAT.txt; then
