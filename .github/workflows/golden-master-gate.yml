@@ -2,23 +2,24 @@ name: Bahrain Brick Golden Master Gate
 
 on:
   push:
-    branches:
-      - work/bahrain-brick-asset-lab-integration-v1
-      - work/bahrain-brick-golden-master-batch1-v1
-    paths:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths: &golden_paths
       - .github/workflows/golden-master-gate.yml
       - docs/assets/GOLDEN_MASTER_CONTRACT.json
       - tools/asset_lab/golden_master_contract.py
       - tools/asset_lab/golden_master_materials.py
+      - tools/asset_lab/generate_golden_master_textures.py
       - tools/asset_lab/generate_golden_masters.py
       - tests/test_golden_master_contract.py
       - tests/test_golden_master_materials.py
+      - tests/test_golden_master_texture_plan.py
       - tests/test_golden_master_generation_plan.py
   pull_request:
     branches:
       - work/bahrain-brick-premium-visual-v14
       - work/bahrain-brick-asset-lab-integration-v1
     types: [opened, synchronize, reopened]
+    paths: *golden_paths
   workflow_dispatch:
 
 permissions:
@@ -40,20 +41,17 @@ jobs:
       - name: Run golden-master authority tests
         shell: bash
         run: |
-          python3 -m unittest \
-            tests.test_golden_master_contract \
-            tests.test_golden_master_materials \
-            tests.test_golden_master_generation_plan \
-            -v
+          python3 -m unittest discover -s tests -p 'test_golden_master*.py' -v
           python3 -m py_compile \
             tools/asset_lab/golden_master_contract.py \
             tools/asset_lab/golden_master_materials.py \
+            tools/asset_lab/generate_golden_master_textures.py \
             tools/asset_lab/generate_golden_masters.py
 
   generate:
     needs: contract
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     env:
       BLENDER_VERSION: 4.3.2
     steps:
@@ -61,11 +59,14 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install deterministic texture dependency
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
       - name: Install checksum-verified Blender
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/downloads build/golden-masters build/reports
+          mkdir -p build/downloads build/golden-masters build/golden-textures build/reports
           cd build/downloads
           archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
           base="https://download.blender.org/release/Blender4.3"
@@ -75,7 +76,14 @@ jobs:
           tar -xf "$archive"
           "${PWD}/blender-${BLENDER_VERSION}-linux-x64/blender" --version | tee ../reports/BLENDER_VERSION.txt
           grep -q '^Blender 4.3.2' ../reports/BLENDER_VERSION.txt
-      - name: Generate all 45 golden-master derivatives
+      - name: Generate 24 shared deterministic textures
+        shell: bash
+        run: |
+          python3 tools/asset_lab/generate_golden_master_textures.py \
+            --seed 140500 \
+            --output-dir build/golden-textures \
+            --report build/reports/GOLDEN_MASTER_TEXTURES.json
+      - name: Generate all 45 textured golden-master derivatives
         shell: bash
         run: |
           set -euo pipefail
@@ -84,9 +92,10 @@ jobs:
             --python tools/asset_lab/generate_golden_masters.py -- \
             generate \
             --seed 1405 \
+            --texture-dir build/golden-textures \
             --output-dir build/golden-masters \
             --report build/reports/GOLDEN_MASTER_GENERATION.json
-      - name: Validate generated matrix and mobile cost ordering
+      - name: Validate generated matrix, textures and mobile cost ordering
         shell: bash
         run: |
           set -euo pipefail
@@ -94,7 +103,10 @@ jobs:
           from pathlib import Path
           import hashlib,json
           report=json.loads(Path('build/reports/GOLDEN_MASTER_GENERATION.json').read_text())
+          texture_report=json.loads(Path('build/reports/GOLDEN_MASTER_TEXTURES.json').read_text())
           outputs=report['outputs']
+          assert texture_report['texture_count']==24, texture_report
+          assert len(list(Path('build/golden-textures').rglob('*_albedo.png')))==24
           assert report['source_asset_count']==5, report
           assert report['derivative_count']==45, report
           assert len(outputs)==45, len(outputs)
@@ -123,17 +135,29 @@ jobs:
               items=sorted(items,key=lambda x:profile_rank[x['profile']])
               triangles=[x['triangle_count'] for x in items]
               assert triangles[0] <= triangles[1] <= triangles[2], (key,triangles)
+          detail_floors={
+              'bh_traditional_projecting_window_01':1200,
+              'bh_souq_shop_gold_01':1200,
+              'bh_waterfront_tower_a_01':1500,
+              'bh_supermarket_storefront_a_01':1200,
+              'bh_cr_skyscraper_tower_01':2500,
+          }
+          for asset_id,floor in detail_floors.items():
+              item=next(x for x in outputs if x['asset_id']==asset_id and x['profile']=='balanced' and x['lod']==0)
+              assert item['triangle_count']>=floor, (asset_id,item['triangle_count'],floor)
           Path('build/reports/GOLDEN_MASTER_TECHNICAL_VALIDATION.json').write_text(
-              json.dumps({'passed':True,'validated_assets':45,'failures':[]},indent=2)+'\n'
+              json.dumps({'passed':True,'validated_assets':45,'texture_count':24,'failures':[]},indent=2)+'\n'
           )
           PY
           find build/golden-masters -type f -name '*.glb' -print0 | sort -z | xargs -0 sha256sum > build/reports/GOLDEN_MASTER_SHA256SUMS.txt
+          find build/golden-textures -type f -name '*.png' -print0 | sort -z | xargs -0 sha256sum > build/reports/GOLDEN_MASTER_TEXTURE_SHA256SUMS.txt
       - name: Upload golden-master technical evidence
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: bahrain-brick-golden-masters-${{ github.run_id }}
           path: |
             build/golden-masters
+            build/golden-textures
             build/reports
           if-no-files-found: error
           retention-days: 30
