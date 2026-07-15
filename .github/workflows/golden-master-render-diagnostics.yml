@@ -6,6 +6,12 @@ on:
     paths:
       - .github/workflows/golden-master-render-diagnostics.yml
       - tools/asset_lab/render_golden_master_contact_sheets.py
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/golden-master-render-diagnostics.yml
+      - tools/asset_lab/render_golden_master_contact_sheets.py
   workflow_dispatch:
 
 permissions:
@@ -23,7 +29,7 @@ jobs:
       - name: Check out exact commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Recover successful V2 GLB artifact
         env:
           GH_TOKEN: ${{ github.token }}
