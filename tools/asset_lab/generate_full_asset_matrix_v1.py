@@ -144,10 +144,21 @@ def _rank(profile: str) -> int:
 
 
 def _materials(bpy: Any, profile: str) -> dict[str, Any]:
-    return {key: gm._material(bpy, profile, key) for key in (
+    materials = {key: gm._material(bpy, profile, key) for key in (
         "sand_plaster", "limestone", "dark_timber", "painted_metal",
         "blue_glass", "souq_gold", "promenade_paving", "signage_accent",
     )}
+    materials.update({
+        "sand": materials["sand_plaster"],
+        "stone": materials["limestone"],
+        "wood": materials["dark_timber"],
+        "metal": materials["painted_metal"],
+        "glass": materials["blue_glass"],
+        "paving": materials["promenade_paving"],
+        "accent": materials["signage_accent"],
+        "green": materials["signage_accent"],
+    })
+    return materials
 
 
 def _prefix_and_parent(bpy: Any, root: Any, asset_id: str) -> None:
