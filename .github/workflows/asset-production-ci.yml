@@ -30,7 +30,9 @@ env:
   GLTF_VALIDATOR_VERSION: 2.0.0-dev.3.10
   GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
   GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
-  PACKAGE_NAME: com.brickbahrain.openworld
+  PACKAGE_NAME: com.bahrainbrick.game.qa
+  VERSION_CODE: '1404'
+  VERSION_NAME: 1.4.0.4-premium-visual-qa
   APK_NAME: bahrain-brick-asset-production-debug.apk
 
 jobs:
@@ -44,86 +46,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-
-      - name: Verify exact integration ancestry
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
-          git merge-base --is-ancestor "${FROZEN_PREMIUM_AUTHORITY}" HEAD
-          git merge-base --is-ancestor "${EXPECTED_CHECKPOINT}" HEAD
-          mkdir -p build/asset-production/reports build/asset-production/logs build/asset-production/artifacts
-          git rev-parse HEAD | tee build/asset-production/reports/INTEGRATION_HEAD.txt
-
-      - name: Recover checksum-locked game source
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/asset-production/downloads build/asset-production/game build/asset-production/baseline
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "${GAME_SOURCE_URL}" --output build/asset-production/downloads/game-source.zip
-          echo "${GAME_SOURCE_SHA256}  build/asset-production/downloads/game-source.zip" | sha256sum -c -
-          unzip -tq build/asset-production/downloads/game-source.zip
-          unzip -q build/asset-production/downloads/game-source.zip -d build/asset-production/game
-          unzip -q build/asset-production/downloads/game-source.zip -d build/asset-production/baseline
-          test -f build/asset-production/game/project.godot
-
-      - name: Protected-control pre-check
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/verify_frozen_controls.py build/asset-production/game \
-            --json-out build/asset-production/reports/FROZEN_CONTROLS_PRE.json \
-            --markdown-out build/asset-production/reports/FROZEN_CONTROLS_PRE.md
-          python3 - <<'PY'
-          import json
-          report=json.load(open('build/asset-production/reports/FROZEN_CONTROLS_PRE.json'))
-          assert report['checks']==25 and report['failures']==[], report
-          PY
-
-      - name: Check out corrected asset authority descendant
-        shell: bash
-        run: |
-          set -euo pipefail
-          git clone --filter=blob:none --no-checkout https://github.com/MuhamedZanabal/Bahrain_bricks_Assets.git build/asset-production/asset-authority
-          git -C build/asset-production/asset-authority checkout --detach "${ASSET_CORRECTIVE_COMMIT}"
-          test "$(git -C build/asset-production/asset-authority rev-parse HEAD)" = "${ASSET_CORRECTIVE_COMMIT}"
-          git -C build/asset-production/asset-authority merge-base --is-ancestor "${ASSET_AUTHORITY_COMMIT}" HEAD
-
-      - name: Verify corrected asset source integrity
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd build/asset-production/asset-authority
-          python3 tools/source_integrity.py verify --root . --ledger SHA256SUMS | tee ../reports/ASSET_SOURCE_INTEGRITY.json
-          sha256sum -c SHA256SUMS > ../logs/asset-sha256-direct.log
-          test "$(grep -c ': FAILED' ../logs/asset-sha256-direct.log || true)" = 0
-
-      - name: Run corrected asset repository tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd build/asset-production/asset-authority
-          python3 -m unittest discover -s tests -v 2>&1 | tee ../logs/asset-python-tests.log
-          grep -Eq 'Ran 20 tests|20 passed' ../logs/asset-python-tests.log
-          python3 tools/validate_manifests.py | tee ../logs/asset-manifest-validation.log
-          grep -q '98 master assets' ../logs/asset-manifest-validation.log
-          python3 tools/check_signing_material.py . | tee ../logs/asset-signing-scan.log
-          grep -q 'passed' ../logs/asset-signing-scan.log
-          python3 -m py_compile tools/*.py tools/blender/*.py tests/*.py
-
-      - name: Run integration Python tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 -m unittest discover -s tests -v 2>&1 | tee build/asset-production/logs/game-python-tests.log
-          python3 -m py_compile tools/asset_lab/*.py tests/*.py
-
       - name: Provision Java 17
         uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Provision pinned Android SDK tools
         uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
         with:
@@ -132,208 +59,22 @@ jobs:
             platform-tools
             platforms;${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
-
-      - name: Install official checksum-verified Blender and Godot
+      - name: Run complete production chain
         shell: bash
-        run: |
-          set -euo pipefail
-          cd build/asset-production/downloads
-          blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
-          blender_base="https://download.blender.org/release/Blender4.3"
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "${blender_base}/${blender_archive}" -o "${blender_archive}"
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "${blender_base}/blender-${BLENDER_VERSION}.sha256" -o blender.sha256
-          grep " ${blender_archive}$" blender.sha256 | sha256sum -c -
-          tar -xf "${blender_archive}"
-          echo "BLENDER=${PWD}/blender-${BLENDER_VERSION}-linux-x64/blender" >> "${GITHUB_ENV}"
-
-          godot_base="https://github.com/godotengine/godot/releases/download/4.3-stable"
-          godot_archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          templates_archive="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "${godot_base}/SHA512-SUMS.txt" -o godot-SHA512-SUMS.txt
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "${godot_base}/${godot_archive}" -o "${godot_archive}"
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "${godot_base}/${templates_archive}" -o "${templates_archive}"
-          grep " ${godot_archive}$" godot-SHA512-SUMS.txt | sha512sum -c -
-          grep " ${templates_archive}$" godot-SHA512-SUMS.txt | sha512sum -c -
-          unzip -q "${godot_archive}" -d godot-bin
-          echo "GODOT=${PWD}/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "${GITHUB_ENV}"
-          rm -rf godot-templates
-          unzip -q "${templates_archive}" -d godot-templates
-          mkdir -p "${HOME}/.local/share/godot/export_templates/4.3.stable"
-          cp -a godot-templates/templates/. "${HOME}/.local/share/godot/export_templates/4.3.stable/"
-
-      - name: Verify installed production tool versions
-        shell: bash
-        run: |
-          set -euo pipefail
-          "${BLENDER}" --version | tee build/asset-production/reports/BLENDER_VERSION.txt
-          grep -q '^Blender 4.3.2' build/asset-production/reports/BLENDER_VERSION.txt
-          "${GODOT}" --version | tee build/asset-production/reports/GODOT_VERSION.txt
-          grep -q '^4.3.stable.official.77dcf97d8' build/asset-production/reports/GODOT_VERSION.txt
-          java -version 2>&1 | tee build/asset-production/reports/JAVA_VERSION.txt
-          sdkmanager --version | tee build/asset-production/reports/ANDROID_SDKMANAGER_VERSION.txt
-          adb version | tee build/asset-production/reports/ADB_VERSION.txt
-          aapt version | tee build/asset-production/reports/AAPT_VERSION.txt
-          apksigner version | tee build/asset-production/reports/APKSIGNER_VERSION.txt
-          zipalign -h 2>&1 | head -20 | tee build/asset-production/reports/ZIPALIGN_VERSION.txt
-
-      - name: Generate deterministic validation cube twice
-        shell: bash
-        run: |
-          set -euo pipefail
-          for run in a b; do
-            "${BLENDER}" --background --factory-startup --python tools/asset_lab/generate_validation_cube.py -- \
-              --output-dir "build/asset-production/cube-${run}" \
-              --report "build/asset-production/reports/CUBE_GENERATION_${run^^}.json"
-          done
-
-      - name: Require deterministic cube GLB bytes
-        shell: bash
-        run: |
-          set -euo pipefail
-          cmp build/asset-production/cube-a/bb_validation_cube_1m.glb build/asset-production/cube-b/bb_validation_cube_1m.glb
-          sha256sum build/asset-production/cube-a/bb_validation_cube_1m.{blend,glb} | tee build/asset-production/reports/CUBE_SHA256SUMS.txt
-          stat -c '%n %s' build/asset-production/cube-a/bb_validation_cube_1m.{blend,glb} | tee build/asset-production/reports/CUBE_SIZES.txt
-
-      - name: Install Khronos glTF Validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/asset-production/gltf-validator
-          npm install --prefix build/asset-production/gltf-validator --ignore-scripts --no-audit --no-fund "gltf-validator@${GLTF_VALIDATOR_VERSION}"
-          npm list --prefix build/asset-production/gltf-validator --depth=0 | tee build/asset-production/reports/GLTF_VALIDATOR_VERSION.txt
-
-      - name: Run Khronos glTF Validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          node - build/asset-production/cube-a/bb_validation_cube_1m.glb build/asset-production/reports/CUBE_KHRONOS_GLTF_VALIDATION.json <<'JS'
-          const fs = require('fs');
-          const validator = require('./build/asset-production/gltf-validator/node_modules/gltf-validator');
-          const input = process.argv[2];
-          const output = process.argv[3];
-          validator.validateBytes(new Uint8Array(fs.readFileSync(input)), {uri: input}).then((report) => {
-            fs.writeFileSync(output, JSON.stringify(report, null, 2) + '\n');
-            if ((report.issues && report.issues.numErrors) !== 0) process.exit(2);
-          }).catch((error) => { console.error(error); process.exit(3); });
-          JS
-
-      - name: Run independent cube contract validator
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/asset_lab/validate_glb_asset.py build/asset-production/cube-a/bb_validation_cube_1m.glb \
-            --expected-name bb_validation_cube_1m --expected-size 1.0 \
-            --report build/asset-production/reports/CUBE_INDEPENDENT_VALIDATION.json
-
-      - name: Run production asset generators
-        shell: bash
-        run: |
-          set -euo pipefail
-          "${BLENDER}" --background --factory-startup --python tools/asset_lab/generate_architecture_families.py -- \
-            --output-dir build/asset-production/generated/architecture \
-            --seed 1405 --report build/asset-production/reports/ARCHITECTURE_GENERATION.json
-          "${BLENDER}" --background --factory-startup --python tools/asset_lab/generate_commercial_modules.py -- \
-            --output-dir build/asset-production/generated/commercial
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib,json
-          root=Path('build/asset-production/generated/commercial')
-          outputs=[{'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(root.glob('*.glb'))]
-          assert len(outputs)==4, outputs
-          Path('build/asset-production/reports/COMMERCIAL_GENERATION.json').write_text(json.dumps({'asset_records':4,'outputs':outputs},indent=2)+'\n')
-          PY
-          find build/asset-production/generated -name '*.glb' -type f -print0 | sort -z | xargs -0 -n1 -I{} node -e "const fs=require('fs'),v=require('./build/asset-production/gltf-validator/node_modules/gltf-validator');const p=process.argv[1];v.validateBytes(new Uint8Array(fs.readFileSync(p)),{uri:p}).then(r=>{if(r.issues.numErrors)process.exit(2)})" "{}"
-
-      - name: Install generated assets into recovered game source
-        shell: bash
-        run: |
-          set -euo pipefail
-          game=build/asset-production/game
-          cp -a assets/. "${game}/assets/"
-          cp scripts/asset_lab_runtime.gd "${game}/scripts/asset_lab_runtime.gd"
-          cp scenes/world.tscn "${game}/scenes/world.tscn"
-          cp tests/test_asset_lab_runtime_integration.py "${game}/tests/test_asset_lab_runtime_integration.py"
-          mkdir -p "${game}/assets/validation"
-          cp build/asset-production/cube-a/bb_validation_cube_1m.glb "${game}/assets/validation/"
-          cp -a build/asset-production/generated/architecture/balanced/traditional/. "${game}/assets/environment/architecture/traditional/"
-          cp -a build/asset-production/generated/architecture/balanced/souq/. "${game}/assets/environment/architecture/souq/"
-          cp -a build/asset-production/generated/architecture/balanced/waterfront/. "${game}/assets/environment/architecture/waterfront/"
-
-      - name: Run clean Godot import
-        shell: bash
-        run: |
-          set -euo pipefail
-          game=build/asset-production/game
-          rm -rf "${game}/.godot"
-          "${GODOT}" --headless --path "${game}" --editor --import --quit --verbose 2>&1 | tee build/asset-production/logs/godot-import.log
-          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' build/asset-production/logs/godot-import.log
-
-      - name: Validate asset integration and wrapper scenes
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd build/asset-production/game
-          python3 -m unittest tests.test_asset_lab_runtime_integration -v 2>&1 | tee ../logs/asset-runtime-integration.log
-          grep -q 'node name="AssetLab"' scenes/world.tscn
-          grep -q '"VillaDistrict"' scripts/asset_lab_runtime.gd
-          compgen -G '.godot/imported/bb_validation_cube_1m.glb-*.md5' >/dev/null
-
-      - name: Apply verified premium validation overlay
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/apply_premium_overlay_resilient.py build/asset-production/game \
-            --report build/asset-production/reports/PREMIUM_WORLD_OVERLAY_REPORT.json
-          python3 tools/apply_premium_validation_corrections.py build/asset-production/game \
-            --report build/asset-production/reports/RUNTIME_DEFECT_CORRECTIONS.json
-
-      - name: Run gameplay regression suites
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/asset_lab/run_game_regressions.sh "${GODOT}" build/asset-production/game build/asset-production/logs build/asset-production/reports
-
-      - name: Protected-control post-check
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/verify_frozen_controls.py build/asset-production/game \
-            --json-out build/asset-production/reports/FROZEN_CONTROLS_POST.json \
-            --markdown-out build/asset-production/reports/FROZEN_CONTROLS_POST.md
-          cmp build/asset-production/reports/FROZEN_CONTROLS_PRE.json build/asset-production/reports/FROZEN_CONTROLS_POST.json
-
-      - name: Export Android APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/asset_lab/export_asset_production_android.sh \
-            "${GODOT}" build/asset-production/game \
-            "$PWD/build/asset-production/artifacts/${APK_NAME}" \
-            "${PACKAGE_NAME}" build/asset-production/reports build/asset-production/logs
-
-      - name: Validate Android APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s "build/asset-production/artifacts/${APK_NAME}"
-          grep -q "package: name='${PACKAGE_NAME}' versionCode='1' versionName='1.0.0'" build/asset-production/reports/APK_BADGING.txt
-          grep -q 'Verified' build/asset-production/reports/APK_SIGNING.txt
-
+        run: bash tools/asset_lab/run_asset_production_ci.sh
       - name: Build final evidence inventory
         if: always()
         shell: bash
         run: |
-          set -euo pipefail
+          mkdir -p build/asset-production
           python3 - <<'PY'
           from pathlib import Path
           import hashlib,json
-          root=Path('build/asset-production')
-          files=[]
-          for path in sorted(p for p in root.rglob('*') if p.is_file() and ('reports' in p.parts or 'logs' in p.parts or 'artifacts' in p.parts or p.suffix in {'.blend','.glb'})):
-              files.append({'path':path.as_posix(),'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+          root=Path('build/asset-production'); files=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and ('reports' in x.parts or 'logs' in x.parts or 'artifacts' in x.parts or x.suffix in {'.blend','.glb'})):
+              files.append({'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
           (root/'EVIDENCE_INVENTORY.json').write_text(json.dumps({'files':files},indent=2)+'\n')
           PY
-
       - name: Upload production evidence
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
