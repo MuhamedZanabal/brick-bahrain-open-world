@@ -190,6 +190,12 @@ mark "Apply verified premium validation overlay"
 python3 tools/apply_premium_overlay_resilient.py "$GAME" --report "$REPORTS/PREMIUM_WORLD_OVERLAY_REPORT.json"
 python3 tools/apply_premium_validation_corrections.py "$GAME" --report "$REPORTS/RUNTIME_DEFECT_CORRECTIONS.json"
 
+mark "Run post-overlay Godot import"
+test -s "$GAME/scripts/premium_world_materials.gd"
+grep -q '^class_name PremiumWorldMaterials' "$GAME/scripts/premium_world_materials.gd"
+"$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$LOGS/godot-post-overlay-import.log"
+! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$LOGS/godot-post-overlay-import.log"
+
 mark "Run gameplay regression suites"
 bash tools/asset_lab/run_game_regressions.sh "$GODOT" "$GAME" "$LOGS" "$REPORTS"
 

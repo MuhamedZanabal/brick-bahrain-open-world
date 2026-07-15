@@ -37,11 +37,20 @@ class AssetProductionWorkflowTests(unittest.TestCase):
             "Require deterministic cube GLB bytes", "Run Khronos glTF Validator",
             "Run independent cube contract validator", "Run production asset generators",
             "Validate generated asset families", "Run Khronos validation for every generated GLB",
-            "Run clean Godot import", "Run gameplay regression suites",
+            "Run clean Godot import", "Apply verified premium validation overlay",
+            "Run post-overlay Godot import", "Run gameplay regression suites",
             "Protected-control post-check", "Export Android APK", "Validate Android APK",
         ]
         positions = [text.index(item) for item in ordered]
         self.assertEqual(positions, sorted(positions))
+
+
+    def test_driver_refreshes_godot_class_cache_after_overlay(self):
+        text = DRIVER.read_text(encoding="utf-8")
+        self.assertIn("class_name PremiumWorldMaterials", text)
+        self.assertIn("godot-post-overlay-import.log", text)
+        self.assertLess(text.index("Apply verified premium validation overlay"), text.index("Run post-overlay Godot import"))
+        self.assertLess(text.index("Run post-overlay Godot import"), text.index("Run gameplay regression suites"))
 
     def test_generated_validation_evidence_paths_are_unique(self):
         text = DRIVER.read_text(encoding="utf-8")
