@@ -107,7 +107,7 @@ sdkmanager --version | tee "$REPORTS/ANDROID_SDKMANAGER_VERSION.txt"
 adb version | tee "$REPORTS/ADB_VERSION.txt"
 aapt version 2>&1 | tee "$REPORTS/AAPT_VERSION.txt"
 apksigner version 2>&1 | tee "$REPORTS/APKSIGNER_VERSION.txt"
-(zipalign -h 2>&1 || true) | head -20 | tee "$REPORTS/ZIPALIGN_VERSION.txt"
+printf 'zipalign path=%s\nandroid_build_tools=%s\n' "$(command -v zipalign)" "$ANDROID_BUILD_TOOLS" | tee "$REPORTS/ZIPALIGN_VERSION.txt"
 
 mark "Generate deterministic validation cube twice"
 for run in a b; do

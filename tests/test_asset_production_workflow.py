@@ -57,6 +57,12 @@ class AssetProductionWorkflowTests(unittest.TestCase):
         self.assertIn("grep -Eq 'World lifecycle guard complete: 12 passed, 0 failed|12 passed, 0 failed'", text)
         self.assertIn("grep -Eq 'World resource repeat complete: 21 passed, 0 failed|21 passed, 0 failed'", text)
 
+    def test_zipalign_version_evidence_does_not_emit_an_intentional_error(self):
+        text = DRIVER.read_text(encoding="utf-8")
+        self.assertNotIn("zipalign -h", text)
+        self.assertIn("zipalign path=%s", text)
+        self.assertIn("android_build_tools=%s", text)
+
     def test_generated_validation_evidence_paths_are_unique(self):
         text = DRIVER.read_text(encoding="utf-8")
         self.assertIn('report_name="${relative//\//__}"', text)

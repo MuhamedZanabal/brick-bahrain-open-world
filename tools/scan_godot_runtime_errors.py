@@ -10,7 +10,7 @@ from pathlib import Path
 DUMMY_MESH_ERROR = 'ERROR: Parameter "m" is null.'
 DUMMY_MESH_STACK = 'at: mesh_get_surface_count (servers/rendering/dummy/storage/mesh_storage.h:120)'
 CRITICAL_RE = re.compile(
-    r'(SCRIPT ERROR:|ERROR:|CRASH|Assertion failed|assertion failed|'
+    r'(SCRIPT ERROR:|ERROR:|\bCRASH(?:ED)?\b|Assertion failed|assertion failed|'
     r'Invalid call|Invalid get index|Invalid set index|Stack trace|stack trace|'
     r'Failed to load|Failed to create an autoload|Parse Error|Parser Error|'
     r'Shader compilation failed|RenderingDevice.*(?:error|failed))',
