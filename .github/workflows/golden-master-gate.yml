@@ -20,6 +20,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: golden-master-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   contract:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
@@ -38,3 +42,95 @@ jobs:
             tests.test_golden_master_materials \
             tests.test_golden_master_generation_plan \
             -v
+          python3 -m py_compile \
+            tools/asset_lab/golden_master_contract.py \
+            tools/asset_lab/golden_master_materials.py \
+            tools/asset_lab/generate_golden_masters.py
+
+  generate:
+    needs: contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      BLENDER_VERSION: 4.3.2
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install checksum-verified Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/downloads build/golden-masters build/reports
+          cd build/downloads
+          archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$archive" -o "$archive"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/blender-${BLENDER_VERSION}.sha256" -o blender.sha256
+          grep " $archive$" blender.sha256 | sha256sum -c -
+          tar -xf "$archive"
+          "${PWD}/blender-${BLENDER_VERSION}-linux-x64/blender" --version | tee ../reports/BLENDER_VERSION.txt
+          grep -q '^Blender 4.3.2' ../reports/BLENDER_VERSION.txt
+      - name: Generate all 45 golden-master derivatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
+          "$BLENDER" --background --factory-startup \
+            --python tools/asset_lab/generate_golden_masters.py -- \
+            generate \
+            --seed 1405 \
+            --output-dir build/golden-masters \
+            --report build/reports/GOLDEN_MASTER_GENERATION.json
+      - name: Validate generated matrix and mobile cost ordering
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          report=json.loads(Path('build/reports/GOLDEN_MASTER_GENERATION.json').read_text())
+          outputs=report['outputs']
+          assert report['source_asset_count']==5, report
+          assert report['derivative_count']==45, report
+          assert len(outputs)==45, len(outputs)
+          paths=[item['path'] for item in outputs]
+          assert len(paths)==len(set(paths)), 'duplicate output paths'
+          assert len(list(Path('build/golden-masters').rglob('*.glb')))==45
+          for item in outputs:
+              path=Path(item['path'])
+              assert path.is_file() and path.stat().st_size==item['bytes'], item
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==item['sha256'], item
+              assert item['triangle_count']>0, item
+              assert item['collision_object_count']>=1, item
+              assert 1 <= item['material_count'] <= 8, item
+          by_asset_profile={}
+          by_asset_lod={}
+          for item in outputs:
+              by_asset_profile.setdefault((item['asset_id'],item['profile']),[]).append(item)
+              by_asset_lod.setdefault((item['asset_id'],item['lod']),[]).append(item)
+          for key,items in by_asset_profile.items():
+              items=sorted(items,key=lambda x:x['lod'])
+              triangles=[x['triangle_count'] for x in items]
+              assert triangles[0] >= triangles[1] >= triangles[2], (key,triangles)
+              assert len({x['sha256'] for x in items})==3, (key,'identical LOD hashes')
+          profile_rank={'low':0,'balanced':1,'high':2}
+          for key,items in by_asset_lod.items():
+              items=sorted(items,key=lambda x:profile_rank[x['profile']])
+              triangles=[x['triangle_count'] for x in items]
+              assert triangles[0] <= triangles[1] <= triangles[2], (key,triangles)
+          Path('build/reports/GOLDEN_MASTER_TECHNICAL_VALIDATION.json').write_text(
+              json.dumps({'passed':True,'validated_assets':45,'failures':[]},indent=2)+'\n'
+          )
+          PY
+          find build/golden-masters -type f -name '*.glb' -print0 | sort -z | xargs -0 sha256sum > build/reports/GOLDEN_MASTER_SHA256SUMS.txt
+      - name: Upload golden-master technical evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-golden-masters-${{ github.run_id }}
+          path: |
+            build/golden-masters
+            build/reports
+          if-no-files-found: error
+          retention-days: 30
