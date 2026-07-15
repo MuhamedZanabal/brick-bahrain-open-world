@@ -1,7 +1,7 @@
 class_name GoldenMasterQuality
 extends RefCounted
 
-const VALID_PROFILES: PackedStringArray = PackedStringArray(["low", "balanced", "high"])
+const VALID_PROFILES = ["low", "balanced", "high"]
 
 
 static func normalize_profile(requested: String) -> String:
