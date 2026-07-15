@@ -2,7 +2,9 @@ name: Bahrain Brick Golden Master Gate
 
 on:
   push:
-    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    branches:
+      - work/bahrain-brick-asset-lab-integration-v1
+      - work/bahrain-brick-golden-master-batch1-v1
     paths:
       - .github/workflows/golden-master-gate.yml
       - docs/assets/GOLDEN_MASTER_CONTRACT.json
