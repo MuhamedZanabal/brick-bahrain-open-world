@@ -58,7 +58,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+          test -x "$JAVA_HOME/bin/java"
+          "$JAVA_HOME/bin/java" -version 2>&1 | tee build/reports/JAVA_VERSION.txt
           export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           test -n "$ANDROID_HOME"
           python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
