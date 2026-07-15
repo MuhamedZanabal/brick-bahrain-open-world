@@ -11,7 +11,7 @@ class AssetProductionWorkflowTests(unittest.TestCase):
         for value in (
             "e26ec912db5c10d071a8e120010bdb5a9a136f17",
             "5383c376df40f2a427fc5f739cac0ad23584de35",
-            "d59efb98b9c06ceb754d95e8ce83853442f46f41",
+            "7aed2cf05f63e0c3c607a98acde454ff103584eb",
             "BLENDER_VERSION: 4.3.2",
             "GODOT_VERSION: 4.3",
             "GODOT_BUILD: 77dcf97d8",
