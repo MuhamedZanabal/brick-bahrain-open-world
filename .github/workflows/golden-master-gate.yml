@@ -15,7 +15,9 @@ on:
       - tests/test_golden_master_materials.py
       - tests/test_golden_master_generation_plan.py
   pull_request:
-    branches: [work/bahrain-brick-premium-visual-v14]
+    branches:
+      - work/bahrain-brick-premium-visual-v14
+      - work/bahrain-brick-asset-lab-integration-v1
     types: [opened, synchronize, reopened]
   workflow_dispatch:
 
@@ -28,7 +30,6 @@ concurrency:
 
 jobs:
   contract:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
