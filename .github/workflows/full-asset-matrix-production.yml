@@ -14,6 +14,20 @@ on:
       - scenes/world.tscn
       - tests/test_full_asset_matrix_v1.py
       - tests/test_full_asset_matrix_runtime.py
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/full-asset-matrix-production.yml
+      - tools/asset_lab/generate_full_asset_matrix_v1.py
+      - tools/asset_lab/validate_full_asset_matrix_v1.py
+      - tools/asset_lab/run_full_asset_matrix_ci.sh
+      - scripts/full_asset_matrix_runtime.gd
+      - scripts/golden_master_quality.gd
+      - scripts/golden_master_lod_instance.gd
+      - scenes/world.tscn
+      - tests/test_full_asset_matrix_v1.py
+      - tests/test_full_asset_matrix_runtime.py
   workflow_dispatch:
 
 permissions:
@@ -26,7 +40,7 @@ concurrency:
 env:
   FROZEN_PREMIUM_AUTHORITY: e26ec912db5c10d071a8e120010bdb5a9a136f17
   BATCH1_AUTHORITY: d8f2c0f18cab2cc0a0d9eee13be2e94a2e2c5fb5
-  EXPECTED_INTEGRATION_SHA: ${{ github.sha }}
+  EXPECTED_INTEGRATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   ASSET_AUTHORITY_COMMIT: 84ac94399262f71f29bf65dd553cd7729d87cce0
   ASSET_CORRECTIVE_COMMIT: 7aed2cf05f63e0c3c607a98acde454ff103584eb
   ASSET_COMMON_SHA256: 460f3f4ec284e0ba0af569603c9efa1f55ba7a46be4eeb14190bea7679704392
@@ -46,13 +60,14 @@ env:
 
 jobs:
   production:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
       - name: Check out exact authorized integration commit
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Stage checksum-pinned generator dependencies
         shell: bash
