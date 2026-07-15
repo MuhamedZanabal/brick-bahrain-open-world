@@ -1,0 +1,35 @@
+name: Bahrain Brick Golden Master Gate
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - .github/workflows/golden-master-gate.yml
+      - docs/assets/GOLDEN_MASTER_CONTRACT.json
+      - tools/asset_lab/golden_master_contract.py
+      - tools/asset_lab/golden_master_materials.py
+      - tools/asset_lab/generate_golden_masters.py
+      - tests/test_golden_master_contract.py
+      - tests/test_golden_master_materials.py
+      - tests/test_golden_master_generation_plan.py
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Run golden-master contract tests
+        shell: bash
+        run: python3 -m unittest tests.test_golden_master_contract -v
