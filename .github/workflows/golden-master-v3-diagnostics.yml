@@ -15,6 +15,8 @@ on:
 permissions:
   contents: read
   actions: read
+  issues: write
+  pull-requests: write
 
 jobs:
   diagnose:
@@ -38,7 +40,7 @@ jobs:
           unzip -tq build/source.zip
           unzip -q build/source.zip -d build/source
           test -f build/source/reports/GOLDEN_MASTER_GENERATION_V3.json
-      - name: Print complete V3 validation diagnostics
+      - name: Build complete V3 validation diagnostics
         shell: bash
         run: |
           python3 - <<'PY'
@@ -49,45 +51,80 @@ jobs:
           outputs=report['outputs']
           failures=[]
           profile_rank={'low':0,'balanced':1,'high':2}
-          print('GENERATOR',report.get('generator_version'))
-          print('DERIVATIVES',report.get('derivative_count'),len(outputs))
-          print('REVISED',report.get('revised_assets'))
-          print('GLB_COUNT',len(list(Path('build/source/golden-masters-v3').rglob('*.glb'))))
-
           by_asset_profile={}
           by_asset_lod={}
           for item in outputs:
               by_asset_profile.setdefault((item['asset_id'],item['profile']),[]).append(item)
               by_asset_lod.setdefault((item['asset_id'],item['lod']),[]).append(item)
 
+          lod_matrix={}
           for key in sorted(by_asset_profile):
               items=sorted(by_asset_profile[key],key=lambda x:x['lod'])
               values=[x['triangle_count'] for x in items]
-              hashes=[x['sha256'] for x in items]
-              print('LOD_MATRIX',key,values)
+              lod_matrix[f'{key[0]}::{key[1]}']=values
               if not values[0] >= values[1] >= values[2]:
-                  failures.append({'rule':'lod_monotonic','key':key,'values':values})
+                  failures.append({'rule':'lod_monotonic','key':list(key),'values':values})
+              hashes=[x['sha256'] for x in items]
               if len(set(hashes)) != 3:
-                  failures.append({'rule':'lod_hash_unique','key':key,'hashes':hashes})
+                  failures.append({'rule':'lod_hash_unique','key':list(key),'hashes':hashes})
 
+          profile_matrix={}
           for key in sorted(by_asset_lod):
               items=sorted(by_asset_lod[key],key=lambda x:profile_rank[x['profile']])
               values=[x['triangle_count'] for x in items]
-              print('PROFILE_MATRIX',key,values)
+              profile_matrix[f'{key[0]}::lod{key[1]}']=values
               if not values[0] <= values[1] <= values[2]:
-                  failures.append({'rule':'profile_monotonic','key':key,'values':values})
+                  failures.append({'rule':'profile_monotonic','key':list(key),'values':values})
 
           floors={'bh_waterfront_tower_a_01':3000,'bh_cr_skyscraper_tower_01':5000}
+          floor_results={}
           for asset_id,floor in floors.items():
               item=next(x for x in outputs if x['asset_id']==asset_id and x['profile']=='balanced' and x['lod']==0)
-              print('DETAIL_FLOOR',asset_id,item['triangle_count'],floor,item['bytes'],item['sha256'])
+              floor_results[asset_id]={'actual':item['triangle_count'],'expected':floor,'bytes':item['bytes'],'sha256':item['sha256']}
               if item['triangle_count'] < floor:
                   failures.append({'rule':'detail_floor','asset_id':asset_id,'actual':item['triangle_count'],'expected':floor})
 
-          print('FAILURE_COUNT',len(failures))
-          print('FAILURES_JSON',json.dumps(failures,sort_keys=True))
-          Path('build/V3_VALIDATION_DIAGNOSTICS.json').write_text(json.dumps({'failures':failures},indent=2,sort_keys=True)+'\n')
+          diagnostic={
+              'source_artifact_id':8352979910,
+              'generator':report.get('generator_version'),
+              'derivative_count':report.get('derivative_count'),
+              'revised_assets':report.get('revised_assets'),
+              'glb_count':len(list(Path('build/source/golden-masters-v3').rglob('*.glb'))),
+              'floor_results':floor_results,
+              'lod_matrix':lod_matrix,
+              'profile_matrix':profile_matrix,
+              'failure_count':len(failures),
+              'failures':failures,
+          }
+          Path('build/V3_VALIDATION_DIAGNOSTICS.json').write_text(json.dumps(diagnostic,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(diagnostic,sort_keys=True))
           PY
+      - name: Publish compact diagnostic to PR 58
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=json.loads(Path('build/V3_VALIDATION_DIAGNOSTICS.json').read_text())
+          lines=[
+              '## V3 validation diagnostic',
+              '',
+              f"- Source artifact: `{d['source_artifact_id']}`",
+              f"- Generator: `{d['generator']}`",
+              f"- Derivatives/GLBs: `{d['derivative_count']}` / `{d['glb_count']}`",
+              f"- Failure count: `{d['failure_count']}`",
+              '',
+              '### Detail floors',
+          ]
+          for asset_id,result in d['floor_results'].items():
+              lines.append(f"- `{asset_id}`: `{result['actual']}` triangles; required `{result['expected']}`")
+          lines.extend(['','### Violations','```json',json.dumps(d['failures'],indent=2,sort_keys=True),'```'])
+          Path('build/PR_COMMENT.md').write_text('\n'.join(lines)+'\n')
+          PY
+          gh api "repos/${GITHUB_REPOSITORY}/issues/58/comments" -f body="$(cat build/PR_COMMENT.md)"
       - name: Upload diagnostic report
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
