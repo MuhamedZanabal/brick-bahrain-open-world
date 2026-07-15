@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Materialize the emulator validator with exact wall-clock traversal/soak gates.
 
-This is intentionally fail-closed: it only patches the reviewed aa08bfd9 source
-shape. Any concurrent source drift prevents execution rather than silently
-producing an unreviewed validator.
+This is fail-closed for the reviewed legacy source shape and pass-through for an
+already-compliant validator. Unrecognized source drift prevents execution.
 """
 from __future__ import annotations
 
@@ -138,6 +137,18 @@ SOAK_PASS=true
 printf 'completed_utc=%s\nactual_duration_seconds=%s\niterations=%s\nresult=PASS\n' "$(date -u +%FT%TZ)" "$ACTUAL_SOAK_SECONDS" "$SOAK_ITERATIONS" >> "$SOAK_REPORT"
 '''
 
+REQUIRED_TOKENS = (
+    'TRAVERSAL_DEADLINE',
+    'SOAK_DEADLINE',
+    'ACTUAL_TRAVERSAL_SECONDS',
+    'ACTUAL_SOAK_SECONDS',
+)
+COMPLIANT_TOKENS = REQUIRED_TOKENS + (
+    'wait_for_world_ready_after',
+    'ANDROID_EMULATOR_GFXINFO.txt',
+    'ANDROID_EMULATOR_FOCUS.txt',
+)
+
 
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
@@ -159,17 +170,20 @@ def main() -> int:
 
     source_bytes = args.source.read_bytes()
     text = source_bytes.decode('utf-8')
-    for label, old, new in (
-        ('state', OLD_STATE, NEW_STATE),
-        ('report environment', OLD_ENV, NEW_ENV),
-        ('report JSON', OLD_JSON, NEW_JSON),
-        ('RSS parser', OLD_RSS, NEW_RSS),
-        ('runtime duration block', OLD_RUNTIME, NEW_RUNTIME),
-    ):
-        text = replace_exact(text, old, new, label)
+    already_compliant = all(token in text for token in COMPLIANT_TOKENS)
+    patches_applied = 0
+    if not already_compliant:
+        for label, old, new in (
+            ('state', OLD_STATE, NEW_STATE),
+            ('report environment', OLD_ENV, NEW_ENV),
+            ('report JSON', OLD_JSON, NEW_JSON),
+            ('RSS parser', OLD_RSS, NEW_RSS),
+            ('runtime duration block', OLD_RUNTIME, NEW_RUNTIME),
+        ):
+            text = replace_exact(text, old, new, label)
+        patches_applied = 5
 
-    required = ('TRAVERSAL_DEADLINE', 'SOAK_DEADLINE', 'ACTUAL_TRAVERSAL_SECONDS', 'ACTUAL_SOAK_SECONDS')
-    if not all(token in text for token in required):
+    if not all(token in text for token in REQUIRED_TOKENS):
         raise SystemExit('effective validator is missing wall-clock tokens')
     output_bytes = text.encode('utf-8')
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -181,7 +195,8 @@ def main() -> int:
         'source_sha256': digest(source_bytes),
         'output_path': args.output.as_posix(),
         'output_sha256': digest(output_bytes),
-        'patches_applied': 5,
+        'patches_applied': patches_applied,
+        'source_already_compliant': already_compliant,
         'traversal_required_seconds': 600,
         'soak_required_seconds': 1800,
         'wall_clock_enforced': True,

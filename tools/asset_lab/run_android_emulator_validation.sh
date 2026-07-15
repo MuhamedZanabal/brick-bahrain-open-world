@@ -26,6 +26,8 @@ KVM_REPORT="$REPORTS/ANDROID_EMULATOR_KVM.txt"
 EMULATOR_COMMAND_REPORT="$REPORTS/ANDROID_EMULATOR_COMMAND.txt"
 BOOT_PROPERTIES="$REPORTS/ANDROID_EMULATOR_BOOT_PROPERTIES.txt"
 ORIENTATION="$REPORTS/ANDROID_EMULATOR_ORIENTATION.txt"
+GFXINFO="$REPORTS/ANDROID_EMULATOR_GFXINFO.txt"
+FOCUS_REPORT="$REPORTS/ANDROID_EMULATOR_FOCUS.txt"
 METRICS="$REPORTS/ANDROID_EMULATOR_RUNTIME_METRICS.csv"
 TRAVERSAL_REPORT="$REPORTS/ANDROID_EMULATOR_10_MINUTE_TRAVERSAL.txt"
 SOAK_REPORT="$REPORTS/ANDROID_EMULATOR_30_MINUTE_SOAK.txt"
@@ -48,6 +50,8 @@ COLD_START=false
 TRAVERSAL_PASS=false
 SOAK_PASS=false
 MEMORY_PASS=false
+ACTUAL_TRAVERSAL_SECONDS=0
+ACTUAL_SOAK_SECONDS=0
 SCREENSHOT_WIDTH=0
 SCREENSHOT_HEIGHT=0
 KVM_PRESENT=false
@@ -78,7 +82,7 @@ write_report() {
   PAUSE_RESUME="$PAUSE_RESUME" COLD_START="$COLD_START" TRAVERSAL_PASS="$TRAVERSAL_PASS" SOAK_PASS="$SOAK_PASS" MEMORY_PASS="$MEMORY_PASS" \
   SCREENSHOT_WIDTH="$SCREENSHOT_WIDTH" SCREENSHOT_HEIGHT="$SCREENSHOT_HEIGHT" \
   KVM_PRESENT="$KVM_PRESENT" KVM_READABLE="$KVM_READABLE" KVM_WRITABLE="$KVM_WRITABLE" ACCELERATION_MODE="$ACCELERATION_MODE" \
-  TRAVERSAL_SECONDS="$TRAVERSAL_SECONDS" SOAK_SECONDS="$SOAK_SECONDS" \
+  TRAVERSAL_SECONDS="$TRAVERSAL_SECONDS" SOAK_SECONDS="$SOAK_SECONDS" ACTUAL_TRAVERSAL_SECONDS="$ACTUAL_TRAVERSAL_SECONDS" ACTUAL_SOAK_SECONDS="$ACTUAL_SOAK_SECONDS" \
   python - "$REPORT" <<'PY'
 import json, os, sys
 boolean=lambda name: os.environ[name].lower() == 'true'
@@ -101,8 +105,8 @@ report={
     'world_ready_log_observed': boolean('WORLD_READY'),
     'pause_resume_passed': boolean('PAUSE_RESUME'),
     'cold_start_passed': boolean('COLD_START'),
-    'ten_minute_traversal': {'seconds': int(os.environ['TRAVERSAL_SECONDS']), 'passed': boolean('TRAVERSAL_PASS')},
-    'thirty_minute_soak': {'seconds': int(os.environ['SOAK_SECONDS']), 'passed': boolean('SOAK_PASS')},
+    'ten_minute_traversal': {'required_seconds': int(os.environ['TRAVERSAL_SECONDS']), 'actual_seconds': int(os.environ['ACTUAL_TRAVERSAL_SECONDS']), 'passed': boolean('TRAVERSAL_PASS')},
+    'thirty_minute_soak': {'required_seconds': int(os.environ['SOAK_SECONDS']), 'actual_seconds': int(os.environ['ACTUAL_SOAK_SECONDS']), 'passed': boolean('SOAK_PASS')},
     'memory_growth_check_passed': boolean('MEMORY_PASS'),
     'host_virtualization': {
         'kvm_present': boolean('KVM_PRESENT'),
@@ -131,6 +135,8 @@ report={
         'continuous_logcat': 'build/asset-production/logs/android-emulator-logcat-continuous.txt',
         'filtered_logcat': 'build/asset-production/logs/android-emulator-logcat-filtered.txt',
         'metrics': 'build/asset-production/reports/ANDROID_EMULATOR_RUNTIME_METRICS.csv',
+        'gfxinfo': 'build/asset-production/reports/ANDROID_EMULATOR_GFXINFO.txt',
+        'focus': 'build/asset-production/reports/ANDROID_EMULATOR_FOCUS.txt',
         'traversal': 'build/asset-production/reports/ANDROID_EMULATOR_10_MINUTE_TRAVERSAL.txt',
         'soak': 'build/asset-production/reports/ANDROID_EMULATOR_30_MINUTE_SOAK.txt',
     },
@@ -194,7 +200,7 @@ sample_memory() {
   [[ -n "$pid" ]] || failed "application process was not alive at memory checkpoint $label"
   adb shell dumpsys meminfo "$PACKAGE" > "$raw"
   total_pss="$(awk '/TOTAL PSS:/{print $3; exit} /^ TOTAL[[:space:]]/{print $2; exit}' "$raw")"
-  total_rss="$(awk '/TOTAL RSS:/{print $3; exit} /^ TOTAL[[:space:]]/{print $3; exit}' "$raw")"
+  total_rss="$(awk '/TOTAL RSS:/{for(i=1;i<=NF;i++) if($i=="RSS:"){print $(i+1); exit}} /^ TOTAL[[:space:]]/{print $3; exit}' "$raw")"
   total_pss="${total_pss:-0}"
   total_rss="${total_rss:-0}"
   printf '%s,%s,%s,%s,%s\n' "$(date -u +%FT%TZ)" "$label" "$pid" "$total_pss" "$total_rss" >> "$METRICS"
@@ -207,9 +213,16 @@ exercise_runtime_input() {
   adb shell input keyevent KEYCODE_D >/dev/null 2>&1 || true
 }
 
-wait_for_world_ready() {
+world_ready_count() {
+  grep -c 'BAHRAIN BRICK GAME ASSET LAB READY' "$LOGCAT_CONTINUOUS" 2>/dev/null || true
+}
+
+wait_for_world_ready_after() {
+  local baseline="$1"
+  local observed
   for _ in $(seq 1 60); do
-    if grep -q 'BAHRAIN BRICK GAME ASSET LAB READY' "$LOGCAT_CONTINUOUS" 2>/dev/null; then
+    observed="$(world_ready_count)"
+    if [[ "$observed" =~ ^[0-9]+$ ]] && (( observed > baseline )); then
       WORLD_READY=true
       return 0
     fi
@@ -353,12 +366,14 @@ adb shell pm path "$PACKAGE" | tee "$REPORTS/ANDROID_EMULATOR_PACKAGE_PATH.txt" 
 adb shell dumpsys package "$PACKAGE" > "$REPORTS/ANDROID_EMULATOR_PACKAGE_DUMPSYS.txt"
 PACKAGE_INSTALLED=true
 
+WORLD_MARKERS_BEFORE="$(world_ready_count)"
+adb shell dumpsys gfxinfo "$PACKAGE" reset >/dev/null 2>&1 || true
 if ! timeout 120 adb shell am start -W -n "$PACKAGE/$ACTIVITY" > "$LAUNCH_LOG" 2>&1; then
   failed "main activity launch command failed"
 fi
 sleep 8
 capture_screenshot "$STARTUP_SCREENSHOT"
-if ! wait_for_world_ready; then
+if ! wait_for_world_ready_after "$WORLD_MARKERS_BEFORE"; then
   failed "integrated 3D world readiness marker was not observed after launch"
 fi
 PID="$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')"
@@ -368,6 +383,12 @@ adb shell input tap 640 620 || true
 adb shell input keyevent KEYCODE_ENTER || true
 sleep 8
 capture_screenshot "$GAMEPLAY_SCREENSHOT"
+adb shell dumpsys gfxinfo "$PACKAGE" > "$GFXINFO" 2>&1 || true
+{
+  adb shell dumpsys activity activities | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity' | head -20 || true
+  adb shell dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp' | head -20 || true
+} > "$FOCUS_REPORT"
+grep -q "$PACKAGE" "$FOCUS_REPORT" || failed "application activity was not focused after reproducible input"
 {
   adb shell dumpsys input | grep -E 'SurfaceOrientation|orientation' | head -20 || true
   adb shell dumpsys window displays | grep -E 'mCurrentFocus|mFocusedApp|DisplayFrames|rotation' | head -60 || true
@@ -383,50 +404,70 @@ PAUSE_RESUME=true
 
 adb shell am force-stop "$PACKAGE"
 sleep 3
+WORLD_MARKERS_BEFORE="$(world_ready_count)"
 adb shell am start -W -n "$PACKAGE/$ACTIVITY" >> "$LAUNCH_LOG" 2>&1
 sleep 12
 [[ -n "$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')" ]] || failed "application process did not survive cold relaunch"
 COLD_START=true
-wait_for_world_ready || failed "integrated 3D world readiness marker was not observed after cold relaunch"
+wait_for_world_ready_after "$WORLD_MARKERS_BEFORE" || failed "a new integrated 3D world readiness marker was not observed after cold relaunch"
 
 printf 'timestamp_utc,label,pid,total_pss_kb,total_rss_kb\n' > "$METRICS"
 sample_memory "START"
-traversal_iterations=$((TRAVERSAL_SECONDS / 10))
+TRAVERSAL_STARTED_EPOCH="$(date +%s)"
+TRAVERSAL_DEADLINE=$((TRAVERSAL_STARTED_EPOCH + TRAVERSAL_SECONDS))
+TRAVERSAL_MIDPOINT=$((TRAVERSAL_STARTED_EPOCH + TRAVERSAL_SECONDS / 2))
+TRAVERSAL_MID_CAPTURED=false
+TRAVERSAL_ITERATIONS=0
 {
   printf 'started_utc=%s\n' "$(date -u +%FT%TZ)"
-  printf 'duration_seconds=%s\n' "$TRAVERSAL_SECONDS"
-  printf 'iterations=%s\n' "$traversal_iterations"
+  printf 'required_duration_seconds=%s\n' "$TRAVERSAL_SECONDS"
+  printf 'deadline_epoch=%s\n' "$TRAVERSAL_DEADLINE"
 } > "$TRAVERSAL_REPORT"
-for iteration in $(seq 1 "$traversal_iterations"); do
+while (( $(date +%s) < TRAVERSAL_DEADLINE )); do
+  TRAVERSAL_ITERATIONS=$((TRAVERSAL_ITERATIONS + 1))
   exercise_runtime_input
   sleep 8
-  [[ -n "$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')" ]] || failed "application process exited during the 10-minute active traversal at iteration $iteration"
-  if [[ "$iteration" -eq $((traversal_iterations / 2)) ]]; then
+  [[ -n "$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')" ]] || failed "application process exited during the 10-minute active traversal at iteration $TRAVERSAL_ITERATIONS"
+  NOW_EPOCH="$(date +%s)"
+  if [[ "$TRAVERSAL_MID_CAPTURED" == false ]] && (( NOW_EPOCH >= TRAVERSAL_MIDPOINT )); then
     sample_memory "TRAVERSAL_MID"
     capture_screenshot "$TRAVERSAL_MID_SCREENSHOT"
+    TRAVERSAL_MID_CAPTURED=true
   fi
-  sleep 1
 done
+ACTUAL_TRAVERSAL_SECONDS=$(( $(date +%s) - TRAVERSAL_STARTED_EPOCH ))
+(( ACTUAL_TRAVERSAL_SECONDS >= TRAVERSAL_SECONDS )) || failed "active traversal ended before the required 600 seconds"
+[[ "$TRAVERSAL_MID_CAPTURED" == true ]] || failed "traversal midpoint evidence was not captured"
 TRAVERSAL_PASS=true
-printf 'completed_utc=%s\nresult=PASS\n' "$(date -u +%FT%TZ)" >> "$TRAVERSAL_REPORT"
+printf 'completed_utc=%s\nactual_duration_seconds=%s\niterations=%s\nresult=PASS\n' "$(date -u +%FT%TZ)" "$ACTUAL_TRAVERSAL_SECONDS" "$TRAVERSAL_ITERATIONS" >> "$TRAVERSAL_REPORT"
 
-soak_iterations=$((SOAK_SECONDS / 15))
+SOAK_STARTED_EPOCH="$(date +%s)"
+SOAK_DEADLINE=$((SOAK_STARTED_EPOCH + SOAK_SECONDS))
+SOAK_MIDPOINT=$((SOAK_STARTED_EPOCH + SOAK_SECONDS / 2))
+SOAK_MID_CAPTURED=false
+SOAK_ITERATIONS=0
 {
   printf 'started_utc=%s\n' "$(date -u +%FT%TZ)"
-  printf 'duration_seconds=%s\n' "$SOAK_SECONDS"
-  printf 'iterations=%s\n' "$soak_iterations"
+  printf 'required_duration_seconds=%s\n' "$SOAK_SECONDS"
+  printf 'deadline_epoch=%s\n' "$SOAK_DEADLINE"
 } > "$SOAK_REPORT"
-for iteration in $(seq 1 "$soak_iterations"); do
+while (( $(date +%s) < SOAK_DEADLINE )); do
+  SOAK_ITERATIONS=$((SOAK_ITERATIONS + 1))
   exercise_runtime_input
   sleep 14
-  [[ -n "$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')" ]] || failed "application process exited during the 30-minute soak at iteration $iteration"
-  if [[ "$iteration" -eq $((soak_iterations / 2)) ]]; then
+  [[ -n "$(adb shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')" ]] || failed "application process exited during the 30-minute soak at iteration $SOAK_ITERATIONS"
+  NOW_EPOCH="$(date +%s)"
+  if [[ "$SOAK_MID_CAPTURED" == false ]] && (( NOW_EPOCH >= SOAK_MIDPOINT )); then
     sample_memory "SOAK_MID"
+    SOAK_MID_CAPTURED=true
   fi
 done
+ACTUAL_SOAK_SECONDS=$(( $(date +%s) - SOAK_STARTED_EPOCH ))
+(( ACTUAL_SOAK_SECONDS >= SOAK_SECONDS )) || failed "soak ended before the required 1800 seconds"
+[[ "$SOAK_MID_CAPTURED" == true ]] || failed "soak midpoint memory evidence was not captured"
 sample_memory "END"
 SOAK_PASS=true
-printf 'completed_utc=%s\nresult=PASS\n' "$(date -u +%FT%TZ)" >> "$SOAK_REPORT"
+printf 'completed_utc=%s\nactual_duration_seconds=%s\niterations=%s\nresult=PASS\n' "$(date -u +%FT%TZ)" "$ACTUAL_SOAK_SECONDS" "$SOAK_ITERATIONS" >> "$SOAK_REPORT"
 capture_screenshot "$FINAL_SCREENSHOT"
 sha256sum "$STARTUP_SCREENSHOT" "$GAMEPLAY_SCREENSHOT" "$TRAVERSAL_MID_SCREENSHOT" "$FINAL_SCREENSHOT" > "$REPORTS/ANDROID_EMULATOR_SCREENSHOT_SHA256SUMS.txt"
 
