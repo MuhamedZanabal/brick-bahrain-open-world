@@ -131,7 +131,11 @@ jobs:
         timeout-minutes: 65
         shell: bash
         run: |
-          bash tools/asset_lab/run_android_emulator_validation.sh \
+          python3 tools/asset_lab/materialize_android_emulator_wallclock.py \
+            tools/asset_lab/run_android_emulator_validation.sh \
+            build/asset-production/run_android_emulator_validation_effective.sh \
+            build/asset-production/reports/ANDROID_EMULATOR_EFFECTIVE_SCRIPT.json
+          bash build/asset-production/run_android_emulator_validation_effective.sh \
             build/asset-production/artifacts/${APK_NAME} \
             ${PACKAGE_NAME} \
             build/asset-production/reports \

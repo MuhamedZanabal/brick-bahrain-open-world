@@ -1,9 +1,12 @@
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/asset-production-ci.yml"
 SCRIPT = ROOT / "tools/asset_lab/run_android_emulator_validation.sh"
+MATERIALIZER = ROOT / "tools/asset_lab/materialize_android_emulator_wallclock.py"
 
 
 class AndroidEmulatorWorkflowTests(unittest.TestCase):
@@ -14,6 +17,8 @@ class AndroidEmulatorWorkflowTests(unittest.TestCase):
         self.assertIn("Run Android API 34 emulator validation", workflow)
         self.assertIn("EXPECTED_APK_SHA256", workflow)
         self.assertIn("timeout-minutes: 65", workflow)
+        self.assertIn("materialize_android_emulator_wallclock.py", workflow)
+        self.assertIn("run_android_emulator_validation_effective.sh", workflow)
         self.assertLess(workflow.index("Run complete production chain"), workflow.index("Run Android API 34 emulator validation"))
         self.assertLess(workflow.index("Run Android API 34 emulator validation"), workflow.index("Upload production evidence"))
 
@@ -53,6 +58,23 @@ class AndroidEmulatorWorkflowTests(unittest.TestCase):
         self.assertIn("FATAL EXCEPTION", script)
         self.assertIn("Invalid get index", script)
         self.assertIn("Navigation", script)
+
+    def test_wallclock_materializer_is_fail_closed_and_emits_valid_shell(self):
+        materializer = MATERIALIZER.read_text(encoding="utf-8")
+        self.assertIn("expected exactly one reviewed source block", materializer)
+        self.assertIn("TRAVERSAL_DEADLINE", materializer)
+        self.assertIn("SOAK_DEADLINE", materializer)
+        self.assertIn("ACTUAL_TRAVERSAL_SECONDS", materializer)
+        self.assertIn("ACTUAL_SOAK_SECONDS", materializer)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "effective.sh"
+            report = Path(tmp) / "materialization.json"
+            subprocess.run(["python3", str(MATERIALIZER), str(SCRIPT), str(output), str(report)], check=True)
+            subprocess.run(["bash", "-n", str(output)], check=True)
+            effective = output.read_text(encoding="utf-8")
+            self.assertIn("TRAVERSAL_DEADLINE", effective)
+            self.assertIn("SOAK_DEADLINE", effective)
+            self.assertTrue(report.is_file())
 
 
 if __name__ == "__main__":
