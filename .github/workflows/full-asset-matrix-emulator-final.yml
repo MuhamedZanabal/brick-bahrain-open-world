@@ -1,0 +1,130 @@
+name: Bahrain Brick Full Matrix Emulator Final
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - .github/workflows/full-asset-matrix-emulator-final.yml
+      - tools/asset_lab/run_full_matrix_emulator_validation.sh
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/full-asset-matrix-emulator-final.yml
+      - tools/asset_lab/run_full_matrix_emulator_validation.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-full-matrix-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_ARTIFACT_ID: '8360668742'
+  EXPECTED_APK_SHA256: f4fcae42fdaa1a79620a2869faccd4e95a701eb43587a0092c3a14363bc18bdd
+  PACKAGE_NAME: com.bahrainbrick.game.qa
+  ANDROID_USER_HOME: ${{ github.workspace }}/build/full-matrix-runtime/android-user
+  ANDROID_AVD_HOME: ${{ github.workspace }}/build/full-matrix-runtime/android-user/avd
+
+jobs:
+  emulator_endurance:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    steps:
+      - name: Check out exact runtime harness head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Recover exact approved full-matrix APK and prerequisite evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/full-matrix-runtime/source build/full-matrix-runtime/reports build/full-matrix-runtime/logs build/full-matrix-runtime/artifacts
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > build/full-matrix-runtime/source.zip
+          unzip -tq build/full-matrix-runtime/source.zip
+          unzip -q build/full-matrix-runtime/source.zip -d build/full-matrix-runtime/source
+          cp build/full-matrix-runtime/source/artifacts/bahrain-brick-full-asset-matrix-debug.apk build/full-matrix-runtime/bahrain-brick-full-asset-matrix-debug.apk
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" build/full-matrix-runtime/bahrain-brick-full-asset-matrix-debug.apk | sha256sum -c -
+          python3 - <<'PY'
+          import json
+          root='build/full-matrix-runtime/source/reports/'
+          completion=json.load(open(root+'FULL_ASSET_MATRIX_COMPLETION.json'))
+          validation=json.load(open(root+'FULL_ASSET_MATRIX_VALIDATION.json'))
+          pre=open(root+'FROZEN_CONTROLS_PRE.json','rb').read()
+          post=open(root+'FROZEN_CONTROLS_POST.json','rb').read()
+          assert completion['passed'] and completion['total_glbs']==436 and completion['textured_glbs']==436 and completion['khronos_validated']==436
+          assert completion['apk']['sha256']=='f4fcae42fdaa1a79620a2869faccd4e95a701eb43587a0092c3a14363bc18bdd'
+          assert validation['passed'] and validation['failures']==[] and validation['unique_sha256_count']==436 and validation['collision_present_total']==148
+          assert pre==post
+          PY
+          cp build/full-matrix-runtime/source/reports/FULL_ASSET_MATRIX_COMPLETION.json build/full-matrix-runtime/reports/SOURCE_FULL_ASSET_MATRIX_COMPLETION.json
+          cp build/full-matrix-runtime/source/reports/FULL_ASSET_MATRIX_VALIDATION.json build/full-matrix-runtime/reports/SOURCE_FULL_ASSET_MATRIX_VALIDATION.json
+          cp build/full-matrix-runtime/source/reports/APK_BADGING.txt build/full-matrix-runtime/reports/SOURCE_APK_BADGING.txt
+          cp build/full-matrix-runtime/source/reports/APK_SIGNING.txt build/full-matrix-runtime/reports/SOURCE_APK_SIGNING.txt
+          cp build/full-matrix-runtime/source/reports/FROZEN_CONTROLS_PRE.json build/full-matrix-runtime/reports/SOURCE_FROZEN_CONTROLS.json
+      - name: Provision Java 17
+        uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Provision pinned Android API 34 environment
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+            emulator
+            system-images;android-34;google_apis;x86_64
+      - name: Provision screenshot validator
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+      - name: Run exact API 34 traversal and soak gate
+        id: runtime
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_APK_SHA256="$EXPECTED_APK_SHA256" \
+          bash tools/asset_lab/run_full_matrix_emulator_validation.sh \
+            build/full-matrix-runtime/bahrain-brick-full-asset-matrix-debug.apk \
+            "$PACKAGE_NAME" \
+            build/full-matrix-runtime/reports \
+            build/full-matrix-runtime/logs \
+            build/full-matrix-runtime/artifacts
+      - name: Build runtime evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('build/full-matrix-runtime'); files=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name!='source.zip' and 'source' not in x.parts):
+              files.append({'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'RUNTIME_EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Upload complete emulator evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-full-matrix-emulator-${{ github.run_id }}
+          path: |
+            build/full-matrix-runtime/bahrain-brick-full-asset-matrix-debug.apk
+            build/full-matrix-runtime/reports
+            build/full-matrix-runtime/logs
+            build/full-matrix-runtime/artifacts
+            build/full-matrix-runtime/RUNTIME_EVIDENCE_INVENTORY.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Require final emulator endurance success after evidence upload
+        if: always()
+        shell: bash
+        run: test '${{ steps.runtime.outcome }}' = 'success'
