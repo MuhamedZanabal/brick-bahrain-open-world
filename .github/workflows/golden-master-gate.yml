@@ -30,6 +30,10 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - name: Run golden-master contract tests
+      - name: Run golden-master authority tests
         shell: bash
-        run: python3 -m unittest tests.test_golden_master_contract -v
+        run: |
+          python3 -m unittest \
+            tests.test_golden_master_contract \
+            tests.test_golden_master_materials \
+            -v
