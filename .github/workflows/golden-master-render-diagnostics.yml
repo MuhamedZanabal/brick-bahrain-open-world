@@ -41,10 +41,13 @@ jobs:
           unzip -tq build/downloads/source-artifact.zip
           unzip -q build/downloads/source-artifact.zip -d build
           test "$(find build/golden-masters -type f -name '*.glb' | wc -l)" -eq 45
-      - name: Install checksum-verified Blender and Pillow
+      - name: Install checksum-verified Blender, Pillow, and headless EGL
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgl1
+          ldconfig -p | grep -q 'libEGL.so.1'
           python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
           cd build/downloads
           archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
