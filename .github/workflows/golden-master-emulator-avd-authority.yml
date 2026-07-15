@@ -65,6 +65,7 @@ jobs:
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           test -n "$ANDROID_HOME"
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
           AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -1)"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
