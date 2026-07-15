@@ -24,6 +24,7 @@ env:
   SOURCE_ARTIFACT_ID: "8358926583"
   EXPECTED_APK_SHA256: 5d3e39f7c9ce845435f2f1a3f9dc5f5ab0eac85d822c5d954daf8c7e4df6b36c
   PACKAGE_NAME: com.brickbahrain.goldenmasterqa
+  HOLDER_PACKAGE: com.brickbahrain.landscapeholder
   ANDROID_USER_HOME: ${{ github.workspace }}/build/android-user
   ANDROID_AVD_HOME: ${{ github.workspace }}/build/android-user/avd
 
@@ -55,7 +56,7 @@ jobs:
           cp build/source/reports/APK_BADGING.txt build/reports/SOURCE_APK_BADGING.txt
           cp build/source/reports/APKSIGNER_VERIFY.txt build/reports/SOURCE_APKSIGNER_VERIFY.txt
           cp build/source/reports/PROTECTED_AUTHORITY.txt build/reports/SOURCE_PROTECTED_AUTHORITY.txt
-      - name: Provision unified API 34 AVD
+      - name: Provision API 34 AVD and landscape holder
         shell: bash
         run: |
           set -euo pipefail
@@ -66,14 +67,60 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
           AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -1)"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-34;google_apis;x86_64"
+          "$SDKMANAGER" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "emulator" "system-images;android-34;google_apis;x86_64"
           rm -rf "$ANDROID_USER_HOME"
           mkdir -p "$ANDROID_AVD_HOME"
           echo no | "$AVDMANAGER" create avd --force --name golden_master_api34 \
             --package "system-images;android-34;google_apis;x86_64" --device "pixel_7"
           "$ANDROID_HOME/emulator/emulator" -list-avds | tee build/reports/EMULATOR_LIST_AVDS.txt
           grep -qx 'golden_master_api34' build/reports/EMULATOR_LIST_AVDS.txt
-      - name: Run pre-rotated nonimmersive Vulkan validation
+
+          HOLDER="$PWD/build/landscape-holder"
+          mkdir -p "$HOLDER/src/com/brickbahrain/landscapeholder" "$HOLDER/classes" "$HOLDER/dex"
+          cat > "$HOLDER/src/com/brickbahrain/landscapeholder/MainActivity.java" <<'JAVA'
+          package com.brickbahrain.landscapeholder;
+          import android.app.Activity;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.view.View;
+          public final class MainActivity extends Activity {
+              @Override protected void onCreate(Bundle state) {
+                  super.onCreate(state);
+                  View view = new View(this);
+                  view.setBackgroundColor(Color.BLACK);
+                  setContentView(view);
+              }
+          }
+          JAVA
+          cat > "$HOLDER/AndroidManifest.xml" <<'XML'
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.brickbahrain.landscapeholder">
+            <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
+            <application android:theme="@android:style/Theme.Material.NoActionBar.Fullscreen" android:label="Landscape Holder" android:allowBackup="false">
+              <activity android:name=".MainActivity" android:screenOrientation="landscape" android:configChanges="orientation|screenSize|keyboardHidden" android:exported="true">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN" />
+                  <category android:name="android.intent.category.LAUNCHER" />
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          XML
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-34/android.jar"
+          BUILD_TOOLS="$ANDROID_HOME/build-tools/34.0.0"
+          "$JAVA_HOME/bin/javac" -source 8 -target 8 -classpath "$ANDROID_JAR" -d "$HOLDER/classes" \
+            "$HOLDER/src/com/brickbahrain/landscapeholder/MainActivity.java"
+          "$BUILD_TOOLS/d8" --lib "$ANDROID_JAR" --output "$HOLDER/dex" \
+            "$HOLDER/classes/com/brickbahrain/landscapeholder/MainActivity.class"
+          "$BUILD_TOOLS/aapt" package -f -M "$HOLDER/AndroidManifest.xml" -I "$ANDROID_JAR" -F "$HOLDER/holder-unsigned.apk"
+          (cd "$HOLDER/dex" && zip -q "$HOLDER/holder-unsigned.apk" classes.dex)
+          "$JAVA_HOME/bin/keytool" -genkeypair -noprompt -keystore "$HOLDER/debug.keystore" \
+            -storepass android -keypass android -alias androiddebugkey \
+            -dname "CN=Landscape Holder,O=Zanabal Gaming,C=BH" -keyalg RSA -keysize 2048 -validity 10000
+          "$BUILD_TOOLS/apksigner" sign --ks "$HOLDER/debug.keystore" --ks-pass pass:android \
+            --key-pass pass:android --ks-key-alias androiddebugkey --out "$HOLDER/landscape-holder.apk" "$HOLDER/holder-unsigned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose "$HOLDER/landscape-holder.apk" | tee build/reports/HOLDER_APKSIGNER_VERIFY.txt
+          test -s "$HOLDER/landscape-holder.apk"
+      - name: Run landscape-holder stabilized Vulkan validation
         id: emulator
         continue-on-error: true
         shell: bash
@@ -102,14 +149,14 @@ jobs:
           done
           test "$BOOTED" -eq 1
 
-          "$ADB" shell settings put system accelerometer_rotation 0
-          "$ADB" shell settings put system user_rotation 1
-          "$ADB" shell wm user-rotation lock 1
+          "$ADB" install -r build/landscape-holder/landscape-holder.apk | tee build/reports/HOLDER_ADB_INSTALL.txt
+          "$ADB" shell am start -W -n "$HOLDER_PACKAGE/.MainActivity" | tee build/reports/HOLDER_ADB_LAUNCH.txt
           STABLE_ROTATION_SAMPLES=0
           for attempt in $(seq 1 90); do
-            "$ADB" shell dumpsys window displays > build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS.txt
-            if grep -q 'mDisplayRotation=ROTATION_90' build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS.txt \
-              && grep -q '2400 x 1080' build/reports/ANDROID_PRELAUNCH_WINDOW_DISPLAYS.txt; then
+            "$ADB" shell dumpsys window displays > build/reports/ANDROID_HOLDER_WINDOW_DISPLAYS.txt
+            "$ADB" shell dumpsys window windows > build/reports/ANDROID_HOLDER_WINDOWS.txt
+            if grep -q 'mDisplayRotation=ROTATION_90' build/reports/ANDROID_HOLDER_WINDOW_DISPLAYS.txt \
+              && grep -q "$HOLDER_PACKAGE/.MainActivity" build/reports/ANDROID_HOLDER_WINDOWS.txt; then
               STABLE_ROTATION_SAMPLES=$((STABLE_ROTATION_SAMPLES + 1))
             else
               STABLE_ROTATION_SAMPLES=0
@@ -126,7 +173,7 @@ jobs:
 
           "$ADB" install -r build/bahrain_brick_golden_master_nonimmersive_vulkan_qa.apk | tee build/reports/ADB_INSTALL.txt
           "$ADB" logcat -c
-          "$ADB" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 | tee build/reports/ADB_LAUNCH.txt
+          "$ADB" shell am start -W -n "$PACKAGE_NAME/com.godot.game.GodotApp" | tee build/reports/ADB_LAUNCH.txt
           READY=0
           for attempt in $(seq 1 90); do
             "$ADB" logcat -d > build/reports/ANDROID_LOGCAT.txt
@@ -153,7 +200,7 @@ jobs:
           extrema=ImageStat.Stat(image).extrema
           assert sum(1 for low,high in extrema if high-low > 40) >= 2, extrema
           Path('build/reports/ANDROID_RUNTIME_VALIDATION.json').write_text(
-              json.dumps({'passed':True,'renderer':'mobile_vulkan','orientation':'pre_rotated_landscape','immersive':False,'package':'com.brickbahrain.goldenmasterqa','profile':'balanced','visible_assets':5,'dimensions':[width,height],'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},indent=2,sort_keys=True)+'\n'
+              json.dumps({'passed':True,'renderer':'mobile_vulkan','orientation':'landscape_holder_stabilized','immersive':False,'package':'com.brickbahrain.goldenmasterqa','profile':'balanced','visible_assets':5,'dimensions':[width,height],'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},indent=2,sort_keys=True)+'\n'
           )
           PY
           if grep -E 'SCRIPT ERROR|Parse Error|GOLDEN_MASTER_PREVIEW_FAILED|FATAL EXCEPTION|Fatal signal|Condition "configured" is true|Singleton for Time already exists' build/reports/ANDROID_LOGCAT.txt; then
@@ -166,6 +213,7 @@ jobs:
           name: golden-master-nonimmersive-emulator-final-${{ github.run_id }}
           path: |
             build/bahrain_brick_golden_master_nonimmersive_vulkan_qa.apk
+            build/landscape-holder/landscape-holder.apk
             build/android-evidence
             build/reports
           if-no-files-found: warn
