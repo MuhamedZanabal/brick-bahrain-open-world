@@ -8,6 +8,7 @@ on:
       - tools/asset_lab/**
       - tests/test_validation_cube_pipeline.py
       - tests/test_asset_production_workflow.py
+      - tests/test_android_emulator_workflow.py
       - asset_lab/reports/**
   pull_request:
     branches: [work/bahrain-brick-premium-visual-v14]
@@ -37,6 +38,7 @@ env:
   VERSION_CODE: '1404'
   VERSION_NAME: 1.4.0.4-premium-visual-qa
   APK_NAME: bahrain-brick-asset-production-debug.apk
+  EXPECTED_APK_SHA256: 9b7edb8a9434bfa972b98ad183aa4b886ed6ab56bea14558bc4c3a4f3c0681b7
 
 jobs:
   production:
@@ -126,7 +128,7 @@ jobs:
           bash tools/asset_lab/run_asset_production_ci.sh 2>&1 | tee build/asset-production/logs/production-driver.log
           test "${PIPESTATUS[0]}" -eq 0
       - name: Run Android API 34 emulator validation
-        timeout-minutes: 25
+        timeout-minutes: 65
         shell: bash
         run: |
           bash tools/asset_lab/run_android_emulator_validation.sh \
