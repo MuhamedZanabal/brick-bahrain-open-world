@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "batch_id": "golden-master-batch1-v31",
+  "default_profile": "balanced",
+  "profiles": [
+    "low",
+    "balanced",
+    "high"
+  ],
+  "hysteresis_m": 4.0,
+  "assets": [
+    {
+      "asset_id": "bh_traditional_projecting_window_01",
+      "family": "traditional",
+      "position": [-27.0, 0.0, -4.0],
+      "rotation_degrees": 8.0,
+      "scale": [2.2, 2.2, 2.2],
+      "lod0_max_m": 22.0,
+      "lod1_max_m": 52.0,
+      "paths": {
+        "low": [
+          "res://assets/asset_lab/golden_masters/low/traditional/bh_traditional_projecting_window_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/low/traditional/bh_traditional_projecting_window_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/low/traditional/bh_traditional_projecting_window_01_lod2.glb"
+        ],
+        "balanced": [
+          "res://assets/asset_lab/golden_masters/balanced/traditional/bh_traditional_projecting_window_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/balanced/traditional/bh_traditional_projecting_window_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/balanced/traditional/bh_traditional_projecting_window_01_lod2.glb"
+        ],
+        "high": [
+          "res://assets/asset_lab/golden_masters/high/traditional/bh_traditional_projecting_window_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/high/traditional/bh_traditional_projecting_window_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/high/traditional/bh_traditional_projecting_window_01_lod2.glb"
+        ]
+      }
+    },
+    {
+      "asset_id": "bh_souq_shop_gold_01",
+      "family": "souq",
+      "position": [-10.0, 0.0, -4.0],
+      "rotation_degrees": 2.0,
+      "scale": [1.25, 1.25, 1.25],
+      "lod0_max_m": 28.0,
+      "lod1_max_m": 62.0,
+      "paths": {
+        "low": [
+          "res://assets/asset_lab/golden_masters/low/souq/bh_souq_shop_gold_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/low/souq/bh_souq_shop_gold_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/low/souq/bh_souq_shop_gold_01_lod2.glb"
+        ],
+        "balanced": [
+          "res://assets/asset_lab/golden_masters/balanced/souq/bh_souq_shop_gold_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/balanced/souq/bh_souq_shop_gold_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/balanced/souq/bh_souq_shop_gold_01_lod2.glb"
+        ],
+        "high": [
+          "res://assets/asset_lab/golden_masters/high/souq/bh_souq_shop_gold_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/high/souq/bh_souq_shop_gold_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/high/souq/bh_souq_shop_gold_01_lod2.glb"
+        ]
+      }
+    },
+    {
+      "asset_id": "bh_supermarket_storefront_a_01",
+      "family": "commercial",
+      "position": [10.0, 0.0, -4.0],
+      "rotation_degrees": -3.0,
+      "scale": [1.05, 1.05, 1.05],
+      "lod0_max_m": 32.0,
+      "lod1_max_m": 70.0,
+      "paths": {
+        "low": [
+          "res://assets/asset_lab/golden_masters/low/commercial/bh_supermarket_storefront_a_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/low/commercial/bh_supermarket_storefront_a_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/low/commercial/bh_supermarket_storefront_a_01_lod2.glb"
+        ],
+        "balanced": [
+          "res://assets/asset_lab/golden_masters/balanced/commercial/bh_supermarket_storefront_a_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/balanced/commercial/bh_supermarket_storefront_a_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/balanced/commercial/bh_supermarket_storefront_a_01_lod2.glb"
+        ],
+        "high": [
+          "res://assets/asset_lab/golden_masters/high/commercial/bh_supermarket_storefront_a_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/high/commercial/bh_supermarket_storefront_a_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/high/commercial/bh_supermarket_storefront_a_01_lod2.glb"
+        ]
+      }
+    },
+    {
+      "asset_id": "bh_waterfront_tower_a_01",
+      "family": "waterfront",
+      "position": [-16.0, 0.0, 28.0],
+      "rotation_degrees": 10.0,
+      "scale": [0.82, 0.82, 0.82],
+      "lod0_max_m": 42.0,
+      "lod1_max_m": 88.0,
+      "paths": {
+        "low": [
+          "res://assets/asset_lab/golden_masters/low/waterfront/bh_waterfront_tower_a_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/low/waterfront/bh_waterfront_tower_a_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/low/waterfront/bh_waterfront_tower_a_01_lod2.glb"
+        ],
+        "balanced": [
+          "res://assets/asset_lab/golden_masters/balanced/waterfront/bh_waterfront_tower_a_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/balanced/waterfront/bh_waterfront_tower_a_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/balanced/waterfront/bh_waterfront_tower_a_01_lod2.glb"
+        ],
+        "high": [
+          "res://assets/asset_lab/golden_masters/high/waterfront/bh_waterfront_tower_a_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/high/waterfront/bh_waterfront_tower_a_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/high/waterfront/bh_waterfront_tower_a_01_lod2.glb"
+        ]
+      }
+    },
+    {
+      "asset_id": "bh_cr_skyscraper_tower_01",
+      "family": "hero_skyline",
+      "position": [18.0, 0.0, 32.0],
+      "rotation_degrees": -8.0,
+      "scale": [0.62, 0.62, 0.62],
+      "lod0_max_m": 48.0,
+      "lod1_max_m": 100.0,
+      "paths": {
+        "low": [
+          "res://assets/asset_lab/golden_masters/low/hero_skyline/bh_cr_skyscraper_tower_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/low/hero_skyline/bh_cr_skyscraper_tower_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/low/hero_skyline/bh_cr_skyscraper_tower_01_lod2.glb"
+        ],
+        "balanced": [
+          "res://assets/asset_lab/golden_masters/balanced/hero_skyline/bh_cr_skyscraper_tower_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/balanced/hero_skyline/bh_cr_skyscraper_tower_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/balanced/hero_skyline/bh_cr_skyscraper_tower_01_lod2.glb"
+        ],
+        "high": [
+          "res://assets/asset_lab/golden_masters/high/hero_skyline/bh_cr_skyscraper_tower_01_lod0.glb",
+          "res://assets/asset_lab/golden_masters/high/hero_skyline/bh_cr_skyscraper_tower_01_lod1.glb",
+          "res://assets/asset_lab/golden_masters/high/hero_skyline/bh_cr_skyscraper_tower_01_lod2.glb"
+        ]
+      }
+    }
+  ]
+}
