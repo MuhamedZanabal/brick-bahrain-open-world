@@ -22,8 +22,6 @@ def _cycles_setup(bpy, minimum, maximum, output):
     scene.render.resolution_x = 512
     scene.render.resolution_y = 512
     scene.render.resolution_percentage = 100
-    scene.render.tile_x = 256
-    scene.render.tile_y = 256
     return camera, center, radius
 
 
