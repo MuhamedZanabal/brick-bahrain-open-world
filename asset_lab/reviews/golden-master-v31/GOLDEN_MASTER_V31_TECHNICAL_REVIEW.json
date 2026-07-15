@@ -1,0 +1,16 @@
+{
+  "failures": [],
+  "passed": true,
+  "tower_summary": {
+    "bh_cr_skyscraper_tower_01": {
+      "bytes": 741684,
+      "sha256": "5df78b7155bae7387f4a4df3a8c053d8642ff4731311e8d6428974258ad78a88",
+      "triangles": 6696
+    },
+    "bh_waterfront_tower_a_01": {
+      "bytes": 587796,
+      "sha256": "704d52131f14fdac24e2a724e4ea045d7189ac7a1436e2fcdc675c4460c49f4b",
+      "triangles": 3824
+    }
+  }
+}
