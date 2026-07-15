@@ -14,7 +14,7 @@ mkdir -p "$REPORTS" "$LOGS" "$ARTIFACTS" "$DOWNLOADS"
 mark() { printf '\n===== %s =====\n' "$1"; }
 
 mark "Verify exact integration ancestry"
-test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+test "$(git rev-parse HEAD)" = "${EXPECTED_INTEGRATION_SHA}"
 git merge-base --is-ancestor "${FROZEN_PREMIUM_AUTHORITY}" HEAD
 git merge-base --is-ancestor "${EXPECTED_CHECKPOINT}" HEAD
 git rev-parse HEAD | tee "$REPORTS/INTEGRATION_HEAD.txt"
