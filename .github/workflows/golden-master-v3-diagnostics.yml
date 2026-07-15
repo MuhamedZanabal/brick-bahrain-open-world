@@ -1,0 +1,97 @@
+name: Golden Master V3 Diagnostics
+
+on:
+  push:
+    branches: [work/bahrain-brick-golden-master-batch1-v1]
+    paths:
+      - .github/workflows/golden-master-v3-diagnostics.yml
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/golden-master-v3-diagnostics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      SOURCE_ARTIFACT_ID: "8352979910"
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Recover failed V3 review artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/source
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > build/source.zip
+          unzip -tq build/source.zip
+          unzip -q build/source.zip -d build/source
+          test -f build/source/reports/GOLDEN_MASTER_GENERATION_V3.json
+      - name: Print complete V3 validation diagnostics
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          report=json.loads(Path('build/source/reports/GOLDEN_MASTER_GENERATION_V3.json').read_text())
+          outputs=report['outputs']
+          failures=[]
+          profile_rank={'low':0,'balanced':1,'high':2}
+          print('GENERATOR',report.get('generator_version'))
+          print('DERIVATIVES',report.get('derivative_count'),len(outputs))
+          print('REVISED',report.get('revised_assets'))
+          print('GLB_COUNT',len(list(Path('build/source/golden-masters-v3').rglob('*.glb'))))
+
+          by_asset_profile={}
+          by_asset_lod={}
+          for item in outputs:
+              by_asset_profile.setdefault((item['asset_id'],item['profile']),[]).append(item)
+              by_asset_lod.setdefault((item['asset_id'],item['lod']),[]).append(item)
+
+          for key in sorted(by_asset_profile):
+              items=sorted(by_asset_profile[key],key=lambda x:x['lod'])
+              values=[x['triangle_count'] for x in items]
+              hashes=[x['sha256'] for x in items]
+              print('LOD_MATRIX',key,values)
+              if not values[0] >= values[1] >= values[2]:
+                  failures.append({'rule':'lod_monotonic','key':key,'values':values})
+              if len(set(hashes)) != 3:
+                  failures.append({'rule':'lod_hash_unique','key':key,'hashes':hashes})
+
+          for key in sorted(by_asset_lod):
+              items=sorted(by_asset_lod[key],key=lambda x:profile_rank[x['profile']])
+              values=[x['triangle_count'] for x in items]
+              print('PROFILE_MATRIX',key,values)
+              if not values[0] <= values[1] <= values[2]:
+                  failures.append({'rule':'profile_monotonic','key':key,'values':values})
+
+          floors={'bh_waterfront_tower_a_01':3000,'bh_cr_skyscraper_tower_01':5000}
+          for asset_id,floor in floors.items():
+              item=next(x for x in outputs if x['asset_id']==asset_id and x['profile']=='balanced' and x['lod']==0)
+              print('DETAIL_FLOOR',asset_id,item['triangle_count'],floor,item['bytes'],item['sha256'])
+              if item['triangle_count'] < floor:
+                  failures.append({'rule':'detail_floor','asset_id':asset_id,'actual':item['triangle_count'],'expected':floor})
+
+          print('FAILURE_COUNT',len(failures))
+          print('FAILURES_JSON',json.dumps(failures,sort_keys=True))
+          Path('build/V3_VALIDATION_DIAGNOSTICS.json').write_text(json.dumps({'failures':failures},indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Upload diagnostic report
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: golden-master-v3-diagnostics-${{ github.run_id }}
+          path: build/V3_VALIDATION_DIAGNOSTICS.json
+          if-no-files-found: error
+          retention-days: 30
