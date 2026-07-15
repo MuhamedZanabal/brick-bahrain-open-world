@@ -103,6 +103,14 @@ jobs:
             platform-tools
             platforms;${{ env.ANDROID_PLATFORM }}
             build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+      - name: Provision deterministic SVG renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+          rsvg-convert --version | tee build/asset-production/reports/RSVG_CONVERT_VERSION.txt
+          dpkg-query -W -f='${Package} ${Version}\n' librsvg2-bin | tee build/asset-production/reports/LIBRSVG_PACKAGE_VERSION.txt
       - name: Run complete production chain
         shell: bash
         run: |

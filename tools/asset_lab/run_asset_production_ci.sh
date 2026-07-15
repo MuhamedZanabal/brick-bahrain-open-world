@@ -143,10 +143,26 @@ root=Path(sys.argv[1]); outputs=[{'path':p.as_posix(),'bytes':p.stat().st_size,'
 assert len(outputs)==4, outputs
 Path(sys.argv[2]).write_text(json.dumps({'asset_records':4,'outputs':outputs},indent=2)+'\n')
 PY
+
+mark "Validate generated asset families"
+python3 tools/asset_lab/validate_generated_asset_batch.py \
+  --architecture-root "$BUILD/generated/architecture" \
+  --commercial-root "$BUILD/generated/commercial" \
+  --manifest docs/assets/ASSET_MASTER_MANIFEST.csv \
+  --report "$REPORTS/GENERATED_ASSET_BATCH_VALIDATION.json"
+
+mark "Run Khronos validation for every generated GLB"
+validated=0
 while IFS= read -r -d '' glb; do
-  report="$REPORTS/generated-$(basename "$glb").json"
+  relative="${glb#"$BUILD/generated/"}"
+  report_name="${relative//\//__}"
+  report="$REPORTS/generated-${report_name%.glb}.json"
   node tools/asset_lab/validate_gltf_khronos.js "$glb" "$report"
+  validated=$((validated + 1))
 done < <(find "$BUILD/generated" -name '*.glb' -type f -print0 | sort -z)
+test "$validated" -eq 436
+test "$(find "$REPORTS" -maxdepth 1 -type f -name 'generated-*.json' | wc -l)" -eq 436
+printf '%s\n' "$validated" | tee "$REPORTS/KHRONOS_GENERATED_GLBS_VALIDATED_COUNT.txt"
 
 mark "Install generated assets into recovered game source"
 cp -a assets/. "$GAME/assets/"

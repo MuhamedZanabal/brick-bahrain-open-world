@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github/workflows/asset-production-ci.yml"
 DRIVER = ROOT / "tools/asset_lab/run_asset_production_ci.sh"
 
+
 class AssetProductionWorkflowTests(unittest.TestCase):
     def test_workflow_pins_authorities_and_toolchains(self):
         text = WORKFLOW.read_text(encoding="utf-8")
@@ -21,6 +22,8 @@ class AssetProductionWorkflowTests(unittest.TestCase):
             "PACKAGE_NAME: com.bahrainbrick.game.qa",
             "VERSION_CODE: '1404'",
             "VERSION_NAME: 1.4.0.4-premium-visual-qa",
+            "librsvg2-bin",
+            "Stage checksum-pinned generator dependencies",
         ):
             self.assertIn(value, text)
 
@@ -32,17 +35,25 @@ class AssetProductionWorkflowTests(unittest.TestCase):
             "Run corrected asset repository tests", "Generate deterministic validation cube twice",
             "Require deterministic cube GLB bytes", "Run Khronos glTF Validator",
             "Run independent cube contract validator", "Run production asset generators",
+            "Validate generated asset families", "Run Khronos validation for every generated GLB",
             "Run clean Godot import", "Run gameplay regression suites",
             "Protected-control post-check", "Export Android APK", "Validate Android APK",
         ]
         positions = [text.index(item) for item in ordered]
         self.assertEqual(positions, sorted(positions))
 
+    def test_generated_validation_evidence_paths_are_unique(self):
+        text = DRIVER.read_text(encoding="utf-8")
+        self.assertIn('report_name="${relative//\//__}"', text)
+        self.assertIn('test "$validated" -eq 436', text)
+        self.assertIn("GENERATED_ASSET_BATCH_VALIDATION.json", text)
+
     def test_workflow_and_driver_do_not_mutate_or_merge(self):
         text = WORKFLOW.read_text(encoding="utf-8") + DRIVER.read_text(encoding="utf-8")
         self.assertIn("contents: read", text)
         for forbidden in ("git push", "gh pr merge", "force: true", "contents: write"):
             self.assertNotIn(forbidden, text)
+
 
 if __name__ == "__main__":
     unittest.main()
