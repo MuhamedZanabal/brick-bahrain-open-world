@@ -36,4 +36,5 @@ jobs:
           python3 -m unittest \
             tests.test_golden_master_contract \
             tests.test_golden_master_materials \
+            tests.test_golden_master_generation_plan \
             -v
