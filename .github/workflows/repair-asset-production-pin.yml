@@ -1,0 +1,38 @@
+name: Advance asset production correction pin
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths: [.github/workflows/repair-asset-production-pin.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  advance:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: work/bahrain-brick-asset-lab-integration-v1
+      - name: Pin verified 20-test asset correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          old='d59efb98b9c06ceb754d95e8ce83853442f46f41'
+          new='7aed2cf05f63e0c3c607a98acde454ff103584eb'
+          for name in ['.github/workflows/asset-production-ci.yml','tests/test_asset_production_workflow.py']:
+              path=Path(name)
+              text=path.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{name}: expected one old pin, found {text.count(old)}')
+              path.write_text(text.replace(old,new), encoding='utf-8')
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/asset-production-ci.yml tests/test_asset_production_workflow.py
+          git commit -m 'ci(asset-lab): pin verified 20-test asset correction'
+          git push origin HEAD:work/bahrain-brick-asset-lab-integration-v1
