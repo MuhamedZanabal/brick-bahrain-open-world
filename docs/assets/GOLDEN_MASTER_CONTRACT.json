@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "quality_profiles": [
+    "low",
+    "balanced",
+    "high"
+  ],
+  "lod_levels": [
+    0,
+    1,
+    2
+  ],
+  "expected_derivative_count": 45,
+  "mass_regeneration_default": false,
+  "golden_masters": [
+    {
+      "asset_id": "bh_traditional_projecting_window_01",
+      "family": "traditional",
+      "visual_role": "Close-range Muharraq and old Manama projecting timber window module",
+      "seed": 140501,
+      "profiles": ["low", "balanced", "high"],
+      "lod_levels": [0, 1, 2],
+      "visual_acceptance": {
+        "bahrain_identity": "Projecting timber bay, shaded opening, limestone trim and restrained Gulf plaster palette must read as Bahraini traditional architecture.",
+        "primary_silhouette": "The projecting bay and upper shade hood remain legible from street gameplay distance.",
+        "facade_depth": "Opening, timber frame, hood, sill and wall plane use visible depth rather than coplanar decals.",
+        "material_control": "Sand plaster, limestone and dark timber remain limited to shared mobile material slots.",
+        "adjacent_variation": "Accent tone and timber slat spacing support repeated placement without identical visual rhythm.",
+        "scale_consistency": "Nominal module width is 3.0 metres and opening proportions remain human-scale.",
+        "uv_integrity": "Balanced profile shows no visible stretching on trim, hood or timber faces.",
+        "lod_integrity": "LOD reductions preserve the projecting silhouette and never collapse the opening into a flat wall."
+      }
+    },
+    {
+      "asset_id": "bh_souq_shop_gold_01",
+      "family": "souq",
+      "visual_role": "Manama Souq gold-shop storefront with readable fascia, recessed display and shade awning",
+      "seed": 140502,
+      "profiles": ["low", "balanced", "high"],
+      "lod_levels": [0, 1, 2],
+      "visual_acceptance": {
+        "bahrain_identity": "Narrow souq bay, bilingual-signage proportions, gold display tone and shaded arcade language must read as Manama Souq.",
+        "primary_silhouette": "Fascia, awning and recessed display form a recognizable shop-front silhouette.",
+        "facade_depth": "Display glazing, jambs, shutter pocket, fascia and awning use real depth.",
+        "material_control": "Gold accent is controlled and does not dominate shared plaster, timber and metal materials.",
+        "adjacent_variation": "Sign panel, awning depth and display segmentation support repeated storefront rows.",
+        "scale_consistency": "Nominal storefront width is 4.0 metres with plausible door and display heights.",
+        "uv_integrity": "Balanced profile fascia, awning and display surfaces show no obvious stretching.",
+        "lod_integrity": "LOD1 and LOD2 preserve fascia and awning readability while removing secondary display detail."
+      }
+    },
+    {
+      "asset_id": "bh_waterfront_tower_a_01",
+      "family": "waterfront",
+      "visual_role": "Bahrain Bay waterfront mid-rise tower used as a mobile-safe skyline anchor",
+      "seed": 140503,
+      "profiles": ["low", "balanced", "high"],
+      "lod_levels": [0, 1, 2],
+      "visual_acceptance": {
+        "bahrain_identity": "Stepped contemporary Gulf massing, shaded crown and blue-glass rhythm must fit Bahrain Bay without copying a protected landmark.",
+        "primary_silhouette": "Stepped tower tiers and crown remain recognizable at skyline distance.",
+        "facade_depth": "Podium, tower tiers, vertical fins and crown are separated in depth.",
+        "material_control": "Glass, limestone and painted-metal slots remain mobile-safe and visually balanced.",
+        "adjacent_variation": "Tier offsets and fin rhythm avoid a single extruded-box appearance.",
+        "scale_consistency": "Tower dimensions remain consistent with a stylized mid-rise skyline anchor.",
+        "uv_integrity": "Balanced profile avoids stretched facade bands and inconsistent glass scale.",
+        "lod_integrity": "LOD reduction preserves stepped massing and crown while removing fins and secondary bands first."
+      }
+    },
+    {
+      "asset_id": "bh_supermarket_storefront_a_01",
+      "family": "commercial",
+      "visual_role": "Neighbourhood Bahrain supermarket storefront with canopy, glazing, entrance and service details",
+      "seed": 140504,
+      "profiles": ["low", "balanced", "high"],
+      "lod_levels": [0, 1, 2],
+      "visual_acceptance": {
+        "bahrain_identity": "Deep sun canopy, compact storefront proportions, bilingual-signage zone and external service details must fit Bahrain neighbourhood retail.",
+        "primary_silhouette": "Canopy, sign band and recessed entrance remain readable from the road.",
+        "facade_depth": "Glazing, doorway, canopy, sign frame, kerb edge and utility zone use real depth.",
+        "material_control": "Glass, painted metal, plaster and signage accents use shared mobile materials.",
+        "adjacent_variation": "Sign accent and window segmentation allow repeated commercial strips without uniform repetition.",
+        "scale_consistency": "Door, glazing and canopy dimensions remain plausible for a small supermarket.",
+        "uv_integrity": "Balanced profile shows consistent texel density across canopy, plaster and signage surfaces.",
+        "lod_integrity": "LOD reduction keeps the entrance, canopy and sign band while simplifying mullions and utility details."
+      }
+    },
+    {
+      "asset_id": "bh_cr_skyscraper_tower_01",
+      "family": "hero_skyline",
+      "visual_role": "Original clean-room Bahrain skyline hero with twin sail-like masses and illuminated crown",
+      "seed": 140505,
+      "profiles": ["low", "balanced", "high"],
+      "lod_levels": [0, 1, 2],
+      "visual_acceptance": {
+        "bahrain_identity": "Original sail-influenced Gulf skyline language and warm limestone podium must evoke Bahrain without reproducing an existing building.",
+        "primary_silhouette": "Twin rising masses, central void and crown remain readable from long distance.",
+        "facade_depth": "Podium, twin masses, central bridge and crown have distinct depth and overlap.",
+        "material_control": "Blue glass, limestone and metal accents remain within shared mobile shader limits.",
+        "adjacent_variation": "Asymmetric height and stepped crown avoid generic mirrored-box massing.",
+        "scale_consistency": "Hero scale is internally consistent with the waterfront district and skyline background.",
+        "uv_integrity": "Balanced profile facade bands maintain consistent scale over tall surfaces.",
+        "lod_integrity": "LOD2 preserves the twin-mass silhouette and void while removing facade bands and bridge detail."
+      }
+    }
+  ]
+}
