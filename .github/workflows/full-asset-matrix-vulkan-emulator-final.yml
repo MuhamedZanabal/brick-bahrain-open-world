@@ -122,7 +122,7 @@ jobs:
           cat "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
           test "$signing_status" -eq 0
           grep -Eq 'Verified using v(2|3) scheme.*true' "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
-          "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK" > "$ROOT/reports/RUNTIME_APK_ZIPALIGN.txt"
+          "$BUILD_TOOLS/zipalign" -c -v 4 "$APK" > "$ROOT/reports/RUNTIME_APK_ZIPALIGN.txt"
           unzip -t "$APK" > "$ROOT/logs/runtime-apk-zip-integrity.txt"
           sha256sum "$APK" | tee "$ROOT/reports/RUNTIME_APK_SHA256SUM.txt"
           python3 - <<'PY'
