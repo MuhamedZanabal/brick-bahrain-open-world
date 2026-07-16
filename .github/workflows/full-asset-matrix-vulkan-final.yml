@@ -93,6 +93,13 @@ jobs:
             build-tools;34.0.0
             emulator
             system-images;android-34;google_apis;x86_64
+      - name: Provision premium overlay SVG renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+          command -v rsvg-convert
       - name: Install official Godot 4.3 and templates
         shell: bash
         run: |
