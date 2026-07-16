@@ -5,170 +5,98 @@ on:
     branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
     paths:
       - .github/workflows/manama-souq-vertical-slice.yml
-      - tools/vertical_slice/run_manama_souq_source_gate.sh
-      - asset_lab/runtime/manama_souq_layout_v1.json
-      - scripts/karak_delivery_mission.gd
-      - scripts/manama_souq_layout_loader.gd
-      - scripts/souq_population_controller.gd
-      - scripts/karak_delivery_hud.gd
-      - scripts/manama_souq_vertical_slice.gd
-      - scenes/karak_delivery_hud.tscn
-      - scenes/manama_souq_vertical_slice.tscn
-      - tests/test_manama_souq_*.py
-      - tests/test_karak_delivery_*.py
-      - tests/test_souq_population_*.py
-      - tests/*souq*runtime.gd
-      - tests/karak_delivery_*runtime.gd
-  pull_request:
-    branches: [work/bahrain-brick-asset-lab-integration-v1]
-    types: [opened, synchronize, reopened]
+      - tools/vertical_slice/promote_manama_souq_asset_authority.sh
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
-  group: bahrain-brick-manama-souq-source-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  SOURCE_ARTIFACT_ID: '8360668742'
-  GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
-  GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
-  GODOT_VERSION: '4.3'
-  EXPECTED_GODOT_VERSION: 4.3.stable.official.77dcf97d8
+  group: bahrain-brick-manama-souq-authority-promotion
+  cancel-in-progress: false
 
 jobs:
-  source_gate:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
+  promote_exact_asset_authority:
     runs-on: ubuntu-24.04
-    timeout-minutes: 80
+    timeout-minutes: 40
     steps:
-      - name: Check out exact vertical-slice candidate
+      - name: Check out exact PR 59 branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
+          ref: ${{ github.sha }}
+          fetch-depth: 1
 
-      - name: Recover exact 436-asset authority and real game source
+      - name: Promote accepted exact bytes to existing release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="$PWD/build/manama-souq-source"
-          mkdir -p "$ROOT/source" "$ROOT/game" "$ROOT/reports" "$ROOT/logs" "$ROOT/artifacts" "$ROOT/downloads" "$ROOT/tools/godot"
-          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > "$ROOT/source.zip"
-          unzip -tq "$ROOT/source.zip"
-          unzip -q "$ROOT/source.zip" -d "$ROOT/source"
-          python3 - <<'PY'
-          import json
-          root='build/manama-souq-source/source/reports/'
-          c=json.load(open(root+'FULL_ASSET_MATRIX_COMPLETION.json'))
-          v=json.load(open(root+'FULL_ASSET_MATRIX_VALIDATION.json'))
-          assert c['passed'] and c['total_glbs']==436 and c['textured_glbs']==436 and c['unique_glb_hashes']==436 and c['khronos_validated']==436, c
-          assert v['passed'] and v['failures']==[] and v['validated_assets']==436 and v['textured_asset_count']==436, v
-          assert open(root+'FROZEN_CONTROLS_PRE.json','rb').read()==open(root+'FROZEN_CONTROLS_POST.json','rb').read()
-          PY
-          test "$(find "$ROOT/source/generated/full_matrix" -type f -name '*.glb' | wc -l)" -eq 436
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$GAME_SOURCE_URL" -o "$ROOT/game-source.zip"
-          echo "$GAME_SOURCE_SHA256  $ROOT/game-source.zip" | sha256sum -c -
-          unzip -tq "$ROOT/game-source.zip"
-          unzip -q "$ROOT/game-source.zip" -d "$ROOT/game"
-          test -f "$ROOT/game/project.godot"
+          mkdir -p build/manama-souq-authority-promotion
+          bash tools/vertical_slice/promote_manama_souq_asset_authority.sh \
+            8360668742 \
+            v1.4.0.3-graphics-qa \
+            76964c58c283cacaee137152189727d678aa83230d7211dc6a15aa9af9d4a67a \
+            469706251 \
+            bahrain-brick-full-asset-matrix-authority-76964c58c283caca.zip \
+            build/manama-souq-authority-promotion/ASSET_AUTHORITY_PROMOTION.json
 
-      - name: Provision premium artwork dependencies
+      - name: Discover immutable tool identities and script checksums
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends librsvg2-bin
-          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
-          command -v rsvg-convert
-
-      - name: Install checksum-verified official Godot 4.3
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT="$PWD/build/manama-souq-source"
-          cd "$ROOT/downloads"
-          editor="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
-          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/SHA512-SUMS.txt" -o SHA512-SUMS.txt
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$editor" -o "$editor"
-          grep " $editor$" SHA512-SUMS.txt | sha512sum -c -
-          unzip -q "$editor" -d "$ROOT/tools/godot"
-          GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
-          chmod +x "$GODOT"
-          test "$("$GODOT" --version)" = "$EXPECTED_GODOT_VERSION"
-
-      - name: Assemble premium Souq slice in disposable game copy
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT="$PWD/build/manama-souq-source"
-          GAME="$ROOT/game"
-          REPORTS="$ROOT/reports"
-          LOGS="$ROOT/logs"
-          cp -a assets/. "$GAME/assets/"
-          mkdir -p "$GAME/assets/generated/full_matrix" "$GAME/asset_lab/runtime" "$GAME/scripts" "$GAME/scenes" "$GAME/tests" "$GAME/tools/vertical_slice" "$GAME/.github/workflows"
-          cp -a "$ROOT/source/generated/full_matrix/." "$GAME/assets/generated/full_matrix/"
-          test "$(find "$GAME/assets/generated/full_matrix" -type f -name '*.glb' | wc -l)" -eq 436
-          cp "$ROOT/source/reports/FULL_ASSET_MATRIX_RUNTIME_MANIFEST.json" "$GAME/asset_lab/runtime/full_asset_matrix_manifest.json"
-          python3 tools/apply_premium_overlay_resilient.py "$GAME" --report "$REPORTS/PREMIUM_SOUQ_OVERLAY_REPORT.json" 2>&1 | tee "$LOGS/premium-overlay.log"
-          python3 tools/apply_premium_validation_corrections.py "$GAME" --report "$REPORTS/PREMIUM_SOUQ_CORRECTIONS.json" 2>&1 | tee "$LOGS/premium-corrections.log"
-          cp asset_lab/runtime/manama_souq_layout_v1.json "$GAME/asset_lab/runtime/"
-          cp scripts/golden_master_quality.gd scripts/golden_master_lod_instance.gd "$GAME/scripts/"
-          cp scripts/karak_delivery_mission.gd scripts/manama_souq_layout_loader.gd scripts/souq_population_controller.gd scripts/karak_delivery_hud.gd scripts/manama_souq_vertical_slice.gd "$GAME/scripts/"
-          cp scenes/karak_delivery_hud.tscn scenes/manama_souq_vertical_slice.tscn "$GAME/scenes/"
-          cp tests/test_manama_souq_layout_contract.py tests/test_karak_delivery_mission_contract.py tests/test_manama_souq_layout_loader.py tests/test_souq_population_contract.py tests/test_karak_delivery_hud_contract.py tests/test_manama_souq_slice_contract.py tests/test_manama_souq_source_gate.py "$GAME/tests/"
-          cp tests/karak_delivery_mission_runtime.gd tests/manama_souq_layout_runtime.gd tests/souq_population_runtime.gd tests/karak_delivery_hud_runtime.gd tests/manama_souq_slice_runtime.gd "$GAME/tests/"
-          cp tools/vertical_slice/run_manama_souq_source_gate.sh "$GAME/tools/vertical_slice/"
-          cp .github/workflows/manama-souq-vertical-slice.yml "$GAME/.github/workflows/"
-          chmod +x tools/vertical_slice/run_manama_souq_source_gate.sh "$GAME/tools/vertical_slice/run_manama_souq_source_gate.sh"
-          python3 tools/verify_frozen_controls.py "$GAME" --json-out "$REPORTS/FROZEN_CONTROLS_SOUQ_PRE.json" --markdown-out "$REPORTS/FROZEN_CONTROLS_SOUQ_PRE.md"
-
-      - name: Run full Manama Souq source and Godot gate
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT="$PWD/build/manama-souq-source"
-          GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
-          bash tools/vertical_slice/run_manama_souq_source_gate.sh "$GODOT" "$ROOT/game" "$ROOT/logs" "$ROOT/reports"
-
-      - name: Verify protected post-state is byte-identical
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT="$PWD/build/manama-souq-source"
-          GAME="$ROOT/game"
-          REPORTS="$ROOT/reports"
-          python3 tools/verify_frozen_controls.py "$GAME" --json-out "$REPORTS/FROZEN_CONTROLS_SOUQ_POST.json" --markdown-out "$REPORTS/FROZEN_CONTROLS_SOUQ_POST.md"
-          cmp "$REPORTS/FROZEN_CONTROLS_SOUQ_PRE.json" "$REPORTS/FROZEN_CONTROLS_SOUQ_POST.json"
-
-      - name: Build checksum-addressed source evidence inventory
-        if: always()
-        shell: bash
-        run: |
-          python3 - <<'PY'
+          ROOT=build/manama-souq-authority-promotion
+          editor=Godot_v4.3-stable_linux.x86_64.zip
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
+            https://github.com/godotengine/godot/releases/download/4.3-stable/SHA512-SUMS.txt \
+            -o "$ROOT/GODOT_SHA512_SUMS.txt"
+          GODOT_SHA512="$(awk -v editor="$editor" '$2==editor {print $1}' "$ROOT/GODOT_SHA512_SUMS.txt")"
+          test "${#GODOT_SHA512}" -eq 128
+          python3 - "$ROOT/GATE1_DISCOVERY.json" "$GODOT_SHA512" <<'PY'
           from pathlib import Path
-          import hashlib,json
-          root=Path('build/manama-souq-source'); files=[]
-          for p in sorted(x for x in root.rglob('*') if x.is_file() and ('reports' in x.parts or 'logs' in x.parts or 'artifacts' in x.parts)):
-              files.append({'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
-          (root/'MANAMA_SOUQ_SOURCE_EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
+          import hashlib,json,os,platform,sys
+          out=Path(sys.argv[1]); godot_sha512=sys.argv[2]
+          paths=[
+              'tools/vertical_slice/composite_source_authority.py',
+              'tools/vertical_slice/promote_manama_souq_asset_authority.sh',
+              'tools/apply_premium_overlay_resilient.py',
+              'tools/apply_bahrain_brick_premium_world_overlay.py',
+              'tools/v3_patch_restore.py',
+              'tools/apply_premium_validation_corrections.py',
+              'tools/apply_post_lifecycle_teardown_guards.py',
+              'tools/apply_visual_evidence_shutdown_fix.py',
+              'tools/verify_frozen_controls.py',
+          ]
+          paths += [p.as_posix() for p in sorted(Path('tools/premium_validation_v18_parts').glob('part_*.pyfrag'))]
+          paths += [p.as_posix() for p in sorted(Path('tools/premium_payload_v2').glob('*')) if p.is_file()]
+          paths += [p.as_posix() for p in sorted(Path('tools/premium_visual_upgrade_v3').glob('*')) if p.is_file()]
+          files=[]
+          for raw in paths:
+              p=Path(raw)
+              if not p.is_file(): raise SystemExit(f'missing authority input: {raw}')
+              files.append({'path':raw,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          os_release={}
+          for line in Path('/etc/os-release').read_text().splitlines():
+              if '=' in line:
+                  k,v=line.split('=',1); os_release[k]=v.strip('"')
+          value={
+              'schema_version':1,
+              'runner_image':f"{os.environ.get('ImageOS')}@{os.environ.get('ImageVersion')}",
+              'os_release':os_release.get('PRETTY_NAME'),
+              'python':platform.python_version(),
+              'godot_version':'4.3.stable.official.77dcf97d8',
+              'godot_archive_sha512':godot_sha512,
+              'reconstruction_inputs':files,
+          }
+          out.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(value,indent=2,sort_keys=True))
           PY
 
-      - name: Upload complete Manama Souq source evidence
-        if: always()
+      - name: Upload promotion and discovery evidence
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-manama-souq-source-${{ github.run_id }}
-          path: |
-            build/manama-souq-source/reports
-            build/manama-souq-source/logs
-            build/manama-souq-source/artifacts
-            build/manama-souq-source/MANAMA_SOUQ_SOURCE_EVIDENCE_INVENTORY.json
+          name: bahrain-brick-pr59-authority-promotion-${{ github.run_id }}
+          path: build/manama-souq-authority-promotion
           if-no-files-found: error
           retention-days: 30
