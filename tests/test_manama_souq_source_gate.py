@@ -96,7 +96,14 @@ class ManamaSouqSourceGateContractTests(unittest.TestCase):
             self.assertIn(fragment, self.driver)
         self.assertIn("set -euo pipefail", self.driver)
         self.assertNotIn("godot --headless", self.driver.lower())
-        self.assertNotIn("run_manama_souq_source_gate", self.driver)
+        self.assertIn(
+            'cp "$REPO_ROOT/tools/vertical_slice/run_manama_souq_source_gate.sh"',
+            self.driver,
+        )
+        self.assertNotIn(
+            "bash tools/vertical_slice/run_manama_souq_source_gate.sh",
+            self.driver,
+        )
 
     def test_authority_tool_rejects_unsafe_or_untracked_source_states(self) -> None:
         for fragment in (
