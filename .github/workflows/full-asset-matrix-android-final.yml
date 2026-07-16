@@ -1,0 +1,332 @@
+name: Bahrain Brick Full Matrix Android Final
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - .github/workflows/full-asset-matrix-android-final.yml
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/full-asset-matrix-android-final.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-full-matrix-android-final-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_ARTIFACT_ID: '8360668742'
+  SOURCE_HEAD_SHA: ba31e620bdcbc2e8def98e2b888362620c26c4db
+  EXPECTED_APK_SHA256: f4fcae42fdaa1a79620a2869faccd4e95a701eb43587a0092c3a14363bc18bdd
+  HOLDER_ARTIFACT_ID: '8359310173'
+  EXPECTED_HOLDER_SHA256: 65149352c1d81f68444e292bedaf0017b0ff6b9ecd5a7923e632a895deb441e7
+  PACKAGE_NAME: com.bahrainbrick.game.qa
+  HOLDER_PACKAGE: com.brickbahrain.landscapeholder
+  AVD_NAME: bahrain_brick_full_matrix_api34
+  ANDROID_USER_HOME: ${{ github.workspace }}/build/android-user
+  ANDROID_AVD_HOME: ${{ github.workspace }}/build/android-user/avd
+
+jobs:
+  android_final:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Check out exact integration head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Recover and verify complete 436-GLB production authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/source build/final/reports build/final/logs build/final/artifacts "$ANDROID_AVD_HOME"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}" > build/final/reports/SOURCE_ARTIFACT_METADATA.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > build/source.zip
+          unzip -tq build/source.zip
+          unzip -q build/source.zip -d build/source
+          test -f build/source/reports/FULL_ASSET_MATRIX_COMPLETION.json
+          test -f build/source/reports/FULL_ASSET_MATRIX_VALIDATION.json
+          test -f build/source/artifacts/bahrain-brick-full-asset-matrix-debug.apk
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          completion=json.loads(Path('build/source/reports/FULL_ASSET_MATRIX_COMPLETION.json').read_text())
+          validation=json.loads(Path('build/source/reports/FULL_ASSET_MATRIX_VALIDATION.json').read_text())
+          assert completion == {
+              'apk': completion['apk'],
+              'architecture_derivatives': 432,
+              'architecture_sources': 48,
+              'commercial_outputs': 4,
+              'khronos_validated': 436,
+              'passed': True,
+              'protected_pre_post_identical': True,
+              'textured_glbs': 436,
+              'total_glbs': 436,
+              'unique_glb_hashes': 436,
+          }, completion
+          assert validation['passed'] is True and validation['failures'] == [], validation.get('failures')
+          assert validation['total_derivatives'] == 436
+          assert validation['textured_assets'] == 436
+          assert validation['unique_hashes'] == 436
+          PY
+          test "$(find build/source/generated/full_matrix -type f -name '*.glb' | wc -l)" -eq 436
+          cp build/source/artifacts/bahrain-brick-full-asset-matrix-debug.apk build/final/artifacts/
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" build/final/artifacts/bahrain-brick-full-asset-matrix-debug.apk | sha256sum -c -
+          printf '%s\n' "$SOURCE_HEAD_SHA" > build/final/reports/SOURCE_HEAD_SHA.txt
+          cp build/source/reports/FULL_ASSET_MATRIX_COMPLETION.json build/final/reports/
+          cp build/source/reports/FULL_ASSET_MATRIX_VALIDATION.json build/final/reports/
+          cp build/source/reports/FULL_ASSET_MATRIX_RUNTIME_MANIFEST.json build/final/reports/
+          cp build/source/reports/FROZEN_CONTROLS_PRE.json build/final/reports/
+          cp build/source/reports/FROZEN_CONTROLS_POST.json build/final/reports/
+
+      - name: Recover checksum-pinned landscape holder
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${HOLDER_ARTIFACT_ID}/zip" > build/holder-source.zip
+          unzip -tq build/holder-source.zip
+          unzip -q build/holder-source.zip -d build/holder-source
+          holder="$(find build/holder-source -type f -name 'landscape-holder.apk' | head -1)"
+          test -n "$holder"
+          cp "$holder" build/final/artifacts/landscape-holder.apk
+          printf '%s  %s\n' "$EXPECTED_HOLDER_SHA256" build/final/artifacts/landscape-holder.apk | sha256sum -c -
+
+      - name: Provision unified API 34 AVD
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            emulator
+            system-images;android-34;google_apis;x86_64
+
+      - name: Create unified landscape AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
+          AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -1)"
+          test -x "$JAVA_HOME/bin/java"
+          test -x "$SDKMANAGER"
+          test -x "$AVDMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-34;google_apis;x86_64"
+          rm -rf "$ANDROID_USER_HOME"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$AVDMANAGER" create avd --force --name "$AVD_NAME" \
+            --package "system-images;android-34;google_apis;x86_64" --device "pixel_7" \
+            > build/final/logs/avd-create.log 2>&1
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee build/final/reports/EMULATOR_LIST_AVDS.txt
+          grep -qx "$AVD_NAME" build/final/reports/EMULATOR_LIST_AVDS.txt
+
+      - name: Run holder-stabilized traversal and soak validation
+        id: runtime
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
+          REPORTS=build/final/reports
+          LOGS=build/final/logs
+          ARTIFACTS=build/final/artifacts
+          APK="$ARTIFACTS/bahrain-brick-full-asset-matrix-debug.apk"
+          HOLDER="$ARTIFACTS/landscape-holder.apk"
+          mkdir -p "$REPORTS" "$LOGS" "$ARTIFACTS"
+          sudo chmod 666 /dev/kvm || true
+          "$EMULATOR" -avd "$AVD_NAME" -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
+            -gpu swiftshader_indirect -camera-back none -camera-front none -memory 4096 -cores 2 -no-metrics \
+            > "$LOGS/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          LOGCAT_PID=''
+          cleanup() {
+            if [ -n "$LOGCAT_PID" ]; then kill "$LOGCAT_PID" 2>/dev/null || true; fi
+            "$ADB" emu kill >/dev/null 2>&1 || true
+            kill "$EMULATOR_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          timeout 240s "$ADB" wait-for-device
+          BOOTED=0
+          for attempt in $(seq 1 150); do
+            kill -0 "$EMULATOR_PID"
+            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = '1' ]; then BOOTED=1; break; fi
+            sleep 2
+          done
+          test "$BOOTED" -eq 1
+          "$ADB" shell settings put system screen_off_timeout 2147483647 || true
+
+          "$ADB" install -r "$HOLDER" | tee "$LOGS/holder-install.log"
+          "$ADB" shell am start -W -n "$HOLDER_PACKAGE/.MainActivity" | tee "$LOGS/holder-launch.log"
+          STABLE=0
+          for attempt in $(seq 1 90); do
+            "$ADB" shell dumpsys window displays > "$REPORTS/HOLDER_WINDOW_DISPLAYS.txt"
+            "$ADB" shell dumpsys window windows > "$REPORTS/HOLDER_WINDOWS.txt"
+            if grep -q 'mDisplayRotation=ROTATION_90' "$REPORTS/HOLDER_WINDOW_DISPLAYS.txt" \
+              && grep -q "$HOLDER_PACKAGE/.MainActivity" "$REPORTS/HOLDER_WINDOWS.txt"; then
+              STABLE=$((STABLE + 1))
+            else
+              STABLE=0
+            fi
+            [ "$STABLE" -ge 5 ] && break
+            sleep 1
+          done
+          test "$STABLE" -ge 5
+          sleep 5
+
+          "$ADB" install -r -t "$APK" | tee "$LOGS/apk-install.log"
+          "$ADB" shell pm path "$PACKAGE_NAME" | tee "$REPORTS/PACKAGE_PATH.txt" | grep -q '^package:'
+          "$ADB" logcat -c
+          "$ADB" logcat -v threadtime > "$LOGS/logcat-continuous.txt" 2>&1 &
+          LOGCAT_PID=$!
+          "$ADB" shell am start -W -n "$PACKAGE_NAME/com.godot.game.GodotApp" | tee "$LOGS/apk-launch.log"
+          READY=0
+          for attempt in $(seq 1 120); do
+            if grep -q 'BAHRAIN BRICK GAME ASSET LAB READY' "$LOGS/logcat-continuous.txt"; then READY=1; break; fi
+            test -n "$("$ADB" shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
+            sleep 2
+          done
+          test "$READY" -eq 1
+
+          capture() {
+            local output="$1"
+            "$ADB" exec-out screencap -p > "$output"
+            python3 - "$output" <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          import sys
+          path=Path(sys.argv[1]); image=Image.open(path).convert('RGB'); stat=ImageStat.Stat(image)
+          width,height=image.size; mean=sum(stat.mean)/3.0
+          varied=sum(1 for low,high in stat.extrema if high-low>35)
+          assert width>height and path.stat().st_size>25000 and mean>12 and varied>=2, (width,height,path.stat().st_size,mean,stat.extrema)
+          PY
+          }
+          capture "$ARTIFACTS/android-startup.png"
+
+          memory_kb() {
+            "$ADB" shell dumpsys meminfo "$PACKAGE_NAME" | awk '/TOTAL PSS:/{print $3; exit} /^ TOTAL[[:space:]]/{print $2; exit}'
+          }
+          START_PSS="$(memory_kb)"; START_PSS="${START_PSS:-0}"
+          printf 'timestamp,label,total_pss_kb\n' > "$REPORTS/RUNTIME_METRICS.csv"
+          printf '%s,start,%s\n' "$(date -u +%FT%TZ)" "$START_PSS" >> "$REPORTS/RUNTIME_METRICS.csv"
+
+          TRAVERSAL_START=$(date +%s)
+          for sample in $(seq 1 20); do
+            test -n "$("$ADB" shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
+            "$ADB" shell input swipe 190 600 190 390 700 >/dev/null 2>&1 || true
+            "$ADB" shell input swipe 1060 500 1140 500 350 >/dev/null 2>&1 || true
+            "$ADB" shell input keyevent KEYCODE_W >/dev/null 2>&1 || true
+            PSS="$(memory_kb)"; PSS="${PSS:-0}"
+            printf '%s,traversal_%02d,%s\n' "$(date -u +%FT%TZ)" "$sample" "$PSS" >> "$REPORTS/RUNTIME_METRICS.csv"
+            [ "$sample" -eq 10 ] && capture "$ARTIFACTS/android-traversal-midpoint.png"
+            sleep 30
+          done
+          TRAVERSAL_SECONDS=$(( $(date +%s) - TRAVERSAL_START ))
+          test "$TRAVERSAL_SECONDS" -ge 600
+
+          "$ADB" shell input keyevent KEYCODE_HOME
+          sleep 3
+          "$ADB" shell am start -W -n "$PACKAGE_NAME/com.godot.game.GodotApp" >> "$LOGS/apk-launch.log"
+          sleep 8
+          test -n "$("$ADB" shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
+
+          SOAK_START=$(date +%s)
+          for sample in $(seq 1 60); do
+            test -n "$("$ADB" shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
+            PSS="$(memory_kb)"; PSS="${PSS:-0}"
+            printf '%s,soak_%02d,%s\n' "$(date -u +%FT%TZ)" "$sample" "$PSS" >> "$REPORTS/RUNTIME_METRICS.csv"
+            [ "$sample" -eq 30 ] && capture "$ARTIFACTS/android-soak-midpoint.png"
+            sleep 30
+          done
+          SOAK_SECONDS=$(( $(date +%s) - SOAK_START ))
+          test "$SOAK_SECONDS" -ge 1800
+          END_PSS="$(memory_kb)"; END_PSS="${END_PSS:-0}"
+          printf '%s,end,%s\n' "$(date -u +%FT%TZ)" "$END_PSS" >> "$REPORTS/RUNTIME_METRICS.csv"
+          if [ "$START_PSS" -gt 0 ] && [ "$END_PSS" -gt 0 ]; then
+            LIMIT=$(( START_PSS + 204800 ))
+            PERCENT_LIMIT=$(( START_PSS * 3 / 2 ))
+            [ "$PERCENT_LIMIT" -gt "$LIMIT" ] && LIMIT="$PERCENT_LIMIT"
+            test "$END_PSS" -le "$LIMIT"
+          fi
+          capture "$ARTIFACTS/android-final.png"
+          "$ADB" logcat -d > "$LOGS/logcat-final.txt"
+          "$ADB" shell dumpsys gfxinfo "$PACKAGE_NAME" > "$REPORTS/GFXINFO.txt" 2>&1 || true
+          "$ADB" shell dumpsys window displays > "$REPORTS/WINDOW_DISPLAYS.txt"
+          "$ADB" shell dumpsys activity activities > "$REPORTS/ACTIVITY.txt"
+          if grep -E 'FATAL EXCEPTION|Fatal signal|ANR in|am_crash|am_anr|Condition "configured" is true|Singleton for Time already exists' "$LOGS/logcat-final.txt"; then
+            exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import hashlib,json
+          apk=Path('build/final/artifacts/bahrain-brick-full-asset-matrix-debug.apk')
+          frames=[]
+          for path in sorted(Path('build/final/artifacts').glob('android-*.png')):
+              image=Image.open(path)
+              frames.append({'path':str(path),'bytes':path.stat().st_size,'dimensions':list(image.size),'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+          report={
+              'passed':True,
+              'api_level':34,
+              'abi':'x86_64',
+              'orientation':'landscape_holder_stabilized',
+              'package':'com.bahrainbrick.game.qa',
+              'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+              'world_ready_marker':'BAHRAIN BRICK GAME ASSET LAB READY',
+              'traversal_required_seconds':600,
+              'traversal_passed':True,
+              'soak_required_seconds':1800,
+              'soak_passed':True,
+              'memory_growth_passed':True,
+              'screenshots':frames,
+              'critical_runtime_errors':0,
+          }
+          Path('build/final/reports/ANDROID_FINAL_VALIDATION.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Build final checksum inventory
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          roots=[Path('build/source/generated/full_matrix'),Path('build/final')]
+          files=[]
+          for root in roots:
+              if root.exists():
+                  for path in sorted(p for p in root.rglob('*') if p.is_file()):
+                      files.append({'path':str(path),'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+          Path('build/final/FINAL_EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload complete final production package
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-full-matrix-final-${{ github.run_id }}
+          path: |
+            build/source/generated/full_matrix
+            build/final
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require final Android success after evidence upload
+        if: always()
+        shell: bash
+        run: test '${{ steps.runtime.outcome }}' = 'success'
