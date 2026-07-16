@@ -53,20 +53,27 @@ jobs:
           unzip -q "$ROOT/source.zip" -d "$ROOT/source"
           cp "$ROOT/source/artifacts/bahrain-brick-full-matrix-vulkan-debug.apk" "$ROOT/bahrain-brick-full-matrix-vulkan-debug.apk"
           printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$ROOT/bahrain-brick-full-matrix-vulkan-debug.apk" | sha256sum -c -
-          unzip -l "$ROOT/bahrain-brick-full-matrix-vulkan-debug.apk" | grep -q 'lib/x86_64/libgodot_android.so'
           grep -q "package: name='$PACKAGE_NAME' versionCode='1406' versionName='1.4.0.6-full-matrix-vulkan-qa'" "$ROOT/source/reports/APK_BADGING.txt"
           python3 - <<'PY'
           from pathlib import Path
+          from zipfile import ZipFile
           import json
-          root=Path('build/vulkan-matrix-runtime/source/reports')
+          base=Path('build/vulkan-matrix-runtime')
+          apk=base/'bahrain-brick-full-matrix-vulkan-debug.apk'
+          with ZipFile(apk) as archive:
+              names=set(archive.namelist())
+          assert 'lib/x86_64/libgodot_android.so' in names
+          root=base/'source/reports'
           pre=(root/'FROZEN_CONTROLS_VULKAN_PRE.json').read_bytes()
           post=(root/'FROZEN_CONTROLS_VULKAN_POST.json').read_bytes()
           assert pre == post
-          assert json.loads((root/'CRITICAL_RUNTIME_ERROR_SCAN.json').read_text())['status'] == 'PASS'
+          scan=json.loads((root/'CRITICAL_RUNTIME_ERROR_SCAN.json').read_text())
+          assert scan['conclusion'] == 'pass' and scan['unresolved_count'] == 0, scan
           PY
           cp "$ROOT/source/reports/APK_BADGING.txt" "$ROOT/reports/SOURCE_APK_BADGING.txt"
           cp "$ROOT/source/reports/APK_SHA256SUM.txt" "$ROOT/reports/SOURCE_APK_SHA256SUM.txt"
           cp "$ROOT/source/reports/FROZEN_CONTROLS_VULKAN_POST.json" "$ROOT/reports/SOURCE_FROZEN_CONTROLS.json"
+          cp "$ROOT/source/reports/CRITICAL_RUNTIME_ERROR_SCAN.json" "$ROOT/reports/SOURCE_CRITICAL_RUNTIME_ERROR_SCAN.json"
 
       - name: Provision Java 17
         uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
