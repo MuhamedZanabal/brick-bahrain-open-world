@@ -105,13 +105,16 @@ jobs:
           source=Path('tools/asset_lab/run_full_matrix_emulator_validation.sh')
           target=Path('build/vulkan-matrix-runtime/run_full_matrix_emulator_validation_stable.sh')
           text=source.read_text()
-          old_image='SYSTEM_IMAGE="system-images;android-34;google_apis;x86_64"'
-          new_image='SYSTEM_IMAGE="${FULL_MATRIX_SYSTEM_IMAGE:-system-images;android-34;google_apis;x86_64}"'
-          assert text.count(old_image) == 1
-          text=text.replace(old_image,new_image)
+          old_sdk='''"$SDKMANAGER" 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0' 'emulator' 'system-images;android-34;google_apis;x86_64' '''.rstrip()
+          new_sdk='''"$SDKMANAGER" 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0' 'emulator' "$FULL_MATRIX_SYSTEM_IMAGE"'''
+          old_avd='''echo no | "$AVDMANAGER" create avd --force --name "$AVD_NAME" --package 'system-images;android-34;google_apis;x86_64' --device pixel_7 > "$LOGS/full-matrix-avd-create.txt" 2>&1'''
+          new_avd='''echo no | "$AVDMANAGER" create avd --force --name "$AVD_NAME" --package "$FULL_MATRIX_SYSTEM_IMAGE" --device pixel_7 > "$LOGS/full-matrix-avd-create.txt" 2>&1'''
+          assert text.count(old_sdk) == 1, text.count(old_sdk)
+          assert text.count(old_avd) == 1, text.count(old_avd)
+          text=text.replace(old_sdk,new_sdk).replace(old_avd,new_avd)
           anchor='''[[ "$stable" -ge 5 ]] || failed "landscape holder did not stabilize display"\nsleep 5\n\n"$ADB" install -r -t "$APK"'''
           replacement='''[[ "$stable" -ge 5 ]] || failed "landscape holder did not stabilize display"\nsleep 5\n\n# Fresh emulator images can still be attaching input devices after boot.\n# Launching Godot during that configuration churn recreates the activity and\n# triggers Godot 4.3 native reinitialization failure. Disable background\n# networking and require a sustained quiet window before the Godot process exists.\n"$ADB" shell svc wifi disable >/dev/null 2>&1 || true\n"$ADB" shell svc data disable >/dev/null 2>&1 || true\n"$ADB" logcat -c\nSETTLE_LOG="$LOGS/full-matrix-system-settle.txt"\n"$ADB" logcat -v threadtime > "$SETTLE_LOG" 2>&1 & SETTLE_PID=$!\nquiet=0; previous=-1\nfor _ in $(seq 1 120); do\n  current="$(grep -Ec 'InputReader: Reconfiguring input devices|CONFIGURATION_CHANGED|RoleService: Granting default roles|PACKAGE_REPLACED|PACKAGE_CHANGED' "$SETTLE_LOG" 2>/dev/null || true)"\n  if [[ "$current" == "$previous" ]]; then quiet=$((quiet+1)); else quiet=0; previous="$current"; fi\n  [[ "$quiet" -ge 15 ]] && break\n  sleep 2\ndone\nkill "$SETTLE_PID" >/dev/null 2>&1 || true; wait "$SETTLE_PID" >/dev/null 2>&1 || true\n[[ "$quiet" -ge 15 ]] || failed "emulator input/configuration state did not become quiescent"\nsleep 5\n\n"$ADB" install -r -t "$APK"'''
-          assert text.count(anchor) == 1
+          assert text.count(anchor) == 1, text.count(anchor)
           text=text.replace(anchor,replacement)
           target.write_text(text)
           target.chmod(0o755)
