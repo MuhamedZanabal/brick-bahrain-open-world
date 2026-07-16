@@ -42,12 +42,15 @@ class ManamaSouqSourceGateContractTests(unittest.TestCase):
             "reconstruct_manama_souq_composite.sh A",
             "reconstruct_manama_souq_composite.sh B",
             "composite_source_authority.py compare",
+        ):
+            self.assertIn(fragment, self.workflow)
+        for fragment in (
             "FINAL_TREE_MANIFEST.json",
             "FINAL_TREE_AUTHORITY.json",
             "MANAMA_SOUQ_COMPOSITE_SOURCE.zip",
             "EVIDENCE_INVENTORY.json",
         ):
-            self.assertIn(fragment, self.workflow)
+            self.assertIn(fragment, self.driver)
         self.assertNotIn("Run full Manama Souq source and Godot gate", self.workflow)
         self.assertNotIn("run_manama_souq_source_gate.sh", self.workflow)
         self.assertNotIn("--editor --import", self.workflow)
