@@ -65,8 +65,9 @@ jobs:
           assert report['file_count'] == 1502
           assert report['total_bytes'] == 369162800
           frozen=json.loads((ev/'FROZEN_CONTROLS_PRE.json').read_text())
-          assert frozen['passed'] is True
-          assert frozen['passed_checks'] == 25
+          assert frozen['checks'] == 25
+          assert frozen['failures'] == []
+          assert all(item.get('pass') is True for item in frozen['results'])
           PY
 
       - name: Materialize pinned Godot and source diagnostics
@@ -83,7 +84,7 @@ jobs:
           cp "$GAME/project.godot" "$GAME/scripts/brick_factory.gd" "$GAME/scripts/souq_population_controller.gd" "$GAME/tests/souq_population_runtime.gd" build/gate2-evidence/source-context/
           sha256sum "$GAME/project.godot" "$GAME/scripts/brick_factory.gd" "$GAME/scripts/souq_population_controller.gd" "$GAME/tests/souq_population_runtime.gd" > build/gate2-evidence/SOURCE_SHA256.txt
           python3 - "$GAME/project.godot" > build/gate2-evidence/AUTOLOADS.json <<'PY'
-          import json,re,sys
+          import json,sys
           lines=open(sys.argv[1],encoding='utf-8').read().splitlines()
           active=False; values={}
           for line in lines:
