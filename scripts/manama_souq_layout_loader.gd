@@ -22,10 +22,10 @@ var last_error: String = ""
 
 func load_layout(path: String, full_manifest_path: String) -> Dictionary:
 	_reset()
-	var layout_variant := _read_json(path)
+	var layout_variant: Variant = _read_json(path)
 	if not layout_variant is Dictionary:
 		return _reject("layout JSON is missing or invalid")
-	var manifest_variant := _read_json(full_manifest_path)
+	var manifest_variant: Variant = _read_json(full_manifest_path)
 	if not manifest_variant is Dictionary:
 		return _reject("full matrix manifest is missing or invalid")
 	_layout = layout_variant as Dictionary
@@ -45,34 +45,37 @@ func instantiate_layout(root: Node3D, camera: Camera3D, profile: String) -> Dict
 	if not _loaded or root == null or camera == null:
 		last_error = "layout must be loaded before instantiation"
 		return {}
-	var normalized_profile := GoldenMasterQuality.normalize_profile(profile)
-	var zones := _ensure_zones(root)
+	var normalized_profile: String = GoldenMasterQuality.normalize_profile(profile)
+	var zones: Dictionary = _ensure_zones(root)
 	var placements: Array = _layout.get("placements", [])
-	var sorted_placements := placements.duplicate(true)
-	sorted_placements.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a.get("placement_id", "")) < str(b.get("placement_id", "")))
-	var architecture_count := 0
-	var commercial_count := 0
+	var sorted_placements: Array = placements.duplicate(true)
+	sorted_placements.sort_custom(
+		func(a: Dictionary, b: Dictionary) -> bool:
+			return str(a.get("placement_id", "")) < str(b.get("placement_id", ""))
+	)
+	var architecture_count: int = 0
+	var commercial_count: int = 0
 	var zone_counts: Dictionary = {}
 	var loaded_asset_ids: Array[String] = []
 	for zone_name: String in REQUIRED_ZONES:
 		zone_counts[zone_name] = 0
 	for placement_variant: Variant in sorted_placements:
-		var placement := placement_variant as Dictionary
-		var family := str(placement.get("family", ""))
-		var asset_id := str(placement.get("asset_id", ""))
-		var zone_name := str(placement.get("zone", ""))
-		var zone := zones.get(zone_name) as Node3D
+		var placement: Dictionary = placement_variant as Dictionary
+		var family: String = str(placement.get("family", ""))
+		var asset_id: String = str(placement.get("asset_id", ""))
+		var zone_name: String = str(placement.get("zone", ""))
+		var zone: Node3D = zones.get(zone_name) as Node3D
 		if zone == null:
 			last_error = "required zone missing during instantiation: %s" % zone_name
 			return {}
 		var instance: Node3D
 		if family == "commercial":
-			var commercial_record := _commercial_by_id.get(asset_id, {}) as Dictionary
-			var commercial_path := str(commercial_record.get("path", ""))
+			var commercial_record: Dictionary = _commercial_by_id.get(asset_id, {}) as Dictionary
+			var commercial_path: String = str(commercial_record.get("path", ""))
 			if not ResourceLoader.exists(commercial_path, "PackedScene"):
 				last_error = "commercial scene missing: %s" % commercial_path
 				return {}
-			var packed := ResourceLoader.load(commercial_path, "PackedScene") as PackedScene
+			var packed: PackedScene = ResourceLoader.load(commercial_path, "PackedScene") as PackedScene
 			if packed == null:
 				last_error = "commercial scene is not PackedScene: %s" % commercial_path
 				return {}
@@ -82,8 +85,8 @@ func instantiate_layout(root: Node3D, camera: Camera3D, profile: String) -> Dict
 				return {}
 			commercial_count += 1
 		else:
-			var manifest_record := _architecture_by_id.get(asset_id, {}) as Dictionary
-			var lod_instance := GoldenMasterLODInstance.new()
+			var manifest_record: Dictionary = _architecture_by_id.get(asset_id, {}) as Dictionary
+			var lod_instance: GoldenMasterLODInstance = GoldenMasterLODInstance.new()
 			if not lod_instance.configure(manifest_record, normalized_profile, camera, _hysteresis_m):
 				last_error = "LOD configuration failed for %s" % asset_id
 				return {}
@@ -109,7 +112,7 @@ func instantiate_layout(root: Node3D, camera: Camera3D, profile: String) -> Dict
 
 func get_mission_points() -> Dictionary:
 	var result: Dictionary = {}
-	var points := _layout.get("mission_points", {}) as Dictionary
+	var points: Dictionary = _layout.get("mission_points", {}) as Dictionary
 	for key: String in points:
 		result[key] = _vector3(points[key])
 	return result
@@ -128,8 +131,12 @@ func get_population_contract() -> Dictionary:
 
 
 func get_bounds() -> AABB:
-	var bounds := _layout.get("bounds", {}) as Dictionary
-	var minimum := Vector3(float(bounds.get("min_x", -110.0)), -4.0, float(bounds.get("min_z", -110.0)))
+	var bounds: Dictionary = _layout.get("bounds", {}) as Dictionary
+	var minimum: Vector3 = Vector3(
+		float(bounds.get("min_x", -110.0)),
+		-4.0,
+		float(bounds.get("min_z", -110.0))
+	)
 	return AABB(minimum, Vector3(220.0, 80.0, 220.0))
 
 
@@ -140,7 +147,7 @@ func _validate_layout_header() -> bool:
 	if str(_layout.get("parent_authority", "")) != "fc8f00182f97c39015610d6603fa7c9c44364c5d":
 		_reject("layout parent authority mismatch")
 		return false
-	var bounds := _layout.get("bounds", {}) as Dictionary
+	var bounds: Dictionary = _layout.get("bounds", {}) as Dictionary
 	if float(bounds.get("max_x", 0.0)) - float(bounds.get("min_x", 0.0)) != 220.0 or float(bounds.get("max_z", 0.0)) - float(bounds.get("min_z", 0.0)) != 220.0:
 		_reject("layout bounds are not 220m x 220m")
 		return false
@@ -162,15 +169,15 @@ func _index_full_manifest() -> bool:
 		_reject("full matrix commercial authority is not 4")
 		return false
 	for record_variant: Variant in architecture:
-		var record := record_variant as Dictionary
-		var asset_id := str(record.get("asset_id", ""))
+		var record: Dictionary = record_variant as Dictionary
+		var asset_id: String = str(record.get("asset_id", ""))
 		if asset_id.is_empty() or _architecture_by_id.has(asset_id):
 			_reject("duplicate or empty architecture asset ID")
 			return false
 		_architecture_by_id[asset_id] = record
 	for record_variant: Variant in commercial:
-		var record := record_variant as Dictionary
-		var asset_id := str(record.get("asset_id", ""))
+		var record: Dictionary = record_variant as Dictionary
+		var asset_id: String = str(record.get("asset_id", ""))
 		if asset_id.is_empty() or _commercial_by_id.has(asset_id):
 			_reject("duplicate or empty commercial asset ID")
 			return false
@@ -183,19 +190,19 @@ func _validate_placements() -> bool:
 	var seen: Dictionary = {}
 	var counts: Dictionary = {}
 	var commercial_ids: Dictionary = {}
-	var bounds := _layout.get("bounds", {}) as Dictionary
+	var bounds: Dictionary = _layout.get("bounds", {}) as Dictionary
 	for placement_variant: Variant in placements:
 		if not placement_variant is Dictionary:
 			_reject("placement record is not a Dictionary")
 			return false
-		var placement := placement_variant as Dictionary
-		var placement_id := str(placement.get("placement_id", ""))
+		var placement: Dictionary = placement_variant as Dictionary
+		var placement_id: String = str(placement.get("placement_id", ""))
 		if placement_id.is_empty() or seen.has(placement_id):
 			_reject("duplicate placement_id: %s" % placement_id)
 			return false
 		seen[placement_id] = true
-		var family := str(placement.get("family", ""))
-		var asset_id := str(placement.get("asset_id", ""))
+		var family: String = str(placement.get("family", ""))
+		var asset_id: String = str(placement.get("asset_id", ""))
 		if family == "commercial":
 			if not _commercial_by_id.has(asset_id):
 				_reject("asset missing from full matrix manifest: %s" % asset_id)
@@ -205,15 +212,15 @@ func _validate_placements() -> bool:
 			if not _architecture_by_id.has(asset_id):
 				_reject("asset missing from full matrix manifest: %s" % asset_id)
 				return false
-			var record := _architecture_by_id[asset_id] as Dictionary
+			var record: Dictionary = _architecture_by_id[asset_id] as Dictionary
 			if str(record.get("family", "")) != family:
 				_reject("placement family does not match full matrix manifest: %s" % asset_id)
 				return false
-		var zone_name := str(placement.get("zone", ""))
+		var zone_name: String = str(placement.get("zone", ""))
 		if not zone_name in REQUIRED_ZONES:
 			_reject("required zone missing from placement: %s" % zone_name)
 			return false
-		var position := _vector3(placement.get("position", []))
+		var position: Vector3 = _vector3(placement.get("position", []))
 		if position.x < float(bounds.get("min_x", 0.0)) or position.x > float(bounds.get("max_x", 0.0)) or position.z < float(bounds.get("min_z", 0.0)) or position.z > float(bounds.get("max_z", 0.0)):
 			_reject("placement outside layout bounds: %s" % placement_id)
 			return false
@@ -231,7 +238,7 @@ func _validate_placements() -> bool:
 func _ensure_zones(root: Node3D) -> Dictionary:
 	var zones: Dictionary = {}
 	for zone_name: String in REQUIRED_ZONES:
-		var node := root.get_node_or_null(zone_name) as Node3D
+		var node: Node3D = root.get_node_or_null(zone_name) as Node3D
 		if node == null:
 			node = Node3D.new()
 			node.name = zone_name
@@ -251,7 +258,7 @@ func _read_json(path: String) -> Variant:
 	if not FileAccess.file_exists(path):
 		last_error = "file missing: %s" % path
 		return null
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		last_error = "file could not be opened: %s" % path
 		return null
@@ -261,7 +268,7 @@ func _read_json(path: String) -> Variant:
 func _vector3(value: Variant) -> Vector3:
 	if not value is Array or (value as Array).size() != 3:
 		return Vector3.ZERO
-	var parts := value as Array
+	var parts: Array = value as Array
 	return Vector3(float(parts[0]), float(parts[1]), float(parts[2]))
 
 
