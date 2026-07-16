@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,hashlib,importlib.util,json
+import argparse,hashlib,importlib.util,json,shutil,subprocess
 from v3_patch_restore import apply_patch_isolated, restore_missing_new_files
 from pathlib import Path
 
@@ -10,6 +10,17 @@ base=importlib.util.module_from_spec(spec); assert spec.loader; spec.loader.exec
 
 def sha(path:Path)->str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def ensure_svg_renderer()->None:
+    if shutil.which('rsvg-convert'):
+        return
+    sudo=shutil.which('sudo')
+    if not sudo:
+        raise RuntimeError('rsvg-convert missing and sudo is unavailable')
+    subprocess.run([sudo,'apt-get','update'],check=True)
+    subprocess.run([sudo,'apt-get','install','-y','--no-install-recommends','librsvg2-bin'],check=True)
+    if not shutil.which('rsvg-convert'):
+        raise RuntimeError('librsvg2-bin installed but rsvg-convert is unavailable')
 
 def apply_v3(project:Path,patch:bytes,expected:dict[str,str])->tuple[list[str],list[str]]:
     collisions=[]
@@ -37,6 +48,7 @@ def main()->int:
     patch,manifest=base.load_v3_patch_and_manifest(tools)
     v3_files,restored=apply_v3(project,patch,manifest)
     post=base.apply_post_v3_replacements(project)
+    ensure_svg_renderer()
     generated=base.generate_binary_artwork(project)+base.prepare_release_smoke_harness(project)
     changed=sorted(set(changed+v3_files+post+generated))
     after={x:sha(project/x) for x in base.FROZEN}; mismatches=[x for x in base.FROZEN if before[x]!=after[x]]
