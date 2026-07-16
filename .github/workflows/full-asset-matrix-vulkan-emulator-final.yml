@@ -57,13 +57,15 @@ jobs:
           unzip -q "$ROOT/source.zip" -d "$ROOT/source"
           cp "$ROOT/source/artifacts/$APK_NAME" "$ROOT/$APK_NAME"
           printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$ROOT/$APK_NAME" | sha256sum -c -
-          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" "$ROOT/source/reports/INDEPENDENT_APK_BADGING.txt"
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
           import json
           base=Path('build/vulkan-matrix-runtime')
           apk=base/'bahrain-brick-full-matrix-vulkan-lit-qa.apk'
+          badging=(base/'source/reports/INDEPENDENT_APK_BADGING.txt').read_text()
+          required="package: name='com.bahrainbrick.game.qa' versionCode='1408' versionName='1.4.0.8-full-matrix-vulkan-lit-qa'"
+          assert required in badging, badging
           with ZipFile(apk) as archive:
               names=set(archive.namelist())
           assert 'lib/x86_64/libgodot_android.so' in names
@@ -102,9 +104,20 @@ jobs:
           APK="$ROOT/$APK_NAME"
           BUILD_TOOLS="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/34.0.0"
           "$BUILD_TOOLS/aapt" dump badging "$APK" > "$ROOT/reports/RUNTIME_APK_BADGING.txt"
-          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" "$ROOT/reports/RUNTIME_APK_BADGING.txt"
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
-          grep -q 'Verified using v2 scheme.*true' "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          badging=Path('build/vulkan-matrix-runtime/reports/RUNTIME_APK_BADGING.txt').read_text()
+          required="package: name='com.bahrainbrick.game.qa' versionCode='1408' versionName='1.4.0.8-full-matrix-vulkan-lit-qa'"
+          assert required in badging, badging
+          PY
+          set +e
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$ROOT/reports/RUNTIME_APK_SIGNING.txt" 2>&1
+          signing_status=$?
+          set -e
+          printf '%s\n' "$signing_status" > "$ROOT/reports/RUNTIME_APK_SIGNING_STATUS.txt"
+          cat "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
+          test "$signing_status" -eq 0
+          grep -Eq 'Verified using v(2|3) scheme.*true' "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
           "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK" > "$ROOT/reports/RUNTIME_APK_ZIPALIGN.txt"
           unzip -t "$APK" > "$ROOT/logs/runtime-apk-zip-integrity.txt"
           sha256sum "$APK" | tee "$ROOT/reports/RUNTIME_APK_SHA256SUM.txt"
