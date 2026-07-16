@@ -122,7 +122,7 @@ jobs:
           unzip -q "$templates" -d "$ROOT/templates"
           mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
           cp -a "$ROOT/templates/templates/." "$HOME/.local/share/godot/export_templates/4.3.stable/"
-      - name: Assemble unchanged approved matrix into Vulkan game candidate
+      - name: Assemble approved matrix and verify protected pre-state
         shell: bash
         run: |
           set -euo pipefail
@@ -142,8 +142,27 @@ jobs:
           cp -a "$ROOT/source/generated/full_matrix/architecture/balanced/waterfront/." "$GAME/assets/environment/architecture/waterfront/"
           cp -a "$ROOT/source/generated/full_matrix/commercial/." "$GAME/assets/environment/architecture/commercial/"
           python3 tools/verify_frozen_controls.py "$GAME" --json-out "$ROOT/reports/FROZEN_CONTROLS_VULKAN_PRE.json" --markdown-out "$ROOT/reports/FROZEN_CONTROLS_VULKAN_PRE.md"
-          python3 tools/apply_premium_overlay_resilient.py "$GAME" --report "$ROOT/reports/PREMIUM_WORLD_OVERLAY_REPORT.json"
-          python3 tools/apply_premium_validation_corrections.py "$GAME" --report "$ROOT/reports/RUNTIME_DEFECT_CORRECTIONS.json"
+      - name: Run clean pre-overlay import and runtime contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan"
+          GAME="$ROOT/game"
+          GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          rm -rf "$GAME/.godot"
+          "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$ROOT/logs/godot-pre-overlay-import.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$ROOT/logs/godot-pre-overlay-import.log"
+          test "$(find "$GAME/.godot/imported" -type f -name '*.md5' | grep -c 'glb')" -ge 436
+          python3 tests/test_asset_lab_runtime_integration.py 2>&1 | tee "$ROOT/logs/asset-runtime-integration-pre-overlay.log"
+          python3 tests/test_full_asset_matrix_runtime.py 2>&1 | tee "$ROOT/logs/full-matrix-runtime-contract-pre-overlay.log"
+      - name: Apply premium overlay and configure Vulkan candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan"
+          GAME="$ROOT/game"
+          python3 tools/apply_premium_overlay_resilient.py "$GAME" --report "$ROOT/reports/PREMIUM_WORLD_OVERLAY_REPORT.json" 2>&1 | tee "$ROOT/logs/premium-overlay.log"
+          python3 tools/apply_premium_validation_corrections.py "$GAME" --report "$ROOT/reports/RUNTIME_DEFECT_CORRECTIONS.json" 2>&1 | tee "$ROOT/logs/premium-corrections.log"
           python3 - "$GAME/project.godot" "$GAME/export_presets.cfg" <<'PY'
           from pathlib import Path
           import re,sys
@@ -167,7 +186,7 @@ jobs:
           grep -q 'window/handheld/orientation=0' "$GAME/project.godot"
           grep -q 'renderer/rendering_method="mobile"' "$GAME/project.godot"
           grep -q '^screen/immersive_mode=false$' "$GAME/export_presets.cfg"
-      - name: Import all 436 GLBs and run regression gates under Vulkan candidate
+      - name: Run post-overlay import and regression gates
         shell: bash
         run: |
           set -euo pipefail
@@ -175,11 +194,9 @@ jobs:
           GAME="$ROOT/game"
           GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
           rm -rf "$GAME/.godot"
-          "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$ROOT/logs/godot-vulkan-import.log"
-          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$ROOT/logs/godot-vulkan-import.log"
+          "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$ROOT/logs/godot-vulkan-post-overlay-import.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$ROOT/logs/godot-vulkan-post-overlay-import.log"
           test "$(find "$GAME/.godot/imported" -type f -name '*.md5' | grep -c 'glb')" -ge 436
-          python3 tests/test_asset_lab_runtime_integration.py | tee "$ROOT/logs/asset-runtime-integration.log"
-          python3 tests/test_full_asset_matrix_runtime.py | tee "$ROOT/logs/full-matrix-runtime-contract.log"
           bash tools/asset_lab/run_game_regressions.sh "$GODOT" "$GAME" "$ROOT/logs" "$ROOT/reports"
           python3 tools/verify_frozen_controls.py "$GAME" --json-out "$ROOT/reports/FROZEN_CONTROLS_VULKAN_POST.json" --markdown-out "$ROOT/reports/FROZEN_CONTROLS_VULKAN_POST.md"
           cmp "$ROOT/reports/FROZEN_CONTROLS_VULKAN_PRE.json" "$ROOT/reports/FROZEN_CONTROLS_VULKAN_POST.json"
