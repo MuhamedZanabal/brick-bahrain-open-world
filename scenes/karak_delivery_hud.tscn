@@ -1,0 +1,77 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/karak_delivery_hud.gd" id="1_hud"]
+
+[node name="KarakDeliveryHUD" type="CanvasLayer"]
+layer = 20
+script = ExtResource("1_hud")
+
+[node name="MissionPanel" type="PanelContainer" parent="."]
+anchor_left = 0.2
+anchor_top = 0.0
+anchor_right = 0.8
+anchor_bottom = 0.0
+offset_top = 14.0
+offset_bottom = 190.0
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="MissionPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="Rows" type="VBoxContainer" parent="MissionPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="MissionTitle" type="Label" parent="MissionPanel/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.78, 0.16, 1)
+theme_override_font_sizes/font_size = 24
+text = "KARAK DELIVERY"
+horizontal_alignment = 1
+
+[node name="ObjectiveText" type="Label" parent="MissionPanel/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "Preparing mission..."
+horizontal_alignment = 1
+
+[node name="DistanceText" type="Label" parent="MissionPanel/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.88, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "Distance: --"
+horizontal_alignment = 1
+
+[node name="OrderIndicator" type="Label" parent="MissionPanel/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.78, 0.78, 1)
+theme_override_font_sizes/font_size = 15
+text = "Order: Not collected"
+horizontal_alignment = 1
+
+[node name="RewardText" type="Label" parent="MissionPanel/Margin/Rows"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.38, 1, 0.42, 1)
+theme_override_font_sizes/font_size = 17
+text = "Reward: 250 coins"
+horizontal_alignment = 1
+
+[node name="InteractionPrompt" type="Label" parent="MissionPanel/Margin/Rows"]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.92, 0.55, 1)
+theme_override_font_sizes/font_size = 16
+text = "INTERACT"
+horizontal_alignment = 1
+
+[node name="ReplayButton" type="Button" parent="MissionPanel/Margin/Rows"]
+visible = false
+layout_mode = 2
+mouse_filter = 0
+text = "REPLAY DELIVERY"
