@@ -103,7 +103,11 @@ jobs:
           ROOT=build/vulkan-matrix-runtime
           APK="$ROOT/$APK_NAME"
           BUILD_TOOLS="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/34.0.0"
-          "$BUILD_TOOLS/aapt" dump badging "$APK" > "$ROOT/reports/RUNTIME_APK_BADGING.txt"
+          set +e
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > "$ROOT/reports/RUNTIME_APK_BADGING.txt" 2> "$ROOT/logs/runtime-aapt-badging-stderr.txt"
+          badging_status=$?
+          set -e
+          printf '%s\n' "$badging_status" > "$ROOT/reports/RUNTIME_AAPT_BADGING_STATUS.txt"
           python3 - <<'PY'
           from pathlib import Path
           badging=Path('build/vulkan-matrix-runtime/reports/RUNTIME_APK_BADGING.txt').read_text()
