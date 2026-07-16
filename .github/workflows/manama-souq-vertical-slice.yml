@@ -6,6 +6,9 @@ on:
     paths:
       - .github/workflows/manama-souq-vertical-slice.yml
       - tools/vertical_slice/promote_manama_souq_asset_authority.sh
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -13,18 +16,19 @@ permissions:
   actions: read
 
 concurrency:
-  group: bahrain-brick-manama-souq-authority-promotion
+  group: bahrain-brick-manama-souq-authority-promotion-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
   promote_exact_asset_authority:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
       - name: Check out exact PR 59 branch
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
 
       - name: Promote accepted exact bytes to existing release
