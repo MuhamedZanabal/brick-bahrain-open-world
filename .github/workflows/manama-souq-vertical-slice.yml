@@ -51,9 +51,21 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
       - name: Run fail-closed authority tests
-        run: python3 -m unittest tests.test_manama_souq_composite_authority tests.test_manama_souq_source_gate -v
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/authority-test-evidence
+          python3 -m unittest tests.test_manama_souq_composite_authority tests.test_manama_souq_source_gate -v 2>&1 | tee build/authority-test-evidence/authority-tests.log
       - name: Validate shell syntax
         run: bash -n tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - name: Upload authority test diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-tests-${{ github.run_id }}
+          path: build/authority-test-evidence
+          if-no-files-found: error
+          retention-days: 30
 
   authority_run_a:
     needs: authority_tests
