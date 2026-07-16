@@ -34,7 +34,7 @@ done
 rm -rf "$GAME/.godot"
 "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$LOGS/manama-souq-import.log"
 
-if grep -Eiq 'SCRIPT ERROR|Parse Error|Failed to load script|Can.t open dynamic library|FATAL' "$LOGS/manama-souq-import.log"; then
+if grep -Eiq "SCRIPT ERROR|Parse Error|Failed to load script|Can't open dynamic library|FATAL" "$LOGS/manama-souq-import.log"; then
   echo "Godot import contained a blocking error" >&2
   exit 1
 fi
@@ -58,7 +58,7 @@ patterns={
     'script_error':re.compile(r'SCRIPT ERROR',re.I),
     'parse_error':re.compile(r'Parse Error',re.I),
     'failed_script':re.compile(r'Failed to load script',re.I),
-    'dynamic_library':re.compile(r"Can.t open dynamic library",re.I),
+    'dynamic_library':re.compile(r"Can't open dynamic library",re.I),
     'fatal':re.compile(r'\bFATAL\b|Fatal signal|FATAL EXCEPTION|ANR in',re.I),
 }
 findings=[]
