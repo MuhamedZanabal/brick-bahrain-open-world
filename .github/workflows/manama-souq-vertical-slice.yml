@@ -5,7 +5,21 @@ on:
     branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
     paths:
       - .github/workflows/manama-souq-vertical-slice.yml
+      - authority/manama_souq_composite_source.json
+      - tools/vertical_slice/composite_source_authority.py
       - tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - tools/apply_premium_overlay_resilient.py
+      - tools/apply_bahrain_brick_premium_world_overlay.py
+      - tools/v3_patch_restore.py
+      - tools/apply_premium_validation_corrections.py
+      - tools/apply_post_lifecycle_teardown_guards.py
+      - tools/apply_visual_evidence_shutdown_fix.py
+      - tools/verify_frozen_controls.py
+      - tools/premium_payload_v2/**
+      - tools/premium_visual_upgrade_v3/**
+      - tools/premium_validation_v18_parts/**
+      - tests/test_manama_souq_source_gate.py
+      - tests/test_manama_souq_composite_authority.py
   pull_request:
     branches: [work/bahrain-brick-asset-lab-integration-v1]
     types: [opened, synchronize, reopened]
@@ -13,84 +27,117 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: bahrain-brick-manama-souq-authority-discovery-${{ github.event_name }}
+  group: bahrain-brick-manama-souq-authority-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  ASSET_AUTHORITY_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain-brick-full-asset-matrix-authority-76964c58c283caca.zip
+  ASSET_AUTHORITY_SHA256: 76964c58c283cacaee137152189727d678aa83230d7211dc6a15aa9af9d4a67a
+  HISTORICAL_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  HISTORICAL_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+
 jobs:
-  discover_exact_authority_identities:
+  authority_tests:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     steps:
-      - name: Check out exact PR 59 branch
+      - name: Check out exact candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
+      - name: Run fail-closed authority tests
+        run: python3 -m unittest tests.test_manama_souq_composite_authority tests.test_manama_souq_source_gate -v
+      - name: Validate shell syntax
+        run: bash -n tools/vertical_slice/reconstruct_manama_souq_composite.sh
 
-      - name: Measure historical input and source-affecting identities
+  authority_run_a:
+    needs: authority_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Check out exact candidate into clean run A
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct composite authority A
         shell: bash
         run: |
           set -euo pipefail
-          ROOT=build/manama-souq-authority-discovery
-          mkdir -p "$ROOT"
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
-            https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip \
-            -o "$ROOT/historical-source.zip"
-          echo '5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a  build/manama-souq-authority-discovery/historical-source.zip' | sha256sum -c -
-          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
-            https://github.com/godotengine/godot/releases/download/4.3-stable/SHA512-SUMS.txt \
-            -o "$ROOT/GODOT_SHA512_SUMS.txt"
-          python3 - "$ROOT/GATE1_DISCOVERY.json" <<'PY'
-          from pathlib import Path
-          import hashlib,json,os,platform,sys
-          out=Path(sys.argv[1]); historical=out.parent/'historical-source.zip'
-          editor='Godot_v4.3-stable_linux.x86_64.zip'
-          lines=(out.parent/'GODOT_SHA512_SUMS.txt').read_text().splitlines()
-          godot_sha512=next(line.split()[0] for line in lines if line.split()[1]==editor)
-          paths=[
-              'tools/vertical_slice/composite_source_authority.py',
-              'tools/vertical_slice/reconstruct_manama_souq_composite.sh',
-              'tools/apply_premium_overlay_resilient.py',
-              'tools/apply_bahrain_brick_premium_world_overlay.py',
-              'tools/v3_patch_restore.py',
-              'tools/apply_premium_validation_corrections.py',
-              'tools/apply_post_lifecycle_teardown_guards.py',
-              'tools/apply_visual_evidence_shutdown_fix.py',
-              'tools/verify_frozen_controls.py',
-          ]
-          paths += [p.as_posix() for p in sorted(Path('tools/premium_validation_v18_parts').glob('part_*.pyfrag'))]
-          paths += [p.as_posix() for p in sorted(Path('tools/premium_payload_v2').glob('*')) if p.is_file()]
-          paths += [p.as_posix() for p in sorted(Path('tools/premium_visual_upgrade_v3').glob('*')) if p.is_file()]
-          records=[]
-          for raw in paths:
-              p=Path(raw)
-              if not p.is_file(): raise SystemExit(f'missing authority input: {raw}')
-              records.append({'path':raw,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
-          value={
-              'schema_version':1,
-              'runner_image':'ubuntu-24.04@'+os.environ['ImageVersion'],
-              'os_release':'Ubuntu 24.04.4 LTS',
-              'python':platform.python_version(),
-              'pillow':'12.3.0',
-              'librsvg2_bin':'2.58.0+dfsg-1build1',
-              'godot_version':'4.3.stable.official.77dcf97d8',
-              'godot_archive_sha512':godot_sha512,
-              'historical_source_bytes':historical.stat().st_size,
-              'historical_source_sha256':hashlib.sha256(historical.read_bytes()).hexdigest(),
-              'reconstruction_inputs':records,
-          }
-          out.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
-          print(json.dumps(value,indent=2,sort_keys=True))
-          PY
-          rm -f "$ROOT/historical-source.zip"
-
-      - name: Upload measured authority identities
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh A "$PWD/build/manama-souq-source-A" "$PWD/authority/manama_souq_composite_source.json" "$CANDIDATE_SHA"
+      - name: Upload retained authority A evidence
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-pr59-authority-discovery-${{ github.run_id }}
-          path: build/manama-souq-authority-discovery
+          name: bahrain-brick-pr59-authority-run-a-${{ github.run_id }}
+          path: build/manama-souq-source-A/evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  authority_run_b:
+    needs: authority_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Check out exact candidate into clean run B
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct composite authority B
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh B "$PWD/build/manama-souq-source-B" "$PWD/authority/manama_souq_composite_source.json" "$CANDIDATE_SHA"
+      - name: Upload retained authority B evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-run-b-${{ github.run_id }}
+          path: build/manama-souq-source-B/evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  authority_compare:
+    needs: [authority_run_a, authority_run_b]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate for comparison
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Download retained authority A evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-authority-run-a-${{ github.run_id }}
+          path: build/compare/run-a
+      - name: Download retained authority B evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-authority-run-b-${{ github.run_id }}
+          path: build/compare/run-b
+      - name: Verify inventories and byte-identical reconstructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/compare/run-a --inventory build/compare/run-a/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/compare/run-b --inventory build/compare/run-b/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py compare --run-a build/compare/run-a --run-b build/compare/run-b --output build/compare/GATE1_DETERMINISM_COMPARISON.json
+          cmp build/compare/run-a/ORIGIN_LEDGER.json build/compare/run-b/ORIGIN_LEDGER.json
+          cmp build/compare/run-a/MANAMA_SOUQ_COMPOSITE_SOURCE.zip build/compare/run-b/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+      - name: Upload Gate 1 determinism comparison
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate1-comparison-${{ github.run_id }}
+          path: build/compare/GATE1_DETERMINISM_COMPARISON.json
           if-no-files-found: error
           retention-days: 30
