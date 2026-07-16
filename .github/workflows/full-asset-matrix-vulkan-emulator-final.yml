@@ -23,9 +23,12 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SOURCE_ARTIFACT_ID: '8362688335'
-  EXPECTED_APK_SHA256: 4ec0e2e35efed263915f3d7a402b5cf576756a7eb0ca4a120c483e6778589642
+  SOURCE_ARTIFACT_ID: '8363068593'
+  EXPECTED_APK_SHA256: ba73962adbf28b5ad79be63d40ece9e417fecf2ec7d78b2a80174992cc303d13
   PACKAGE_NAME: com.bahrainbrick.game.qa
+  VERSION_CODE: '1408'
+  VERSION_NAME: 1.4.0.8-full-matrix-vulkan-lit-qa
+  APK_NAME: bahrain-brick-full-matrix-vulkan-lit-qa.apk
   SYSTEM_IMAGE: system-images;android-34;default;x86_64
   ANDROID_USER_HOME: ${{ github.workspace }}/build/vulkan-matrix-runtime/android-user
   ANDROID_AVD_HOME: ${{ github.workspace }}/build/vulkan-matrix-runtime/android-user/avd
@@ -41,7 +44,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Recover exact signed direct-world Vulkan APK and prerequisite evidence
+      - name: Recover exact signed lit Vulkan QA APK and prerequisite evidence
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -52,26 +55,26 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > "$ROOT/source.zip"
           unzip -tq "$ROOT/source.zip"
           unzip -q "$ROOT/source.zip" -d "$ROOT/source"
-          cp "$ROOT/source/artifacts/bahrain-brick-full-matrix-vulkan-world-debug.apk" "$ROOT/bahrain-brick-full-matrix-vulkan-world-debug.apk"
-          printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$ROOT/bahrain-brick-full-matrix-vulkan-world-debug.apk" | sha256sum -c -
-          grep -q "package: name='$PACKAGE_NAME' versionCode='1407' versionName='1.4.0.7-full-matrix-vulkan-world-qa'" "$ROOT/source/reports/APK_BADGING.txt"
+          cp "$ROOT/source/artifacts/$APK_NAME" "$ROOT/$APK_NAME"
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$ROOT/$APK_NAME" | sha256sum -c -
+          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" "$ROOT/source/reports/INDEPENDENT_APK_BADGING.txt"
           python3 - <<'PY'
           from pathlib import Path
           from zipfile import ZipFile
           import json
           base=Path('build/vulkan-matrix-runtime')
-          apk=base/'bahrain-brick-full-matrix-vulkan-world-debug.apk'
+          apk=base/'bahrain-brick-full-matrix-vulkan-lit-qa.apk'
           with ZipFile(apk) as archive:
               names=set(archive.namelist())
           assert 'lib/x86_64/libgodot_android.so' in names
           root=base/'source/reports'
-          assert (root/'FROZEN_CONTROLS_WORLD_PRE.json').read_bytes() == (root/'FROZEN_CONTROLS_WORLD_POST.json').read_bytes()
+          assert (root/'FROZEN_CONTROLS_LIT_QA_PRE.json').read_bytes() == (root/'FROZEN_CONTROLS_LIT_QA_POST.json').read_bytes()
           scan=json.loads((root/'CRITICAL_RUNTIME_ERROR_SCAN.json').read_text())
           assert scan['conclusion'] == 'pass' and scan['unresolved_count'] == 0, scan
           PY
-          cp "$ROOT/source/reports/APK_BADGING.txt" "$ROOT/reports/SOURCE_APK_BADGING.txt"
+          cp "$ROOT/source/reports/INDEPENDENT_APK_BADGING.txt" "$ROOT/reports/SOURCE_APK_BADGING.txt"
           cp "$ROOT/source/reports/APK_SHA256SUM.txt" "$ROOT/reports/SOURCE_APK_SHA256SUM.txt"
-          cp "$ROOT/source/reports/FROZEN_CONTROLS_WORLD_POST.json" "$ROOT/reports/SOURCE_FROZEN_CONTROLS.json"
+          cp "$ROOT/source/reports/FROZEN_CONTROLS_LIT_QA_POST.json" "$ROOT/reports/SOURCE_FROZEN_CONTROLS.json"
           cp "$ROOT/source/reports/CRITICAL_RUNTIME_ERROR_SCAN.json" "$ROOT/reports/SOURCE_CRITICAL_RUNTIME_ERROR_SCAN.json"
 
       - name: Provision Java 17
@@ -90,6 +93,44 @@ jobs:
             build-tools;34.0.0
             emulator
             ${{ env.SYSTEM_IMAGE }}
+
+      - name: Independently verify exact lit APK binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=build/vulkan-matrix-runtime
+          APK="$ROOT/$APK_NAME"
+          BUILD_TOOLS="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/34.0.0"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > "$ROOT/reports/RUNTIME_APK_BADGING.txt"
+          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" "$ROOT/reports/RUNTIME_APK_BADGING.txt"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
+          grep -q 'Verified using v2 scheme.*true' "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
+          "$BUILD_TOOLS/zipalign" -c -P 16 -v 4 "$APK" > "$ROOT/reports/RUNTIME_APK_ZIPALIGN.txt"
+          unzip -t "$APK" > "$ROOT/logs/runtime-apk-zip-integrity.txt"
+          sha256sum "$APK" | tee "$ROOT/reports/RUNTIME_APK_SHA256SUM.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib,json
+          root=Path('build/vulkan-matrix-runtime')
+          apk=root/'bahrain-brick-full-matrix-vulkan-lit-qa.apk'
+          with ZipFile(apk) as z:
+              names=set(z.namelist())
+          assert 'lib/x86_64/libgodot_android.so' in names
+          report={
+            'passed':True,
+            'package':'com.bahrainbrick.game.qa',
+            'version_code':1408,
+            'version_name':'1.4.0.8-full-matrix-vulkan-lit-qa',
+            'renderer':'mobile_vulkan',
+            'qa_main_scene':'res://scenes/full_matrix_android_qa.tscn',
+            'abi':'x86_64',
+            'apk_bytes':apk.stat().st_size,
+            'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+          }
+          assert report['apk_sha256']=='ba73962adbf28b5ad79be63d40ece9e417fecf2ec7d78b2a80174992cc303d13'
+          (root/'reports/RUNTIME_APK_AUTHORITY.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          PY
 
       - name: Provision screenshot validator
         shell: bash
@@ -122,7 +163,7 @@ jobs:
           grep -q 'FULL_MATRIX_SYSTEM_IMAGE' "$ROOT/run_full_matrix_emulator_validation_stable.sh"
           grep -q 'system-settle' "$ROOT/run_full_matrix_emulator_validation_stable.sh"
 
-      - name: Run exact direct-world Vulkan API 34 traversal and soak gate
+      - name: Run exact lit Vulkan QA API 34 traversal and soak gate
         id: runtime
         continue-on-error: true
         shell: bash
@@ -132,7 +173,7 @@ jobs:
           EXPECTED_APK_SHA256="$EXPECTED_APK_SHA256" \
           FULL_MATRIX_SYSTEM_IMAGE="$SYSTEM_IMAGE" \
           bash "$ROOT/run_full_matrix_emulator_validation_stable.sh" \
-            "$ROOT/bahrain-brick-full-matrix-vulkan-world-debug.apk" \
+            "$ROOT/$APK_NAME" \
             "$PACKAGE_NAME" \
             "$ROOT/reports" \
             "$ROOT/logs" \
@@ -151,13 +192,13 @@ jobs:
           (root/'RUNTIME_EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
           PY
 
-      - name: Upload complete direct-world Vulkan emulator evidence
+      - name: Upload complete lit Vulkan QA emulator evidence
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-vulkan-matrix-emulator-${{ github.run_id }}
+          name: bahrain-brick-vulkan-lit-qa-emulator-${{ github.run_id }}
           path: |
-            build/vulkan-matrix-runtime/bahrain-brick-full-matrix-vulkan-world-debug.apk
+            build/vulkan-matrix-runtime/bahrain-brick-full-matrix-vulkan-lit-qa.apk
             build/vulkan-matrix-runtime/reports
             build/vulkan-matrix-runtime/logs
             build/vulkan-matrix-runtime/artifacts
@@ -166,7 +207,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Require final direct-world Vulkan emulator success after evidence upload
+      - name: Require final lit Vulkan QA emulator success after evidence upload
         if: always()
         shell: bash
         run: test '${{ steps.runtime.outcome }}' = 'success'
