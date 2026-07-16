@@ -1,0 +1,266 @@
+name: Bahrain Brick Full Matrix Vulkan World Build
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - .github/workflows/full-matrix-vulkan-world-build.yml
+      - scripts/full_asset_matrix_runtime.gd
+      - scenes/world.tscn
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/full-matrix-vulkan-world-build.yml
+      - scripts/full_asset_matrix_runtime.gd
+      - scenes/world.tscn
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-full-matrix-vulkan-world-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_ARTIFACT_ID: '8360668742'
+  SOURCE_APK_SHA256: f4fcae42fdaa1a79620a2869faccd4e95a701eb43587a0092c3a14363bc18bdd
+  GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+  GODOT_VERSION: '4.3'
+  EXPECTED_GODOT_VERSION: 4.3.stable.official.77dcf97d8
+  ANDROID_BUILD_TOOLS: 34.0.0
+  PACKAGE_NAME: com.bahrainbrick.game.qa
+  VERSION_CODE: '1407'
+  VERSION_NAME: 1.4.0.7-full-matrix-vulkan-world-qa
+  APK_NAME: bahrain-brick-full-matrix-vulkan-world-debug.apk
+
+jobs:
+  world_build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    steps:
+      - name: Check out exact authorized integration head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Recover approved matrix and real game source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          mkdir -p "$ROOT/source" "$ROOT/game" "$ROOT/reports" "$ROOT/logs" "$ROOT/artifacts"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > "$ROOT/source.zip"
+          unzip -tq "$ROOT/source.zip"
+          unzip -q "$ROOT/source.zip" -d "$ROOT/source"
+          printf '%s  %s\n' "$SOURCE_APK_SHA256" "$ROOT/source/artifacts/bahrain-brick-full-asset-matrix-debug.apk" | sha256sum -c -
+          python3 - <<'PY'
+          import json
+          root='build/full-matrix-vulkan-world/source/reports/'
+          c=json.load(open(root+'FULL_ASSET_MATRIX_COMPLETION.json'))
+          v=json.load(open(root+'FULL_ASSET_MATRIX_VALIDATION.json'))
+          assert c['passed'] and c['total_glbs']==436 and c['textured_glbs']==436 and c['unique_glb_hashes']==436 and c['khronos_validated']==436
+          assert v['passed'] and v['failures']==[] and v['validated_assets']==436 and v['collision_present_total']==148
+          assert open(root+'FROZEN_CONTROLS_PRE.json','rb').read()==open(root+'FROZEN_CONTROLS_POST.json','rb').read()
+          PY
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$GAME_SOURCE_URL" -o "$ROOT/game-source.zip"
+          echo "$GAME_SOURCE_SHA256  $ROOT/game-source.zip" | sha256sum -c -
+          unzip -tq "$ROOT/game-source.zip"
+          unzip -q "$ROOT/game-source.zip" -d "$ROOT/game"
+          test -f "$ROOT/game/project.godot"
+
+      - name: Provision Java 17
+        uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Provision pinned Android build environment
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Provision premium artwork dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          command -v rsvg-convert
+
+      - name: Install official Godot 4.3 and templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          mkdir -p "$ROOT/downloads" "$ROOT/tools/godot"
+          cd "$ROOT/downloads"
+          editor="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          templates="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/SHA512-SUMS.txt" -o SHA512-SUMS.txt
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$editor" -o "$editor"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$templates" -o "$templates"
+          grep " $editor$" SHA512-SUMS.txt | sha512sum -c -
+          grep " $templates$" SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "$editor" -d "$ROOT/tools/godot"
+          chmod +x "$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          test "$("$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" --version)" = "$EXPECTED_GODOT_VERSION"
+          rm -rf "$ROOT/templates"
+          unzip -q "$templates" -d "$ROOT/templates"
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          cp -a "$ROOT/templates/templates/." "$HOME/.local/share/godot/export_templates/4.3.stable/"
+
+      - name: Assemble approved matrix and verify protected pre-state
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          GAME="$ROOT/game"
+          cp -a assets/. "$GAME/assets/"
+          mkdir -p "$GAME/assets/generated/full_matrix" "$GAME/asset_lab/runtime" "$GAME/scripts" "$GAME/tests"
+          cp -a "$ROOT/source/generated/full_matrix/." "$GAME/assets/generated/full_matrix/"
+          test "$(find "$GAME/assets/generated/full_matrix" -type f -name '*.glb' | wc -l)" -eq 436
+          cp "$ROOT/source/reports/FULL_ASSET_MATRIX_RUNTIME_MANIFEST.json" "$GAME/asset_lab/runtime/full_asset_matrix_manifest.json"
+          cp scripts/asset_lab_runtime.gd scripts/golden_master_quality.gd scripts/golden_master_lod_instance.gd scripts/full_asset_matrix_runtime.gd "$GAME/scripts/"
+          cp scenes/world.tscn "$GAME/scenes/world.tscn"
+          cp tests/test_asset_lab_runtime_integration.py tests/test_full_asset_matrix_runtime.py "$GAME/tests/"
+          mkdir -p "$GAME/assets/environment/architecture/traditional" "$GAME/assets/environment/architecture/souq" "$GAME/assets/environment/architecture/waterfront" "$GAME/assets/environment/architecture/commercial"
+          cp -a "$ROOT/source/generated/full_matrix/architecture/balanced/traditional/." "$GAME/assets/environment/architecture/traditional/"
+          cp -a "$ROOT/source/generated/full_matrix/architecture/balanced/souq/." "$GAME/assets/environment/architecture/souq/"
+          cp -a "$ROOT/source/generated/full_matrix/architecture/balanced/waterfront/." "$GAME/assets/environment/architecture/waterfront/"
+          cp -a "$ROOT/source/generated/full_matrix/commercial/." "$GAME/assets/environment/architecture/commercial/"
+          python3 tools/verify_frozen_controls.py "$GAME" --json-out "$ROOT/reports/FROZEN_CONTROLS_WORLD_PRE.json" --markdown-out "$ROOT/reports/FROZEN_CONTROLS_WORLD_PRE.md"
+
+      - name: Run clean pre-overlay import and runtime contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          GAME="$ROOT/game"
+          GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          rm -rf "$GAME/.godot"
+          "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$ROOT/logs/godot-pre-overlay-import.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$ROOT/logs/godot-pre-overlay-import.log"
+          test "$(find "$GAME/.godot/imported" -type f -name '*.md5' | grep -c 'glb')" -ge 436
+          python3 tests/test_asset_lab_runtime_integration.py 2>&1 | tee "$ROOT/logs/asset-runtime-integration-pre-overlay.log"
+          python3 tests/test_full_asset_matrix_runtime.py 2>&1 | tee "$ROOT/logs/full-matrix-runtime-contract-pre-overlay.log"
+
+      - name: Apply premium overlay and configure direct-world Vulkan QA candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          GAME="$ROOT/game"
+          python3 tools/apply_premium_overlay_resilient.py "$GAME" --report "$ROOT/reports/PREMIUM_WORLD_OVERLAY_REPORT.json" 2>&1 | tee "$ROOT/logs/premium-overlay.log"
+          python3 tools/apply_premium_validation_corrections.py "$GAME" --report "$ROOT/reports/RUNTIME_DEFECT_CORRECTIONS.json" 2>&1 | tee "$ROOT/logs/premium-corrections.log"
+          python3 - "$GAME/project.godot" "$GAME/export_presets.cfg" <<'PY'
+          from pathlib import Path
+          import re,sys
+          project=Path(sys.argv[1]); text=project.read_text()
+          substitutions=[
+            (r'(?m)^run/main_scene=.*$', 'run/main_scene="res://scenes/world.tscn"'),
+            (r'(?m)^config/features=.*$', 'config/features=PackedStringArray("4.3", "Mobile")'),
+            (r'(?m)^window/handheld/orientation=.*$', 'window/handheld/orientation=0'),
+            (r'(?m)^renderer/rendering_method=.*$', 'renderer/rendering_method="mobile"'),
+            (r'(?m)^renderer/rendering_method\.mobile=.*$', 'renderer/rendering_method.mobile="mobile"'),
+          ]
+          for pattern,replacement in substitutions:
+              text,count=re.subn(pattern,replacement,text)
+              assert count==1,(pattern,count)
+          project.write_text(text)
+          preset=Path(sys.argv[2]); text=preset.read_text()
+          text,count=re.subn(r'(?m)^screen/immersive_mode=.*$', 'screen/immersive_mode=false', text)
+          assert count==1,count
+          preset.write_text(text)
+          PY
+          grep -q '^run/main_scene="res://scenes/world.tscn"$' "$GAME/project.godot"
+          grep -q 'config/features=PackedStringArray("4.3", "Mobile")' "$GAME/project.godot"
+          grep -q 'window/handheld/orientation=0' "$GAME/project.godot"
+          grep -q 'renderer/rendering_method="mobile"' "$GAME/project.godot"
+          grep -q '^screen/immersive_mode=false$' "$GAME/export_presets.cfg"
+
+      - name: Run post-overlay import regressions and protected post-state
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          GAME="$ROOT/game"
+          GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          rm -rf "$GAME/.godot"
+          "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$ROOT/logs/godot-world-post-overlay-import.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$ROOT/logs/godot-world-post-overlay-import.log"
+          test "$(find "$GAME/.godot/imported" -type f -name '*.md5' | grep -c 'glb')" -ge 436
+          bash tools/asset_lab/run_game_regressions.sh "$GODOT" "$GAME" "$ROOT/logs" "$ROOT/reports"
+          python3 tools/verify_frozen_controls.py "$GAME" --json-out "$ROOT/reports/FROZEN_CONTROLS_WORLD_POST.json" --markdown-out "$ROOT/reports/FROZEN_CONTROLS_WORLD_POST.md"
+          cmp "$ROOT/reports/FROZEN_CONTROLS_WORLD_PRE.json" "$ROOT/reports/FROZEN_CONTROLS_WORLD_POST.json"
+
+      - name: Export and verify direct-world Vulkan Mobile APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$PWD/build/full-matrix-vulkan-world"
+          GODOT="$ROOT/tools/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          ANDROID_BUILD_TOOLS="$ANDROID_BUILD_TOOLS" VERSION_CODE="$VERSION_CODE" VERSION_NAME="$VERSION_NAME" \
+          bash tools/asset_lab/export_asset_production_android.sh "$GODOT" "$ROOT/game" "$ROOT/artifacts/$APK_NAME" "$PACKAGE_NAME" "$ROOT/reports" "$ROOT/logs"
+          test -s "$ROOT/artifacts/$APK_NAME"
+          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" "$ROOT/reports/APK_BADGING.txt"
+          sha256sum "$ROOT/artifacts/$APK_NAME" | tee "$ROOT/reports/WORLD_VULKAN_APK_SHA256SUM.txt"
+          python3 - "$ROOT" <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib,json,sys
+          root=Path(sys.argv[1]); apk=root/'artifacts/bahrain-brick-full-matrix-vulkan-world-debug.apk'
+          with ZipFile(apk) as archive:
+              names=set(archive.namelist())
+          assert 'lib/x86_64/libgodot_android.so' in names
+          report={
+            'passed':True,
+            'renderer':'mobile_vulkan',
+            'qa_main_scene':'res://scenes/world.tscn',
+            'orientation':'landscape',
+            'immersive':False,
+            'matrix_glbs':436,
+            'protected_pre_post_identical':True,
+            'apk':{'bytes':apk.stat().st_size,'sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},
+          }
+          (root/'reports/FULL_MATRIX_VULKAN_WORLD_BUILD.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Build checksum-addressed build evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('build/full-matrix-vulkan-world'); files=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and 'source' not in x.parts and 'game' not in x.parts and 'downloads' not in x.parts and 'tools' not in x.parts and 'templates' not in x.parts):
+              files.append({'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'WORLD_BUILD_EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload complete direct-world Vulkan build evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-full-matrix-vulkan-world-${{ github.run_id }}
+          path: |
+            build/full-matrix-vulkan-world/artifacts
+            build/full-matrix-vulkan-world/reports
+            build/full-matrix-vulkan-world/logs
+            build/full-matrix-vulkan-world/WORLD_BUILD_EVIDENCE_INVENTORY.json
+          if-no-files-found: error
+          retention-days: 30
