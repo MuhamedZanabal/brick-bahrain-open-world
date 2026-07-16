@@ -1,0 +1,76 @@
+{
+  "asset_count": 5,
+  "contact_sheet_count": 5,
+  "contact_sheets": [
+    {
+      "asset_id": "bh_traditional_projecting_window_01",
+      "bytes": 672892,
+      "family": "traditional",
+      "lod": 0,
+      "path": "build/golden-renders-v31/contact-sheets/bh_traditional_projecting_window_01.png",
+      "profile": "balanced",
+      "sha256": "44515c8a8cf72b0549d549a932ac51de6e8ed4efe69b6f58860051b04f967ba4",
+      "views": [
+        "front",
+        "three_quarter",
+        "rear"
+      ]
+    },
+    {
+      "asset_id": "bh_souq_shop_gold_01",
+      "bytes": 695026,
+      "family": "souq",
+      "lod": 0,
+      "path": "build/golden-renders-v31/contact-sheets/bh_souq_shop_gold_01.png",
+      "profile": "balanced",
+      "sha256": "9e20d597f56f99c642dc359d625bb1e61342c40a8796b4d9e4b7e3f3cda89c30",
+      "views": [
+        "front",
+        "three_quarter",
+        "rear"
+      ]
+    },
+    {
+      "asset_id": "bh_waterfront_tower_a_01",
+      "bytes": 542650,
+      "family": "waterfront",
+      "lod": 0,
+      "path": "build/golden-renders-v31/contact-sheets/bh_waterfront_tower_a_01.png",
+      "profile": "balanced",
+      "sha256": "4f44e8208c6440717009320f2e3b4b7560a20d7c5962748fb56a11e3368d895b",
+      "views": [
+        "front",
+        "three_quarter",
+        "rear"
+      ]
+    },
+    {
+      "asset_id": "bh_supermarket_storefront_a_01",
+      "bytes": 601603,
+      "family": "commercial",
+      "lod": 0,
+      "path": "build/golden-renders-v31/contact-sheets/bh_supermarket_storefront_a_01.png",
+      "profile": "balanced",
+      "sha256": "1fc1c05619b3d5544341ab813ccb1cb36635a58d6ccb96a040dbd261f9bb4ae3",
+      "views": [
+        "front",
+        "three_quarter",
+        "rear"
+      ]
+    },
+    {
+      "asset_id": "bh_cr_skyscraper_tower_01",
+      "bytes": 535412,
+      "family": "hero_skyline",
+      "lod": 0,
+      "path": "build/golden-renders-v31/contact-sheets/bh_cr_skyscraper_tower_01.png",
+      "profile": "balanced",
+      "sha256": "4c383a3577b4b14a3b125971851be3de7828565c1a624d3ccd367d70c515a780",
+      "views": [
+        "front",
+        "three_quarter",
+        "rear"
+      ]
+    }
+  ]
+}

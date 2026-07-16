@@ -1,0 +1,170 @@
+name: Bahrain Brick Full Asset Matrix Production
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - .github/workflows/full-asset-matrix-production.yml
+      - tools/asset_lab/generate_full_asset_matrix_v1.py
+      - tools/asset_lab/validate_full_asset_matrix_v1.py
+      - tools/asset_lab/run_full_asset_matrix_ci.sh
+      - scripts/full_asset_matrix_runtime.gd
+      - scripts/golden_master_quality.gd
+      - scripts/golden_master_lod_instance.gd
+      - scenes/world.tscn
+      - tests/test_full_asset_matrix_v1.py
+      - tests/test_full_asset_matrix_runtime.py
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/full-asset-matrix-production.yml
+      - tools/asset_lab/generate_full_asset_matrix_v1.py
+      - tools/asset_lab/validate_full_asset_matrix_v1.py
+      - tools/asset_lab/run_full_asset_matrix_ci.sh
+      - scripts/full_asset_matrix_runtime.gd
+      - scripts/golden_master_quality.gd
+      - scripts/golden_master_lod_instance.gd
+      - scenes/world.tscn
+      - tests/test_full_asset_matrix_v1.py
+      - tests/test_full_asset_matrix_runtime.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bahrain-brick-full-asset-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FROZEN_PREMIUM_AUTHORITY: e26ec912db5c10d071a8e120010bdb5a9a136f17
+  BATCH1_AUTHORITY: d8f2c0f18cab2cc0a0d9eee13be2e94a2e2c5fb5
+  EXPECTED_INTEGRATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  ASSET_AUTHORITY_COMMIT: 84ac94399262f71f29bf65dd553cd7729d87cce0
+  ASSET_CORRECTIVE_COMMIT: 7aed2cf05f63e0c3c607a98acde454ff103584eb
+  ASSET_COMMON_SHA256: 460f3f4ec284e0ba0af569603c9efa1f55ba7a46be4eeb14190bea7679704392
+  ASSET_MANIFEST_SHA256: 4b92898515b6bc5d17d9629cda7c43ad82cc75e43368a01c0aa3d651783a3647
+  BLENDER_VERSION: 4.3.2
+  GODOT_VERSION: 4.3
+  GODOT_BUILD: 77dcf97d8
+  ANDROID_PLATFORM: android-34
+  ANDROID_BUILD_TOOLS: 34.0.0
+  GLTF_VALIDATOR_VERSION: 2.0.0-dev.3.10
+  GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+  PACKAGE_NAME: com.bahrainbrick.game.qa
+  VERSION_CODE: '1405'
+  VERSION_NAME: 1.4.0.5-full-asset-matrix-qa
+  APK_NAME: bahrain-brick-full-asset-matrix-debug.apk
+
+jobs:
+  production:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out exact authorized integration commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Stage checksum-pinned generator dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage=build/generator-dependencies/asset-authority
+          rm -rf build/generator-dependencies
+          git clone --filter=blob:none --no-checkout https://github.com/MuhamedZanabal/Bahrain_bricks_Assets.git "$stage"
+          git -C "$stage" checkout --detach "$ASSET_CORRECTIVE_COMMIT"
+          test "$(git -C "$stage" rev-parse HEAD)" = "$ASSET_CORRECTIVE_COMMIT"
+          git -C "$stage" merge-base --is-ancestor "$ASSET_AUTHORITY_COMMIT" HEAD
+          mkdir -p tools/asset_lab docs/assets build/full-asset-matrix/reports
+          helper=tools/blender/_common.py
+          manifest=docs/assets/ASSET_MASTER_MANIFEST.csv
+          original_helper="$(git -C "$stage" show "$ASSET_AUTHORITY_COMMIT:$helper" | sha256sum | awk '{print $1}')"
+          corrected_helper="$(sha256sum "$stage/$helper" | awk '{print $1}')"
+          original_manifest="$(git -C "$stage" show "$ASSET_AUTHORITY_COMMIT:$manifest" | sha256sum | awk '{print $1}')"
+          corrected_manifest="$(sha256sum "$stage/$manifest" | awk '{print $1}')"
+          test "$original_helper" = "$ASSET_COMMON_SHA256"
+          test "$corrected_helper" = "$ASSET_COMMON_SHA256"
+          test "$original_manifest" = "$ASSET_MANIFEST_SHA256"
+          test "$corrected_manifest" = "$ASSET_MANIFEST_SHA256"
+          cp "$stage/$helper" tools/asset_lab/_common.py
+          cp "$stage/$manifest" docs/assets/ASSET_MASTER_MANIFEST.csv
+          echo "$ASSET_COMMON_SHA256  tools/asset_lab/_common.py" | sha256sum -c -
+          echo "$ASSET_MANIFEST_SHA256  docs/assets/ASSET_MASTER_MANIFEST.csv" | sha256sum -c -
+      - name: Provision Java 17
+        uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Provision pinned Android SDK tools
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;${{ env.ANDROID_PLATFORM }}
+            build-tools;${{ env.ANDROID_BUILD_TOOLS }}
+            emulator
+            system-images;android-34;google_apis;x86_64
+      - name: Provision deterministic image dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends librsvg2-bin libpulse0
+          python3 -m venv build/full-asset-matrix/venv
+          build/full-asset-matrix/venv/bin/python -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          echo "$PWD/build/full-asset-matrix/venv/bin" >> "$GITHUB_PATH"
+      - name: Run complete textured production chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/full-asset-matrix/logs
+          bash tools/asset_lab/run_full_asset_matrix_ci.sh 2>&1 | tee build/full-asset-matrix/logs/production-driver.log
+      - name: Run Android API 34 traversal and soak validation
+        timeout-minutes: 65
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/full-asset-matrix/artifacts/${APK_NAME}"
+          candidate_sha="$(sha256sum "$apk" | awk '{print $1}')"
+          python3 tools/asset_lab/materialize_android_emulator_wallclock.py \
+            tools/asset_lab/run_android_emulator_validation.sh \
+            build/full-asset-matrix/run_android_emulator_validation_effective.sh \
+            build/full-asset-matrix/reports/ANDROID_EMULATOR_EFFECTIVE_SCRIPT.json
+          EXPECTED_APK_SHA256="$candidate_sha" \
+          bash build/full-asset-matrix/run_android_emulator_validation_effective.sh \
+            "$apk" \
+            "$PACKAGE_NAME" \
+            build/full-asset-matrix/reports \
+            build/full-asset-matrix/logs \
+            build/full-asset-matrix/artifacts
+      - name: Build checksum-addressed final evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/full-asset-matrix
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('build/full-asset-matrix'); files=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and ('reports' in x.parts or 'logs' in x.parts or 'artifacts' in x.parts or 'generated' in x.parts)):
+              files.append({'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Upload full production evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-full-asset-matrix-${{ github.run_id }}
+          path: |
+            build/full-asset-matrix/reports
+            build/full-asset-matrix/logs
+            build/full-asset-matrix/artifacts
+            build/full-asset-matrix/generated
+            build/full-asset-matrix/EVIDENCE_INVENTORY.json
+          if-no-files-found: error
+          retention-days: 30

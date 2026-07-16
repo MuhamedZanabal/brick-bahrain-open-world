@@ -1,0 +1,207 @@
+name: Integrate verified architecture families
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - tools/asset_lab/generate_architecture_families.py
+      - scripts/asset_lab_runtime.gd
+      - tests/test_asset_lab_runtime_integration.py
+      - .github/workflows/integrate-architecture-families.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ASSET_SCAFFOLD_COMMIT: b7702d7a371b38ff712352ab5de7179fe962b86b
+  ASSET_BUNDLE_SHA256: 89c73b89ac65402fa193fd5d6f608bd000f4116bfcfa60140c090b6751ee4735
+  ASSET_HEAD: f9bb1f8d5aca1d8547fd1cc67f570573b9e9f727
+  ASSET_REF: work/bahrain-brick-complete-asset-system-v1
+  BLENDER_VERSION: '4.3.2'
+  GODOT_VERSION: '4.3'
+  GAME_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  GAME_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+
+jobs:
+  integrate_architecture:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact integration branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: work/bahrain-brick-asset-lab-integration-v1
+          fetch-depth: 0
+
+      - name: Recover checksum-locked frozen gameplay source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/architecture/downloads build/architecture/game
+          curl --fail --location --retry 5 --proto '=https' "${GAME_SOURCE_URL}" --output build/architecture/downloads/game-source.zip
+          echo "${GAME_SOURCE_SHA256}  build/architecture/downloads/game-source.zip" | sha256sum -c -
+          unzip -tq build/architecture/downloads/game-source.zip
+          unzip -q build/architecture/downloads/game-source.zip -d build/architecture/game
+          test -f build/architecture/game/project.godot
+
+      - name: Verify frozen controls before asset writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_frozen_controls.py build/architecture/game --json-out build/architecture/FROZEN_CONTROLS_PRE.json --markdown-out build/architecture/FROZEN_CONTROLS_PRE.md
+          grep -q '"checks": 25' build/architecture/FROZEN_CONTROLS_PRE.json
+          grep -q '"failures": \[\]' build/architecture/FROZEN_CONTROLS_PRE.json
+
+      - name: Fetch checksum-pinned public asset authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle=build/architecture/downloads/bahrain-brick-assets-runtime-v1-f9bb1f8.bundle
+          url="https://raw.githubusercontent.com/MuhamedZanabal/Bahrain_bricks_Assets/${ASSET_SCAFFOLD_COMMIT}/authority/bahrain-brick-assets-runtime-v1-f9bb1f8.bundle"
+          curl --fail --location --retry 5 --proto '=https' "$url" --output "$bundle"
+          test "$(stat -c '%s' "$bundle")" = '660172'
+          echo "${ASSET_BUNDLE_SHA256}  ${bundle}" | sha256sum -c -
+          git bundle verify "$bundle" 2>&1 | tee build/architecture/asset-bundle-verification.log
+          test "$(git bundle list-heads "$bundle" "refs/heads/${ASSET_REF}" | awk '{print $1}')" = "${ASSET_HEAD}"
+          git clone --branch "${ASSET_REF}" "$bundle" build/architecture/authority
+          test "$(git -C build/architecture/authority rev-parse HEAD)" = "${ASSET_HEAD}"
+          cp tools/asset_lab/generate_architecture_families.py build/architecture/authority/tools/blender/generate_architecture_families.py
+          python3 build/architecture/authority/tools/blender/generate_architecture_families.py --plan-json --seed 1405 > build/architecture/architecture-plan.json
+          grep -q '"asset_records": 48' build/architecture/architecture-plan.json
+          grep -q '"runtime_derivatives": 432' build/architecture/architecture-plan.json
+
+      - name: Install official pinned Blender and Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/architecture
+          blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          blender_base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 5 --proto '=https' "${blender_base}/${blender_archive}" --output "${blender_archive}"
+          curl --fail --location --retry 5 --proto '=https' "${blender_base}/blender-${BLENDER_VERSION}.sha256" --output blender.sha256
+          ! head -c 256 "${blender_archive}" | grep -Eiq '<!doctype|<html|access denied|error'
+          grep " ${blender_archive}$" blender.sha256 | sha256sum -c -
+          tar -xf "${blender_archive}"
+          echo "BLENDER=${PWD}/blender-${BLENDER_VERSION}-linux-x64/blender" >> "${GITHUB_ENV}"
+          godot_base="https://github.com/godotengine/godot/releases/download/4.3-stable"
+          godot_archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          curl --fail --location --retry 5 --proto '=https' "${godot_base}/SHA512-SUMS.txt" --output godot-SHA512-SUMS.txt
+          curl --fail --location --retry 5 --proto '=https' "${godot_base}/${godot_archive}" --output "${godot_archive}"
+          grep " ${godot_archive}$" godot-SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "${godot_archive}" -d godot-bin
+          echo "GODOT=${PWD}/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64" >> "${GITHUB_ENV}"
+
+      - name: Generate two clean architecture passes
+        shell: bash
+        run: |
+          set -euo pipefail
+          authority=build/architecture/authority
+          "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_architecture_families.py" -- --output-dir build/architecture/run-a --seed 1405 --report build/architecture/run-a/generation-report.json
+          "${BLENDER}" --background --factory-startup --python "${authority}/tools/blender/generate_architecture_families.py" -- --output-dir build/architecture/run-b --seed 1405 --report build/architecture/run-b/generation-report.json
+          test "$(find build/architecture/run-a -name '*.glb' | wc -l)" = '432'
+          test "$(find build/architecture/run-b -name '*.glb' | wc -l)" = '432'
+
+      - name: Verify deterministic hashes and GLB structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          find build/architecture/run-a -name '*.glb' -printf '%P\n' | LC_ALL=C sort > build/architecture/run-a.paths
+          find build/architecture/run-b -name '*.glb' -printf '%P\n' | LC_ALL=C sort > build/architecture/run-b.paths
+          diff -u build/architecture/run-a.paths build/architecture/run-b.paths
+          : > build/architecture/ARCHITECTURE_SHA256SUMS.txt
+          while IFS= read -r relative; do
+            a="$(sha256sum "build/architecture/run-a/${relative}" | cut -d' ' -f1)"
+            b="$(sha256sum "build/architecture/run-b/${relative}" | cut -d' ' -f1)"
+            test "$a" = "$b"
+            printf '%s  %s\n' "$a" "$relative" >> build/architecture/ARCHITECTURE_SHA256SUMS.txt
+          done < build/architecture/run-a.paths
+          mapfile -t glbs < <(find build/architecture/run-a -name '*.glb' | LC_ALL=C sort)
+          python3 build/architecture/authority/tools/validate_glb.py "${glbs[@]}" > build/architecture/ARCHITECTURE_GLB_VALIDATION.json
+          grep -q '"validated": 432' build/architecture/ARCHITECTURE_GLB_VALIDATION.json
+          echo 'DETERMINISM: 432/432 architecture GLB hashes identical' | tee build/architecture/determinism-result.txt
+
+      - name: Install Balanced LOD0 into category destinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          for family in traditional souq waterfront; do
+            mkdir -p "assets/environment/architecture/${family}"
+            cp build/architecture/run-a/balanced/${family}/*_lod0.glb "assets/environment/architecture/${family}/"
+          done
+          test "$(find assets/environment/architecture/traditional -name 'bh_traditional_*_lod0.glb' | wc -l)" = '14'
+          test "$(find assets/environment/architecture/souq -name 'bh_souq_*_lod0.glb' | wc -l)" = '18'
+          test "$(find assets/environment/architecture/waterfront -name 'bh_waterfront_*_lod0.glb' | wc -l)" = '16'
+
+      - name: Validate real game scene and Godot imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a assets/. build/architecture/game/assets/
+          cp scripts/asset_lab_runtime.gd build/architecture/game/scripts/asset_lab_runtime.gd
+          cp tests/test_asset_lab_runtime_integration.py build/architecture/game/tests/test_asset_lab_runtime_integration.py
+          (cd build/architecture/game && python3 -m unittest tests.test_asset_lab_runtime_integration -v) 2>&1 | tee build/architecture/runtime-integration-tests.log
+          "${GODOT}" --headless --editor --path build/architecture/game --import --quit 2>&1 | tee build/architecture/godot-game-import.log
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' build/architecture/godot-game-import.log
+          grep -q '"TraditionalDistrict"' scripts/asset_lab_runtime.gd
+          grep -q '"SouqDistrict"' scripts/asset_lab_runtime.gd
+          grep -q '"WaterfrontDistrict"' scripts/asset_lab_runtime.gd
+
+      - name: Build cumulative runtime usage map
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          root=Path('.')
+          source=root/'docs/asset_lab/RUNTIME_USAGE_MAP_FIRST_FAMILIES.csv'
+          with source.open(newline='',encoding='utf-8') as f:
+              reader=csv.reader(f); header=next(reader); rows=list(reader)
+          for family,district in [('traditional','TraditionalDistrict'),('souq','SouqDistrict'),('waterfront','WaterfrontDistrict')]:
+              for path in sorted((root/f'assets/environment/architecture/{family}').glob(f'bh_{family}_*_lod0.glb')):
+                  rows.append([path.stem.removesuffix('_lod0'),str(path),'res://scenes/world.tscn',f'World/AssetLab/{district}','1','balanced','0','simplified_box','integrated_runtime'])
+          assert len(rows)==74, len(rows)
+          ids=[row[0] for row in rows]
+          assert len(ids)==len(set(ids))
+          out=root/'docs/asset_lab/RUNTIME_USAGE_MAP.csv'
+          with out.open('w',newline='',encoding='utf-8') as f:
+              writer=csv.writer(f,lineterminator='\n'); writer.writerow(header); writer.writerows(rows)
+          PY
+
+      - name: Verify frozen controls after asset integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_frozen_controls.py build/architecture/game --json-out build/architecture/FROZEN_CONTROLS_POST.json --markdown-out build/architecture/FROZEN_CONTROLS_POST.md
+          grep -q '"checks": 25' build/architecture/FROZEN_CONTROLS_POST.json
+          grep -q '"failures": \[\]' build/architecture/FROZEN_CONTROLS_POST.json
+
+      - name: Commit verified architecture runtime assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/environment/architecture/traditional assets/environment/architecture/souq assets/environment/architecture/waterfront
+          git add docs/asset_lab/RUNTIME_USAGE_MAP.csv
+          git commit -m 'build: integrate verified traditional souq and waterfront assets'
+          git push origin HEAD:work/bahrain-brick-asset-lab-integration-v1
+
+      - name: Upload architecture evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: architecture-family-integration-evidence
+          path: |
+            build/architecture/architecture-plan.json
+            build/architecture/ARCHITECTURE_SHA256SUMS.txt
+            build/architecture/ARCHITECTURE_GLB_VALIDATION.json
+            build/architecture/determinism-result.txt
+            build/architecture/run-a/generation-report.json
+            build/architecture/runtime-integration-tests.log
+            build/architecture/godot-game-import.log
+            build/architecture/FROZEN_CONTROLS_PRE.json
+            build/architecture/FROZEN_CONTROLS_POST.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,146 @@
+{
+  "artifacts": [],
+  "authority": {
+    "asset_authority_commit": "84ac94399262f71f29bf65dd553cd7729d87cce0",
+    "asset_bundle": {
+      "bytes": 623404,
+      "sha256": "98e3964a1c84200c8d764116bc027678de0019fc6481ca41825ed606aa2a9c41"
+    },
+    "asset_corrective_commit": "d59efb98b9c06ceb754d95e8ce83853442f46f41",
+    "asset_corrective_pr": 3,
+    "asset_repository": "MuhamedZanabal/Bahrain_bricks_Assets",
+    "checklist": {
+      "duplicate_ids": 0,
+      "final_release_gates": 15,
+      "sequence_gaps": 0,
+      "task_ids": 467
+    },
+    "expected_checkpoint_ancestor": "5383c376df40f2a427fc5f739cac0ad23584de35",
+    "frozen_premium_authority": "e26ec912db5c10d071a8e120010bdb5a9a136f17",
+    "game_repository": "MuhamedZanabal/brick-bahrain-open-world",
+    "integration_branch": "work/bahrain-brick-asset-lab-integration-v1",
+    "integration_head_at_checkpoint": "b76b8fd2c67bfee07862abd7a6a0243c39d23048",
+    "integration_pr": {
+      "draft": true,
+      "merged": false,
+      "number": 57,
+      "state": "open"
+    },
+    "lineage": {
+      "asset": "corrective commit is direct descendant of asset authority; authority commit unchanged",
+      "game": "frozen authority is exact merge base; integration head 20 commits ahead and 0 behind at audit"
+    },
+    "premium_validation_pr": {
+      "draft": true,
+      "merged": false,
+      "mutation": "prohibited",
+      "number": 55,
+      "state": "open"
+    },
+    "protected_controls": {
+      "baseline_commit": "c5548465627942a2889a0bd09f8979c3a29fbcdd",
+      "expected_sha256": {
+        "project.godot::[input]": "ffb79530e51ae22bb7664c98c73204079ecdaa6c53edcdd9b8aad16b9e4b22ad",
+        "scenes/mobile_input_pipeline_test.tscn": "29c3bba4dabf57c3f52f6d31c9de935bfaf45c3b96eae877b390c9dcf633d527",
+        "scenes/mobile_input_visual_evidence.tscn": "c456c26db3f2e6d15a4de300c976613c6717aa6a1006c0b23c3b68dba20fbb1b",
+        "scripts/hud.gd::_build_action_bar": "b55caddc0650cc63bb66db0d5b0b6a8eba998e63bb9cbfefd92e47f027bde353",
+        "scripts/hud.gd::_build_touch_controls": "af46af6c6542fe8ad32ebb59ffe5d21f98c533011417832d61204cb6b76e1cbd",
+        "scripts/hud.gd::_exit_tree": "4b7dad0209c99ba9d6f119377446655f31ac7565446198d106f8034fbd0d8d87",
+        "scripts/hud.gd::_refresh_all": "edb9d3a666f6fe198dfa27e2d2b674603f83b7febd26e8d2d8fa0e8ed934dea3",
+        "scripts/hud.gd::_round_action": "399608f79b174f31596dfe4d50cee77fb27dfb6830e1a96cd4648bd7bed352ce",
+        "scripts/player_controller.gd": "79f18a1950c9d0819e36ff102615eda2ed6796ba74daece9c7c2631c3e348366",
+        "scripts/touch_input.gd": "d9ff063d02140fdcd330a26f967982b929896b742d53d36678ad70608ba5591d",
+        "scripts/virtual_joystick.gd": "917fde4ffac3cf6f224d6761b26443ad3ffe66a913c56b0f11570058584f166e",
+        "scripts/world.gd::_exit_tree": "fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc",
+        "scripts/world.gd::_spawn_player": "5d97ef3556dafa21f8e934fc4b6802e4957c2c4e3790a3c28289dfcfd05e0e05",
+        "tests/mobile_input_pipeline_test.gd": "c4d6c5d8fab9197259cd82ea02f76da4d906a1283e242b92e9a2892bf1c790bf",
+        "tests/mobile_input_visual_evidence.gd": "eb363e0ea7ce3c14b67e3c6d18be5f034c437f9841715582fa84b074301d4b78"
+      },
+      "final_direct_recheck_required": true,
+      "method": "Exact immutable lineage: frozen authority is current-head merge base and complete compare contains zero protected paths.",
+      "required_snippets": {
+        "scripts/hud.gd": [
+          "root.mouse_filter = Control.MOUSE_FILTER_IGNORE",
+          "joystick.name = \"MovementJoystick\"",
+          "_walking_controls.visible = true",
+          "_vehicle_controls.visible = false",
+          "_walking_controls.visible = not in_vehicle",
+          "_vehicle_controls.visible = in_vehicle"
+        ],
+        "scripts/player_controller.gd": [
+          "var touch_vector: Vector2 = TouchInput.movement",
+          "move_and_slide()",
+          "\"is_local\": is_local"
+        ],
+        "scripts/world.gd": [
+          "TouchInput.reset_all()"
+        ]
+      },
+      "verification": "MATCH_BY_IMMUTABLE_LINEAGE"
+    }
+  },
+  "ci_runs_at_integration_head": [
+    {
+      "conclusion": "action_required",
+      "jobs_created": 0,
+      "retry_result": "not attempted; protected PR #55 workflow remains unchanged",
+      "run_id": 29377365831,
+      "workflow": "Build Bahrain Brick Premium Visual QA"
+    },
+    {
+      "conclusion": "action_required",
+      "jobs_created": 0,
+      "retry_result": "403 This workflow run cannot be retried",
+      "run_id": 29377365827,
+      "workflow": "Integrate verified Asset Lab runtime families"
+    },
+    {
+      "conclusion": "action_required",
+      "jobs_created": 0,
+      "retry_result": "not attempted; diagnostic trigger only",
+      "run_id": 29377365835,
+      "workflow": "Trigger Bahrain Brick Premium Visual Validation"
+    }
+  ],
+  "classification": "PRODUCTION TOOLCHAIN / CI EXECUTION BLOCKED",
+  "completion_claim": false,
+  "confirmed_defect": {
+    "classification": "SOURCE-INTEGRITY LEDGER INVALID — 40 FAILED ENTRIES",
+    "commit": "d59efb98b9c06ceb754d95e8ce83853442f46f41",
+    "pr": 3,
+    "state": "CORRECTED_ON_DESCENDANT_DRAFT_PR"
+  },
+  "next_tasks": [
+    "persist this checkpoint to game integration branch",
+    "add pinned production CI workflow and cube pipeline",
+    "resolve exact GitHub pre-job action_required cause",
+    "execute cube through Android export"
+  ],
+  "protected_controls": {
+    "expected_checks": 25,
+    "modified_protected_paths": 0,
+    "post_result": "pending production CI",
+    "pre_result": "verified from frozen authority definition and lineage; executable CI recheck pending"
+  },
+  "schema_version": "2.0.0",
+  "task_ledger": {
+    "path": "asset_lab/reports/ASSET_PRODUCTION_TASK_MATRIX.csv",
+    "records": 467,
+    "status_counts": {
+      "BLOCKED": 7,
+      "COMPLETE": 20,
+      "NOT_APPLICABLE": 1,
+      "NOT_STARTED": 437,
+      "READY": 2
+    }
+  },
+  "updated_at_utc": "2026-07-15T01:41:10.134030+00:00",
+  "validated_asset_repository": {
+    "corrected_ledger_entries": 161,
+    "integrity_failures": 0,
+    "manifest_records": 98,
+    "python_compile": "passed",
+    "python_tests_passed": 20,
+    "signing_scan": "passed"
+  }
+}

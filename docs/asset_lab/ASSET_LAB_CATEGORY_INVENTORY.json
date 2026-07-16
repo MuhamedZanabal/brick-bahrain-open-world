@@ -1,0 +1,56 @@
+{
+  "source_repository": "MuhamedZanabal/Bahrain_bricks_Assets",
+  "source_commit": "84ac94399262f71f29bf65dd553cd7729d87cce0",
+  "record_count": 98,
+  "categories": {
+    "architecture": 68,
+    "props": 9,
+    "third_party_quarantine": 8,
+    "environment": 7,
+    "roads": 6
+  },
+  "subcategories": {
+    "souq": 18,
+    "villas": 18,
+    "waterfront": 16,
+    "traditional": 14,
+    "roads": 7,
+    "street": 6,
+    "geometry": 4,
+    "commercial": 3,
+    "external_nature": 3,
+    "external_buildings": 2,
+    "external_roads": 1,
+    "external_shader": 1,
+    "external_vehicles": 1,
+    "kerbs": 1,
+    "markings": 1,
+    "restaurant": 1,
+    "supermarket": 1
+  },
+  "source_types": {
+    "original_spec": 66,
+    "original_procedural_or_spec": 15,
+    "procedural_original": 9,
+    "inherited_unverified": 8
+  },
+  "licenses": {
+    "PROJECT_OWNED_PENDING": 81,
+    "Original project asset": 9,
+    "QUARANTINED": 8
+  },
+  "original_formats": {
+    "svg/spec": 66,
+    "python/spec": 15,
+    "blender_python": 9,
+    "glb/shader": 8
+  },
+  "processed_status": {
+    "glb_pending": 81,
+    "glb_planned": 9,
+    "blank_quarantine": 8
+  },
+  "production_glb_count": 0,
+  "godot_runtime": "not_run",
+  "android_benchmark": "not_run"
+}

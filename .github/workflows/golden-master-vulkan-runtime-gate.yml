@@ -1,0 +1,285 @@
+name: Golden Master Vulkan Runtime Gate
+
+on:
+  push:
+    branches: [work/bahrain-brick-golden-master-batch1-v1]
+    paths:
+      - .github/workflows/golden-master-vulkan-runtime-gate.yml
+      - asset_lab/runtime/golden_master_manifest.json
+      - scenes/golden_master_preview_district.tscn
+      - scripts/golden_master_quality.gd
+      - scripts/golden_master_lod_instance.gd
+      - scripts/golden_master_preview_district.gd
+      - tests/golden_master_runtime_test.gd
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/golden-master-vulkan-runtime-gate.yml
+      - asset_lab/runtime/golden_master_manifest.json
+      - scenes/golden_master_preview_district.tscn
+      - scripts/golden_master_quality.gd
+      - scripts/golden_master_lod_instance.gd
+      - scripts/golden_master_preview_district.gd
+      - tests/golden_master_runtime_test.gd
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: golden-master-vulkan-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.3
+  GODOT_BUILD: stable
+  EXPECTED_GODOT_VERSION: 4.3.stable.official.77dcf97d8
+  SOURCE_ARTIFACT_ID: "8353372533"
+  PACKAGE_NAME: com.brickbahrain.goldenmasterqa
+  ANDROID_USER_HOME: ${{ github.workspace }}/build/android-user
+  ANDROID_AVD_HOME: ${{ github.workspace }}/build/android-user/avd
+
+jobs:
+  vulkan_runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact Vulkan-gate head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install deterministic host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends unzip libfontconfig1 libgl1 libx11-6 libxcursor1 libxinerama1 libxi6 libxrandr2
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          mkdir -p build/downloads build/tools build/source build/preview-project build/reports build/android-evidence "$ANDROID_AVD_HOME"
+      - name: Recover approved V3.1 GLB authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > build/downloads/v31.zip
+          unzip -tq build/downloads/v31.zip
+          unzip -q build/downloads/v31.zip -d build/source
+          test "$(find build/source/golden-masters-v31 -type f -name '*.glb' | wc -l)" -eq 45
+      - name: Install official Godot 4.3 and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/downloads
+          editor="Godot_v${GODOT_VERSION}-${GODOT_BUILD}_linux.x86_64.zip"
+          templates="Godot_v${GODOT_VERSION}-${GODOT_BUILD}_export_templates.tpz"
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-${GODOT_BUILD}"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$editor" -o "$editor"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$templates" -o "$templates"
+          sha256sum "$editor" "$templates" | tee ../reports/GODOT_DOWNLOAD_SHA256SUMS.txt
+          unzip -q "$editor" -d ../tools/godot
+          chmod +x ../tools/godot/Godot_v${GODOT_VERSION}-${GODOT_BUILD}_linux.x86_64
+          GODOT="$PWD/../tools/godot/Godot_v${GODOT_VERSION}-${GODOT_BUILD}_linux.x86_64"
+          test "$($GODOT --version)" = "$EXPECTED_GODOT_VERSION"
+          unzip -q "$templates" -d ../templates
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_BUILD}"
+          cp -a ../templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.${GODOT_BUILD}/"
+      - name: Assemble Vulkan Mobile preview project
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREVIEW="$PWD/build/preview-project"
+          mkdir -p "$PREVIEW/scripts" "$PREVIEW/scenes" "$PREVIEW/tests" "$PREVIEW/asset_lab/runtime" \
+            "$PREVIEW/assets/asset_lab/golden_masters" "$PREVIEW/assets/asset_lab/golden_textures"
+          cp scripts/golden_master_quality.gd "$PREVIEW/scripts/"
+          cp scripts/golden_master_lod_instance.gd "$PREVIEW/scripts/"
+          cp scripts/golden_master_preview_district.gd "$PREVIEW/scripts/"
+          cp scenes/golden_master_preview_district.tscn "$PREVIEW/scenes/"
+          cp tests/golden_master_runtime_test.gd "$PREVIEW/tests/"
+          cp asset_lab/runtime/golden_master_manifest.json "$PREVIEW/asset_lab/runtime/"
+          cp -a build/source/golden-masters-v31/. "$PREVIEW/assets/asset_lab/golden_masters/"
+          cp -a build/source/golden-textures/. "$PREVIEW/assets/asset_lab/golden_textures/"
+          cat > "$PREVIEW/project.godot" <<'EOF'
+          config_version=5
+          [application]
+          config/name="Bahrain Brick Golden Master QA"
+          run/main_scene="res://scenes/golden_master_preview_district.tscn"
+          config/features=PackedStringArray("4.3", "Mobile")
+          [display]
+          window/size/viewport_width=1920
+          window/size/viewport_height=1080
+          window/size/window_width_override=1280
+          window/size/window_height_override=720
+          window/stretch/mode="canvas_items"
+          window/stretch/aspect="expand"
+          window/handheld/orientation=1
+          [rendering]
+          renderer/rendering_method="mobile"
+          renderer/rendering_method.mobile="mobile"
+          renderer/rendering_method.web="gl_compatibility"
+          textures/vram_compression/import_etc2_astc=true
+          EOF
+          cat > "$PREVIEW/export_presets.cfg" <<'EOF'
+          [preset.0]
+          name="Android"
+          platform="Android"
+          runnable=true
+          dedicated_server=false
+          custom_features=""
+          export_filter="all_resources"
+          include_filter=""
+          exclude_filter=""
+          export_path="../bahrain_brick_golden_master_vulkan_qa.apk"
+          encryption_include_filters=""
+          encryption_exclude_filters=""
+          encrypt_pck=false
+          encrypt_directory=false
+          [preset.0.options]
+          custom_template/debug=""
+          custom_template/release=""
+          gradle_build/use_gradle_build=false
+          architectures/armeabi-v7a=false
+          architectures/arm64-v8a=true
+          architectures/x86_64=true
+          architectures/x86=false
+          keystore/debug="res://debug.keystore"
+          keystore/debug_password="android"
+          keystore/debug_user="androiddebugkey"
+          version/code=140532
+          version/name="1.4.0-golden-master-v31-vulkan"
+          package/unique_name="com.brickbahrain.goldenmasterqa"
+          package/name="Bahrain Brick Golden Master QA"
+          package/signed=true
+          package/app_category="game"
+          screen/immersive_mode=true
+          screen/support_small=true
+          screen/support_normal=true
+          screen/support_large=true
+          screen/support_xlarge=true
+          user_data_backup/allow=false
+          command_line/extra_args=""
+          permissions/custom_permissions=PackedStringArray()
+          permissions/access_network_state=false
+          permissions/internet=false
+          EOF
+          keytool -genkeypair -noprompt -keystore "$PREVIEW/debug.keystore" -storepass android -keypass android \
+            -alias androiddebugkey -dname "CN=Bahrain Brick Golden Master Vulkan QA,O=Zanabal Gaming,C=BH" \
+            -keyalg RSA -keysize 2048 -validity 10000
+      - name: Import, test, and export Vulkan APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          GODOT="$PWD/build/tools/godot/Godot_v${GODOT_VERSION}-${GODOT_BUILD}_linux.x86_64"
+          PREVIEW="$PWD/build/preview-project"
+          APK="$PWD/build/bahrain_brick_golden_master_vulkan_qa.apk"
+          "$GODOT" --headless --editor --path "$PREVIEW" --quit 2>&1 | tee build/reports/GODOT_VULKAN_IMPORT.log
+          "$GODOT" --headless --path "$PREVIEW" --script res://tests/golden_master_runtime_test.gd \
+            2>&1 | tee build/reports/GODOT_VULKAN_RUNTIME_TEST.log
+          grep -q 'GOLDEN_MASTER_RUNTIME_TEST_PASS assets=5 resources=45 profile=balanced' build/reports/GODOT_VULKAN_RUNTIME_TEST.log
+          "$GODOT" --headless --path "$PREVIEW" --export-debug Android "$APK" \
+            2>&1 | tee build/reports/GODOT_VULKAN_ANDROID_EXPORT.log
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee build/reports/APKSIGNER_VERIFY.txt
+          "$ANDROID_HOME/build-tools/34.0.0/aapt" dump badging "$APK" | tee build/reports/APK_BADGING.txt
+          grep -q "package: name='$PACKAGE_NAME'" build/reports/APK_BADGING.txt
+          sha256sum "$APK" | tee build/reports/APK_SHA256SUM.txt
+      - name: Provision unified API 34 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
+          AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -1)"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-34;google_apis;x86_64"
+          rm -rf "$ANDROID_USER_HOME"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$AVDMANAGER" create avd --force --name golden_master_api34 \
+            --package "system-images;android-34;google_apis;x86_64" --device "pixel_7"
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee build/reports/EMULATOR_LIST_AVDS.txt
+          grep -qx 'golden_master_api34' build/reports/EMULATOR_LIST_AVDS.txt
+      - name: Run bounded Vulkan Android validation
+        id: emulator
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
+          sudo chmod 666 /dev/kvm || true
+          "$EMULATOR" -avd golden_master_api34 -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
+            -gpu swiftshader_indirect -camera-back none -camera-front none -memory 4096 \
+            > build/reports/EMULATOR_STDOUT.log 2>&1 &
+          EMULATOR_PID=$!
+          printf '%s\n' "$EMULATOR_PID" > build/reports/EMULATOR_PID.txt
+          trap 'kill "$EMULATOR_PID" 2>/dev/null || true' EXIT
+          timeout 240s "$ADB" wait-for-device
+          BOOTED=0
+          for attempt in $(seq 1 120); do
+            kill -0 "$EMULATOR_PID"
+            "$ADB" devices -l > build/reports/ADB_DEVICES.txt
+            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+              BOOTED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$BOOTED" -eq 1
+          "$ADB" shell settings put system accelerometer_rotation 0
+          "$ADB" shell settings put system user_rotation 1
+          "$ADB" install -r build/bahrain_brick_golden_master_vulkan_qa.apk | tee build/reports/ADB_INSTALL.txt
+          "$ADB" logcat -c
+          "$ADB" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 | tee build/reports/ADB_LAUNCH.txt
+          READY=0
+          for attempt in $(seq 1 90); do
+            "$ADB" logcat -d > build/reports/ANDROID_LOGCAT.txt
+            if grep -q 'GOLDEN_MASTER_PREVIEW_READY profile=balanced assets=5' build/reports/ANDROID_LOGCAT.txt; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          "$ADB" exec-out screencap -p > build/android-evidence/golden_master_vulkan_preview_landscape.png
+          "$ADB" shell dumpsys window displays > build/reports/ANDROID_WINDOW_DISPLAYS.txt
+          "$ADB" shell dumpsys activity activities > build/reports/ANDROID_ACTIVITY.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          import hashlib,json
+          screenshot=Path('build/android-evidence/golden_master_vulkan_preview_landscape.png')
+          apk=Path('build/bahrain_brick_golden_master_vulkan_qa.apk')
+          assert screenshot.stat().st_size > 50000, screenshot.stat().st_size
+          image=Image.open(screenshot).convert('RGB')
+          width,height=image.size
+          assert width > height, (width,height)
+          extrema=ImageStat.Stat(image).extrema
+          assert sum(1 for low,high in extrema if high-low > 40) >= 2, extrema
+          Path('build/reports/ANDROID_VULKAN_RUNTIME_VALIDATION.json').write_text(
+              json.dumps({'passed':True,'renderer':'mobile_vulkan','package':'com.brickbahrain.goldenmasterqa','profile':'balanced','visible_assets':5,'landscape':True,'dimensions':[width,height],'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},indent=2,sort_keys=True)+'\n'
+          )
+          PY
+          if grep -E 'SCRIPT ERROR|Parse Error|GOLDEN_MASTER_PREVIEW_FAILED|FATAL EXCEPTION|Fatal signal' build/reports/ANDROID_LOGCAT.txt; then
+            exit 1
+          fi
+      - name: Upload Vulkan APK and runtime evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: golden-master-vulkan-runtime-${{ github.run_id }}
+          path: |
+            build/bahrain_brick_golden_master_vulkan_qa.apk
+            build/android-evidence
+            build/reports
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require Vulkan runtime success after evidence upload
+        if: always()
+        shell: bash
+        run: test '${{ steps.emulator.outcome }}' = 'success'

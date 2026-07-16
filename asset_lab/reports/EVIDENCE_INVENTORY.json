@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "path": "asset_lab/reports/ASSET_AUTHORITY_TRACKED_SHA256.txt",
+      "bytes": 16696,
+      "sha256": "4817e09f23cf953b4e4e5be546c942d627503ba538f8b7ee49d3df8c8f725722"
+    },
+    {
+      "path": "asset_lab/reports/ASSET_PRODUCTION_CHECKPOINT.md",
+      "bytes": 1467,
+      "sha256": "d5e70ee37fd5170dd09b79922917e13251fbc897a404af27a2b4ee4fbf1ba021"
+    },
+    {
+      "path": "asset_lab/reports/ASSET_PRODUCTION_EXECUTION_LEDGER.json",
+      "bytes": 6251,
+      "sha256": "8c68b6552e011ac724463d04a0536a1423023d6c55b4c9326ce34d5c37be3950"
+    },
+    {
+      "path": "asset_lab/reports/ASSET_PRODUCTION_TASK_MATRIX.csv",
+      "bytes": 9100,
+      "sha256": "26cf6d2bd15a3da8f14dc28dbc1b723bb2cf3736e0177b0a10857549b659923a"
+    },
+    {
+      "path": "asset_lab/reports/AUTHORITY_REPORT.json",
+      "bytes": 3926,
+      "sha256": "d4e6c0260e5d5eb4848d8e17e2296f906cd490ce167f93fda6e57934411dd03f"
+    },
+    {
+      "path": "asset_lab/reports/CAPABILITY_AUDIT.json",
+      "bytes": 989,
+      "sha256": "16ad308e2385ac0dea70f54ad11d86fb7098ae867778d5d56a94cb24b6e2ec84"
+    },
+    {
+      "path": "asset_lab/reports/ROLLBACK_PLAN.json",
+      "bytes": 564,
+      "sha256": "c9e899a67b2b114ea8e01178fa97c08519d61b7641af33f8ed6d7c32b595e5aa"
+    },
+    {
+      "path": "asset_lab/reports/SOURCE_INTEGRITY_LEDGER_DEFECT_REPORT.json",
+      "bytes": 13399,
+      "sha256": "cb9eda1706ace9adc1726bc55efa90497d24013c06a821ae1e8ecd68df5dac90"
+    }
+  ]
+}

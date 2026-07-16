@@ -1,0 +1,34 @@
+{
+  "android_runtime": "not available; no emulator or physical device claim permitted",
+  "classification": "PRODUCTION TOOLCHAIN / CI EXECUTION BLOCKED",
+  "connected": [
+    "GitHub repository read/write connector",
+    "Google Drive authority bundle access"
+  ],
+  "direct_git_transport": "blocked: DNS resolution for github.com/api.github.com unavailable in execution container",
+  "github_object_api": "available and used for verified non-force descendant commits",
+  "local": {
+    "cmake": "3.31.6",
+    "ffmpeg": "7.1.3",
+    "git": "2.47.3",
+    "imagemagick": "7.1.2-1",
+    "java": "OpenJDK 21.0.10",
+    "ninja": "1.12.1",
+    "node": "22.16.0",
+    "python": "3.13.5",
+    "trimesh": "4.11.1"
+  },
+  "not_local": [
+    "Blender",
+    "Godot 4.3",
+    "Android SDK",
+    "sdkmanager",
+    "adb",
+    "emulator",
+    "Gradle",
+    "aapt",
+    "apksigner",
+    "zipalign"
+  ],
+  "selected_route": "Pinned GitHub Actions workflow on work/bahrain-brick-asset-lab-integration-v1"
+}

@@ -1,0 +1,153 @@
+name: Golden Master Landscape Emulator Final
+
+on:
+  push:
+    branches: [work/bahrain-brick-golden-master-batch1-v1]
+    paths:
+      - .github/workflows/golden-master-landscape-emulator-final.yml
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/golden-master-landscape-emulator-final.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: golden-master-landscape-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_ARTIFACT_ID: "8358665722"
+  EXPECTED_APK_SHA256: 2c9666032c8b1ccb7e45b4a9bd17e49aa9a8300d4ee336f1ee067024024aa3c0
+  PACKAGE_NAME: com.brickbahrain.goldenmasterqa
+  ANDROID_USER_HOME: ${{ github.workspace }}/build/android-user
+  ANDROID_AVD_HOME: ${{ github.workspace }}/build/android-user/avd
+
+jobs:
+  landscape_emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact runtime head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Recover verified true-landscape APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/source build/reports build/android-evidence "$ANDROID_AVD_HOME"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > build/source.zip
+          unzip -tq build/source.zip
+          unzip -q build/source.zip -d build/source
+          cp build/source/bahrain_brick_golden_master_landscape_vulkan_qa.apk build/bahrain_brick_golden_master_landscape_vulkan_qa.apk
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" build/bahrain_brick_golden_master_landscape_vulkan_qa.apk | sha256sum -c -
+          grep -q 'GOLDEN_MASTER_RUNTIME_TEST_PASS assets=5 resources=45 profile=balanced' build/source/reports/GODOT_RUNTIME_TEST.log
+          grep -q "package: name='$PACKAGE_NAME'" build/source/reports/APK_BADGING.txt
+          grep -q '^Verifies$' build/source/reports/APKSIGNER_VERIFY.txt
+          cp build/source/reports/GODOT_RUNTIME_TEST.log build/reports/SOURCE_GODOT_RUNTIME_TEST.log
+          cp build/source/reports/APK_BADGING.txt build/reports/SOURCE_APK_BADGING.txt
+          cp build/source/reports/APKSIGNER_VERIFY.txt build/reports/SOURCE_APKSIGNER_VERIFY.txt
+          cp build/source/reports/PROTECTED_AUTHORITY.txt build/reports/SOURCE_PROTECTED_AUTHORITY.txt
+      - name: Provision unified API 34 AVD
+        shell: bash
+        run: |
+          set -euo pipefail
+          export JAVA_HOME="$(dirname "$(dirname "$(readlink -f "$(command -v java)")")")"
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -x "$JAVA_HOME/bin/java"
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort | tail -1)"
+          AVDMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name avdmanager | sort | tail -1)"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "emulator" "system-images;android-34;google_apis;x86_64"
+          rm -rf "$ANDROID_USER_HOME"
+          mkdir -p "$ANDROID_AVD_HOME"
+          echo no | "$AVDMANAGER" create avd --force --name golden_master_api34 \
+            --package "system-images;android-34;google_apis;x86_64" --device "pixel_7"
+          "$ANDROID_HOME/emulator/emulator" -list-avds | tee build/reports/EMULATOR_LIST_AVDS.txt
+          grep -qx 'golden_master_api34' build/reports/EMULATOR_LIST_AVDS.txt
+      - name: Run bounded true-landscape Vulkan validation
+        id: emulator
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          ADB="$ANDROID_HOME/platform-tools/adb"
+          EMULATOR="$ANDROID_HOME/emulator/emulator"
+          sudo chmod 666 /dev/kvm || true
+          "$EMULATOR" -avd golden_master_api34 -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
+            -gpu swiftshader_indirect -camera-back none -camera-front none -memory 4096 -no-metrics \
+            > build/reports/EMULATOR_STDOUT.log 2>&1 &
+          EMULATOR_PID=$!
+          printf '%s\n' "$EMULATOR_PID" > build/reports/EMULATOR_PID.txt
+          trap 'kill "$EMULATOR_PID" 2>/dev/null || true' EXIT
+          timeout 240s "$ADB" wait-for-device
+          BOOTED=0
+          for attempt in $(seq 1 120); do
+            kill -0 "$EMULATOR_PID"
+            "$ADB" devices -l > build/reports/ADB_DEVICES.txt
+            if [ "$("$ADB" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ]; then
+              BOOTED=1
+              break
+            fi
+            sleep 2
+          done
+          test "$BOOTED" -eq 1
+          "$ADB" install -r build/bahrain_brick_golden_master_landscape_vulkan_qa.apk | tee build/reports/ADB_INSTALL.txt
+          "$ADB" logcat -c
+          "$ADB" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 | tee build/reports/ADB_LAUNCH.txt
+          READY=0
+          for attempt in $(seq 1 90); do
+            "$ADB" logcat -d > build/reports/ANDROID_LOGCAT.txt
+            if grep -q 'GOLDEN_MASTER_PREVIEW_READY profile=balanced assets=5' build/reports/ANDROID_LOGCAT.txt; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" -eq 1
+          "$ADB" exec-out screencap -p > build/android-evidence/golden_master_preview_landscape.png
+          "$ADB" shell dumpsys window displays > build/reports/ANDROID_WINDOW_DISPLAYS.txt
+          "$ADB" shell dumpsys activity activities > build/reports/ANDROID_ACTIVITY.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          import hashlib, json
+          screenshot=Path('build/android-evidence/golden_master_preview_landscape.png')
+          apk=Path('build/bahrain_brick_golden_master_landscape_vulkan_qa.apk')
+          assert screenshot.stat().st_size > 50000, screenshot.stat().st_size
+          image=Image.open(screenshot).convert('RGB')
+          width,height=image.size
+          assert width > height, (width,height)
+          extrema=ImageStat.Stat(image).extrema
+          assert sum(1 for low,high in extrema if high-low > 40) >= 2, extrema
+          Path('build/reports/ANDROID_RUNTIME_VALIDATION.json').write_text(
+              json.dumps({'passed':True,'renderer':'mobile_vulkan','orientation':'landscape','package':'com.brickbahrain.goldenmasterqa','profile':'balanced','visible_assets':5,'dimensions':[width,height],'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest()},indent=2,sort_keys=True)+'\n'
+          )
+          PY
+          if grep -E 'SCRIPT ERROR|Parse Error|GOLDEN_MASTER_PREVIEW_FAILED|FATAL EXCEPTION|Fatal signal|Condition "configured" is true|Singleton for Time already exists' build/reports/ANDROID_LOGCAT.txt; then
+            exit 1
+          fi
+      - name: Upload final landscape evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: golden-master-landscape-emulator-final-${{ github.run_id }}
+          path: |
+            build/bahrain_brick_golden_master_landscape_vulkan_qa.apk
+            build/android-evidence
+            build/reports
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Require true-landscape runtime success after evidence upload
+        if: always()
+        shell: bash
+        run: test '${{ steps.emulator.outcome }}' = 'success'

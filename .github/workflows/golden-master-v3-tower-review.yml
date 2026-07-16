@@ -1,0 +1,159 @@
+name: Golden Master V3 Tower Review
+
+on:
+  push:
+    branches: [work/bahrain-brick-golden-master-batch1-v1]
+    paths: &v3_paths
+      - .github/workflows/golden-master-v3-tower-review.yml
+      - tools/asset_lab/generate_golden_masters.py
+      - tools/asset_lab/generate_golden_masters_v2.py
+      - tools/asset_lab/generate_golden_masters_v3.py
+      - tools/asset_lab/generate_golden_master_textures.py
+      - tools/asset_lab/render_golden_master_contact_sheets.py
+      - tools/asset_lab/render_golden_master_contact_sheets_cycles.py
+      - tests/test_golden_master_v3_towers.py
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths: *v3_paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: golden-master-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate_v3:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      BLENDER_VERSION: 4.3.2
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Run V3 massing contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests.test_golden_master_v3_towers -v
+          python3 -m py_compile tools/asset_lab/generate_golden_masters_v3.py
+      - name: Install Pillow and checksum-verified Blender
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+          mkdir -p build/downloads build/golden-textures build/golden-masters-v3 build/golden-renders-v3 build/reports
+          cd build/downloads
+          archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/$archive" -o "$archive"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$base/blender-${BLENDER_VERSION}.sha256" -o blender.sha256
+          grep " $archive$" blender.sha256 | sha256sum -c -
+          tar -xf "$archive"
+      - name: Generate deterministic texture authority
+        shell: bash
+        run: |
+          python3 tools/asset_lab/generate_golden_master_textures.py \
+            --seed 140500 \
+            --output-dir build/golden-textures \
+            --report build/reports/GOLDEN_MASTER_TEXTURES_V3.json
+      - name: Generate complete 45-derivative V3 review matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
+          "$BLENDER" --background --factory-startup --python-exit-code 1 \
+            --python tools/asset_lab/generate_golden_masters_v3.py -- \
+            --seed 1405 \
+            --texture-dir build/golden-textures \
+            --output-dir build/golden-masters-v3 \
+            --report build/reports/GOLDEN_MASTER_GENERATION_V3.json
+      - name: Validate V3 technical and cost gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          report=json.loads(Path('build/reports/GOLDEN_MASTER_GENERATION_V3.json').read_text())
+          outputs=report['outputs']
+          assert report['generator_version']=='bahrain-brick-golden-master-v3-tower-rework', report
+          assert set(report['revised_assets'])=={'bh_waterfront_tower_a_01','bh_cr_skyscraper_tower_01'}
+          assert report['derivative_count']==45 and len(outputs)==45
+          assert len(list(Path('build/golden-masters-v3').rglob('*.glb')))==45
+          paths=[item['path'] for item in outputs]
+          assert len(paths)==len(set(paths))
+          for item in outputs:
+              path=Path(item['path'])
+              assert path.is_file() and path.stat().st_size==item['bytes']
+              assert hashlib.sha256(path.read_bytes()).hexdigest()==item['sha256']
+              assert item['triangle_count']>0
+              assert item['collision_object_count']>=1
+          by_asset_profile={}
+          by_asset_lod={}
+          for item in outputs:
+              by_asset_profile.setdefault((item['asset_id'],item['profile']),[]).append(item)
+              by_asset_lod.setdefault((item['asset_id'],item['lod']),[]).append(item)
+          for key,items in by_asset_profile.items():
+              triangles=[x['triangle_count'] for x in sorted(items,key=lambda x:x['lod'])]
+              assert triangles[0] >= triangles[1] >= triangles[2], (key,triangles)
+          profile_rank={'low':0,'balanced':1,'high':2}
+          for key,items in by_asset_lod.items():
+              triangles=[x['triangle_count'] for x in sorted(items,key=lambda x:profile_rank[x['profile']])]
+              assert triangles[0] <= triangles[1] <= triangles[2], (key,triangles)
+          floors={'bh_waterfront_tower_a_01':3000,'bh_cr_skyscraper_tower_01':5000}
+          summary={}
+          for asset_id,floor in floors.items():
+              item=next(x for x in outputs if x['asset_id']==asset_id and x['profile']=='balanced' and x['lod']==0)
+              assert item['triangle_count']>=floor, (asset_id,item['triangle_count'],floor)
+              summary[asset_id]={'triangles':item['triangle_count'],'bytes':item['bytes'],'sha256':item['sha256']}
+          Path('build/reports/GOLDEN_MASTER_V3_TOWER_TECHNICAL_REVIEW.json').write_text(
+              json.dumps({'passed':True,'tower_summary':summary,'failures':[]},indent=2,sort_keys=True)+'\n'
+          )
+          PY
+      - name: Render 15 V3 Cycles CPU evidence views
+        shell: bash
+        run: |
+          set -euo pipefail
+          BLENDER="$PWD/build/downloads/blender-${BLENDER_VERSION}-linux-x64/blender"
+          "$BLENDER" --background --factory-startup --python-exit-code 1 \
+            --python tools/asset_lab/render_golden_master_contact_sheets_cycles.py -- \
+            render \
+            --input-root build/golden-masters-v3 \
+            --output-root build/golden-renders-v3 \
+            --report build/reports/GOLDEN_MASTER_RENDER_VIEWS_V3.json
+          test "$(find build/golden-renders-v3/views -type f -name '*.png' | wc -l)" -eq 15
+      - name: Compose and validate five V3 contact sheets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/asset_lab/render_golden_master_contact_sheets.py \
+            compose \
+            --view-report build/reports/GOLDEN_MASTER_RENDER_VIEWS_V3.json \
+            --output-root build/golden-renders-v3 \
+            --report build/reports/GOLDEN_MASTER_CONTACT_SHEETS_V3.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          report=json.loads(Path('build/reports/GOLDEN_MASTER_CONTACT_SHEETS_V3.json').read_text())
+          assert report['contact_sheet_count']==5 and len(report['contact_sheets'])==5
+          assert len(list(Path('build/golden-renders-v3/contact-sheets').glob('*.png')))==5
+          assert all(Path(item['path']).stat().st_size>10000 for item in report['contact_sheets'])
+          PY
+      - name: Upload V3 technical and visual review evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-golden-master-v3-${{ github.run_id }}
+          path: |
+            build/golden-masters-v3
+            build/golden-textures
+            build/golden-renders-v3
+            build/reports
+          if-no-files-found: error
+          retention-days: 30

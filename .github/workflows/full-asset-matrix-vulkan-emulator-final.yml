@@ -1,0 +1,230 @@
+name: Bahrain Brick Vulkan Matrix Emulator Final
+
+on:
+  push:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    paths:
+      - .github/workflows/full-asset-matrix-vulkan-emulator-final.yml
+      - tools/asset_lab/run_full_matrix_emulator_validation.sh
+  pull_request:
+    branches: [work/bahrain-brick-premium-visual-v14]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/full-asset-matrix-vulkan-emulator-final.yml
+      - tools/asset_lab/run_full_matrix_emulator_validation.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-vulkan-matrix-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_ARTIFACT_ID: '8363068593'
+  EXPECTED_APK_SHA256: ba73962adbf28b5ad79be63d40ece9e417fecf2ec7d78b2a80174992cc303d13
+  PACKAGE_NAME: com.bahrainbrick.game.qa
+  VERSION_CODE: '1408'
+  VERSION_NAME: 1.4.0.8-full-matrix-vulkan-lit-qa
+  APK_NAME: bahrain-brick-full-matrix-vulkan-lit-qa.apk
+  SYSTEM_IMAGE: system-images;android-34;default;x86_64
+  ANDROID_USER_HOME: ${{ github.workspace }}/build/vulkan-matrix-runtime/android-user
+  ANDROID_AVD_HOME: ${{ github.workspace }}/build/vulkan-matrix-runtime/android-user/avd
+
+jobs:
+  emulator_endurance:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-asset-lab-integration-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Check out exact runtime harness head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Recover exact signed lit Vulkan QA APK and prerequisite evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=build/vulkan-matrix-runtime
+          mkdir -p "$ROOT/source" "$ROOT/reports" "$ROOT/logs" "$ROOT/artifacts"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > "$ROOT/source.zip"
+          unzip -tq "$ROOT/source.zip"
+          unzip -q "$ROOT/source.zip" -d "$ROOT/source"
+          cp "$ROOT/source/artifacts/$APK_NAME" "$ROOT/$APK_NAME"
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$ROOT/$APK_NAME" | sha256sum -c -
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import json
+          base=Path('build/vulkan-matrix-runtime')
+          apk=base/'bahrain-brick-full-matrix-vulkan-lit-qa.apk'
+          badging=(base/'source/reports/INDEPENDENT_APK_BADGING.txt').read_text()
+          required="package: name='com.bahrainbrick.game.qa' versionCode='1408' versionName='1.4.0.8-full-matrix-vulkan-lit-qa'"
+          assert required in badging, badging
+          with ZipFile(apk) as archive:
+              names=set(archive.namelist())
+          assert 'lib/x86_64/libgodot_android.so' in names
+          root=base/'source/reports'
+          assert (root/'FROZEN_CONTROLS_LIT_QA_PRE.json').read_bytes() == (root/'FROZEN_CONTROLS_LIT_QA_POST.json').read_bytes()
+          scan=json.loads((root/'CRITICAL_RUNTIME_ERROR_SCAN.json').read_text())
+          assert scan['conclusion'] == 'pass' and scan['unresolved_count'] == 0, scan
+          PY
+          cp "$ROOT/source/reports/INDEPENDENT_APK_BADGING.txt" "$ROOT/reports/SOURCE_APK_BADGING.txt"
+          cp "$ROOT/source/reports/APK_SHA256SUM.txt" "$ROOT/reports/SOURCE_APK_SHA256SUM.txt"
+          cp "$ROOT/source/reports/FROZEN_CONTROLS_LIT_QA_POST.json" "$ROOT/reports/SOURCE_FROZEN_CONTROLS.json"
+          cp "$ROOT/source/reports/CRITICAL_RUNTIME_ERROR_SCAN.json" "$ROOT/reports/SOURCE_CRITICAL_RUNTIME_ERROR_SCAN.json"
+
+      - name: Provision Java 17
+        uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Provision pinned AOSP Android API 34 environment
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+            emulator
+            ${{ env.SYSTEM_IMAGE }}
+
+      - name: Independently verify exact lit APK binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=build/vulkan-matrix-runtime
+          APK="$ROOT/$APK_NAME"
+          BUILD_TOOLS="${ANDROID_SDK_ROOT:-$ANDROID_HOME}/build-tools/34.0.0"
+          set +e
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > "$ROOT/reports/RUNTIME_APK_BADGING.txt" 2> "$ROOT/logs/runtime-aapt-badging-stderr.txt"
+          badging_status=$?
+          set -e
+          printf '%s\n' "$badging_status" > "$ROOT/reports/RUNTIME_AAPT_BADGING_STATUS.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          badging=Path('build/vulkan-matrix-runtime/reports/RUNTIME_APK_BADGING.txt').read_text()
+          required="package: name='com.bahrainbrick.game.qa' versionCode='1408' versionName='1.4.0.8-full-matrix-vulkan-lit-qa'"
+          assert required in badging, badging
+          PY
+          set +e
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$ROOT/reports/RUNTIME_APK_SIGNING.txt" 2>&1
+          signing_status=$?
+          set -e
+          printf '%s\n' "$signing_status" > "$ROOT/reports/RUNTIME_APK_SIGNING_STATUS.txt"
+          cat "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
+          test "$signing_status" -eq 0
+          grep -Eq 'Verified using v(2|3) scheme.*true' "$ROOT/reports/RUNTIME_APK_SIGNING.txt"
+          "$BUILD_TOOLS/zipalign" -c -v 4 "$APK" > "$ROOT/reports/RUNTIME_APK_ZIPALIGN.txt"
+          unzip -t "$APK" > "$ROOT/logs/runtime-apk-zip-integrity.txt"
+          sha256sum "$APK" | tee "$ROOT/reports/RUNTIME_APK_SHA256SUM.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib,json
+          root=Path('build/vulkan-matrix-runtime')
+          apk=root/'bahrain-brick-full-matrix-vulkan-lit-qa.apk'
+          with ZipFile(apk) as z:
+              names=set(z.namelist())
+          assert 'lib/x86_64/libgodot_android.so' in names
+          report={
+            'passed':True,
+            'package':'com.bahrainbrick.game.qa',
+            'version_code':1408,
+            'version_name':'1.4.0.8-full-matrix-vulkan-lit-qa',
+            'renderer':'mobile_vulkan',
+            'qa_main_scene':'res://scenes/full_matrix_android_qa.tscn',
+            'abi':'x86_64',
+            'apk_bytes':apk.stat().st_size,
+            'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+          }
+          assert report['apk_sha256']=='ba73962adbf28b5ad79be63d40ece9e417fecf2ec7d78b2a80174992cc303d13'
+          (root/'reports/RUNTIME_APK_AUTHORITY.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Provision screenshot validator
+        shell: bash
+        run: python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+
+      - name: Materialize AOSP quiescence validator
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=build/vulkan-matrix-runtime
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path('tools/asset_lab/run_full_matrix_emulator_validation.sh')
+          target=Path('build/vulkan-matrix-runtime/run_full_matrix_emulator_validation_stable.sh')
+          text=source.read_text()
+          old_sdk='''"$SDKMANAGER" 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0' 'emulator' 'system-images;android-34;google_apis;x86_64' '''.rstrip()
+          new_sdk='''"$SDKMANAGER" 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0' 'emulator' "$FULL_MATRIX_SYSTEM_IMAGE"'''
+          old_avd='''echo no | "$AVDMANAGER" create avd --force --name "$AVD_NAME" --package 'system-images;android-34;google_apis;x86_64' --device pixel_7 > "$LOGS/full-matrix-avd-create.txt" 2>&1'''
+          new_avd='''echo no | "$AVDMANAGER" create avd --force --name "$AVD_NAME" --package "$FULL_MATRIX_SYSTEM_IMAGE" --device pixel_7 > "$LOGS/full-matrix-avd-create.txt" 2>&1'''
+          assert text.count(old_sdk) == 1, text.count(old_sdk)
+          assert text.count(old_avd) == 1, text.count(old_avd)
+          text=text.replace(old_sdk,new_sdk).replace(old_avd,new_avd)
+          anchor='''[[ "$stable" -ge 5 ]] || failed "landscape holder did not stabilize display"\nsleep 5\n\n"$ADB" install -r -t "$APK"'''
+          replacement='''[[ "$stable" -ge 5 ]] || failed "landscape holder did not stabilize display"\nsleep 5\n\n# Fresh emulator images can still be attaching input devices after boot.\n# Launching Godot during that configuration churn recreates the activity and\n# triggers Godot 4.3 native reinitialization failure. Disable background\n# networking and require a sustained quiet window before the Godot process exists.\n"$ADB" shell svc wifi disable >/dev/null 2>&1 || true\n"$ADB" shell svc data disable >/dev/null 2>&1 || true\n"$ADB" logcat -c\nSETTLE_LOG="$LOGS/full-matrix-system-settle.txt"\n"$ADB" logcat -v threadtime > "$SETTLE_LOG" 2>&1 & SETTLE_PID=$!\nquiet=0; previous=-1\nfor _ in $(seq 1 120); do\n  current="$(grep -Ec 'InputReader: Reconfiguring input devices|CONFIGURATION_CHANGED|RoleService: Granting default roles|PACKAGE_REPLACED|PACKAGE_CHANGED' "$SETTLE_LOG" 2>/dev/null || true)"\n  if [[ "$current" == "$previous" ]]; then quiet=$((quiet+1)); else quiet=0; previous="$current"; fi\n  [[ "$quiet" -ge 15 ]] && break\n  sleep 2\ndone\nkill "$SETTLE_PID" >/dev/null 2>&1 || true; wait "$SETTLE_PID" >/dev/null 2>&1 || true\n[[ "$quiet" -ge 15 ]] || failed "emulator input/configuration state did not become quiescent"\nsleep 5\n\n"$ADB" install -r -t "$APK"'''
+          assert text.count(anchor) == 1, text.count(anchor)
+          text=text.replace(anchor,replacement)
+          target.write_text(text)
+          target.chmod(0o755)
+          PY
+          grep -q 'FULL_MATRIX_SYSTEM_IMAGE' "$ROOT/run_full_matrix_emulator_validation_stable.sh"
+          grep -q 'system-settle' "$ROOT/run_full_matrix_emulator_validation_stable.sh"
+
+      - name: Run exact lit Vulkan QA API 34 traversal and soak gate
+        id: runtime
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=build/vulkan-matrix-runtime
+          EXPECTED_APK_SHA256="$EXPECTED_APK_SHA256" \
+          FULL_MATRIX_SYSTEM_IMAGE="$SYSTEM_IMAGE" \
+          bash "$ROOT/run_full_matrix_emulator_validation_stable.sh" \
+            "$ROOT/$APK_NAME" \
+            "$PACKAGE_NAME" \
+            "$ROOT/reports" \
+            "$ROOT/logs" \
+            "$ROOT/artifacts"
+
+      - name: Build runtime evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json
+          root=Path('build/vulkan-matrix-runtime'); files=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name!='source.zip' and 'source' not in x.parts):
+              files.append({'path':p.as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'RUNTIME_EVIDENCE_INVENTORY.json').write_text(json.dumps({'file_count':len(files),'files':files},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload complete lit Vulkan QA emulator evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-vulkan-lit-qa-emulator-${{ github.run_id }}
+          path: |
+            build/vulkan-matrix-runtime/bahrain-brick-full-matrix-vulkan-lit-qa.apk
+            build/vulkan-matrix-runtime/reports
+            build/vulkan-matrix-runtime/logs
+            build/vulkan-matrix-runtime/artifacts
+            build/vulkan-matrix-runtime/run_full_matrix_emulator_validation_stable.sh
+            build/vulkan-matrix-runtime/RUNTIME_EVIDENCE_INVENTORY.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Require final lit Vulkan QA emulator success after evidence upload
+        if: always()
+        shell: bash
+        run: test '${{ steps.runtime.outcome }}' = 'success'

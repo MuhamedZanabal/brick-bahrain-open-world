@@ -1,0 +1,11 @@
+{
+  "baseline_asset_commit": "84ac94399262f71f29bf65dd553cd7729d87cce0",
+  "baseline_game_commit": "e26ec912db5c10d071a8e120010bdb5a9a136f17",
+  "rules": [
+    "Do not merge PR #57, PR #55, or asset PR #3 without later explicit authority.",
+    "Do not amend, reset, force-push, or rewrite authority history.",
+    "Undo an intentional checkpoint only with a normal revert limited to that checkpoint.",
+    "Preserve unrelated user work, provenance, quarantine records, and evidence.",
+    "Never update expected protected hashes to accommodate a mutation."
+  ]
+}
