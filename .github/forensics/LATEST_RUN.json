@@ -1,9 +1,9 @@
 {
   "workflow_name": "Bahrain Brick PR59 Gate 4 Matrix Forensics",
-  "run_id": 29597217473,
+  "run_id": 29597513593,
   "run_attempt": 1,
-  "workflow_commit": "d2f3a909350a625a4ae6f049265b6794f94bbec9",
+  "workflow_commit": "2cde9fd5faac90ce4ce01eb11bcf8c2e59557e4a",
   "candidate_head": "f512fe8be09d15d2c9466f5edb089404a37a5c9b",
   "source_run_id": 29589205147,
-  "analysis_exit_code": "1"
+  "analysis_exit_code": "unavailable"
 }
