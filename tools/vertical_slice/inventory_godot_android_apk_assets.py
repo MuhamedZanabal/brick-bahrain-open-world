@@ -91,7 +91,16 @@ def parse_string_list(raw: str) -> list[str]:
     return list(value)
 
 
+def sanitize_metadata_text(text: str) -> str:
+    if text.endswith("\x00"):
+        text = text[:-1]
+    if "\x00" in text:
+        raise MetadataError("embedded or repeated NUL byte in import metadata")
+    return text
+
+
 def parse_glb_import_metadata(text: str) -> dict[str, Any]:
+    text = sanitize_metadata_text(text)
     section: str | None = None
     values: dict[tuple[str, str], Any] = {}
     relevant = {("remap", "path"), ("deps", "source_file"), ("deps", "dest_files")}
@@ -122,8 +131,8 @@ def parse_glb_import_metadata(text: str) -> dict[str, Any]:
             values[identity] = parse_string_list(encoded)
         else:
             values[identity] = parse_string_value(encoded)
-    if "remap" not in seen_sections or "deps" not in seen_sections:
-        raise MetadataError("required [remap] and [deps] sections are missing")
+    if "remap" not in seen_sections:
+        raise MetadataError("required [remap] section is missing")
     return {
         "path": values.get(("remap", "path")),
         "source_file": values.get(("deps", "source_file")),
@@ -241,12 +250,14 @@ def inventory_apk(apk: Path, source_root: Path | None) -> dict[str, Any]:
             verified_targets: list[str] = []
             source_verified = False
             metadata: dict[str, Any] | None = None
+            logical_safe = True
 
             if not logical.endswith(".glb"):
                 failures.append("invalid_logical_extension")
             try:
                 logical = strict_relative_path(logical)
             except UnsafePathError:
+                logical_safe = False
                 failures.append("unsafe_sidecar_logical_path")
 
             try:
@@ -256,7 +267,7 @@ def inventory_apk(apk: Path, source_root: Path | None) -> dict[str, Any]:
 
             if source_root is None:
                 failures.append("source_root_required")
-            elif not failures or failures == ["malformed_sidecar"]:
+            elif logical_safe:
                 source_verified = source_exists(source_root, logical)
                 if not source_verified:
                     failures.append("missing_source_file")
