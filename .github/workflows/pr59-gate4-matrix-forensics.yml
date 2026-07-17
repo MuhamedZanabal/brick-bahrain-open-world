@@ -1,0 +1,136 @@
+name: Bahrain Brick PR59 Gate 4 Matrix Forensics
+
+on:
+  push:
+    branches: [ci/pr59-gate4-matrix-forensics-20260717]
+    paths:
+      - .github/workflows/pr59-gate4-matrix-forensics.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-matrix-forensics
+  cancel-in-progress: false
+
+jobs:
+  extract_and_reconcile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Check out forensic tooling branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-gate4-matrix-forensics-20260717
+          path: forensic-tooling
+          fetch-depth: 1
+
+      - name: Check out exact PR 59 candidate read-only
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: f512fe8be09d15d2c9466f5edb089404a37a5c9b
+          path: candidate
+          fetch-depth: 1
+
+      - name: Materialize forensic analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat forensic-tooling/.github/forensics/pr59_matrix_forensics_part_*.pyfrag > /tmp/pr59_matrix_forensics.py
+          python3 -m py_compile /tmp/pr59_matrix_forensics.py
+          sha256sum /tmp/pr59_matrix_forensics.py
+
+      - name: Download retained primary evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-gate4-primary-29589205147
+          path: build/extracted/primary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29589205147'
+          github-token: ${{ github.token }}
+
+      - name: Download retained secondary evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-gate4-secondary-29589205147
+          path: build/extracted/secondary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29589205147'
+          github-token: ${{ github.token }}
+
+      - name: Record exact source artifact authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/forensic-output
+          find build/extracted/primary -type f -printf '%P\n' | LC_ALL=C sort > build/forensic-output/PRIMARY_SOURCE_ARTIFACT_FILE_LIST.txt
+          find build/extracted/secondary -type f -printf '%P\n' | LC_ALL=C sort > build/forensic-output/SECONDARY_SOURCE_ARTIFACT_FILE_LIST.txt
+          cat > build/forensic-output/SOURCE_ARTIFACT_AUTHORITY.json <<'JSON'
+          {
+            "source_run_id": 29589205147,
+            "primary": {
+              "artifact_id": 8411002980,
+              "artifact_name": "bahrain-brick-pr59-gate4-primary-29589205147",
+              "github_digest_sha256": "40c1a54244deebe14d0ba3f48fd73e1d38c0389ed02fac9e68679d5391d72f4b"
+            },
+            "secondary": {
+              "artifact_id": 8410983642,
+              "artifact_name": "bahrain-brick-pr59-gate4-secondary-29589205147",
+              "github_digest_sha256": "312e86b65a9090e6de097d56671434b5d0f8a6dddd93cf897d6b01f70785aea8"
+            }
+          }
+          JSON
+
+      - name: Reconcile expected matrix against both retained APKs
+        shell: bash
+        run: |
+          set +e
+          python3 /tmp/pr59_matrix_forensics.py \
+            "$PWD/build/extracted/primary" \
+            "$PWD/build/extracted/secondary" \
+            "$PWD/candidate" \
+            "$PWD/build/forensic-output" \
+            > build/forensic-output/ANALYZER_STDOUT.txt \
+            2> build/forensic-output/ANALYZER_STDERR.txt
+          code=$?
+          printf '%s\n' "$code" > build/forensic-output/ANALYZER_EXIT_CODE.txt
+          exit 0
+
+      - name: Finalize compact forensic evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/forensic-output
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/forensic-output')
+          records=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name != 'COMPACT_EVIDENCE_INVENTORY.json'):
+              records.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          value={'schema_version':1,'file_count':len(records),'total_bytes':sum(r['bytes'] for r in records),'files':records}
+          (root/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          if value['total_bytes'] >= 50 * 1024 * 1024:
+              raise SystemExit(f"compact evidence exceeds 50 MiB: {value['total_bytes']}")
+          forbidden=[p for p in root.rglob('*') if p.is_file() and p.suffix.lower() in {'.apk','.glb','.pck'}]
+          if forbidden:
+              raise SystemExit(f"forbidden binaries in compact evidence: {forbidden}")
+          PY
+          du -ah build/forensic-output | sort -h > build/forensic-output/COMPACT_EVIDENCE_SIZE_LIST.txt
+          test "$(cat build/forensic-output/ANALYZER_EXIT_CODE.txt)" = "0"
+          for required in EXPECTED_MATRIX_PATHS.json PRIMARY_APK_LOGICAL_PATHS.json SECONDARY_APK_LOGICAL_PATHS.json PRIMARY_MATRIX_RECONCILIATION.json SECONDARY_MATRIX_RECONCILIATION.json MATRIX_RECONCILIATION_COMPARISON.json MATRIX_DISCREPANCY_CLASSIFICATION.json PROPOSED_CORRECTION.json; do
+            test -s "build/forensic-output/$required"
+          done
+
+      - name: Upload compact matrix forensic evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-matrix-forensics-${{ github.run_id }}
+          path: build/forensic-output
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
