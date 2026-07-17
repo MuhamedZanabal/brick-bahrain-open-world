@@ -114,8 +114,8 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
         for fragment in (
             "--export-debug",
             "timeout --signal=TERM --kill-after=30s",
-            "apksigner verify --verbose --print-certs",
-            "zipalign -c -v 4",
+            '"$APKSIGNER" verify --verbose --print-certs',
+            '"$ZIPALIGN" -c -v 4',
             "unzip -tq",
             "APK_PROVENANCE.json",
             "SOURCE_AUTHORITY_PRE_EXPORT.json",
