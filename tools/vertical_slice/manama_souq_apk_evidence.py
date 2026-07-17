@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 import zipfile
 from collections import Counter
 from pathlib import Path, PurePosixPath
@@ -591,6 +592,18 @@ def command_inspect(args: argparse.Namespace) -> int:
         "signing_validation": {"passed": not signing_failures, "failures": signing_failures},
     }
     write_json(report_dir / "APK_EXPORT_RECORD.json", record)
+    if not record["passed"]:
+        print(
+            json.dumps(
+                {
+                    "archive_failures": integrity_failures,
+                    "packaged_resource_failures": packaged_failures,
+                    "signing_failures": signing_failures,
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
     return 0 if record["passed"] else 1
 
 
