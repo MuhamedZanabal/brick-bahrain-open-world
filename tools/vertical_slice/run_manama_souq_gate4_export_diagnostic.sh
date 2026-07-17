@@ -49,7 +49,7 @@ value={
 out.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
 PY
 
-python3 - "$BASE_RUNNER" "$PATCHED_RUNNER" "$REPORTS/GATE4_HARNESS_CORRECTION.json" "$PRESET_INSPECTOR" "$ASSET_INVENTORY" <<'PY'
+python3 - "$BASE_RUNNER" "$PATCHED_RUNNER" "$REPORTS/GATE4_HARNESS_CORRECTION.json" "$PRESET_INSPECTOR" "$ASSET_INVENTORY" <<'PATCH_PY'
 from pathlib import Path
 import hashlib,json,sys
 source=Path(sys.argv[1]); target=Path(sys.argv[2]); report=Path(sys.argv[3]); inspector=Path(sys.argv[4]); asset_inventory=Path(sys.argv[5])
@@ -172,7 +172,7 @@ report.write_text(json.dumps({
  'product_source_modified':False,
  'export_preset_modified':False,
 },indent=2,sort_keys=True)+'\n')
-PY
+PATCH_PY
 
 TRACE="$LOGS/gate4-runner-xtrace.log"
 PS4='+ ${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]:-main}: '
