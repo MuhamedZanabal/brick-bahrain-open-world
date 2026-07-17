@@ -84,6 +84,24 @@ class GlbImportSidecarInventoryTests(unittest.TestCase):
         self.assertEqual(alias["source_file"], LOGICAL)
         self.assertEqual(alias["verified_import_targets"], [TARGET])
 
+    def test_real_godot_remap_only_sidecar_with_terminal_nul_is_accepted(self) -> None:
+        payload = (
+            '[remap]\n\n'
+            'importer="scene"\n'
+            'importer_version=1\n'
+            'type="PackedScene"\n'
+            'uid="uid://bi2kc3c1pmnku"\n'
+            f'path="res://{TARGET}"\n'
+            '\x00'
+        )
+        value = self.run_fixture([(f"assets/{SIDE}", payload), (f"assets/{TARGET}", b"scene")])
+        self.assertTrue(value["passed"], value)
+        alias = next(item for item in value["logical_aliases"] if item["logical_path"] == LOGICAL)
+        self.assertEqual(alias["source_file"], LOGICAL)
+        self.assertEqual(alias["declared_import_targets"], [TARGET])
+        self.assertEqual(alias["verified_import_targets"], [TARGET])
+        self.assertEqual(alias["validation_failures"], [])
+
     def test_rejects_all_fail_closed_negative_fixtures(self) -> None:
         cases = {
             "target_absent": ([(f"assets/{SIDE}", sidecar(dest_files=[TARGET]))], (LOGICAL,), "missing_import_target"),
@@ -100,6 +118,7 @@ class GlbImportSidecarInventoryTests(unittest.TestCase):
             "target_case_differs": ([(f"assets/{SIDE}", sidecar(dest_files=[TARGET])), (f"assets/{TARGET.upper()}", b"scene")], (LOGICAL,), "missing_import_target"),
             "unrelated_same_base_scn": ([(f"assets/{SIDE}", sidecar(dest_files=[TARGET])), ("assets/models/example.scn", b"scene")], (LOGICAL,), "missing_import_target"),
             "multiple_one_missing": ([(f"assets/{SIDE}", sidecar(path=TARGET, dest_files=[TARGET, ".godot/imported/example-extra.scn"])), (f"assets/{TARGET}", b"scene")], (LOGICAL,), "missing_import_target"),
+            "internal_nul": ([(f"assets/{SIDE}", f'[remap]\npath="res://{TARGET}"\n\x00unexpected=1\n'), (f"assets/{TARGET}", b"scene")], (LOGICAL,), "malformed_sidecar"),
         }
         for name, (entries, source_paths, reason) in cases.items():
             with self.subTest(name=name):
