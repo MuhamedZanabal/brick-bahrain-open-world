@@ -57,22 +57,28 @@ host_old="grep -q '^VERSION=\"24.04.4 LTS\"' /etc/os-release"
 host_new="test \"$(. /etc/os-release; printf '%s' \"$PRETTY_NAME\")\" = \"Ubuntu 24.04.4 LTS\""
 preset_old='python3 "$TOOL" preset --preset "$GAME/export_presets.cfg" --project "$GAME/project.godot" --output "$REPORTS/EXPORT_PRESET_INSPECTION.json"'
 preset_new='python3 "$REPO_ROOT/tools/vertical_slice/inspect_manama_souq_android_preset.py" --preset "$GAME/export_presets.cfg" --project "$GAME/project.godot" --output "$REPORTS/EXPORT_PRESET_INSPECTION.json"'
+sdk_old="match=re.search(rf'^{re.escape(name)}\\s+\\|\\s+([^|\\s]+)', text('ANDROID_SDK_PACKAGES.txt'), re.M)"
+sdk_new="match=re.search(rf'^\\s*{re.escape(name)}\\s+\\|\\s+([^|\\s]+)', text('ANDROID_SDK_PACKAGES.txt'), re.M)"
 host_count=text.count(host_old)
 preset_count=text.count(preset_old)
+sdk_count=text.count(sdk_old)
 if host_count != 1:
     raise SystemExit(f'host OS identity assertion replacement count={host_count}')
 if preset_count != 1:
     raise SystemExit(f'accepted preset inspector replacement count={preset_count}')
+if sdk_count != 1:
+    raise SystemExit(f'SDK package identity parser replacement count={sdk_count}')
 if not inspector.is_file():
     raise SystemExit(f'accepted preset inspector missing: {inspector}')
-patched=text.replace(host_old,host_new,1).replace(preset_old,preset_new,1)
+patched=text.replace(host_old,host_new,1).replace(preset_old,preset_new,1).replace(sdk_old,sdk_new,1)
 target.write_text(patched,encoding='utf-8')
 target.chmod(0o755)
 report.write_text(json.dumps({
- 'classification':'Gate 4 harness host-identity and stale preset-inspector defects',
+ 'classification':'Gate 4 harness host-identity, stale preset-inspector, and SDK package identity parser indentation defects',
  'corrections':[
   {'first_causal_command':host_old,'correction':host_new,'replacement_count':host_count},
   {'first_causal_command':preset_old,'correction':preset_new,'replacement_count':preset_count},
+  {'classification':'SDK package identity parser indentation defect','first_causal_command':sdk_old,'correction':sdk_new,'replacement_count':sdk_count},
  ],
  'base_runner_sha256':hashlib.sha256(text.encode()).hexdigest(),
  'patched_runner_sha256':hashlib.sha256(patched.encode()).hexdigest(),
@@ -91,7 +97,7 @@ CODE=${PIPESTATUS[0]}
 set -e
 
 if [[ "$CODE" -ne 0 ]]; then
-  LAST_TRACE="$(tail -n 180 "$TRACE" 2>/dev/null || true)"
+  LAST_TRACE="$(tail -n 200 "$TRACE" 2>/dev/null || true)"
   python3 - "$REPORTS/GATE4_FAILURE.json" "$CODE" "$PATCHED_RUNNER" "$SLOT" "$TRACE" "$LAST_TRACE" <<'PY'
 from pathlib import Path
 import json,os,sys
