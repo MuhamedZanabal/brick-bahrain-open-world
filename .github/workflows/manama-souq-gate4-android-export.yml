@@ -1,0 +1,269 @@
+name: Bahrain Brick Manama Souq Gate 4 Android Export
+
+on:
+  push:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    paths:
+      - .github/workflows/manama-souq-gate4-android-export.yml
+      - tools/vertical_slice/run_manama_souq_gate4_export.sh
+      - tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
+      - tools/vertical_slice/manama_souq_apk_evidence.py
+      - tests/test_manama_souq_gate4_android_export_contract.py
+      - tests/test_manama_souq_gate4_compact_diagnostics_contract.py
+      - export_presets.cfg
+      - debug.keystore
+      - authority/manama_souq_composite_source.json
+      - tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh
+      - tests/gate2/**
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/manama-souq-gate4-android-export.yml
+      - tools/vertical_slice/run_manama_souq_gate4_export.sh
+      - tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
+      - tools/vertical_slice/manama_souq_apk_evidence.py
+      - tests/test_manama_souq_gate4_android_export_contract.py
+      - tests/test_manama_souq_gate4_compact_diagnostics_contract.py
+      - export_presets.cfg
+      - debug.keystore
+      - authority/manama_souq_composite_source.json
+      - tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh
+      - tests/gate2/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-gate4-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACCEPTED_HEAD: b12e1e012e256036e71066260a4c6392d26c3839
+  ACCEPTED_MANIFEST_SHA256: ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab
+  ACCEPTED_TREE_SHA256: e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e
+  ACCEPTED_FILE_COUNT: '1502'
+  ACCEPTED_SOURCE_BYTES: '369162800'
+  GODOT_VERSION: 4.3.stable.official.77dcf97d8
+  GODOT_EDITOR_SHA512: fd52bb4ba8acc30ca5accd1c566d470ad7282f891ccc0995dfafabcf92bcf76280ce182bf9d80ebd885f3ed2165d01e1fc3f2928436b15498dfbd98656c2a45a
+
+jobs:
+  gate4_contracts:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Run all vertical-slice Python contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gate4-contract-evidence
+          shopt -s nullglob
+          tests=(tests/test_manama_souq_*.py tests/test_karak_delivery_*.py tests/test_souq_population_*.py)
+          [[ ${#tests[@]} -gt 0 ]]
+          for test_file in "${tests[@]}"; do
+            python3 "$test_file" 2>&1
+          done | tee build/gate4-contract-evidence/all-python-contracts.log
+          bash -n tools/vertical_slice/run_manama_souq_gate4_export.sh
+          bash -n tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
+          python3 -m py_compile tools/vertical_slice/manama_souq_apk_evidence.py
+      - name: Upload Gate 4 contract evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-contracts-${{ github.run_id }}
+          path: build/gate4-contract-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  export_primary:
+    needs: gate4_contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct accepted authority independently
+        run: bash tools/vertical_slice/reconstruct_manama_souq_composite.sh A "$PWD/build/gate4-primary-source" "$PWD/authority/manama_souq_composite_source.json" "$ACCEPTED_HEAD"
+      - name: Revalidate Gates 2 and 3 on an isolated clone
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a build/gate4-primary-source build/gate4-primary-validation
+          bash tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh "$PWD" "$PWD/build/gate4-primary-validation" "$PWD/build/gate4-primary-validation-evidence"
+          mkdir -p build/gate4-primary-evidence/prior-gates
+          cp -a build/gate4-primary-validation-evidence/. build/gate4-primary-evidence/prior-gates/
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+          check-latest: false
+      - uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+      - name: Export and inspect primary APK
+        run: bash tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh "$PWD" "$PWD/build/gate4-primary-source" "$PWD/build/gate4-primary-evidence" primary
+      - name: Finalize primary evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gate4-primary-evidence
+          python3 tools/vertical_slice/composite_source_authority.py inventory --root build/gate4-primary-evidence --output build/gate4-primary-evidence/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/gate4-primary-evidence --inventory build/gate4-primary-evidence/EVIDENCE_INVENTORY.json
+      - name: Upload primary compact failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-primary-diagnostics-${{ github.run_id }}
+          path: |
+            build/gate4-primary-evidence/reports/GATE4_FAILURE.json
+            build/gate4-primary-evidence/reports/GATE4_PREREQUISITES.json
+            build/gate4-primary-evidence/reports/GATE4_HARNESS_CORRECTION.json
+            build/gate4-primary-evidence/reports/WORKSPACE_DISK_BEFORE.txt
+            build/gate4-primary-evidence/reports/WORKSPACE_DISK_FAILURE.txt
+            build/gate4-primary-evidence/reports/WORKSPACE_USAGE_BEFORE.txt
+            build/gate4-primary-evidence/reports/WORKSPACE_USAGE_FAILURE.txt
+            build/gate4-primary-evidence/logs/gate4-runner-xtrace.log
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - name: Upload primary APK and evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-primary-${{ github.run_id }}
+          path: build/gate4-primary-evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  export_secondary:
+    needs: gate4_contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct accepted authority independently
+        run: bash tools/vertical_slice/reconstruct_manama_souq_composite.sh B "$PWD/build/gate4-secondary-source" "$PWD/authority/manama_souq_composite_source.json" "$ACCEPTED_HEAD"
+      - name: Revalidate Gates 2 and 3 on an isolated clone
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a build/gate4-secondary-source build/gate4-secondary-validation
+          bash tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh "$PWD" "$PWD/build/gate4-secondary-validation" "$PWD/build/gate4-secondary-validation-evidence"
+          mkdir -p build/gate4-secondary-evidence/prior-gates
+          cp -a build/gate4-secondary-validation-evidence/. build/gate4-secondary-evidence/prior-gates/
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+          check-latest: false
+      - uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+      - name: Export and inspect secondary APK
+        run: bash tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh "$PWD" "$PWD/build/gate4-secondary-source" "$PWD/build/gate4-secondary-evidence" secondary
+      - name: Finalize secondary evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gate4-secondary-evidence
+          python3 tools/vertical_slice/composite_source_authority.py inventory --root build/gate4-secondary-evidence --output build/gate4-secondary-evidence/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/gate4-secondary-evidence --inventory build/gate4-secondary-evidence/EVIDENCE_INVENTORY.json
+      - name: Upload secondary compact failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-secondary-diagnostics-${{ github.run_id }}
+          path: |
+            build/gate4-secondary-evidence/reports/GATE4_FAILURE.json
+            build/gate4-secondary-evidence/reports/GATE4_PREREQUISITES.json
+            build/gate4-secondary-evidence/reports/GATE4_HARNESS_CORRECTION.json
+            build/gate4-secondary-evidence/reports/WORKSPACE_DISK_BEFORE.txt
+            build/gate4-secondary-evidence/reports/WORKSPACE_DISK_FAILURE.txt
+            build/gate4-secondary-evidence/reports/WORKSPACE_USAGE_BEFORE.txt
+            build/gate4-secondary-evidence/reports/WORKSPACE_USAGE_FAILURE.txt
+            build/gate4-secondary-evidence/logs/gate4-runner-xtrace.log
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - name: Upload secondary APK and evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-secondary-${{ github.run_id }}
+          path: build/gate4-secondary-evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  compare_and_package:
+    needs: [export_primary, export_secondary]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-gate4-primary-${{ github.run_id }}
+          path: build/primary
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-gate4-secondary-${{ github.run_id }}
+          path: build/secondary
+      - name: Compare independent APK exports
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gate4-final/reports
+          PRIMARY_APK="$(find build/primary/artifacts -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          SECONDARY_APK="$(find build/secondary/artifacts -maxdepth 1 -type f -name '*.apk' -print -quit)"
+          test -s "$PRIMARY_APK"; test -s "$SECONDARY_APK"
+          python3 tools/vertical_slice/manama_souq_apk_evidence.py compare --primary "$PRIMARY_APK" --secondary "$SECONDARY_APK" --primary-record build/primary/reports/APK_EXPORT_RECORD.json --secondary-record build/secondary/reports/APK_EXPORT_RECORD.json --output build/gate4-final/reports/APK_REPRODUCIBILITY.json
+      - name: Generate final provenance manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          python3 tools/vertical_slice/manama_souq_apk_evidence.py finalize --primary-record build/primary/reports/APK_EXPORT_RECORD.json --secondary-record build/secondary/reports/APK_EXPORT_RECORD.json --comparison build/gate4-final/reports/APK_REPRODUCIBILITY.json --preset-report build/primary/reports/EXPORT_PRESET_INSPECTION.json --toolchain-report build/primary/reports/TOOLCHAIN_IDENTITY.json --source-report build/primary/reports/SOURCE_AUTHORITY_PRE_EXPORT.json --pr-head "$CANDIDATE_SHA" --workflow-run-id "$GITHUB_RUN_ID" --primary-job-id export_primary --secondary-job-id export_secondary --output build/gate4-final/reports/APK_PROVENANCE.json
+          sha256sum build/gate4-final/reports/APK_PROVENANCE.json > build/gate4-final/reports/APK_PROVENANCE_SHA256.txt
+          cp build/primary/reports/APK_METADATA.json build/gate4-final/reports/PRIMARY_APK_METADATA.json
+          cp build/secondary/reports/APK_METADATA.json build/gate4-final/reports/SECONDARY_APK_METADATA.json
+          cp build/primary/reports/APK_SIZE_BREAKDOWN.json build/gate4-final/reports/PRIMARY_APK_SIZE_BREAKDOWN.json
+          cp build/primary/reports/PACKAGED_VERTICAL_SLICE_RESOURCES.json build/gate4-final/reports/PRIMARY_PACKAGED_RESOURCES.json
+          python3 tools/vertical_slice/composite_source_authority.py inventory --root build/gate4-final --output build/gate4-final/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/gate4-final --inventory build/gate4-final/EVIDENCE_INVENTORY.json
+      - name: Upload reproducibility and provenance evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-comparison-${{ github.run_id }}
+          path: build/gate4-final
+          if-no-files-found: error
+          retention-days: 30

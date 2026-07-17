@@ -1,0 +1,50 @@
+name: Bahrain Brick Manama Souq Contracts
+
+on:
+  push:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    paths:
+      - .github/workflows/manama-souq-contracts.yml
+      - asset_lab/runtime/manama_souq_layout_v1.json
+      - scripts/karak_delivery_mission.gd
+      - scripts/manama_souq_layout_loader.gd
+      - scripts/manama_souq_vertical_slice.gd
+      - scripts/souq_population_controller.gd
+      - scripts/karak_delivery_hud.gd
+      - scenes/manama_souq_vertical_slice.tscn
+      - scenes/karak_delivery_hud.tscn
+      - tests/test_manama_souq_*.py
+      - tests/test_karak_delivery_*.py
+      - tests/test_souq_population_*.py
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bahrain-brick-manama-souq-contracts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Run vertical-slice Python contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          tests=(tests/test_manama_souq_*.py tests/test_karak_delivery_*.py tests/test_souq_population_*.py)
+          [[ ${#tests[@]} -gt 0 ]]
+          for test_file in "${tests[@]}"; do
+            python3 "$test_file"
+          done

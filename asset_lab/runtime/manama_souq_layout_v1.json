@@ -1,0 +1,403 @@
+{
+  "schema": "bahrain-brick-manama-souq-layout-v1",
+  "schema_version": 1,
+  "parent_authority": "fc8f00182f97c39015610d6603fa7c9c44364c5d",
+  "asset_profile": "balanced",
+  "seed": 1409,
+  "bounds": {
+    "min_x": -110.0,
+    "max_x": 110.0,
+    "min_z": -110.0,
+    "max_z": 110.0
+  },
+  "zones": [
+    "cafe_start",
+    "souq_lane",
+    "vehicle_route",
+    "waterfront_delivery"
+  ],
+  "mission": {
+    "id": "karak_delivery_v1",
+    "name": "Karak Delivery",
+    "reward_coins": 250,
+    "time_limit_seconds": 300
+  },
+  "mission_points": {
+    "player_spawn": [-82.0, 1.0, 65.0],
+    "cafe_collection": [-72.0, 0.0, 62.0],
+    "vehicle_spawn": [-58.0, 0.6, 48.0],
+    "waterfront_dropoff": [72.0, 0.0, -62.0],
+    "replay_anchor": [-82.0, 0.0, 65.0]
+  },
+  "population": {
+    "pedestrians": 12,
+    "traffic": 6
+  },
+  "traffic_route": [
+    [-80.0, 0.0, 55.0],
+    [-55.0, 0.0, 50.0],
+    [-20.0, 0.0, 45.0],
+    [20.0, 0.0, 30.0],
+    [55.0, 0.0, 0.0],
+    [75.0, 0.0, -35.0],
+    [70.0, 0.0, -70.0],
+    [35.0, 0.0, -80.0],
+    [0.0, 0.0, -70.0],
+    [-30.0, 0.0, -45.0],
+    [-55.0, 0.0, -10.0],
+    [-75.0, 0.0, 25.0],
+    [-80.0, 0.0, 55.0]
+  ],
+  "placements": [
+    {
+      "placement_id": "cafe_karak_front",
+      "family": "commercial",
+      "asset_id": "bh_cafe_storefront_karak_a_01",
+      "zone": "cafe_start",
+      "profile": "balanced",
+      "position": [-72.0, 0.0, 72.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.35, 1.35, 1.35]
+    },
+    {
+      "placement_id": "cafe_seating",
+      "family": "commercial",
+      "asset_id": "bh_cafe_table_chair_set_a_01",
+      "zone": "cafe_start",
+      "profile": "balanced",
+      "position": [-63.0, 0.0, 66.0],
+      "rotation_degrees": [0.0, 25.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "grocery_supermarket",
+      "family": "commercial",
+      "asset_id": "bh_supermarket_storefront_a_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [12.0, 0.0, 57.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.1, 1.1, 1.1]
+    },
+    {
+      "placement_id": "grocery_shelf_display",
+      "family": "commercial",
+      "asset_id": "bh_supermarket_shelf_1m_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [8.0, 0.0, 50.0],
+      "rotation_degrees": [0.0, 90.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "traditional_west_wall_a",
+      "family": "traditional",
+      "asset_id": "bh_traditional_party_wall_01",
+      "zone": "cafe_start",
+      "profile": "balanced",
+      "position": [-91.0, 0.0, 72.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [3.2, 1.0, 1.8]
+    },
+    {
+      "placement_id": "traditional_west_door",
+      "family": "traditional",
+      "asset_id": "bh_traditional_timber_door_01",
+      "zone": "cafe_start",
+      "profile": "balanced",
+      "position": [-84.0, 0.0, 72.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.2, 1.2, 1.2]
+    },
+    {
+      "placement_id": "traditional_west_window",
+      "family": "traditional",
+      "asset_id": "bh_traditional_projecting_window_01",
+      "zone": "cafe_start",
+      "profile": "balanced",
+      "position": [-78.0, 0.0, 72.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "traditional_entry_arch",
+      "family": "traditional",
+      "asset_id": "bh_traditional_alley_arch_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-48.0, 0.0, 48.0],
+      "rotation_degrees": [0.0, 90.0, 0.0],
+      "scale": [1.45, 1.45, 1.45]
+    },
+    {
+      "placement_id": "traditional_lane_parapet",
+      "family": "traditional",
+      "asset_id": "bh_traditional_parapet_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-36.0, 3.4, 58.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [3.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "traditional_courtyard",
+      "family": "traditional",
+      "asset_id": "bh_traditional_courtyard_hint_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-20.0, 0.0, 62.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.5, 1.5, 1.5]
+    },
+    {
+      "placement_id": "traditional_shop_bay",
+      "family": "traditional",
+      "asset_id": "bh_traditional_shop_bay_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-7.0, 0.0, 58.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.3, 1.3, 1.3]
+    },
+    {
+      "placement_id": "traditional_shade",
+      "family": "traditional",
+      "asset_id": "bh_traditional_shade_canopy_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-29.0, 0.0, 42.0],
+      "rotation_degrees": [0.0, 90.0, 0.0],
+      "scale": [1.2, 1.2, 1.2]
+    },
+    {
+      "placement_id": "traditional_lane_lamp",
+      "family": "traditional",
+      "asset_id": "bh_traditional_traditional_lamp_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-12.0, 0.0, 44.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "traditional_lane_bench",
+      "family": "traditional",
+      "asset_id": "bh_traditional_bench_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-3.0, 0.0, 42.0],
+      "rotation_degrees": [0.0, -90.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "souq_gold",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_gold_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-42.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_spice",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_spice_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-34.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_tailor",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_tailor_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-26.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_perfume",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_perfume_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-18.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_electronics",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_electronics_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-10.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_fabric",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_fabric_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-2.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_toy",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_toy_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [6.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_grocery",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_grocery_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [14.0, 0.0, 32.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_cafe",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_cafe_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-38.0, 0.0, 18.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_bakery",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_bakery_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-28.0, 0.0, 18.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_souvenir",
+      "family": "souq",
+      "asset_id": "bh_souq_shop_souvenir_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-18.0, 0.0, 18.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_awning",
+      "family": "souq",
+      "asset_id": "bh_souq_awning_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [-8.0, 0.0, 18.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.25, 1.25, 1.25]
+    },
+    {
+      "placement_id": "souq_passage",
+      "family": "souq",
+      "asset_id": "bh_souq_covered_passage_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [3.0, 0.0, 18.0],
+      "rotation_degrees": [0.0, 90.0, 0.0],
+      "scale": [1.35, 1.35, 1.35]
+    },
+    {
+      "placement_id": "souq_sign",
+      "family": "souq",
+      "asset_id": "bh_souq_sign_panel_01",
+      "zone": "souq_lane",
+      "profile": "balanced",
+      "position": [16.0, 0.0, 18.0],
+      "rotation_degrees": [0.0, 180.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "waterfront_prom_10",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_promenade_10m_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [62.0, 0.0, -48.0],
+      "rotation_degrees": [0.0, 90.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "waterfront_prom_20",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_promenade_20m_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [72.0, 0.0, -57.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "waterfront_marina_edge",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_marina_edge_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [84.0, 0.0, -68.0],
+      "rotation_degrees": [0.0, 0.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "waterfront_railing",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_railing_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [73.0, 0.0, -78.0],
+      "rotation_degrees": [0.0, 90.0, 0.0],
+      "scale": [2.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "waterfront_bench",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_bench_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [64.0, 0.0, -66.0],
+      "rotation_degrees": [0.0, -35.0, 0.0],
+      "scale": [1.0, 1.0, 1.0]
+    },
+    {
+      "placement_id": "waterfront_cafe_terrace",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_cafe_terrace_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [56.0, 0.0, -62.0],
+      "rotation_degrees": [0.0, 70.0, 0.0],
+      "scale": [1.1, 1.1, 1.1]
+    },
+    {
+      "placement_id": "waterfront_destination_tower",
+      "family": "waterfront",
+      "asset_id": "bh_waterfront_tower_a_01",
+      "zone": "waterfront_delivery",
+      "profile": "balanced",
+      "position": [95.0, 0.0, -25.0],
+      "rotation_degrees": [0.0, -20.0, 0.0],
+      "scale": [0.85, 0.85, 0.85]
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+name: Bahrain Brick Manama Souq Vertical Slice
+
+on:
+  push:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    paths:
+      - .github/workflows/manama-souq-vertical-slice.yml
+      - authority/manama_souq_composite_source.json
+      - tools/vertical_slice/composite_source_authority.py
+      - tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - tools/apply_premium_overlay_resilient.py
+      - tools/apply_bahrain_brick_premium_world_overlay.py
+      - tools/v3_patch_restore.py
+      - tools/apply_premium_validation_corrections.py
+      - tools/apply_post_lifecycle_teardown_guards.py
+      - tools/apply_visual_evidence_shutdown_fix.py
+      - tools/verify_frozen_controls.py
+      - tools/premium_payload_v2/**
+      - tools/premium_visual_upgrade_v3/**
+      - tools/premium_validation_v18_parts/**
+      - tests/test_manama_souq_source_gate.py
+      - tests/test_manama_souq_composite_authority.py
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-manama-souq-authority-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ASSET_AUTHORITY_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain-brick-full-asset-matrix-authority-76964c58c283caca.zip
+  ASSET_AUTHORITY_SHA256: 76964c58c283cacaee137152189727d678aa83230d7211dc6a15aa9af9d4a67a
+  HISTORICAL_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  HISTORICAL_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
+
+jobs:
+  authority_tests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Run fail-closed authority tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/authority-test-evidence
+          python3 -m unittest tests.test_manama_souq_composite_authority tests.test_manama_souq_source_gate -v 2>&1 | tee build/authority-test-evidence/authority-tests.log
+      - name: Validate shell syntax
+        run: bash -n tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - name: Upload authority test diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-tests-${{ github.run_id }}
+          path: build/authority-test-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  authority_run_a:
+    needs: authority_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Check out exact candidate into clean run A
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct composite authority A
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh A "$PWD/build/manama-souq-source-A" "$PWD/authority/manama_souq_composite_source.json" "$CANDIDATE_SHA"
+      - name: Upload retained authority A evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-run-a-${{ github.run_id }}
+          path: build/manama-souq-source-A/evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  authority_run_b:
+    needs: authority_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Check out exact candidate into clean run B
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct composite authority B
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh B "$PWD/build/manama-souq-source-B" "$PWD/authority/manama_souq_composite_source.json" "$CANDIDATE_SHA"
+      - name: Upload retained authority B evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-run-b-${{ github.run_id }}
+          path: build/manama-souq-source-B/evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  authority_compare:
+    needs: [authority_run_a, authority_run_b]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate for comparison
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Download retained authority A evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-authority-run-a-${{ github.run_id }}
+          path: build/compare/run-a
+      - name: Download retained authority B evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-authority-run-b-${{ github.run_id }}
+          path: build/compare/run-b
+      - name: Verify inventories and byte-identical reconstructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/compare/run-a --inventory build/compare/run-a/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/compare/run-b --inventory build/compare/run-b/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py compare --run-a build/compare/run-a --run-b build/compare/run-b --output build/compare/GATE1_DETERMINISM_COMPARISON.json
+          cmp build/compare/run-a/ORIGIN_LEDGER.json build/compare/run-b/ORIGIN_LEDGER.json
+          cmp build/compare/run-a/MANAMA_SOUQ_COMPOSITE_SOURCE.zip build/compare/run-b/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+      - name: Upload Gate 1 determinism comparison
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate1-comparison-${{ github.run_id }}
+          path: build/compare/GATE1_DETERMINISM_COMPARISON.json
+          if-no-files-found: error
+          retention-days: 30
