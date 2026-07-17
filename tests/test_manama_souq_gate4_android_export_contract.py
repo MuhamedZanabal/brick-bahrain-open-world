@@ -10,6 +10,7 @@ GATE1 = ROOT / ".github" / "workflows" / "manama-souq-vertical-slice.yml"
 GATE2 = ROOT / ".github" / "workflows" / "manama-souq-gate2-source-runtime.yml"
 GATE4 = ROOT / ".github" / "workflows" / "manama-souq-gate4-android-export.yml"
 EXPORT_RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate4_export.sh"
+DIAGNOSTIC_RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate4_export_diagnostic.sh"
 APK_TOOL = ROOT / "tools" / "vertical_slice" / "manama_souq_apk_evidence.py"
 PRESET = ROOT / "export_presets.cfg"
 
@@ -35,7 +36,7 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
         self.assertNotEqual(GATE1, GATE2)
 
     def test_gate4_components_exist_separately(self) -> None:
-        for path in (GATE4, EXPORT_RUNNER, APK_TOOL, PRESET):
+        for path in (GATE4, EXPORT_RUNNER, DIAGNOSTIC_RUNNER, APK_TOOL, PRESET):
             self.assertTrue(path.is_file(), f"Gate 4 component missing: {path}")
         self.assertNotEqual(GATE4, GATE1)
         self.assertNotEqual(GATE4, GATE2)
@@ -69,7 +70,8 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
 
     def test_gate4_has_no_install_emulator_publish_release_or_historical_apk_path(self) -> None:
         combined = "\n".join(
-            path.read_text(encoding="utf-8") for path in (GATE4, EXPORT_RUNNER, APK_TOOL)
+            path.read_text(encoding="utf-8")
+            for path in (GATE4, EXPORT_RUNNER, DIAGNOSTIC_RUNNER, APK_TOOL)
         ).lower()
         prohibited = (
             "adb install",
@@ -120,6 +122,20 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
             self.assertIn(fragment, runner)
         self.assertNotIn('cp "$SIGNING_KEYSTORE" "$GAME/debug.keystore"', runner)
         self.assertNotIn('"$GAME/debug.keystore"', runner)
+
+    def test_first_failure_is_retained_with_prerequisites_disk_and_xtrace(self) -> None:
+        workflow = GATE4.read_text(encoding="utf-8")
+        diagnostics = DIAGNOSTIC_RUNNER.read_text(encoding="utf-8")
+        for fragment in (
+            "run_manama_souq_gate4_export_diagnostic.sh",
+            "GATE4_PREREQUISITES.json",
+            "GATE4_FAILURE.json",
+            "gate4-runner-xtrace.log",
+            "WORKSPACE_DISK_BEFORE.txt",
+            "bash -x",
+            "BASH_COMMAND",
+        ):
+            self.assertIn(fragment, workflow + diagnostics)
 
     def test_exports_are_independent_bounded_and_inspected(self) -> None:
         workflow = GATE4.read_text(encoding="utf-8")
