@@ -6,9 +6,11 @@ on:
     paths:
       - .github/workflows/manama-souq-gate2-source-runtime.yml
       - tools/vertical_slice/run_manama_souq_gate2_source_runtime.sh
+      - tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh
       - tests/gate2/**
       - tests/test_manama_souq_gate2_workflow_contract.py
       - tests/souq_population_runtime.gd
+      - tests/manama_souq_slice_runtime.gd
       - scripts/brick_factory.gd
       - scripts/souq_population_controller.gd
   pull_request:
@@ -17,9 +19,11 @@ on:
     paths:
       - .github/workflows/manama-souq-gate2-source-runtime.yml
       - tools/vertical_slice/run_manama_souq_gate2_source_runtime.sh
+      - tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh
       - tests/gate2/**
       - tests/test_manama_souq_gate2_workflow_contract.py
       - tests/souq_population_runtime.gd
+      - tests/manama_souq_slice_runtime.gd
       - scripts/brick_factory.gd
       - scripts/souq_population_controller.gd
   workflow_dispatch:
@@ -90,7 +94,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          bash tools/vertical_slice/run_manama_souq_gate2_source_runtime.sh "$PWD" "$PWD/build/gate2-source" "$PWD/build/gate2-evidence" 2>&1 | tee build/gate2-runner.log
+          bash tools/vertical_slice/run_manama_souq_gate2_source_runtime_v2.sh "$PWD" "$PWD/build/gate2-source" "$PWD/build/gate2-evidence" 2>&1 | tee build/gate2-runner.log
       - name: Finalize evidence inventory
         if: always()
         shell: bash
