@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import collections
+import hashlib
+import json
+import re
+import shutil
+import sys
+import zipfile
+from pathlib import Path
+from typing import Any
+
+SOURCE_RE = re.compile(r'(?m)^\s*source_file\s*=\s*"res://([^"\r\n]+)"\s*$')
+PATH_RE = re.compile(r'(?m)^\s*path(?:\.[A-Za-z0-9_-]+)?\s*=\s*"res://([^"\r\n]+)"\s*$')
+DEST_FILES_RE = re.compile(r'(?ms)^\s*dest_files\s*=\s*\[(.*?)\]\s*$')
+QUOTED_RES_RE = re.compile(r'"res://([^"\r\n]+)"')
+
+
+def norm(value: str) -> str:
+    return value.replace('\\', '/').replace('res://', '').lstrip('/')
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open('rb') as f:
+        for block in iter(lambda: f.read(1024 * 1024), b''):
+            h.update(block)
+    return h.hexdigest()
+
+
+def read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding='utf-8'))
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.write_text(json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + '\n', encoding='utf-8')
+
+
+def find_apk(root: Path) -> Path:
+    values = sorted(p for p in root.rglob('*.apk') if p.is_file())
+    if len(values) != 1:
+        raise RuntimeError(f'expected one APK beneath {root}, found {values}')
+    return values[0]
+
+
+def parse_import(text: str) -> dict[str, Any]:
+    source_match = SOURCE_RE.search(text)
+    paths = [norm(v) for v in PATH_RE.findall(text)]
+    dest_match = DEST_FILES_RE.search(text)
+    dest_files = [norm(v) for v in QUOTED_RES_RE.findall(dest_match.group(1))] if dest_match else []
+    targets = sorted(set(paths + dest_files))
+    return {
+        'source_file': norm(source_match.group(1)) if source_match else None,
+        'path_values': sorted(set(paths)),
+        'dest_files': sorted(set(dest_files)),
+        'target_candidates': targets,
+    }
+
+
+def reconcile_side(side: str, root: Path, expected_records: list[dict[str, Any]], output: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    apk = find_apk(root)
+    current_path = output / f'{side.upper()}_MATRIX_RECONCILIATION.json'
+    current = read_json(current_path)
+    shutil.copy2(current_path, output / f'{side.upper()}_CURRENT_INSPECTOR_RECONCILIATION.json')
+    current_map = {r['expected_normalized_logical_path']: r for r in current['records']}
+    rows: list[dict[str, Any]] = []
+    counts = collections.Counter()
+    with zipfile.ZipFile(apk) as z:
+        infos = {i.filename: i for i in z.infolist() if not i.is_dir()}
