@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
-import subprocess
+import importlib.util
 import tempfile
 import unittest
+import warnings
 import zipfile
 from pathlib import Path
 
@@ -13,6 +13,11 @@ TOOL = ROOT / "tools" / "vertical_slice" / "inventory_godot_android_apk_assets.p
 TARGET = ".godot/imported/example.glb-0123456789abcdef.scn"
 SIDE = "models/example.glb.import"
 LOGICAL = "models/example.glb"
+
+spec = importlib.util.spec_from_file_location("android_asset_inventory", TOOL)
+assert spec and spec.loader
+inventory_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(inventory_module)
 
 
 def sidecar(*, path: str | None = TARGET, source_file: str | None = LOGICAL, dest_files: list[str] | None = None) -> str:
@@ -34,7 +39,7 @@ class GlbImportSidecarInventoryTests(unittest.TestCase):
         entries: list[tuple[str, bytes | str]],
         *,
         source_paths: tuple[str, ...] = (LOGICAL,),
-    ) -> tuple[subprocess.CompletedProcess[str], dict]:
+    ) -> dict:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source = root / "source"
@@ -44,24 +49,18 @@ class GlbImportSidecarInventoryTests(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(b"source")
             apk = root / "fixture.apk"
-            with zipfile.ZipFile(apk, "w") as archive:
-                for name, payload in entries:
-                    archive.writestr(name, payload)
-            output = root / "inventory.json"
-            result = subprocess.run(
-                ["python3", str(TOOL), "--apk", str(apk), "--source-root", str(source), "--output", str(output)],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            value = json.loads(output.read_text(encoding="utf-8"))
-            return result, value
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                with zipfile.ZipFile(apk, "w") as archive:
+                    for name, payload in entries:
+                        archive.writestr(name, payload)
+            return inventory_module.inventory_apk(apk, source)
 
     def test_exact_glb_import_sidecar_emits_one_verified_alias(self) -> None:
-        result, value = self.run_fixture(
+        value = self.run_fixture(
             [(f"assets/{SIDE}", sidecar(dest_files=[TARGET])), (f"assets/{TARGET}", b"scene")]
         )
-        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(value["passed"], value)
         aliases = [item for item in value["logical_aliases"] if item["logical_path"] == LOGICAL]
         self.assertEqual(len(aliases), 1)
         self.assertIn(LOGICAL, value["files"])
@@ -74,6 +73,16 @@ class GlbImportSidecarInventoryTests(unittest.TestCase):
         self.assertEqual(alias["verified_import_targets"], [TARGET])
         self.assertTrue(alias["source_verified"])
         self.assertTrue(alias["targets_verified"])
+        self.assertEqual(alias["validation_failures"], [])
+
+    def test_sidecar_path_binds_source_when_source_file_is_absent(self) -> None:
+        value = self.run_fixture(
+            [(f"assets/{SIDE}", sidecar(source_file=None, dest_files=None)), (f"assets/{TARGET}", b"scene")]
+        )
+        self.assertTrue(value["passed"], value)
+        alias = next(item for item in value["logical_aliases"] if item["logical_path"] == LOGICAL)
+        self.assertEqual(alias["source_file"], LOGICAL)
+        self.assertEqual(alias["verified_import_targets"], [TARGET])
 
     def test_rejects_all_fail_closed_negative_fixtures(self) -> None:
         cases = {
@@ -94,18 +103,18 @@ class GlbImportSidecarInventoryTests(unittest.TestCase):
         }
         for name, (entries, source_paths, reason) in cases.items():
             with self.subTest(name=name):
-                result, value = self.run_fixture(entries, source_paths=source_paths)
-                self.assertNotEqual(result.returncode, 0)
+                value = self.run_fixture(entries, source_paths=source_paths)
+                self.assertFalse(value["passed"])
                 self.assertNotIn(LOGICAL, [item["logical_path"] for item in value.get("logical_aliases", [])])
                 self.assertGreaterEqual(value.get("rejected_glb_sidecar_count", 0), 1)
                 reasons = {failure for item in value.get("glb_import_rejections", []) for failure in item.get("validation_failures", [])}
                 self.assertIn(reason, reasons)
 
     def test_duplicate_apk_paths_fail_closed(self) -> None:
-        result, value = self.run_fixture(
+        value = self.run_fixture(
             [(f"assets/{SIDE}", sidecar(dest_files=[TARGET])), (f"assets/{SIDE}", sidecar(dest_files=[TARGET])), (f"assets/{TARGET}", b"scene")]
         )
-        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(value["passed"])
         self.assertIn(f"assets/{SIDE}", value["duplicate_apk_paths"])
         self.assertNotIn(LOGICAL, [item["logical_path"] for item in value.get("logical_aliases", [])])
 
