@@ -83,33 +83,46 @@ jobs:
           }
           JSON
 
-      - name: Retrieve exact matrix manifest from pinned 436-asset authority
+      - name: Extract exact matrix manifest from retained composite source archive
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/downloads build/extracted/primary/forensic-source-authority/asset_lab/runtime build/forensic-output
-          authority_zip=build/downloads/bahrain-brick-full-asset-matrix-authority.zip
-          authority_url=https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain-brick-full-asset-matrix-authority-76964c58c283caca.zip
-          curl --fail --location --retry 4 --retry-delay 5 "$authority_url" --output "$authority_zip"
-          test "$(stat -c %s "$authority_zip")" = "312008776"
-          printf '%s  %s\n' 76964c58c283caca8bd61d6a3f24b68ef8db1999f039a18a0929cb68e6068849 "$authority_zip" | sha256sum -c -
-          mapfile -t entries < <(unzip -Z1 "$authority_zip" | grep -E '(^|/)asset_lab/runtime/full_asset_matrix_manifest\.json$')
-          test "${#entries[@]}" = "1"
-          manifest=build/extracted/primary/forensic-source-authority/asset_lab/runtime/full_asset_matrix_manifest.json
-          unzip -p "$authority_zip" "${entries[0]}" > "$manifest"
-          final_tree="$(find build/extracted/primary -type f -name FINAL_TREE_MANIFEST.json -print -quit)"
-          test -n "$final_tree"
-          python3 - "$manifest" "$final_tree" "$authority_url" "${entries[0]}" <<'PY'
+          mkdir -p build/extracted/primary/forensic-source-authority/asset_lab/runtime build/forensic-output
+          mapfile -t source_archives < <(find build/extracted/primary -type f -name MANAMA_SOUQ_COMPOSITE_SOURCE.zip -print)
+          test "${#source_archives[@]}" = "1"
+          source_archive="${source_archives[0]}"
+          evidence_inventory="$(find build/extracted/primary -maxdepth 2 -type f -name EVIDENCE_INVENTORY.json -print -quit)"
+          test -n "$evidence_inventory"
+          python3 - "$source_archive" "$evidence_inventory" <<'PY'
           import hashlib,json,sys
           from pathlib import Path
-          manifest,tree,url,entry=Path(sys.argv[1]),Path(sys.argv[2]),sys.argv[3],sys.argv[4]
+          archive,inventory=Path(sys.argv[1]),Path(sys.argv[2])
+          root=inventory.parent
+          relative=archive.relative_to(root).as_posix()
+          records=json.loads(inventory.read_text())['files']
+          expected=next(r for r in records if r['path']==relative)
+          actual={'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest()}
+          assert actual['bytes']==expected['bytes'] and actual['sha256']==expected['sha256'], (actual,expected)
+          PY
+          mapfile -t entries < <(unzip -Z1 "$source_archive" | grep -E '(^|/)asset_lab/runtime/full_asset_matrix_manifest\.json$')
+          test "${#entries[@]}" = "1"
+          manifest=build/extracted/primary/forensic-source-authority/asset_lab/runtime/full_asset_matrix_manifest.json
+          unzip -p "$source_archive" "${entries[0]}" > "$manifest"
+          final_tree="$(find build/extracted/primary -type f -path '*/reports/FINAL_TREE_MANIFEST.json' -print -quit)"
+          test -n "$final_tree"
+          python3 - "$manifest" "$final_tree" "$source_archive" "${entries[0]}" <<'PY'
+          import hashlib,json,sys
+          from pathlib import Path
+          manifest,tree,archive,entry=Path(sys.argv[1]),Path(sys.argv[2]),Path(sys.argv[3]),sys.argv[4]
           digest=hashlib.sha256(manifest.read_bytes()).hexdigest()
           records=json.loads(tree.read_text())['files']
           expected=next(r for r in records if r['path']=='asset_lab/runtime/full_asset_matrix_manifest.json')
           value={
-            'authority_url':url,
-            'authority_archive_bytes':312008776,
-            'authority_archive_sha256':'76964c58c283caca8bd61d6a3f24b68ef8db1999f039a18a0929cb68e6068849',
+            'source_artifact_id':8411002980,
+            'source_run_id':29589205147,
+            'composite_source_archive_path':str(archive),
+            'composite_source_archive_bytes':archive.stat().st_size,
+            'composite_source_archive_sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),
             'archive_entry':entry,
             'manifest_bytes':manifest.stat().st_size,
             'manifest_sha256':digest,
