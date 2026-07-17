@@ -43,6 +43,11 @@ class ManamaSouqGate2WorkflowContractTests(unittest.TestCase):
         self.assertIn("FROZEN_CONTROLS_PRE.json", combined)
         self.assertIn("FROZEN_CONTROLS_POST.json", combined)
 
+    def test_runner_uses_the_accepted_frozen_control_report_schema(self) -> None:
+        runner = RUNNER.read_text(encoding="utf-8")
+        self.assertIn("item['pass']", runner)
+        self.assertNotIn("item['passed']", runner)
+
     def test_both_population_execution_contexts_are_bounded_and_retained(self) -> None:
         runner = RUNNER.read_text(encoding="utf-8")
         self.assertIn(
