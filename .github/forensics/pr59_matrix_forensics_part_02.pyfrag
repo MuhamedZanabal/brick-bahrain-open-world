@@ -1,0 +1,96 @@
+    candidates = find_all(primary_root, "full_asset_matrix_manifest.json") + find_all(secondary_root, "full_asset_matrix_manifest.json")
+    unique_by_sha: dict[str, Path] = {}
+    for p in candidates:
+        unique_by_sha.setdefault(sha256_file(p), p)
+    if not candidates:
+        raise FileNotFoundError("full_asset_matrix_manifest.json is absent from both retained artifacts")
+    manifest_path = candidates[0]
+    manifest = read_json(manifest_path)
+    manifest_sha = sha256_file(manifest_path)
+    occurrences = walk_glbs(manifest)
+    current_collect = sorted(set(item["original_value"].replace("res://", "") for item in occurrences))
+    canonical_groups: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+    for item in occurrences:
+        canonical_groups[norm(item["original_value"])].append(item)
+
+    tree_path = find_one(primary_root, "FINAL_TREE_MANIFEST.json")
+    assert tree_path is not None
+    tree = read_json(tree_path)
+    source_map = {
+        str(item.get("path")): item
+        for item in tree.get("files", [])
+        if isinstance(item, dict) and isinstance(item.get("path"), str)
+    }
+
+    expected: list[dict[str, Any]] = []
+    for canonical in sorted(canonical_groups):
+        group = canonical_groups[canonical]
+        source = source_map.get(canonical)
+        expected.append({
+            "original_manifest_values": sorted(set(item["original_value"] for item in group)),
+            "normalized_logical_path": canonical,
+            "manifest_occurrences": group,
+            "manifest_record_identifiers": sorted(set(item["manifest_record_identifier"] for item in group)),
+            "source_file_exists": source is not None,
+            "source_byte_size": source.get("bytes") if source else None,
+            "source_sha256": source.get("sha256") if source else None,
+        })
+
+    original_values = [item["original_value"] for item in occurrences]
+    canonical = [item["normalized_logical_path"] for item in expected]
+    prefixes = collections.Counter("/".join(PurePosixPath(p).parts[:3]) for p in canonical)
+    schema = {
+        "root_type": type(manifest).__name__,
+        "schema_version": manifest.get("schema_version") if isinstance(manifest, dict) else None,
+        "top_level_keys": sorted(manifest) if isinstance(manifest, dict) else None,
+        "top_level_types": {k: type(v).__name__ for k, v in manifest.items()} if isinstance(manifest, dict) else None,
+        "fields_containing_glb_paths": sorted(set(pointer_pattern(item["json_pointer"]) for item in occurrences)),
+    }
+    analysis = {
+        "manifest_path": str(manifest_path),
+        "manifest_sha256": manifest_sha,
+        "manifest_copy_count": len(candidates),
+        "manifest_copy_sha256s": {str(p): sha256_file(p) for p in candidates},
+        "manifest_copies_byte_identical": len(unique_by_sha) == 1,
+        "schema": schema,
+        "total_glb_string_occurrences": len(occurrences),
+        "current_collect_glb_paths_count": len(current_collect),
+        "unique_canonical_expected_count": len(expected),
+        "duplicate_path_occurrence_count": len(occurrences) - len(set(original_values)),
+        "canonical_collapse_count": len(set(current_collect)) - len(expected),
+        "absolute_path_count": sum(1 for p in original_values if p.startswith("/") or re.match(r"^[A-Za-z]:[/\\]", p)),
+        "res_prefixed_count": sum(1 for p in original_values if p.startswith("res://")),
+        "relative_path_count": sum(1 for p in original_values if not p.startswith("res://") and not p.startswith("/") and not re.match(r"^[A-Za-z]:[/\\]", p)),
+        "case_collisions": case_collisions(canonical),
+        "case_collision_count": len(case_collisions(canonical)),
+        "unsafe_paths": sorted(set(p for p in original_values if unsafe(p))),
+        "unsafe_path_count": len(set(p for p in original_values if unsafe(p))),
+        "common_path_prefixes": [{"prefix": p, "count": c} for p, c in prefixes.most_common(25)],
+        "first_25_canonical_expected_paths": canonical[:25],
+        "last_25_canonical_expected_paths": canonical[-25:],
+        "requirement_satisfied": len(expected) == REQUIRED_MATRIX_COUNT,
+    }
+    write_json(output / "EXPECTED_MATRIX_PATHS.json", {"analysis": analysis, "records": expected})
+    write_json(output / "MATRIX_MANIFEST_SCHEMA_ANALYSIS.json", analysis)
+    return expected, analysis, source_map
+
+
+def parse_current_remap(text: str) -> str | None:
+    m = CURRENT_REMAP_RE.search(text)
+    return norm(m.group(1)) if m else None
+
+
+def parse_robust_remap(text: str) -> str | None:
+    m = ROBUST_REMAP_RE.search(text)
+    return norm(m.group(1)) if m else None
+
+
+def validated_alias_map(inventory: dict[str, Any], raw_files: set[str]) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    valid: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+    invalid: list[dict[str, Any]] = []
+    aliases = inventory.get("logical_aliases") if isinstance(inventory, dict) else []
+    if not isinstance(aliases, list):
+        aliases = []
+    for alias in aliases:
+        if not isinstance(alias, dict):
+            invalid.append({"reason": "alias_not_object"})
