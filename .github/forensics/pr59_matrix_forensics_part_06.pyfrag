@@ -1,0 +1,96 @@
+    return report
+
+
+def export_semantics(checkout: Path, primary_root: Path, output: Path) -> dict[str, Any]:
+    preset_path = checkout / "export_presets.cfg"
+    preset_text = preset_path.read_text(encoding="utf-8", errors="replace") if preset_path.is_file() else ""
+    def cfg(key: str) -> str | None:
+        m = re.search(rf"(?m)^{re.escape(key)}=(.*)$", preset_text)
+        return m.group(1).strip().strip('"') if m else None
+    log_path = find_one(primary_root, "android-export.log", required=False)
+    log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path else ""
+    log_filter = re.search(r"(?m)^- export filter:\s*(\d+)\s*$", log_text)
+    log_include = re.search(r"(?m)^- include filter:\s*(.*)$", log_text)
+    log_exclude = re.search(r"(?m)^- exclude filter:\s*(.*)$", log_text)
+    inspection_path = find_one(primary_root, "EXPORT_PRESET_INSPECTION.json", required=False)
+    report = {
+        "preset_path": str(preset_path),
+        "preset_sha256": sha256_file(preset_path) if preset_path.is_file() else None,
+        "preset_export_filter": cfg("export_filter"),
+        "preset_include_filter": cfg("include_filter"),
+        "preset_exclude_filter": cfg("exclude_filter"),
+        "export_log_filter": int(log_filter.group(1)) if log_filter else None,
+        "export_log_include_filter": log_include.group(1) if log_include else None,
+        "export_log_exclude_filter": log_exclude.group(1) if log_exclude else None,
+        "accepted_semantics": "Godot export_filter=0 with empty include/exclude filters; raw evidence records the selected all-project-resources mode. Whether unreferenced imported resources are included is evaluated against the actual APK reconciliation, not assumed from filename similarity.",
+        "inspection_report": read_json(inspection_path) if inspection_path else None,
+        "gate4_contract_requires_436": True,
+    }
+    write_json(output / "EXPORT_PRESET_INCLUSION_SEMANTICS.json", report)
+    return report
+
+
+def choose_classification(manifest: dict[str, Any], comparison: dict[str, Any]) -> tuple[str, str]:
+    cats = comparison["mismatch_categories_and_counts"]
+    missing = comparison["exact_missing_path_list"]
+    if manifest["current_collect_glb_paths_count"] != REQUIRED_MATRIX_COUNT or manifest["unique_canonical_expected_count"] != REQUIRED_MATRIX_COUNT:
+        if missing and any(k not in {"MANIFEST_EXTRACTION_FALSE_POSITIVE", "EXPECTED_PATH_NORMALIZATION_DEFECT"} for k in cats):
+            return "Classification E — Mixed defect", "matrix expected-set extraction is incorrect and at least one additional mismatch category is proven"
+        return "Classification C — Matrix-manifest extraction defect", "current collect_glb_paths() does not produce the intended exact 436 canonical paths"
+    if not missing:
+        return "Classification A — Inspector false negative", "independent reconciliation proves all 436 resources present while the inspector reported failure"
+    category_names = set(cats)
+    inventory_categories = {"INVENTORY_COMPILED_ALIAS_DEFECT", "INVENTORY_REMAP_PARSER_DEFECT", "INVENTORY_REMAP_TARGET_MATCH_DEFECT", "EXPECTED_PATH_NORMALIZATION_DEFECT", "CASE_OR_PREFIX_MISMATCH"}
+    product_categories = {"SOURCE_IMPORT_DEFECT", "GENUINE_EXPORT_OMISSION", "STALE_MATRIX_AUTHORITY"}
+    if category_names and category_names <= inventory_categories:
+        return "Classification B — Inventory generator false negative", "APK evidence contains the required packaged form, but logical alias/remap/path interpretation is incomplete"
+    if category_names and category_names <= {"GENUINE_EXPORT_OMISSION"}:
+        return "Classification D — Genuine export omission", "one or more expected assets are absent from both APKs despite valid source/import authority"
+    if category_names & inventory_categories and category_names & product_categories:
+        return "Classification E — Mixed defect", "both evidence-harness and source/export categories are proven"
+    if category_names <= product_categories:
+        return "Classification D — Genuine export omission", "the missing resources are absent from the APK payload or lack valid source import authority"
+    if missing:
+        return "Classification E — Mixed defect", "multiple or non-uniform precisely evidenced mismatch categories remain"
+    return "Classification F — Evidence insufficient", "retained evidence does not support path-level classification"
+
+
+def proposal(classification: str, comparison: dict[str, Any]) -> dict[str, Any]:
+    cats = comparison["mismatch_categories_and_counts"]
+    if classification.startswith("Classification B"):
+        if "INVENTORY_REMAP_PARSER_DEFECT" in cats:
+            return {
+                "exact_file": "tools/vertical_slice/inventory_godot_android_apk_assets.py",
+                "exact_function": "inventory_apk() / remap parser",
+                "current_behavior": "accepts only a single exact path=\"res://...\" remap syntax",
+                "corrected_behavior": "parse the proven valid Godot remap syntax while still requiring exact logical source, packaged remap, and target existence",
+                "false_positive_control": "alias remains valid only when the exact remap target exists in APK raw_files and the logical source path exists in accepted authority",
+                "focused_red_test": "fixture using the exact retained remap syntax must fail before correction",
+                "focused_green_test": "same fixture must generate one validated .glb logical alias and still reject absent targets",
+                "existing_apks_can_be_reinspected": True,
+                "reexport_required": False,
+                "earliest_gate_to_rerun": "Gate 5 APK inventory/inspection and then Gate 4 comparison/provenance",
+            }
+        return {
+            "exact_file": "tools/vertical_slice/inventory_godot_android_apk_assets.py",
+            "exact_function": "inventory_apk() logical alias reconciliation",
+            "current_behavior": "does not generate a validated logical .glb alias for the precisely evidenced packaged representation",
+            "corrected_behavior": "generate only the exact proven alias when packaged path, source path, and imported/remap target all verify",
+            "false_positive_control": "no basename matching; every alias requires exact source authority and exact APK target existence",
+            "focused_red_test": "retained missing-path representation must fail to generate its logical alias",
+            "focused_green_test": "same exact mapping passes while unrelated filename collisions and absent targets remain failures",
+            "existing_apks_can_be_reinspected": True,
+            "reexport_required": False,
+            "earliest_gate_to_rerun": "Gate 5 APK inventory/inspection and then Gate 4 comparison/provenance",
+        }
+    if classification.startswith("Classification C"):
+        return {
+            "exact_file": "tools/vertical_slice/manama_souq_apk_evidence.py",
+            "exact_function": "collect_glb_paths()",
+            "current_behavior": "recursively treats every string ending in .glb as an expected runtime matrix asset",
+            "corrected_behavior": "extract only the manifest field proven by schema analysis to represent the 436 runtime assets",
+            "false_positive_control": "require schema/version plus exact 436 unique safe canonical paths and source-authority existence",
+            "focused_red_test": "manifest fixture containing non-runtime .glb metadata must demonstrate the current false positive",
+            "focused_green_test": "schema-aware extraction returns exactly the intended 436 and rejects duplicates/unsafe/stale paths",
+            "existing_apks_can_be_reinspected": True,
+            "reexport_required": False,
