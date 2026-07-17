@@ -1,4 +1,4 @@
-name: Bahrain Brick Manama Souq Gate 2 Source Import
+name: Bahrain Brick Manama Souq Vertical Slice
 
 on:
   push:
@@ -6,12 +6,20 @@ on:
     paths:
       - .github/workflows/manama-souq-vertical-slice.yml
       - authority/manama_souq_composite_source.json
-      - tools/vertical_slice/**
-      - scripts/souq_population_controller.gd
-      - scripts/brick_factory.gd
-      - tests/souq_population_runtime.gd
+      - tools/vertical_slice/composite_source_authority.py
+      - tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - tools/apply_premium_overlay_resilient.py
+      - tools/apply_bahrain_brick_premium_world_overlay.py
+      - tools/v3_patch_restore.py
+      - tools/apply_premium_validation_corrections.py
+      - tools/apply_post_lifecycle_teardown_guards.py
+      - tools/apply_visual_evidence_shutdown_fix.py
+      - tools/verify_frozen_controls.py
+      - tools/premium_payload_v2/**
+      - tools/premium_visual_upgrade_v3/**
+      - tools/premium_validation_v18_parts/**
       - tests/test_manama_souq_source_gate.py
-      - tests/test_brick_factory_resolution.py
+      - tests/test_manama_souq_composite_authority.py
   pull_request:
     branches: [work/bahrain-brick-asset-lab-integration-v1]
     types: [opened, synchronize, reopened]
@@ -22,127 +30,126 @@ permissions:
   actions: read
 
 concurrency:
-  group: bahrain-brick-pr59-gate2-${{ github.ref }}
+  group: bahrain-brick-manama-souq-authority-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  ACCEPTED_HEAD: b12e1e012e256036e71066260a4c6392d26c3839
-  ACCEPTED_MANIFEST_SHA256: ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab
-  ACCEPTED_TREE_SHA256: e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e
-  ACCEPTED_FILE_COUNT: '1502'
-  ACCEPTED_SOURCE_BYTES: '369162800'
+  ASSET_AUTHORITY_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain-brick-full-asset-matrix-authority-76964c58c283caca.zip
+  ASSET_AUTHORITY_SHA256: 76964c58c283cacaee137152189727d678aa83230d7211dc6a15aa9af9d4a67a
+  HISTORICAL_SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain_brick_v14.0.3-graphics-source.zip
+  HISTORICAL_SOURCE_SHA256: 5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a
 
 jobs:
-  reproduce_gate2_import:
+  authority_tests:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.ref == 'work/bahrain-brick-manama-souq-vertical-slice-v1'
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
-      - name: Check out accepted Gate 1 head
+      - name: Check out exact candidate
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: b12e1e012e256036e71066260a4c6392d26c3839
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
-
-      - name: Reconstruct accepted composite authority
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh A "$PWD/build/gate2-baseline" "$PWD/authority/manama_souq_composite_source.json" "$ACCEPTED_HEAD"
-          cp -a build/gate2-baseline/evidence build/gate2-evidence
-
-      - name: Verify accepted Gate 1 values before Godot
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import hashlib,json
-          from pathlib import Path
-          ev=Path('build/gate2-baseline/evidence')
-          manifest=ev/'FINAL_TREE_MANIFEST.json'
-          report=json.loads((ev/'FINAL_TREE_AUTHORITY.json').read_text())
-          assert hashlib.sha256(manifest.read_bytes()).hexdigest() == 'ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab'
-          assert report['aggregate_tree_sha256'] == 'e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e'
-          assert report['file_count'] == 1502
-          assert report['total_bytes'] == 369162800
-          frozen=json.loads((ev/'FROZEN_CONTROLS_PRE.json').read_text())
-          assert frozen['checks'] == 25
-          assert frozen['failures'] == []
-          assert all(item.get('pass') is True for item in frozen['results'])
-          PY
-
-      - name: Materialize pinned Godot and source diagnostics
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/gate2-evidence/source-context build/gate2-evidence/logs build/godot
-          unzip -q build/gate2-baseline/downloads/Godot_v4.3-stable_linux.x86_64.zip -d build/godot
-          GODOT="$(find build/godot -maxdepth 1 -type f -name 'Godot*' | head -1)"
-          chmod +x "$GODOT"
-          "$GODOT" --version | tee build/gate2-evidence/GODOT_VERSION.txt
-          sha512sum build/gate2-baseline/downloads/Godot_v4.3-stable_linux.x86_64.zip > build/gate2-evidence/GODOT_ARCHIVE_SHA512.txt
-          GAME="$PWD/build/gate2-baseline/game"
-          cp "$GAME/project.godot" "$GAME/scripts/brick_factory.gd" "$GAME/scripts/souq_population_controller.gd" "$GAME/tests/souq_population_runtime.gd" build/gate2-evidence/source-context/
-          sha256sum "$GAME/project.godot" "$GAME/scripts/brick_factory.gd" "$GAME/scripts/souq_population_controller.gd" "$GAME/tests/souq_population_runtime.gd" > build/gate2-evidence/SOURCE_SHA256.txt
-          python3 - "$GAME/project.godot" > build/gate2-evidence/AUTOLOADS.json <<'PY'
-          import json,sys
-          lines=open(sys.argv[1],encoding='utf-8').read().splitlines()
-          active=False; values={}
-          for line in lines:
-              if line.strip()=='[autoload]': active=True; continue
-              if active and line.startswith('['): break
-              if active and '=' in line and not line.lstrip().startswith(';'):
-                  k,v=line.split('=',1); values[k.strip()]=v.strip().strip('"')
-          print(json.dumps(values,indent=2,sort_keys=True))
-          PY
-          nl -ba "$GAME/scripts/souq_population_controller.gd" | sed -n '88,106p' > build/gate2-evidence/SOUQ_POPULATION_LINE_97_CONTEXT.txt
-          printf '%q --headless --path %q --editor --import --quit --verbose\n' "$GODOT" "$GAME" > build/gate2-evidence/IMPORT_COMMAND.txt
-          echo "$GODOT" > build/gate2-evidence/GODOT_PATH.txt
-
-      - name: Reproduce clean Godot import failure
-        id: import
-        continue-on-error: true
+      - name: Run fail-closed authority tests
         shell: bash
         run: |
           set -o pipefail
-          GAME="$PWD/build/gate2-baseline/game"
-          GODOT="$(cat build/gate2-evidence/GODOT_PATH.txt)"
-          rm -rf "$GAME/.godot"
-          timeout --signal=TERM --kill-after=20s 15m "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee build/gate2-evidence/logs/clean-import.log
-          code=${PIPESTATUS[0]}
-          printf '%s\n' "$code" > build/gate2-evidence/IMPORT_EXIT_CODE.txt
-          exit "$code"
-
-      - name: Classify reproduced failure without repair
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,re
-          from pathlib import Path
-          root=Path('build/gate2-evidence')
-          log=(root/'logs/clean-import.log').read_text(errors='replace')
-          autoloads=json.loads((root/'AUTOLOADS.json').read_text())
-          result={
-            'brick_factory_autoload':autoloads.get('BrickFactory'),
-            'identifier_error_count':len(re.findall(r'Identifier not found: BrickFactory',log,re.I)),
-            'brick_factory_script_errors':[line for line in log.splitlines() if 'brick_factory.gd' in line or 'BrickFactory' in line],
-            'all_compile_errors':[line for line in log.splitlines() if re.search(r'SCRIPT ERROR|Parse Error|Failed to load script',line,re.I)],
-          }
-          (root/'PRE_CORRECTION_DIAGNOSIS.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
-          PY
-
-      - name: Upload Gate 2 pre-correction evidence
+          mkdir -p build/authority-test-evidence
+          python3 -m unittest tests.test_manama_souq_composite_authority tests.test_manama_souq_source_gate -v 2>&1 | tee build/authority-test-evidence/authority-tests.log
+      - name: Validate shell syntax
+        run: bash -n tools/vertical_slice/reconstruct_manama_souq_composite.sh
+      - name: Upload authority test diagnostics
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-pr59-gate2-pre-correction-${{ github.run_id }}
-          path: build/gate2-evidence
+          name: bahrain-brick-pr59-authority-tests-${{ github.run_id }}
+          path: build/authority-test-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  authority_run_a:
+    needs: authority_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Check out exact candidate into clean run A
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct composite authority A
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh A "$PWD/build/manama-souq-source-A" "$PWD/authority/manama_souq_composite_source.json" "$CANDIDATE_SHA"
+      - name: Upload retained authority A evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-run-a-${{ github.run_id }}
+          path: build/manama-souq-source-A/evidence
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
 
-      - name: Require the accepted blocker to be reproduced
+  authority_run_b:
+    needs: authority_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Check out exact candidate into clean run B
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct composite authority B
         shell: bash
         run: |
-          grep -Eiq 'Identifier not found: BrickFactory' build/gate2-evidence/logs/clean-import.log
+          set -euo pipefail
+          CANDIDATE_SHA='${{ github.event.pull_request.head.sha || github.sha }}'
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh B "$PWD/build/manama-souq-source-B" "$PWD/authority/manama_souq_composite_source.json" "$CANDIDATE_SHA"
+      - name: Upload retained authority B evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-authority-run-b-${{ github.run_id }}
+          path: build/manama-souq-source-B/evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+  authority_compare:
+    needs: [authority_run_a, authority_run_b]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact candidate for comparison
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Download retained authority A evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-authority-run-a-${{ github.run_id }}
+          path: build/compare/run-a
+      - name: Download retained authority B evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-authority-run-b-${{ github.run_id }}
+          path: build/compare/run-b
+      - name: Verify inventories and byte-identical reconstructions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/compare/run-a --inventory build/compare/run-a/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/compare/run-b --inventory build/compare/run-b/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py compare --run-a build/compare/run-a --run-b build/compare/run-b --output build/compare/GATE1_DETERMINISM_COMPARISON.json
+          cmp build/compare/run-a/ORIGIN_LEDGER.json build/compare/run-b/ORIGIN_LEDGER.json
+          cmp build/compare/run-a/MANAMA_SOUQ_COMPOSITE_SOURCE.zip build/compare/run-b/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+      - name: Upload Gate 1 determinism comparison
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate1-comparison-${{ github.run_id }}
+          path: build/compare/GATE1_DETERMINISM_COMPARISON.json
+          if-no-files-found: error
+          retention-days: 30
