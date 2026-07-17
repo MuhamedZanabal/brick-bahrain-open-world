@@ -1,0 +1,70 @@
+        asset_raw = {norm(n[len('assets/'):]) for n in infos if n.startswith('assets/')}
+        for expected in expected_records:
+            logical = expected['normalized_logical_path']
+            import_path = logical + '.import'
+            apk_import_name = 'assets/' + import_path
+            info = infos.get(apk_import_name)
+            import_exists = info is not None
+            metadata = None
+            metadata_sha = None
+            source_matches = False
+            target_candidates: list[str] = []
+            existing_targets: list[str] = []
+            if info is not None:
+                payload = z.read(info)
+                metadata_sha = hashlib.sha256(payload).hexdigest()
+                text = payload.decode('utf-8', errors='replace')
+                metadata = parse_import(text)
+                source_matches = metadata['source_file'] == logical
+                target_candidates = metadata['target_candidates']
+                existing_targets = sorted(t for t in target_candidates if t in asset_raw)
+            exact_target_verified = bool(source_matches and existing_targets)
+            current_row = current_map[logical]
+            current_present = bool(current_row.get('inspector_considered_present'))
+            actual_packaged = bool(current_present or exact_target_verified)
+            if current_present:
+                category = None
+                reason = None
+                status = 'MATCHED_BY_CURRENT_INVENTORY'
+            elif exact_target_verified:
+                category = 'INVENTORY_COMPILED_ALIAS_DEFECT'
+                reason = (
+                    'exact <logical>.glb.import metadata exists; source_file equals the expected logical GLB; '
+                    'at least one exact imported target exists beneath APK assets/. The current inventory reads '
+                    '.remap files only, so it does not generate the logical GLB alias.'
+                )
+                status = 'PACKAGED_BUT_LOGICAL_ALIAS_NOT_GENERATED'
+            elif import_exists and not source_matches:
+                category = 'EXPECTED_PATH_NORMALIZATION_DEFECT'
+                reason = f'.glb.import exists but source_file={metadata.get("source_file") if metadata else None!r} does not equal expected {logical!r}'
+                status = 'MISSING'
+            elif import_exists and source_matches and not existing_targets:
+                category = 'GENUINE_EXPORT_OMISSION'
+                reason = f'exact .glb.import exists and source_file matches, but none of its exact targets exist: {target_candidates}'
+                status = 'MISSING'
+            elif not expected.get('source_file_exists'):
+                category = 'STALE_MATRIX_AUTHORITY'
+                reason = 'expected path is absent from accepted final-tree authority'
+                status = 'MISSING'
+            else:
+                category = 'SOURCE_IMPORT_DEFECT'
+                reason = 'source GLB exists in authority, but no exact .glb.import metadata is packaged'
+                status = 'MISSING'
+            if category:
+                counts[category] += 1
+            row = dict(current_row)
+            row.update({
+                'import_metadata_path': import_path,
+                'import_metadata_exists_in_apk': import_exists,
+                'import_metadata_sha256': metadata_sha,
+                'import_metadata_source_file': metadata.get('source_file') if metadata else None,
+                'import_metadata_source_matches_expected': source_matches,
+                'import_metadata_path_values': metadata.get('path_values', []) if metadata else [],
+                'import_metadata_dest_files': metadata.get('dest_files', []) if metadata else [],
+                'imported_target_candidates': target_candidates,
+                'exact_imported_targets_existing_in_apk': existing_targets,
+                'exact_imported_target_verified': exact_target_verified,
+                'compiled_imported_resource_exists': bool(existing_targets),
+                'actual_resource_packaged': actual_packaged,
+                f'{side}_status': status,
+                'failure_category': category,
