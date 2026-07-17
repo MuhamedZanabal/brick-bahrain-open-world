@@ -205,7 +205,7 @@ class InspectorFixture:
         marker = "" if valid else "DOES NOT VERIFY\n"
         self.signing.write_text(
             marker
-            + f"Verified using v1 (JAR signing) scheme: {verified}\n"
+            + f"Verified using v1 scheme (JAR signing): {verified}\n"
             + f"Verified using v2 scheme (APK Signature Scheme v2): {verified}\n"
             + f"Verified using v3 scheme (APK Signature Scheme v3): {verified}\n"
             + "Verified using v4 scheme (APK Signature Scheme v4): false\n"
@@ -256,6 +256,7 @@ class ManamaSouqGate4ApkInspectorDirectAssetsTests(unittest.TestCase):
             result, archive, packaged, record = fixture.inspect()
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             self.assertTrue(record["passed"])
+            self.assertTrue(record["apk"]["signing"]["v1"])
             self.assertTrue(archive["direct_assets_layout"])
             self.assertEqual(archive["standalone_pck_paths"], [])
             self.assertNotIn("missing Godot PCK payload", archive["failures"])
