@@ -12,6 +12,7 @@ LOGS="$EVIDENCE/logs"
 DIAGNOSTICS="$EVIDENCE/diagnostics"
 ARTIFACTS="$EVIDENCE/artifacts"
 TOOL="$REPO_ROOT/tools/vertical_slice/manama_souq_apk_evidence.py"
+SIGNING_KEYSTORE="$REPO_ROOT/debug.keystore"
 GODOT_ARCHIVE="$SOURCE_ROOT/downloads/Godot_v4.3-stable_linux.x86_64.zip"
 GODOT_DIR="$SOURCE_ROOT/godot-editor"
 TEMPLATE_DIR="$SOURCE_ROOT/godot-template-download"
@@ -32,7 +33,7 @@ EXPECTED_IMAGE_VERSION="20260714.240.1"
 
 case "$SLOT" in primary|secondary) ;; *) echo "invalid export slot: $SLOT" >&2; exit 2 ;; esac
 mkdir -p "$REPORTS" "$LOGS" "$DIAGNOSTICS" "$ARTIFACTS" "$GODOT_DIR" "$TEMPLATE_DIR"
-for required in "$GAME/project.godot" "$GAME/export_presets.cfg" "$GAME/debug.keystore" "$RECON_EVIDENCE/FINAL_TREE_MANIFEST.json" "$RECON_EVIDENCE/FINAL_TREE_AUTHORITY.json" "$GODOT_ARCHIVE" "$TOOL"; do
+for required in "$GAME/project.godot" "$GAME/export_presets.cfg" "$SIGNING_KEYSTORE" "$RECON_EVIDENCE/FINAL_TREE_MANIFEST.json" "$RECON_EVIDENCE/FINAL_TREE_AUTHORITY.json" "$GODOT_ARCHIVE" "$TOOL"; do
   test -f "$required"
 done
 
@@ -57,7 +58,21 @@ PY
 python3 "$TOOL" authority --game "$GAME" --manifest "$REPORTS/FINAL_TREE_MANIFEST.json" --output "$REPORTS/SOURCE_AUTHORITY_INITIAL.json"
 python3 "$TOOL" preset --preset "$GAME/export_presets.cfg" --project "$GAME/project.godot" --output "$REPORTS/EXPORT_PRESET_INSPECTION.json"
 sha256sum "$GAME/export_presets.cfg" > "$REPORTS/EXPORT_PRESET_SHA256.txt"
-sha256sum "$GAME/debug.keystore" > "$REPORTS/DEBUG_KEYSTORE_SHA256.txt"
+sha256sum "$SIGNING_KEYSTORE" > "$REPORTS/DEBUG_KEYSTORE_SHA256.txt"
+python3 - "$SIGNING_KEYSTORE" "$REPORTS/SIGNING_AUTHORITY.json" <<'PY'
+from pathlib import Path
+import hashlib,json,sys
+key=Path(sys.argv[1]); out=Path(sys.argv[2])
+out.write_text(json.dumps({
+ 'classification':'repository-approved QA/debug signing identity external to accepted source authority',
+ 'repository_path':'debug.keystore',
+ 'bytes':key.stat().st_size,
+ 'sha256':hashlib.sha256(key.read_bytes()).hexdigest(),
+ 'godot_override':'GODOT_ANDROID_KEYSTORE_DEBUG_PATH',
+ 'source_tree_mutated':False,
+ 'production_signing':False,
+},indent=2,sort_keys=True)+'\n')
+PY
 
 rm -rf "$GAME/.godot" "$GODOT_DIR" "$XDG_DATA_HOME"
 mkdir -p "$GODOT_DIR" "$XDG_DATA_HOME"
@@ -158,7 +173,7 @@ for tool in "$AAPT" "$AAPT2" "$APKSIGNER" "$ZIPALIGN" "$APKANALYZER" "$SDKMANAGE
 "$APKANALYZER" --version > "$REPORTS/APKANALYZER_VERSION.txt" 2>&1
 "$ADB" version > "$REPORTS/PLATFORM_TOOLS_VERSION.txt" 2>&1
 set +e; "$ZIPALIGN" -h > "$REPORTS/ZIPALIGN_VERSION.txt" 2>&1; set -e
-"$JAVA_HOME/bin/keytool" -list -v -keystore "$GAME/debug.keystore" -storepass android -alias androiddebugkey > "$REPORTS/DEBUG_SIGNING_IDENTITY.txt" 2>&1
+"$JAVA_HOME/bin/keytool" -list -v -keystore "$SIGNING_KEYSTORE" -storepass android -alias androiddebugkey > "$REPORTS/DEBUG_SIGNING_IDENTITY.txt" 2>&1
 
 python3 - "$REPORTS" "$EXPECTED_TEMPLATE_SHA512" <<'PY'
 from pathlib import Path
@@ -189,10 +204,10 @@ if any(x is None for x in required): raise SystemExit('required Android package 
 PY
 
 EXPORT_START="$(date -u +%FT%TZ)"
-printf '%q ' env XDG_DATA_HOME="$XDG_DATA_HOME" "$GODOT" --headless --path "$GAME" --verbose --export-debug "$PRESET_NAME" "$APK" > "$REPORTS/EXPORT_COMMAND.txt"; printf '\n' >> "$REPORTS/EXPORT_COMMAND.txt"
+printf '%q ' env XDG_DATA_HOME="$XDG_DATA_HOME" GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$SIGNING_KEYSTORE" GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android "$GODOT" --headless --path "$GAME" --verbose --export-debug "$PRESET_NAME" "$APK" > "$REPORTS/EXPORT_COMMAND.txt"; printf '\n' >> "$REPORTS/EXPORT_COMMAND.txt"
 set +e
 set -o pipefail
-/usr/bin/time -v timeout --signal=TERM --kill-after=30s 1800s env XDG_DATA_HOME="$XDG_DATA_HOME" "$GODOT" --headless --path "$GAME" --verbose --export-debug "$PRESET_NAME" "$APK" 2>&1 | tee "$LOGS/android-export.log"
+/usr/bin/time -v timeout --signal=TERM --kill-after=30s 1800s env XDG_DATA_HOME="$XDG_DATA_HOME" GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$SIGNING_KEYSTORE" GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android "$GODOT" --headless --path "$GAME" --verbose --export-debug "$PRESET_NAME" "$APK" 2>&1 | tee "$LOGS/android-export.log"
 EXPORT_CODE=${PIPESTATUS[0]}
 set -e
 EXPORT_END="$(date -u +%FT%TZ)"
