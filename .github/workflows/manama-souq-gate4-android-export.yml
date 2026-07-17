@@ -9,6 +9,7 @@ on:
       - tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
       - tools/vertical_slice/manama_souq_apk_evidence.py
       - tests/test_manama_souq_gate4_android_export_contract.py
+      - tests/test_manama_souq_gate4_compact_diagnostics_contract.py
       - export_presets.cfg
       - debug.keystore
       - authority/manama_souq_composite_source.json
@@ -24,6 +25,7 @@ on:
       - tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
       - tools/vertical_slice/manama_souq_apk_evidence.py
       - tests/test_manama_souq_gate4_android_export_contract.py
+      - tests/test_manama_souq_gate4_compact_diagnostics_contract.py
       - export_presets.cfg
       - debug.keystore
       - authority/manama_souq_composite_source.json
@@ -124,6 +126,23 @@ jobs:
           mkdir -p build/gate4-primary-evidence
           python3 tools/vertical_slice/composite_source_authority.py inventory --root build/gate4-primary-evidence --output build/gate4-primary-evidence/EVIDENCE_INVENTORY.json
           python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/gate4-primary-evidence --inventory build/gate4-primary-evidence/EVIDENCE_INVENTORY.json
+      - name: Upload primary compact failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-primary-diagnostics-${{ github.run_id }}
+          path: |
+            build/gate4-primary-evidence/reports/GATE4_FAILURE.json
+            build/gate4-primary-evidence/reports/GATE4_PREREQUISITES.json
+            build/gate4-primary-evidence/reports/GATE4_HARNESS_CORRECTION.json
+            build/gate4-primary-evidence/reports/WORKSPACE_DISK_BEFORE.txt
+            build/gate4-primary-evidence/reports/WORKSPACE_DISK_FAILURE.txt
+            build/gate4-primary-evidence/reports/WORKSPACE_USAGE_BEFORE.txt
+            build/gate4-primary-evidence/reports/WORKSPACE_USAGE_FAILURE.txt
+            build/gate4-primary-evidence/logs/gate4-runner-xtrace.log
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
       - name: Upload primary APK and evidence
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
@@ -175,6 +194,23 @@ jobs:
           mkdir -p build/gate4-secondary-evidence
           python3 tools/vertical_slice/composite_source_authority.py inventory --root build/gate4-secondary-evidence --output build/gate4-secondary-evidence/EVIDENCE_INVENTORY.json
           python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/gate4-secondary-evidence --inventory build/gate4-secondary-evidence/EVIDENCE_INVENTORY.json
+      - name: Upload secondary compact failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate4-secondary-diagnostics-${{ github.run_id }}
+          path: |
+            build/gate4-secondary-evidence/reports/GATE4_FAILURE.json
+            build/gate4-secondary-evidence/reports/GATE4_PREREQUISITES.json
+            build/gate4-secondary-evidence/reports/GATE4_HARNESS_CORRECTION.json
+            build/gate4-secondary-evidence/reports/WORKSPACE_DISK_BEFORE.txt
+            build/gate4-secondary-evidence/reports/WORKSPACE_DISK_FAILURE.txt
+            build/gate4-secondary-evidence/reports/WORKSPACE_USAGE_BEFORE.txt
+            build/gate4-secondary-evidence/reports/WORKSPACE_USAGE_FAILURE.txt
+            build/gate4-secondary-evidence/logs/gate4-runner-xtrace.log
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
       - name: Upload secondary APK and evidence
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
