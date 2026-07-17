@@ -1,0 +1,39 @@
+name: Bahrain Brick Advance Existing APK Closure
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-advance-existing-apk-closure.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  advance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          fetch-depth: 1
+      - name: Pin final corrective head and test authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('.github/workflows/pr59-existing-apk-gate-closure.yml')
+          text=path.read_text()
+          text=text.replace('CORRECTION_HEAD: cbe11e445aaf4b563be6e1630bdb440e49b861fe','CORRECTION_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f')
+          text=text.replace("'green_correction_head':'cbe11e445aaf4b563be6e1630bdb440e49b861fe',", "'green_correction_head':'5b4e2466ef84f3984f3bf336b31925d4d2e97a7f',\n            'real_schema_red_head':'790609c432435fb50f88096102d0bebb00d7accd',\n            'real_schema_red_run_id':29610305475,\n            'real_schema_red_job_id':87983157672,\n            'real_schema_green_run_id':29610450350,\n            'real_schema_green_job_id':87983611002,")
+          path.write_text(text)
+          assert 'CORRECTION_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f' in text
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/pr59-existing-apk-gate-closure.yml
+          git commit -m 'ci(forensics): advance existing-APK closure to final correction'
+          git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
