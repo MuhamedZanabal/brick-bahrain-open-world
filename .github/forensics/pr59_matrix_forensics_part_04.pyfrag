@@ -1,0 +1,96 @@
+        "summary": summary,
+        "raw_paths": sorted(raw_set),
+        "reported_raw_paths": sorted(raw_from_report),
+        "reported_logical_paths": sorted(logical_from_report),
+        "validated_aliases": valid_aliases,
+        "invalid_aliases": invalid_aliases,
+        "remaps": remaps,
+        "reported_remap_failures": inventory.get("remap_failures") or [],
+        "imported_glb_targets": imported_targets,
+    }
+    write_json(output / f"{side.upper()}_APK_LOGICAL_PATHS.json", report)
+    report["_apk"] = apk
+    report["_raw_set"] = raw_set
+    report["_logical_set"] = logical_from_report
+    report["_valid_aliases"] = valid_aliases
+    report["_remaps"] = remaps
+    return report
+
+
+def casefold_matches(value: str, paths: set[str]) -> list[str]:
+    folded = value.casefold()
+    return sorted(p for p in paths if p.casefold() == folded)
+
+
+def prefix_matches(value: str, paths: set[str]) -> list[str]:
+    parts = PurePosixPath(value).parts
+    results: set[str] = set()
+    # Only exact multi-component suffix equivalence; never basename-only similarity.
+    for width in range(min(len(parts), 6), 2, -1):
+        suffix = "/".join(parts[-width:])
+        matches = [p for p in paths if p.endswith("/" + suffix) or p == suffix]
+        if len(matches) == 1:
+            results.add(matches[0])
+            break
+    return sorted(results)
+
+
+def reconcile(side: str, expected: list[dict[str, Any]], apk_report: dict[str, Any], source_map: dict[str, dict[str, Any]], output: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    raw: set[str] = apk_report["_raw_set"]
+    logical: set[str] = apk_report["_logical_set"]
+    aliases: dict[str, list[dict[str, Any]]] = apk_report["_valid_aliases"]
+    remaps: dict[str, dict[str, Any]] = apk_report["_remaps"]
+    inventory_all_aliases: dict[str, list[dict[str, Any]]] = collections.defaultdict(list)
+    for path, records in aliases.items():
+        inventory_all_aliases[path].extend(records)
+    rows: list[dict[str, Any]] = []
+    categories: collections.Counter[str] = collections.Counter()
+    all_candidates = raw | logical | set(aliases)
+    imported_raw = {p for p in raw if p.startswith(".godot/imported/")}
+
+    for exp in expected:
+        path = exp["normalized_logical_path"]
+        remap_path = path + ".remap"
+        remap = remaps.get(remap_path)
+        parsed_current = remap.get("current_parser_target") if remap else None
+        parsed_robust = remap.get("robust_parser_target") if remap else None
+        target = parsed_current or parsed_robust
+        target_exists = bool(target and target in raw)
+        alias_generated = path in aliases
+        raw_exists = path in raw
+        inspector_present = raw_exists or alias_generated
+        compiled_actual = None
+        compiled_suffix = REVERSE_COMPILED.get(PurePosixPath(path).suffix.lower())
+        if compiled_suffix:
+            candidate = str(PurePosixPath(path).with_suffix(compiled_suffix))
+            if candidate in raw:
+                compiled_actual = candidate
+        cf = casefold_matches(path, all_candidates)
+        pm = prefix_matches(path, all_candidates)
+        source_exists = bool(exp["source_file_exists"])
+        source_import_metadata = [
+            candidate for candidate in (path + ".import", path + ".remap")
+            if candidate in source_map
+        ]
+        status = "MATCH" if inspector_present else "MISSING"
+        category = None
+        reason = None
+        if not inspector_present:
+            if not source_exists:
+                category = "STALE_MATRIX_AUTHORITY"
+                reason = "expected manifest path is absent from FINAL_TREE_MANIFEST.json"
+            elif cf and path not in cf:
+                category = "CASE_OR_PREFIX_MISMATCH"
+                reason = f"case-equivalent packaged/logical path(s): {cf}"
+            elif pm:
+                category = "CASE_OR_PREFIX_MISMATCH"
+                reason = f"unique multi-component suffix/prefix equivalent path: {pm}"
+            elif compiled_actual:
+                category = "INVENTORY_COMPILED_ALIAS_DEFECT"
+                reason = f"compiled packaged resource exists at {compiled_actual}, but no validated logical alias exists"
+            elif remap is not None and parsed_current is None and parsed_robust is not None and target_exists:
+                category = "INVENTORY_REMAP_PARSER_DEFECT"
+                reason = "valid remap target is parsed by robust syntax but not by the current exact parser"
+            elif remap is not None and target and not target_exists and casefold_matches(target, raw):
+                category = "INVENTORY_REMAP_TARGET_MATCH_DEFECT"
+                reason = f"remap target differs only by case from APK path: {casefold_matches(target, raw)}"
