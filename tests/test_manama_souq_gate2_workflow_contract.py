@@ -8,7 +8,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 GATE1 = ROOT / ".github" / "workflows" / "manama-souq-vertical-slice.yml"
 GATE2 = ROOT / ".github" / "workflows" / "manama-souq-gate2-source-runtime.yml"
-RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate2_source_runtime.sh"
+BASE_RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate2_source_runtime.sh"
+RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate2_source_runtime_v2.sh"
 PROJECT_SCRIPT = ROOT / "tests" / "gate2" / "souq_population_project_context_runtime.gd"
 PROJECT_SCENE = ROOT / "tests" / "gate2" / "souq_population_project_context_runtime.tscn"
 SLICE_PROJECT_SCRIPT = ROOT / "tests" / "gate2" / "manama_souq_slice_project_context_runtime.gd"
@@ -34,6 +35,7 @@ class ManamaSouqGate2WorkflowContractTests(unittest.TestCase):
     def test_gate2_workflow_and_harness_are_separate_components(self) -> None:
         for path in (
             GATE2,
+            BASE_RUNNER,
             RUNNER,
             PROJECT_SCRIPT,
             PROJECT_SCENE,
@@ -47,21 +49,22 @@ class ManamaSouqGate2WorkflowContractTests(unittest.TestCase):
 
     def test_gate2_consumes_the_accepted_gate1_authority(self) -> None:
         workflow = GATE2.read_text(encoding="utf-8")
-        runner = RUNNER.read_text(encoding="utf-8")
+        runner = BASE_RUNNER.read_text(encoding="utf-8") + RUNNER.read_text(encoding="utf-8")
         combined = workflow + runner
         for value in (ACCEPTED_HEAD, ACCEPTED_MANIFEST, ACCEPTED_TREE, "1502", "369162800"):
             self.assertIn(value, combined)
         self.assertIn("reconstruct_manama_souq_composite.sh", combined)
         self.assertIn("FROZEN_CONTROLS_PRE.json", combined)
         self.assertIn("FROZEN_CONTROLS_POST.json", combined)
+        self.assertIn("run_manama_souq_gate2_source_runtime_v2.sh", workflow)
 
     def test_runner_uses_the_accepted_frozen_control_report_schema(self) -> None:
-        runner = RUNNER.read_text(encoding="utf-8")
+        runner = BASE_RUNNER.read_text(encoding="utf-8")
         self.assertIn("item['pass']", runner)
         self.assertNotIn("item['passed']", runner)
 
     def test_both_population_execution_contexts_are_bounded_and_retained(self) -> None:
-        runner = RUNNER.read_text(encoding="utf-8")
+        runner = BASE_RUNNER.read_text(encoding="utf-8")
         self.assertIn(
             '--script "res://tests/souq_population_runtime.gd"',
             runner,
@@ -127,7 +130,7 @@ class ManamaSouqGate2WorkflowContractTests(unittest.TestCase):
     def test_gate2_does_not_perform_android_or_product_source_mutations(self) -> None:
         combined = "\n".join(
             path.read_text(encoding="utf-8")
-            for path in (GATE2, RUNNER, PROJECT_SCRIPT, PROJECT_SCENE, SLICE_PROJECT_SCRIPT, SLICE_PROJECT_SCENE)
+            for path in (GATE2, BASE_RUNNER, RUNNER, PROJECT_SCRIPT, PROJECT_SCENE, SLICE_PROJECT_SCRIPT, SLICE_PROJECT_SCENE)
         )
         self.assertNotIn("android", combined.lower())
         for prohibited in (
