@@ -178,6 +178,27 @@ class InspectorFixture:
         }
         self.inventory.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
+    def remove_logical_resource(self, logical: str) -> None:
+        aliases = [dict(item) for item in self.aliases]
+        matching = [item for item in aliases if item.get("logical_path") == logical]
+        raw_files = set(self.raw_files)
+        omitted: set[str] = set()
+        if matching:
+            for item in matching:
+                packaged = str(item["packaged_path"])
+                raw_files.discard(packaged)
+                omitted.add(packaged)
+                target = item.get("remap_target")
+                if target:
+                    raw_files.discard(str(target))
+                    omitted.add(str(target))
+            aliases = [item for item in aliases if item.get("logical_path") != logical]
+        else:
+            raw_files.discard(logical)
+            omitted.add(logical)
+        self.write_apk(omitted_assets=omitted)
+        self.write_inventory(raw_files=raw_files, aliases=aliases)
+
     def write_signing(self, *, valid: bool, qa: bool) -> None:
         verified = "true" if valid else "false"
         subject = "CN=Android Debug,O=Android" if qa else "CN=Production,O=Example"
@@ -253,9 +274,7 @@ class ManamaSouqGate4ApkInspectorDirectAssetsTests(unittest.TestCase):
         temporary, fixture = self.fixture()
         with temporary:
             missing = "scenes/manama_souq_vertical_slice.tscn"
-            files = set(fixture.raw_files) | set(REQUIRED_RESOURCES) | set(MATRIX_PATHS)
-            files.discard(missing)
-            fixture.write_inventory(files=files)
+            fixture.remove_logical_resource(missing)
             result, _, packaged, _ = fixture.inspect()
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(packaged["required_vertical_slice_resources"][missing])
@@ -265,9 +284,7 @@ class ManamaSouqGate4ApkInspectorDirectAssetsTests(unittest.TestCase):
             with self.subTest(missing=missing):
                 temporary, fixture = self.fixture()
                 with temporary:
-                    files = set(fixture.raw_files) | set(REQUIRED_RESOURCES) | set(MATRIX_PATHS)
-                    files.discard(missing)
-                    fixture.write_inventory(files=files)
+                    fixture.remove_logical_resource(missing)
                     result, _, packaged, _ = fixture.inspect()
                     self.assertNotEqual(result.returncode, 0)
                     self.assertFalse(packaged["required_vertical_slice_resources"][missing])
@@ -297,10 +314,7 @@ class ManamaSouqGate4ApkInspectorDirectAssetsTests(unittest.TestCase):
         temporary, fixture = self.fixture()
         with temporary:
             missing = MATRIX_PATHS[-1]
-            aliases = [item for item in fixture.aliases if item["logical_path"] != missing]
-            files = set(fixture.raw_files) | set(REQUIRED_RESOURCES) | set(MATRIX_PATHS)
-            files.discard(missing)
-            fixture.write_inventory(files=files, aliases=aliases)
+            fixture.remove_logical_resource(missing)
             result, _, packaged, _ = fixture.inspect()
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(packaged["full_asset_matrix_manifest_glb_count"], 436)
