@@ -1,0 +1,94 @@
+name: Bahrain Brick PR59 GLB Sidecar Schema Sample
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-glb-sidecar-schema-sample.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  sample_sidecars:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out inspection branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+
+      - name: Download retained primary evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-pr59-gate4-primary-29589205147
+          path: build/primary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29589205147'
+          github-token: ${{ github.token }}
+
+      - name: Verify APK and extract exact textual sidecars
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=build/primary/artifacts/bahrain-brick-pr59-primary-debug.apk
+          test "$(stat -c %s "$apk")" = '347919106'
+          printf '%s  %s\n' 0956a0c8195dc9319238b1230ef3c0291a09742c357256ae29da46aa649bf455 "$apk" | sha256sum -c -
+          mkdir -p build/sample
+          python3 - "$apk" <<'PY'
+          import hashlib,json,sys,zipfile
+          from pathlib import Path
+          apk=Path(sys.argv[1])
+          requested=[
+            'assets/assets/generated/full_matrix/architecture/balanced/souq/bh_souq_awning_01_lod0.glb.import',
+            'assets/assets/environment/architecture/commercial/bh_cafe_storefront_karak_a_01.glb.import',
+          ]
+          out=Path('build/sample')
+          records=[]
+          with zipfile.ZipFile(apk) as archive:
+            names=set(archive.namelist())
+            for index,name in enumerate(requested,1):
+              assert name in names, name
+              payload=archive.read(name)
+              target=out/f'SIDECAR_{index}.txt'
+              target.write_bytes(payload)
+              records.append({'apk_path':name,'bytes':len(payload),'sha256':hashlib.sha256(payload).hexdigest(),'output':target.name})
+          (out/'SIDECAR_SAMPLE_AUTHORITY.json').write_text(json.dumps({'apk_bytes':apk.stat().st_size,'apk_sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'samples':records},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Record sample run locator
+        if: always()
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_GLB_SIDECAR_SAMPLE_RUN.json <<JSON
+          {
+            "run_id": ${{ github.run_id }},
+            "workflow_commit": "${{ github.sha }}",
+            "original_export_run": 29589205147
+          }
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_GLB_SIDECAR_SAMPLE_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(forensics): record GLB sidecar sample run ${{ github.run_id }}"
+            git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+          fi
+
+      - name: Upload compact sidecar schema sample
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-glb-sidecar-schema-${{ github.run_id }}
+          path: build/sample
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
