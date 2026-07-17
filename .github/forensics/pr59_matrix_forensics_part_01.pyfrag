@@ -1,0 +1,96 @@
+        actual_bytes = p.stat().st_size
+        actual_sha = sha256_file(p)
+        if actual_bytes != record.get("bytes") or actual_sha != record.get("sha256"):
+            failures.append({
+                "path": record.get("path"),
+                "reason": "content_mismatch",
+                "expected_bytes": record.get("bytes"),
+                "actual_bytes": actual_bytes,
+                "expected_sha256": record.get("sha256"),
+                "actual_sha256": actual_sha,
+            })
+        else:
+            verified.append({"path": record.get("path"), "bytes": actual_bytes, "sha256": actual_sha})
+    return {
+        "passed": bool(records) and not failures,
+        "inventory_path": str(inv_path),
+        "inventory_sha256": sha256_file(inv_path),
+        "expected_file_count": inv.get("file_count") if isinstance(inv, dict) else None,
+        "verified_file_count": len(verified),
+        "failures": failures,
+    }
+
+
+def copy_retained(side: str, root: Path, output: Path) -> dict[str, Any]:
+    dest = output / "retained" / side
+    dest.mkdir(parents=True, exist_ok=True)
+    requested = [
+        "APK_SHA256.txt", "APK_SIZE.txt", "APK_PROJECT_ASSETS.json", "PCK_CONTENTS.json",
+        "PACKAGED_VERTICAL_SLICE_RESOURCES.json", "APK_EXPORT_RECORD.json", "APK_ARCHIVE_REPORT.json",
+        "APK_ENTRY_INVENTORY.json", "APK_METADATA.json", "APK_BADGING.txt", "APK_MANIFEST_XMLTREE.txt",
+        "APK_SIGNING.txt", "SOURCE_AUTHORITY_INITIAL.json", "SOURCE_AUTHORITY_PRE_EXPORT.json",
+        "SOURCE_AUTHORITY_POST_EXPORT.json", "FINAL_TREE_MANIFEST.json", "FINAL_TREE_AUTHORITY.json",
+        "EXPORT_PRESET_INSPECTION.json", "EXPORT_PRESET_SHA256.txt", "TOOLCHAIN_IDENTITY.json",
+        "GATE4_FAILURE.json", "GATE4_PREREQUISITES.json", "GATE4_HARNESS_CORRECTION.json",
+    ]
+    copied: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for name in requested:
+        source = find_one(root, name, required=False)
+        if source is None:
+            missing.append(name)
+            continue
+        target = dest / name
+        shutil.copy2(source, target)
+        copied.append({"name": name, "source_path": str(source), "bytes": target.stat().st_size, "sha256": sha256_file(target)})
+    for source_name, target_name in (("android-export.log", "ANDROID_EXPORT_CAUSAL_EXCERPT.txt"), ("gate4-runner-xtrace.log", "GATE4_RUNNER_CAUSAL_EXCERPT.txt")):
+        source = find_one(root, source_name, required=False)
+        if source is None:
+            missing.append(source_name)
+            continue
+        lines = source.read_text(encoding="utf-8", errors="replace").splitlines()
+        selected = lines[:80] + (["... [middle omitted] ..."] if len(lines) > 500 else []) + lines[-420:]
+        target = dest / target_name
+        target.write_text("\n".join(selected) + "\n", encoding="utf-8")
+        copied.append({"name": target_name, "source_path": str(source), "bytes": target.stat().st_size, "sha256": sha256_file(target)})
+    return {"copied": copied, "missing_requested": missing}
+
+
+def json_pointer_escape(value: str) -> str:
+    return value.replace("~", "~0").replace("/", "~1")
+
+
+def record_identifier(parent: Any, pointer: str) -> str:
+    if isinstance(parent, dict):
+        for key in ("id", "asset_id", "record_id", "task_id", "name", "slug", "key", "path", "glb", "glb_path"):
+            value = parent.get(key)
+            if isinstance(value, (str, int)) and str(value).strip():
+                return f"{key}:{value}"
+    return pointer.rsplit("/", 1)[0] or "/"
+
+
+def walk_glbs(value: Any, pointer: str = "", parent: Any = None, field: str | None = None) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if isinstance(value, dict):
+        for key, child in value.items():
+            child_pointer = pointer + "/" + json_pointer_escape(str(key))
+            out.extend(walk_glbs(child, child_pointer, value, str(key)))
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            child_pointer = pointer + f"/{index}"
+            out.extend(walk_glbs(child, child_pointer, value, field))
+    elif isinstance(value, str) and value.lower().endswith(".glb"):
+        out.append({
+            "original_value": value,
+            "json_pointer": pointer or "/",
+            "field": field,
+            "manifest_record_identifier": record_identifier(parent, pointer),
+        })
+    return out
+
+
+def pointer_pattern(pointer: str) -> str:
+    return re.sub(r"/\d+(?=/|$)", "/[]", pointer)
+
+
+def analyze_manifest(primary_root: Path, secondary_root: Path, output: Path) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, dict[str, Any]]]:
