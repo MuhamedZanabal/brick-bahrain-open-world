@@ -41,6 +41,9 @@ jobs:
           cat forensic-tooling/.github/forensics/pr59_matrix_forensics_part_*.pyfrag > /tmp/pr59_matrix_forensics.py
           python3 -m py_compile /tmp/pr59_matrix_forensics.py
           sha256sum /tmp/pr59_matrix_forensics.py
+          cat forensic-tooling/.github/forensics/pr59_import_metadata_part_*.pyfrag > /tmp/pr59_import_metadata.py
+          python3 -m py_compile /tmp/pr59_import_metadata.py
+          sha256sum /tmp/pr59_import_metadata.py
 
       - name: Download retained primary evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -146,6 +149,15 @@ jobs:
             > build/forensic-output/ANALYZER_STDOUT.txt \
             2> build/forensic-output/ANALYZER_STDERR.txt
           code=$?
+          if [[ "$code" -eq 0 ]]; then
+            python3 /tmp/pr59_import_metadata.py \
+              "$PWD/build/extracted/primary" \
+              "$PWD/build/extracted/secondary" \
+              "$PWD/build/forensic-output" \
+              > build/forensic-output/IMPORT_METADATA_ANALYZER_STDOUT.txt \
+              2> build/forensic-output/IMPORT_METADATA_ANALYZER_STDERR.txt
+            code=$?
+          fi
           printf '%s\n' "$code" > build/forensic-output/ANALYZER_EXIT_CODE.txt
           exit 0
 
