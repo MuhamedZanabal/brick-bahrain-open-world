@@ -1,0 +1,96 @@
+            continue
+        logical = norm(alias.get("logical_path") or "")
+        packaged = norm(alias.get("packaged_path") or "")
+        target_raw = alias.get("remap_target")
+        target = norm(target_raw) if target_raw else None
+        ok = bool(logical and packaged and packaged in raw_files and alias.get("target_verified") is True)
+        if target is not None:
+            ok = ok and target in raw_files and alias.get("source_verified") is True
+        normalized = dict(alias)
+        normalized.update({"logical_path": logical, "packaged_path": packaged, "remap_target": target})
+        if ok:
+            valid[logical].append(normalized)
+        else:
+            normalized["validation_failure"] = "inspector validate_project_asset_inventory rejected alias"
+            invalid.append(normalized)
+    return dict(valid), invalid
+
+
+def analyze_apk(side: str, root: Path, output: Path) -> dict[str, Any]:
+    apks = sorted(p for p in root.rglob("*.apk") if p.is_file())
+    if len(apks) != 1:
+        raise RuntimeError(f"expected exactly one APK for {side}, found {len(apks)}: {apks}")
+    apk = apks[0]
+    inv_path = find_one(root, "APK_PROJECT_ASSETS.json")
+    assert inv_path is not None
+    inventory = read_json(inv_path)
+    raw_from_report = {norm(p) for p in inventory.get("raw_files", []) if isinstance(p, str)}
+    logical_from_report = {norm(p) for p in inventory.get("files", []) if isinstance(p, str)}
+
+    raw_independent: list[str] = []
+    duplicate_names: list[str] = []
+    remaps: dict[str, dict[str, Any]] = {}
+    with zipfile.ZipFile(apk) as z:
+        names = [i.filename for i in z.infolist()]
+        counts = collections.Counter(names)
+        duplicate_names = sorted(k for k, v in counts.items() if v > 1)
+        for info in z.infolist():
+            if info.is_dir() or not info.filename.startswith("assets/"):
+                continue
+            p = norm(info.filename[len("assets/"):])
+            raw_independent.append(p)
+            if p.endswith(".remap") and info.file_size <= 1024 * 1024:
+                text = z.read(info).decode("utf-8", errors="replace")
+                remaps[p] = {
+                    "remap_path": p,
+                    "current_parser_target": parse_current_remap(text),
+                    "robust_parser_target": parse_robust_remap(text),
+                    "payload_sha256": hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest(),
+                    "payload_excerpt": "\n".join(text.splitlines()[:30]),
+                }
+    raw_set = set(raw_independent)
+    for item in remaps.values():
+        item["current_target_exists"] = bool(item["current_parser_target"] and item["current_parser_target"] in raw_set)
+        item["robust_target_exists"] = bool(item["robust_parser_target"] and item["robust_parser_target"] in raw_set)
+
+    valid_aliases, invalid_aliases = validated_alias_map(inventory, raw_from_report)
+    glb_aliases = [a for records in valid_aliases.values() for a in records if a["logical_path"].lower().endswith(".glb")]
+    imported_targets = sorted(set(a["remap_target"] for a in glb_aliases if a.get("remap_target") and a["remap_target"].startswith(".godot/imported/")))
+    glb_remaps = {p: v for p, v in remaps.items() if p.lower().endswith(".glb.remap")}
+    missing_remap_targets = sorted(p for p, v in glb_remaps.items() if not (v.get("robust_parser_target") and v.get("robust_target_exists")))
+    raw_collisions = case_collisions(raw_independent)
+    logical_collisions = case_collisions(logical_from_report)
+    summary = {
+        "side": side,
+        "apk_path": str(apk),
+        "apk_filename": apk.name,
+        "apk_bytes": apk.stat().st_size,
+        "apk_sha256": sha256_file(apk),
+        "raw_apk_asset_count_independent": len(raw_set),
+        "raw_apk_asset_count_reported": inventory.get("raw_asset_count"),
+        "raw_inventory_matches_apk": raw_set == raw_from_report,
+        "raw_paths_missing_from_report": sorted(raw_set - raw_from_report),
+        "raw_paths_not_in_apk": sorted(raw_from_report - raw_set),
+        "logical_resource_count_reported": len(logical_from_report),
+        "logical_file_count_field": inventory.get("logical_file_count"),
+        "raw_glb_count": sum(1 for p in raw_set if p.lower().endswith(".glb")),
+        "logical_glb_count": sum(1 for p in logical_from_report if p.lower().endswith(".glb")),
+        "glb_remap_count": len(glb_remaps),
+        "verified_glb_remap_target_count": sum(1 for v in glb_remaps.values() if v.get("robust_target_exists")),
+        "missing_remap_target_count": len(missing_remap_targets),
+        "missing_remap_targets": missing_remap_targets,
+        "imported_glb_target_count": len(imported_targets),
+        "remap_failure_count_reported": len(inventory.get("remap_failures") or []),
+        "case_collision_count": len(raw_collisions) + len(logical_collisions),
+        "raw_case_collisions": raw_collisions,
+        "logical_case_collisions": logical_collisions,
+        "unsafe_logical_paths": sorted(p for p in logical_from_report if unsafe(p)),
+        "unsafe_logical_path_count": sum(1 for p in logical_from_report if unsafe(p)),
+        "duplicate_apk_paths": duplicate_names,
+        "inventory_packaging": inventory.get("packaging"),
+        "inventory_passed": inventory.get("passed"),
+        "remap_targets_verified_field": inventory.get("remap_targets_verified"),
+        "validated_alias_count": sum(len(v) for v in valid_aliases.values()),
+        "invalid_alias_count": len(invalid_aliases),
+    }
+    report = {
