@@ -1,0 +1,83 @@
+name: Bahrain Brick PR59 Real Sidecar RED
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-real-sidecar-red.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify_red:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out inspection branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+
+      - name: Check out exact RED head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 790609c432435fb50f88096102d0bebb00d7accd
+          path: candidate
+          fetch-depth: 1
+
+      - name: Prove real sidecar fixture fails before parser correction
+        shell: bash
+        run: |
+          set +e
+          mkdir -p build/red
+          python3 candidate/tests/test_manama_souq_gate4_glb_import_sidecar_inventory.py > build/red/REAL_SIDECAR_RED.log 2>&1
+          code=$?
+          printf '%s\n' "$code" > build/red/REAL_SIDECAR_RED_EXIT_CODE.txt
+          grep -q 'test_real_godot_remap_only_sidecar_with_terminal_nul_is_accepted' build/red/REAL_SIDECAR_RED.log
+          test "$code" -ne 0
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          log=Path('build/red/REAL_SIDECAR_RED.log')
+          value={
+            'red_head':'790609c432435fb50f88096102d0bebb00d7accd',
+            'test':'test_real_godot_remap_only_sidecar_with_terminal_nul_is_accepted',
+            'exit_code':int(Path('build/red/REAL_SIDECAR_RED_EXIT_CODE.txt').read_text()),
+            'failed_as_expected':True,
+            'log_sha256':hashlib.sha256(log.read_bytes()).hexdigest(),
+          }
+          Path('build/red/REAL_SIDECAR_RED_EVIDENCE.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+          exit 0
+
+      - name: Record RED run locator
+        if: always()
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_REAL_SIDECAR_RED_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"red_head":"790609c432435fb50f88096102d0bebb00d7accd"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_REAL_SIDECAR_RED_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(forensics): record real-sidecar RED run ${{ github.run_id }}"
+            git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+          fi
+
+      - name: Upload RED evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-real-sidecar-red-${{ github.run_id }}
+          path: build/red
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
