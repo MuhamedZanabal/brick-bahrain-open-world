@@ -1,0 +1,96 @@
+            elif remap is not None and target_exists and not alias_generated:
+                category = "INVENTORY_REMAP_TARGET_MATCH_DEFECT"
+                reason = "remap and target both exist in APK but inventory did not generate a validated logical alias"
+            elif remap is not None and target and not target_exists:
+                category = "GENUINE_EXPORT_OMISSION"
+                reason = f"packaged remap references absent target {target}"
+            elif source_import_metadata and not raw_exists and remap is None:
+                category = "GENUINE_EXPORT_OMISSION"
+                reason = f"source/import authority exists ({source_import_metadata}) but original/remap/target is absent from APK"
+            elif source_exists and not raw_exists and remap is None:
+                # Distinguish missing source import authority from an exporter that dropped a valid import.
+                related_imported = prefix_matches(PurePosixPath(path).stem, imported_raw) if imported_raw else []
+                category = "SOURCE_IMPORT_DEFECT"
+                reason = "source GLB exists, but no raw GLB, .glb.remap, or evidenced imported target is packaged"
+                if related_imported:
+                    reason += f"; non-authoritative related imported candidates={related_imported}"
+            else:
+                category = "OTHER_PRECISELY_EVIDENCED_CAUSE"
+                reason = "path absent from raw/logical/validated-alias sets; no remap, compiled alias, case, or safe prefix equivalence was proven"
+            categories[category] += 1
+
+        history = [
+            {"stage": "manifest_original", "values": exp["original_manifest_values"]},
+            {"stage": "inspector_normalized", "value": path},
+            {"stage": "raw_original_lookup", "exists": raw_exists},
+            {"stage": "remap_lookup", "path": remap_path, "exists": remap is not None},
+            {"stage": "remap_parse", "current_target": parsed_current, "robust_target": parsed_robust},
+            {"stage": "remap_target_lookup", "target": target, "exists": target_exists},
+            {"stage": "validated_alias_lookup", "exists": alias_generated, "records": aliases.get(path, [])},
+            {"stage": "inspector_presence_result", "present": inspector_present},
+        ]
+        rows.append({
+            "expected_original_path": exp["original_manifest_values"],
+            "expected_normalized_logical_path": path,
+            "manifest_record_identifier": exp["manifest_record_identifiers"],
+            "source_file_exists": source_exists,
+            "source_byte_size": exp["source_byte_size"],
+            "source_sha256": exp["source_sha256"],
+            "raw_original_path_exists_in_apk": raw_exists,
+            "remap_path": remap_path,
+            "remap_path_exists": remap is not None,
+            "parsed_remap_target": target,
+            "current_parser_target": parsed_current,
+            "robust_parser_target": parsed_robust,
+            "remap_target_exists_in_apk": target_exists,
+            "compiled_imported_resource_exists": bool(compiled_actual or target_exists),
+            "compiled_packaged_path": compiled_actual,
+            "logical_alias_was_generated": alias_generated,
+            "validated_alias_records": aliases.get(path, []),
+            "inspector_considered_present": inspector_present,
+            f"{side}_status": status,
+            "failure_category": category,
+            "failure_reason": reason,
+            "case_equivalent_paths": cf,
+            "prefix_equivalent_paths": pm,
+            "path_transformation_history": history,
+        })
+    write_json(output / f"{side.upper()}_MATRIX_RECONCILIATION.json", {"records": rows})
+    return rows, dict(sorted(categories.items()))
+
+
+def compare_reconciliation(primary: list[dict[str, Any]], secondary: list[dict[str, Any]], output: Path) -> dict[str, Any]:
+    def path(r: dict[str, Any]) -> str:
+        return r["expected_normalized_logical_path"]
+    p_map = {path(r): r for r in primary}
+    s_map = {path(r): r for r in secondary}
+    expected = sorted(set(p_map) | set(s_map))
+    p_missing = sorted(p for p in expected if p_map.get(p, {}).get("inspector_considered_present") is not True)
+    s_missing = sorted(p for p in expected if s_map.get(p, {}).get("inspector_considered_present") is not True)
+    p_match = sorted(set(expected) - set(p_missing))
+    s_match = sorted(set(expected) - set(s_missing))
+    category_counts = collections.Counter()
+    for p in sorted(set(p_missing) | set(s_missing)):
+        pc = p_map.get(p, {}).get("failure_category")
+        sc = s_map.get(p, {}).get("failure_category")
+        if pc == sc:
+            category_counts[pc or "UNCLASSIFIED"] += 1
+        else:
+            category_counts[f"PRIMARY:{pc}|SECONDARY:{sc}"] += 1
+    report = {
+        "expected_count": len(expected),
+        "primary_matched_count": len(p_match),
+        "primary_missing_count": len(p_missing),
+        "secondary_matched_count": len(s_match),
+        "secondary_missing_count": len(s_missing),
+        "missing_sets_identical": p_missing == s_missing,
+        "intersection_of_missing_paths": sorted(set(p_missing) & set(s_missing)),
+        "paths_missing_only_in_primary": sorted(set(p_missing) - set(s_missing)),
+        "paths_missing_only_in_secondary": sorted(set(s_missing) - set(p_missing)),
+        "exact_missing_path_list": sorted(set(p_missing) | set(s_missing)),
+        "exact_matching_path_list_primary": p_match,
+        "exact_matching_path_list_secondary": s_match,
+        "mismatch_categories_and_counts": dict(sorted(category_counts.items())),
+    }
+    write_json(output / "MATRIX_RECONCILIATION_COMPARISON.json", report)
+    (output / "EXACT_MISSING_PATHS.txt").write_text("\n".join(report["exact_missing_path_list"]) + ("\n" if report["exact_missing_path_list"] else ""), encoding="utf-8")
