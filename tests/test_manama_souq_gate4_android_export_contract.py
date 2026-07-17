@@ -13,6 +13,7 @@ EXPORT_RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate4_expor
 DIAGNOSTIC_RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate4_export_diagnostic.sh"
 APK_TOOL = ROOT / "tools" / "vertical_slice" / "manama_souq_apk_evidence.py"
 PRESET = ROOT / "export_presets.cfg"
+DIRECT_ASSETS_TEST = ROOT / "tests" / "test_manama_souq_gate4_apk_inspector_direct_assets.py"
 
 ACCEPTED_GATE1_SHA256 = "ada88cb2d6a19282124f2e836f574dc59d1d61c85348e27f61fb42a59712fdbd"
 ACCEPTED_HEAD = "b12e1e012e256036e71066260a4c6392d26c3839"
@@ -36,7 +37,7 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
         self.assertNotEqual(GATE1, GATE2)
 
     def test_gate4_components_exist_separately(self) -> None:
-        for path in (GATE4, EXPORT_RUNNER, DIAGNOSTIC_RUNNER, APK_TOOL, PRESET):
+        for path in (GATE4, EXPORT_RUNNER, DIAGNOSTIC_RUNNER, APK_TOOL, PRESET, DIRECT_ASSETS_TEST):
             self.assertTrue(path.is_file(), f"Gate 4 component missing: {path}")
         self.assertNotEqual(GATE4, GATE1)
         self.assertNotEqual(GATE4, GATE2)
