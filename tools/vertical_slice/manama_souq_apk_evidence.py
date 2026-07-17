@@ -12,6 +12,8 @@ from typing import Any
 
 SIGNATURE_PATH_RE = re.compile(r"^META-INF/(?:MANIFEST\.MF|[^/]+\.(?:SF|RSA|DSA|EC))$", re.I)
 TEXTURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".ktx", ".ktx2", ".dds", ".svg"}
+DIRECT_ASSETS_PACKAGING = "godot-4.3-default-android-apk-assets"
+REQUIRED_MATRIX_COUNT = 436
 ORIENTATION_NAMES = {
     0: "sensor",
     1: "landscape",
@@ -301,13 +303,92 @@ def normalized_pack_path(path: str) -> str:
     return path.replace("res://", "").lstrip("/")
 
 
-def pack_has_path(pack_paths: set[str], required: str) -> bool:
+def _normalized_string_set(value: Any) -> set[str]:
+    if not isinstance(value, list):
+        return set()
+    return {normalized_pack_path(item) for item in value if isinstance(item, str) and item.strip()}
+
+
+def validate_project_asset_inventory(value: Any, inventory_path: Path | None) -> dict[str, Any]:
+    failures: list[str] = []
+    if not isinstance(value, dict):
+        value = {}
+        failures.append("invalid normalized project-resource inventory schema")
+    files = _normalized_string_set(value.get("files"))
+    raw_files = _normalized_string_set(value.get("raw_files"))
+    aliases_value = value.get("logical_aliases")
+    aliases = aliases_value if isinstance(aliases_value, list) else []
+    packaging = value.get("packaging")
+    direct_assets_layout = packaging == DIRECT_ASSETS_PACKAGING and value.get("pck_required") is False
+    if value.get("passed") is not True:
+        failures.append("project asset inventory generator did not pass")
+    if not files:
+        failures.append("empty normalized project-resource inventory")
+    if not raw_files:
+        failures.append("empty raw APK project-assets inventory")
+    if not direct_assets_layout:
+        failures.append("unsupported or unverified project-assets packaging layout")
+    remap_failures = value.get("remap_failures")
+    if value.get("remap_targets_verified") is not True or (isinstance(remap_failures, list) and remap_failures):
+        failures.append("unverified or missing remap target")
+
+    validated_aliases: dict[str, list[dict[str, Any]]] = {}
+    alias_failures: list[dict[str, Any]] = []
+    for raw_alias in aliases:
+        if not isinstance(raw_alias, dict):
+            alias_failures.append({"reason": "alias is not an object"})
+            continue
+        logical = normalized_pack_path(str(raw_alias.get("logical_path") or ""))
+        packaged = normalized_pack_path(str(raw_alias.get("packaged_path") or ""))
+        target_value = raw_alias.get("remap_target")
+        target = normalized_pack_path(str(target_value)) if target_value else None
+        valid = bool(logical and packaged and packaged in raw_files and raw_alias.get("target_verified") is True)
+        if target is not None:
+            valid = valid and target in raw_files and raw_alias.get("source_verified") is True
+        if valid:
+            normalized_alias = dict(raw_alias)
+            normalized_alias["logical_path"] = logical
+            normalized_alias["packaged_path"] = packaged
+            if target is not None:
+                normalized_alias["remap_target"] = target
+            validated_aliases.setdefault(logical, []).append(normalized_alias)
+        else:
+            alias_failures.append(
+                {
+                    "logical_path": logical or None,
+                    "packaged_path": packaged or None,
+                    "remap_target": target,
+                    "reason": "alias mapping is incomplete or references an absent APK asset",
+                }
+            )
+    if alias_failures:
+        failures.append("invalid compiled or remapped project-resource mapping")
+
+    return {
+        "path": str(inventory_path.resolve()) if inventory_path else None,
+        "valid": not failures,
+        "packaging": packaging,
+        "direct_assets_layout": direct_assets_layout,
+        "pck_required": value.get("pck_required"),
+        "logical_file_count": len(files),
+        "raw_asset_count": len(raw_files),
+        "files": files,
+        "raw_files": raw_files,
+        "validated_aliases": validated_aliases,
+        "alias_failures": alias_failures,
+        "remap_targets_verified": value.get("remap_targets_verified") is True,
+        "remap_failures": remap_failures if isinstance(remap_failures, list) else [],
+        "compatibility_note": value.get("compatibility_note")
+        or "PCK_CONTENTS.json is a normalized logical project-resource inventory, not proof of a physical PCK entry.",
+        "failures": failures,
+    }
+
+
+def project_inventory_has_path(project_inventory: dict[str, Any], required: str) -> bool:
     normalized = normalized_pack_path(required)
-    if normalized in pack_paths:
+    if normalized in project_inventory["raw_files"]:
         return True
-    if normalized.endswith(".gd") and normalized[:-3] + ".gdc" in pack_paths:
-        return True
-    return False
+    return bool(project_inventory["validated_aliases"].get(normalized))
 
 
 def command_inspect(args: argparse.Namespace) -> int:
@@ -318,8 +399,9 @@ def command_inspect(args: argparse.Namespace) -> int:
     badging_text = Path(args.badging).read_text(encoding="utf-8", errors="replace")
     manifest_text = Path(args.manifest_xml).read_text(encoding="utf-8", errors="replace")
     signing_text = Path(args.signing).read_text(encoding="utf-8", errors="replace")
-    pck_inventory = read_json(Path(args.pck_inventory)) if args.pck_inventory else {"files": []}
-    pack_paths = {normalized_pack_path(item) for item in pck_inventory.get("files", [])}
+    project_inventory_path = Path(args.pck_inventory).resolve() if args.pck_inventory else None
+    project_inventory_value = read_json(project_inventory_path) if project_inventory_path else {}
+    project_inventory = validate_project_asset_inventory(project_inventory_value, project_inventory_path)
 
     with zipfile.ZipFile(apk) as archive:
         infos = archive.infolist()
@@ -355,8 +437,9 @@ def command_inspect(args: argparse.Namespace) -> int:
     missing_exact = [path for path in required_exact if path not in counts]
     dex_paths = sorted(path for path in counts if re.fullmatch(r"classes\d*\.dex", PurePosixPath(path).name, re.I))
     native_paths = sorted(path for path in counts if path.startswith("lib/") and path.endswith(".so"))
-    pck_paths = sorted(
-        path for path in counts if path.startswith("assets/") and (path.endswith(".pck") or PurePosixPath(path).name == "_cl_")
+    standalone_pck_paths = sorted(path for path in counts if path.startswith("assets/") and path.lower().endswith(".pck"))
+    command_line_asset_paths = sorted(
+        path for path in counts if path.startswith("assets/") and PurePosixPath(path).name == "_cl_"
     )
     zero_byte_critical = sorted(
         item["path"]
@@ -381,14 +464,19 @@ def command_inspect(args: argparse.Namespace) -> int:
         integrity_failures.append("missing DEX")
     if not native_paths:
         integrity_failures.append("missing native libraries")
-    if not pck_paths:
-        integrity_failures.append("missing Godot PCK payload")
     if zero_byte_critical:
         integrity_failures.append("zero-byte critical files")
 
     metadata = parse_badging(badging_text)
     metadata.update(parse_manifest_xml(manifest_text))
     signing = parse_signing(signing_text)
+    signing_failures: list[str] = []
+    if not signing["verified"]:
+        signing_failures.append("APK signature verification failed")
+    if not all(signing.get(scheme) is True for scheme in ("v1", "v2", "v3")):
+        signing_failures.append("required APK signing schemes v1, v2 and v3 did not all verify")
+    if not signing["qa_debug_identity"]:
+        signing_failures.append("QA/debug signing identity not verified")
     metadata["signing"] = signing
     metadata["apk_filename"] = apk.name
     metadata["apk_bytes"] = apk.stat().st_size
@@ -407,29 +495,52 @@ def command_inspect(args: argparse.Namespace) -> int:
         "scripts/touch_input.gd",
         "asset_lab/runtime/manama_souq_layout_v1.json",
     ]
-    required_status = {path: pack_has_path(pack_paths, path) for path in required_resources}
+    required_status = {path: project_inventory_has_path(project_inventory, path) for path in required_resources}
     matrix_manifest = source_root / "asset_lab/runtime/full_asset_matrix_manifest.json"
     matrix_glbs: list[str] = []
+    packaged_failures = list(project_inventory["failures"])
     if matrix_manifest.is_file():
         matrix_glbs = collect_glb_paths(read_json(matrix_manifest))
-    matrix_presence = {path: pack_has_path(pack_paths, path) for path in matrix_glbs}
+    else:
+        packaged_failures.append("missing full asset matrix manifest")
+    if len(matrix_glbs) != REQUIRED_MATRIX_COUNT:
+        packaged_failures.append(
+            f"full asset matrix manifest count mismatch: expected {REQUIRED_MATRIX_COUNT}, found {len(matrix_glbs)}"
+        )
+    matrix_presence = {path: project_inventory_has_path(project_inventory, path) for path in matrix_glbs}
+    missing_required = sorted(path for path, present in required_status.items() if not present)
+    missing_matrix = sorted(path for path, present in matrix_presence.items() if not present)
+    if missing_required:
+        packaged_failures.append("missing required Manama Souq or Karak Delivery project resources")
+    if missing_matrix:
+        packaged_failures.append("missing required full asset matrix project resources")
     source_glbs = sorted(path.relative_to(source_root).as_posix() for path in source_root.rglob("*.glb") if path.is_file())
     source_textures = [
         path for path in source_root.rglob("*") if path.is_file() and path.suffix.lower() in TEXTURE_EXTENSIONS
     ]
     packaged = {
-        "passed": bool(pack_paths)
-        and all(required_status.values())
-        and (not matrix_glbs or all(matrix_presence.values())),
-        "pck_inventory_file_count": len(pack_paths),
-        "pck_glb_path_count": sum(1 for path in pack_paths if path.lower().endswith(".glb")),
+        "passed": not packaged_failures,
+        "failures": packaged_failures,
+        "project_asset_inventory": {
+            key: value
+            for key, value in project_inventory.items()
+            if key not in {"files", "raw_files", "validated_aliases"}
+        },
+        "project_asset_inventory_file_count": project_inventory["logical_file_count"],
+        "project_asset_raw_file_count": project_inventory["raw_asset_count"],
+        "direct_assets_layout": project_inventory["direct_assets_layout"],
+        "standalone_pck_required": False,
+        "standalone_pck_paths": standalone_pck_paths,
+        "pck_inventory_file_count": project_inventory["logical_file_count"],
+        "pck_glb_path_count": sum(1 for path in project_inventory["files"] if path.lower().endswith(".glb")),
+        "compatibility_note": project_inventory["compatibility_note"],
         "source_glb_count": len(source_glbs),
         "source_glb_bytes": sum((source_root / path).stat().st_size for path in source_glbs),
         "source_texture_count": len(source_textures),
         "source_texture_bytes": sum(path.stat().st_size for path in source_textures),
         "full_asset_matrix_manifest_glb_count": len(matrix_glbs),
         "full_asset_matrix_packaged_count": sum(1 for value in matrix_presence.values() if value),
-        "full_asset_matrix_missing": sorted(path for path, present in matrix_presence.items() if not present),
+        "full_asset_matrix_missing": missing_matrix,
         "required_vertical_slice_resources": required_status,
     }
 
@@ -443,7 +554,16 @@ def command_inspect(args: argparse.Namespace) -> int:
         "missing_required_entries": missing_exact,
         "dex_paths": dex_paths,
         "native_library_paths": native_paths,
-        "pck_paths": pck_paths,
+        "standalone_pck_paths": standalone_pck_paths,
+        "command_line_asset_paths": command_line_asset_paths,
+        "direct_assets_layout": project_inventory["direct_assets_layout"],
+        "project_asset_inventory": {
+            "path": project_inventory["path"],
+            "valid": project_inventory["valid"],
+            "logical_file_count": project_inventory["logical_file_count"],
+            "raw_asset_count": project_inventory["raw_asset_count"],
+        },
+        "pck_paths": standalone_pck_paths,
         "zero_byte_critical_files": zero_byte_critical,
         "failures": integrity_failures,
     }
@@ -464,10 +584,11 @@ def command_inspect(args: argparse.Namespace) -> int:
     write_json(report_dir / "APK_METADATA.json", metadata)
     write_json(report_dir / "PACKAGED_VERTICAL_SLICE_RESOURCES.json", packaged)
     record = {
-        "passed": archive_report["passed"] and packaged["passed"] and signing["verified"] and signing["qa_debug_identity"],
+        "passed": archive_report["passed"] and packaged["passed"] and not signing_failures,
         "apk": metadata,
         "archive": archive_report,
         "packaged_resources": packaged,
+        "signing_validation": {"passed": not signing_failures, "failures": signing_failures},
     }
     write_json(report_dir / "APK_EXPORT_RECORD.json", record)
     return 0 if record["passed"] else 1
@@ -675,7 +796,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--badging", required=True)
     inspect.add_argument("--manifest-xml", required=True)
     inspect.add_argument("--signing", required=True)
-    inspect.add_argument("--pck-inventory")
+    inspect.add_argument(
+        "--pck-inventory",
+        help="Compatibility input containing the normalized logical project-resource inventory; not proof of a physical PCK entry.",
+    )
     inspect.set_defaults(func=command_inspect)
 
     compare = sub.add_parser("compare")
