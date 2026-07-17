@@ -21,7 +21,7 @@ class ManamaSouqGate4SdkLedgerContractTests(unittest.TestCase):
     def test_installed_package_parser_accepts_sdkmanager_table_indentation(self) -> None:
         wrapper = WRAPPER.read_text(encoding="utf-8")
         self.assertIn("SDK package identity parser indentation defect", wrapper)
-        self.assertIn("^\\s*{re.escape(name)}", wrapper)
+        self.assertIn(r"^\\s*{re.escape(name)}", wrapper)
         pattern = re.compile(r"^\s*build\-tools;34\.0\.0\s+\|\s+([^|\s]+)", re.M)
         match = pattern.search(SAMPLE)
         self.assertIsNotNone(match)
