@@ -1,0 +1,94 @@
+            "earliest_gate_to_rerun": "Gate 5 APK inspection and then Gate 4 comparison/provenance",
+        }
+    return {
+        "exact_file": "export/source authority to be selected from the exact missing-path category",
+        "exact_function": "no code change proposed until the path-level category is reviewed",
+        "current_behavior": "one or more exact required paths lack a validated packaged representation",
+        "corrected_behavior": "restore the exact source import/export inclusion for only the proven missing resources",
+        "false_positive_control": "retain exact 436-path reconciliation and exact target verification",
+        "focused_red_test": "assert each proven missing path is absent in retained APK evidence",
+        "focused_green_test": "after payload correction, each exact path resolves through raw/remap/imported target without filename similarity",
+        "existing_apks_can_be_reinspected": not classification.startswith("Classification D"),
+        "reexport_required": classification.startswith("Classification D") or classification.startswith("Classification E"),
+        "earliest_gate_to_rerun": "source/import authority and Android export only if payload change is proven; otherwise Gate 5 inspection",
+    }
+
+
+def hash_output_files(output: Path) -> None:
+    manifest = []
+    for p in sorted(x for x in output.rglob("*") if x.is_file() and x.name != "REPORT_SHA256SUMS.json"):
+        manifest.append({"path": p.relative_to(output).as_posix(), "bytes": p.stat().st_size, "sha256": sha256_file(p)})
+    write_json(output / "REPORT_SHA256SUMS.json", {"files": manifest, "file_count": len(manifest), "total_bytes": sum(x["bytes"] for x in manifest)})
+
+
+def main() -> int:
+    if len(sys.argv) != 5:
+        raise SystemExit("usage: analyze.py PRIMARY_ROOT SECONDARY_ROOT CHECKOUT OUTPUT")
+    primary_root, secondary_root, checkout, output = map(Path, sys.argv[1:])
+    output.mkdir(parents=True, exist_ok=True)
+
+    artifact_verification = {
+        "source_run_id": 29589205147,
+        "candidate_head": "f512fe8be09d15d2c9466f5edb089404a37a5c9b",
+        "primary": {**PRIMARY_ARTIFACT, "evidence_inventory": verify_evidence_inventory(primary_root)},
+        "secondary": {**SECONDARY_ARTIFACT, "evidence_inventory": verify_evidence_inventory(secondary_root)},
+    }
+    artifact_verification["passed"] = artifact_verification["primary"]["evidence_inventory"]["passed"] and artifact_verification["secondary"]["evidence_inventory"]["passed"]
+    write_json(output / "ARTIFACT_VERIFICATION.json", artifact_verification)
+    write_json(output / "RETAINED_REPORT_COPY.json", {
+        "primary": copy_retained("primary", primary_root, output),
+        "secondary": copy_retained("secondary", secondary_root, output),
+    })
+
+    expected, manifest_analysis, source_map = analyze_manifest(primary_root, secondary_root, output)
+    primary_apk = analyze_apk("primary", primary_root, output)
+    secondary_apk = analyze_apk("secondary", secondary_root, output)
+    primary_rows, primary_categories = reconcile("primary", expected, primary_apk, source_map, output)
+    secondary_rows, secondary_categories = reconcile("secondary", expected, secondary_apk, source_map, output)
+    comparison = compare_reconciliation(primary_rows, secondary_rows, output)
+    semantics = export_semantics(checkout, primary_root, output)
+    classification, rationale = choose_classification(manifest_analysis, comparison)
+    correction = proposal(classification, comparison)
+    representatives: dict[str, Any] = {}
+    for row in primary_rows:
+        cat = row.get("failure_category")
+        if cat and cat not in representatives:
+            representatives[cat] = row
+    classification_report = {
+        "classification": classification,
+        "rationale": rationale,
+        "manifest_analysis": manifest_analysis,
+        "primary_apk_summary": primary_apk["summary"],
+        "secondary_apk_summary": secondary_apk["summary"],
+        "comparison": comparison,
+        "primary_mismatch_category_counts": primary_categories,
+        "secondary_mismatch_category_counts": secondary_categories,
+        "representative_reconciliation_records": representatives,
+        "export_preset_semantics": semantics,
+        "proposed_correction_only": correction,
+        "no_correction_implemented": True,
+        "no_export_performed": True,
+        "no_apk_installation_or_execution": True,
+    }
+    write_json(output / "MATRIX_DISCREPANCY_CLASSIFICATION.json", classification_report)
+    write_json(output / "INSPECTOR_INPUT_SUMMARY.json", {
+        "primary": primary_apk["summary"],
+        "secondary": secondary_apk["summary"],
+        "expected_count": len(expected),
+        "current_collect_count": manifest_analysis["current_collect_glb_paths_count"],
+        "comparison": comparison,
+    })
+    write_json(output / "PROPOSED_CORRECTION.json", correction)
+    hash_output_files(output)
+    print(json.dumps({
+        "classification": classification,
+        "expected": len(expected),
+        "primary_missing": comparison["primary_missing_count"],
+        "secondary_missing": comparison["secondary_missing_count"],
+        "categories": comparison["mismatch_categories_and_counts"],
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
