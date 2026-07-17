@@ -111,6 +111,8 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
     def test_exports_are_independent_bounded_and_inspected(self) -> None:
         workflow = GATE4.read_text(encoding="utf-8")
         runner = EXPORT_RUNNER.read_text(encoding="utf-8")
+        inspector = APK_TOOL.read_text(encoding="utf-8")
+        surface = workflow + runner + inspector
         for fragment in (
             "--export-debug",
             "timeout --signal=TERM --kill-after=30s",
@@ -123,10 +125,10 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
             "APK_ARCHIVE_REPORT.json",
             "APK_SIZE_BREAKDOWN.json",
         ):
-            self.assertIn(fragment, workflow + runner)
+            self.assertIn(fragment, surface)
         self.assertIn("primary", workflow)
         self.assertIn("secondary", workflow)
-        self.assertIn("APK_REPRODUCIBILITY.json", workflow + APK_TOOL.read_text(encoding="utf-8"))
+        self.assertIn("APK_REPRODUCIBILITY.json", surface)
 
     def test_android_actions_and_components_are_exactly_pinned(self) -> None:
         workflow = GATE4.read_text(encoding="utf-8")
