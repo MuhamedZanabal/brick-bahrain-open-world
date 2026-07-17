@@ -108,6 +108,19 @@ class ManamaSouqGate4AndroidExportContractTests(unittest.TestCase):
         self.assertNotIn("re.sub", runner)
         self.assertNotIn("sed -i", runner)
 
+    def test_repository_qa_keystore_is_external_and_does_not_mutate_source_authority(self) -> None:
+        runner = EXPORT_RUNNER.read_text(encoding="utf-8")
+        for fragment in (
+            'SIGNING_KEYSTORE="$REPO_ROOT/debug.keystore"',
+            'GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$SIGNING_KEYSTORE"',
+            'GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey',
+            'GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android',
+            'sha256sum "$SIGNING_KEYSTORE"',
+        ):
+            self.assertIn(fragment, runner)
+        self.assertNotIn('cp "$SIGNING_KEYSTORE" "$GAME/debug.keystore"', runner)
+        self.assertNotIn('"$GAME/debug.keystore"', runner)
+
     def test_exports_are_independent_bounded_and_inspected(self) -> None:
         workflow = GATE4.read_text(encoding="utf-8")
         runner = EXPORT_RUNNER.read_text(encoding="utf-8")
