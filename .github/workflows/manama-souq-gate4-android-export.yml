@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/manama-souq-gate4-android-export.yml
       - tools/vertical_slice/run_manama_souq_gate4_export.sh
+      - tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
       - tools/vertical_slice/manama_souq_apk_evidence.py
       - tests/test_manama_souq_gate4_android_export_contract.py
       - export_presets.cfg
@@ -20,6 +21,7 @@ on:
     paths:
       - .github/workflows/manama-souq-gate4-android-export.yml
       - tools/vertical_slice/run_manama_souq_gate4_export.sh
+      - tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
       - tools/vertical_slice/manama_souq_apk_evidence.py
       - tests/test_manama_souq_gate4_android_export_contract.py
       - export_presets.cfg
@@ -70,6 +72,7 @@ jobs:
             python3 "$test_file" 2>&1
           done | tee build/gate4-contract-evidence/all-python-contracts.log
           bash -n tools/vertical_slice/run_manama_souq_gate4_export.sh
+          bash -n tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh
           python3 -m py_compile tools/vertical_slice/manama_souq_apk_evidence.py
       - name: Upload Gate 4 contract evidence
         if: always()
@@ -112,7 +115,7 @@ jobs:
             platforms;android-34
             build-tools;34.0.0
       - name: Export and inspect primary APK
-        run: bash tools/vertical_slice/run_manama_souq_gate4_export.sh "$PWD" "$PWD/build/gate4-primary-source" "$PWD/build/gate4-primary-evidence" primary
+        run: bash tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh "$PWD" "$PWD/build/gate4-primary-source" "$PWD/build/gate4-primary-evidence" primary
       - name: Finalize primary evidence inventory
         if: always()
         shell: bash
@@ -163,7 +166,7 @@ jobs:
             platforms;android-34
             build-tools;34.0.0
       - name: Export and inspect secondary APK
-        run: bash tools/vertical_slice/run_manama_souq_gate4_export.sh "$PWD" "$PWD/build/gate4-secondary-source" "$PWD/build/gate4-secondary-evidence" secondary
+        run: bash tools/vertical_slice/run_manama_souq_gate4_export_diagnostic.sh "$PWD" "$PWD/build/gate4-secondary-source" "$PWD/build/gate4-secondary-evidence" secondary
       - name: Finalize secondary evidence inventory
         if: always()
         shell: bash
