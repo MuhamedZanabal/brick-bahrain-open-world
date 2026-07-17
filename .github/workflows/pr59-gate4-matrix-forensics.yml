@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -124,6 +124,32 @@ jobs:
           for required in EXPECTED_MATRIX_PATHS.json PRIMARY_APK_LOGICAL_PATHS.json SECONDARY_APK_LOGICAL_PATHS.json PRIMARY_MATRIX_RECONCILIATION.json SECONDARY_MATRIX_RECONCILIATION.json MATRIX_RECONCILIATION_COMPARISON.json MATRIX_DISCREPANCY_CLASSIFICATION.json PROPOSED_CORRECTION.json; do
             test -s "build/forensic-output/$required"
           done
+
+      - name: Record forensic run locator on isolated branch
+        if: always()
+        shell: bash
+        working-directory: forensic-tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_RUN.json <<JSON
+          {
+            "workflow_name": "Bahrain Brick PR59 Gate 4 Matrix Forensics",
+            "run_id": ${{ github.run_id }},
+            "run_attempt": ${{ github.run_attempt }},
+            "workflow_commit": "${{ github.sha }}",
+            "candidate_head": "f512fe8be09d15d2c9466f5edb089404a37a5c9b",
+            "source_run_id": 29589205147,
+            "analysis_exit_code": "$(cat ../build/forensic-output/ANALYZER_EXIT_CODE.txt 2>/dev/null || printf unavailable)"
+          }
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(forensics): record PR59 matrix forensic run ${{ github.run_id }}"
+            git push origin HEAD:ci/pr59-gate4-matrix-forensics-20260717
+          fi
 
       - name: Upload compact matrix forensic evidence
         if: always()
