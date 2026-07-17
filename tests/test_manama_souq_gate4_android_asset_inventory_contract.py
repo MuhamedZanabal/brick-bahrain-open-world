@@ -20,9 +20,11 @@ class ManamaSouqGate4AndroidAssetInventoryContractTests(unittest.TestCase):
         self.assertIn("APK_PROJECT_ASSETS.json", wrapper)
         self.assertIn("PCK_CONTENTS.json", wrapper)
         self.assertIn("ProjectSettings.load_resource_pack", wrapper)
-        self.assertIn("asset_packaging_old", wrapper)
+        self.assertIn("asset_start_marker", wrapper)
+        self.assertIn("asset_end_marker", wrapper)
         self.assertIn("asset_packaging_new", wrapper)
         self.assertIn("default Android APK assets are not a PCK", wrapper)
+        self.assertNotIn("asset_packaging_old", wrapper)
 
     def test_inventory_maps_compiled_and_imported_assets_to_logical_resource_paths(self) -> None:
         self.assertTrue(INVENTORY_TOOL.is_file())
