@@ -1,0 +1,88 @@
+name: Bahrain Brick PR59 Real Sidecar GREEN
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-real-sidecar-green.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify_green:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out inspection branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+
+      - name: Check out exact GREEN head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+          path: candidate
+          fetch-depth: 1
+
+      - name: Run focused and full contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/green
+          cd candidate
+          python3 tests/test_manama_souq_gate4_glb_import_sidecar_inventory.py 2>&1 | tee ../build/green/FOCUSED_GREEN.log
+          shopt -s nullglob
+          tests=(tests/test_manama_souq_*.py tests/test_karak_delivery_*.py tests/test_souq_population_*.py)
+          [[ ${#tests[@]} -gt 0 ]]
+          for test_file in "${tests[@]}"; do
+            python3 "$test_file"
+          done 2>&1 | tee ../build/green/ALL_CONTRACTS_GREEN.log
+          python3 -m py_compile tools/vertical_slice/inventory_godot_android_apk_assets.py
+          cd ..
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          focused=Path('build/green/FOCUSED_GREEN.log')
+          all_tests=Path('build/green/ALL_CONTRACTS_GREEN.log')
+          value={
+            'green_head':'5b4e2466ef84f3984f3bf336b31925d4d2e97a7f',
+            'focused_passed':True,
+            'all_contracts_passed':True,
+            'focused_log_sha256':hashlib.sha256(focused.read_bytes()).hexdigest(),
+            'all_contracts_log_sha256':hashlib.sha256(all_tests.read_bytes()).hexdigest(),
+          }
+          Path('build/green/GREEN_TEST_EVIDENCE.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Record GREEN run locator
+        if: always()
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_REAL_SIDECAR_GREEN_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"green_head":"5b4e2466ef84f3984f3bf336b31925d4d2e97a7f"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_REAL_SIDECAR_GREEN_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(forensics): record real-sidecar GREEN run ${{ github.run_id }}"
+            git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+          fi
+
+      - name: Upload GREEN evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-real-sidecar-green-${{ github.run_id }}
+          path: build/green
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
