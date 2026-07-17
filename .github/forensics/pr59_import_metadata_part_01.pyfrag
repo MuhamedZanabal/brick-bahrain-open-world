@@ -7,7 +7,8 @@
             import_exists = info is not None
             metadata = None
             metadata_sha = None
-            source_matches = False
+            explicit_source_matches = False
+            source_binding_verified = False
             target_candidates: list[str] = []
             existing_targets: list[str] = []
             if info is not None:
@@ -15,10 +16,11 @@
                 metadata_sha = hashlib.sha256(payload).hexdigest()
                 text = payload.decode('utf-8', errors='replace')
                 metadata = parse_import(text)
-                source_matches = metadata['source_file'] == logical
+                explicit_source_matches = metadata['source_file'] == logical
+                source_binding_verified = metadata['source_file'] is None or explicit_source_matches
                 target_candidates = metadata['target_candidates']
                 existing_targets = sorted(t for t in target_candidates if t in asset_raw)
-            exact_target_verified = bool(source_matches and existing_targets)
+            exact_target_verified = bool(import_exists and source_binding_verified and existing_targets)
             current_row = current_map[logical]
             current_present = bool(current_row.get('inspector_considered_present'))
             actual_packaged = bool(current_present or exact_target_verified)
@@ -29,18 +31,18 @@
             elif exact_target_verified:
                 category = 'INVENTORY_COMPILED_ALIAS_DEFECT'
                 reason = (
-                    'exact <logical>.glb.import metadata exists; source_file equals the expected logical GLB; '
-                    'at least one exact imported target exists beneath APK assets/. The current inventory reads '
-                    '.remap files only, so it does not generate the logical GLB alias.'
+                    'the exact <logical>.glb.import sidecar exists and binds the expected logical GLB by its exact '
+                    'path; its metadata names at least one exact imported target present beneath APK assets/. '
+                    'The current inventory reads .remap only, so it does not generate the logical GLB alias.'
                 )
                 status = 'PACKAGED_BUT_LOGICAL_ALIAS_NOT_GENERATED'
-            elif import_exists and not source_matches:
+            elif import_exists and metadata and metadata['source_file'] is not None and not explicit_source_matches:
                 category = 'EXPECTED_PATH_NORMALIZATION_DEFECT'
-                reason = f'.glb.import exists but source_file={metadata.get("source_file") if metadata else None!r} does not equal expected {logical!r}'
+                reason = f'.glb.import exists but explicit source_file={metadata.get("source_file")!r} does not equal expected {logical!r}'
                 status = 'MISSING'
-            elif import_exists and source_matches and not existing_targets:
+            elif import_exists and source_binding_verified and not existing_targets:
                 category = 'GENUINE_EXPORT_OMISSION'
-                reason = f'exact .glb.import exists and source_file matches, but none of its exact targets exist: {target_candidates}'
+                reason = f'exact .glb.import sidecar exists, but none of its exact imported targets exist: {target_candidates}'
                 status = 'MISSING'
             elif not expected.get('source_file_exists'):
                 category = 'STALE_MATRIX_AUTHORITY'
@@ -58,7 +60,8 @@
                 'import_metadata_exists_in_apk': import_exists,
                 'import_metadata_sha256': metadata_sha,
                 'import_metadata_source_file': metadata.get('source_file') if metadata else None,
-                'import_metadata_source_matches_expected': source_matches,
+                'import_metadata_explicit_source_matches_expected': explicit_source_matches,
+                'import_metadata_source_binding_verified': source_binding_verified,
                 'import_metadata_path_values': metadata.get('path_values', []) if metadata else [],
                 'import_metadata_dest_files': metadata.get('dest_files', []) if metadata else [],
                 'imported_target_candidates': target_candidates,
