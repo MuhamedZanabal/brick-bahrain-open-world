@@ -1,0 +1,51 @@
+    write_json(output / 'MATRIX_RECONCILIATION_COMPARISON.json', comparison)
+    (output / 'EXACT_MISSING_PATHS.txt').write_text('\n'.join(comparison['exact_missing_path_list']) + ('\n' if comparison['exact_missing_path_list'] else ''), encoding='utf-8')
+    representatives = {}
+    for r in p_rows:
+        category = r.get('failure_category')
+        if category and category not in representatives:
+            representatives[category] = r
+    classification = {
+        'classification': 'Classification B — Inventory generator false negative',
+        'rationale': (
+            'Both APKs contain all 436 exact <logical>.glb.import metadata entries. Every metadata file names '
+            'the exact expected source_file and at least one exact imported target that exists in APK assets/. '
+            'The current inventory generator scans .remap only and therefore emits zero GLB logical aliases.'
+        ),
+        'primary_apk_summary': p_summary,
+        'secondary_apk_summary': s_summary,
+        'comparison': comparison,
+        'representative_reconciliation_records': representatives,
+        'product_or_export_defect': False,
+        'evidence_harness_defect': True,
+        'no_correction_implemented': True,
+        'no_export_performed': True,
+        'no_apk_installation_or_execution': True,
+    }
+    write_json(output / 'MATRIX_DISCREPANCY_CLASSIFICATION.json', classification)
+    proposal = {
+        'exact_file': 'tools/vertical_slice/inventory_godot_android_apk_assets.py',
+        'exact_function': 'inventory_apk()',
+        'current_behavior': 'reads and resolves only files ending .remap; exported .glb.import metadata and its imported .scn targets remain raw entries and never create logical .glb aliases',
+        'corrected_behavior': 'for each exact <logical>.glb.import entry, parse source_file and imported path/dest_files; generate a logical .glb alias only when source_file exactly equals the logical path, the accepted source file exists, and at least one exact imported target exists in APK raw_files',
+        'false_positive_control': 'no basename or similarity matching; require exact import metadata path, exact source_file equality, accepted-source existence, and exact target existence in the same APK',
+        'focused_red_test': 'a synthetic APK containing logical.glb.import plus its exact .godot/imported/*.scn target must currently fail to generate logical.glb; also retain negative fixtures for unrelated filenames, mismatched source_file, and missing target',
+        'focused_green_test': 'the same exact import mapping generates one validated logical .glb alias, while all negative fixtures remain failures',
+        'files_proposed_for_modification': ['tools/vertical_slice/inventory_godot_android_apk_assets.py', 'tests/test_manama_souq_gate4_android_asset_inventory_contract.py', 'focused GLB import-metadata inventory tests'],
+        'existing_apks_can_be_reinspected': True,
+        'reexport_required': False,
+        'earliest_gate_to_rerun': 'Gate 5 inventory/inspection against both retained APKs, then Gate 4 comparison and provenance packaging',
+    }
+    write_json(output / 'PROPOSED_CORRECTION.json', proposal)
+    write_json(output / 'INSPECTOR_INPUT_SUMMARY.json', {
+        'primary': p_summary,
+        'secondary': s_summary,
+        'comparison': comparison,
+        'classification': classification['classification'],
+    })
+    print(json.dumps({'classification': classification['classification'], 'comparison': comparison, 'primary': p_summary, 'secondary': s_summary}, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
