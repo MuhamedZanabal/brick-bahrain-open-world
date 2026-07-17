@@ -1,0 +1,291 @@
+name: Bahrain Brick PR59 Existing APK Gate Closure
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-existing-apk-gate-closure.yml
+      - .github/forensics/pr59_existing_apk_gate_closure.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-existing-apk-gate-closure
+  cancel-in-progress: false
+
+env:
+  CORRECTION_HEAD: cbe11e445aaf4b563be6e1630bdb440e49b861fe
+  ORIGINAL_RUN_ID: '29589205147'
+  PRIMARY_ARTIFACT_ID: '8411002980'
+  PRIMARY_ARTIFACT_NAME: bahrain-brick-pr59-gate4-primary-29589205147
+  PRIMARY_ARTIFACT_DIGEST: 40c1a54244deebe14d0ba3f48fd73e1d38c0389ed02fac9e68679d5391d72f4b
+  SECONDARY_ARTIFACT_ID: '8410983642'
+  SECONDARY_ARTIFACT_NAME: bahrain-brick-pr59-gate4-secondary-29589205147
+  SECONDARY_ARTIFACT_DIGEST: 312e86b65a9090e6de097d56671434b5d0f8a6dddd93cf897d6b01f70785aea8
+  PRIMARY_APK_SHA256: 0956a0c8195dc9319238b1230ef3c0291a09742c357256ae29da46aa649bf455
+  SECONDARY_APK_SHA256: db42d1190957a244bec5745b3dbed82ba5707796075e5d828cfb0056cb3951d0
+
+jobs:
+  reinspect_existing_apks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Check out detached inspection tooling
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+
+      - name: Check out exact corrective PR head read-only
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.CORRECTION_HEAD }}
+          path: candidate
+          fetch-depth: 1
+
+      - name: Run GREEN regression and full vertical-slice contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/final
+          cd candidate
+          python3 tests/test_manama_souq_gate4_glb_import_sidecar_inventory.py 2>&1 | tee ../build/final/FOCUSED_GREEN_TEST.log
+          shopt -s nullglob
+          tests=(tests/test_manama_souq_*.py tests/test_karak_delivery_*.py tests/test_souq_population_*.py)
+          [[ ${#tests[@]} -gt 0 ]]
+          for test_file in "${tests[@]}"; do
+            python3 "$test_file"
+          done 2>&1 | tee ../build/final/ALL_VERTICAL_SLICE_CONTRACTS.log
+          python3 -m py_compile tools/vertical_slice/inventory_godot_android_apk_assets.py
+          cd ..
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          focused=Path('build/final/FOCUSED_GREEN_TEST.log')
+          all_tests=Path('build/final/ALL_VERTICAL_SLICE_CONTRACTS.log')
+          value={
+            'red_commit':'dbbb64a43a48f32cc4de5171eea65c8178493435',
+            'red_gate4_run_id':29609133646,
+            'red_gate4_contract_job_id':87979388652,
+            'red_result':'failure before implementation; both exports skipped',
+            'green_correction_head':'cbe11e445aaf4b563be6e1630bdb440e49b861fe',
+            'focused_log_sha256':hashlib.sha256(focused.read_bytes()).hexdigest(),
+            'all_contracts_log_sha256':hashlib.sha256(all_tests.read_bytes()).hexdigest(),
+            'focused_passed':True,
+            'all_vertical_slice_contracts_passed':True,
+          }
+          Path('build/final/TEST_EVIDENCE.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Verify GitHub artifact identities and digests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/final/artifact-metadata
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${PRIMARY_ARTIFACT_ID}" > build/final/artifact-metadata/primary.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SECONDARY_ARTIFACT_ID}" > build/final/artifact-metadata/secondary.json
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          expected={
+            'primary':{
+              'id':int(os.environ['PRIMARY_ARTIFACT_ID']),
+              'name':os.environ['PRIMARY_ARTIFACT_NAME'],
+              'digest':'sha256:'+os.environ['PRIMARY_ARTIFACT_DIGEST'],
+            },
+            'secondary':{
+              'id':int(os.environ['SECONDARY_ARTIFACT_ID']),
+              'name':os.environ['SECONDARY_ARTIFACT_NAME'],
+              'digest':'sha256:'+os.environ['SECONDARY_ARTIFACT_DIGEST'],
+            },
+          }
+          output={'source_run_id':int(os.environ['ORIGINAL_RUN_ID'])}
+          for side in ('primary','secondary'):
+            value=json.loads(Path(f'build/final/artifact-metadata/{side}.json').read_text())
+            checks={key:value.get(key)==wanted for key,wanted in expected[side].items()}
+            checks['source_run']=value.get('workflow_run',{}).get('id')==int(os.environ['ORIGINAL_RUN_ID'])
+            checks['source_head']=value.get('workflow_run',{}).get('head_sha')=='f512fe8be09d15d2c9466f5edb089404a37a5c9b'
+            output[side]={'metadata':value,'checks':checks,'passed':all(checks.values())}
+            assert output[side]['passed'], output[side]
+          Path('build/final/ARTIFACT_AUTHORITY.json').write_text(json.dumps(output,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Download retained primary evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.PRIMARY_ARTIFACT_NAME }}
+          path: build/primary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ORIGINAL_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained secondary evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SECONDARY_ARTIFACT_NAME }}
+          path: build/secondary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ORIGINAL_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Verify retained evidence inventories and immutable APK authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 candidate/tools/vertical_slice/composite_source_authority.py verify-inventory --root build/primary --inventory build/primary/EVIDENCE_INVENTORY.json > build/final/PRIMARY_EVIDENCE_INVENTORY_VERIFICATION.json
+          python3 candidate/tools/vertical_slice/composite_source_authority.py verify-inventory --root build/secondary --inventory build/secondary/EVIDENCE_INVENTORY.json > build/final/SECONDARY_EVIDENCE_INVENTORY_VERIFICATION.json
+          PRIMARY_APK=build/primary/artifacts/bahrain-brick-pr59-primary-debug.apk
+          SECONDARY_APK=build/secondary/artifacts/bahrain-brick-pr59-secondary-debug.apk
+          test "$(stat -c %s "$PRIMARY_APK")" = '347919106'
+          test "$(stat -c %s "$SECONDARY_APK")" = '347919106'
+          printf '%s  %s\n' "$PRIMARY_APK_SHA256" "$PRIMARY_APK" | sha256sum -c -
+          printf '%s  %s\n' "$SECONDARY_APK_SHA256" "$SECONDARY_APK" | sha256sum -c -
+          chmod 0444 "$PRIMARY_APK" "$SECONDARY_APK"
+          sha256sum "$PRIMARY_APK" "$SECONDARY_APK" > build/final/APK_SHA256_BEFORE.txt
+          stat -c '%n %s %a' "$PRIMARY_APK" "$SECONDARY_APK" > build/final/APK_SIZE_MODE_BEFORE.txt
+
+      - name: Extract accepted source only from retained composite archive
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive=build/primary/prior-gates/reconstruction/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+          test -s "$archive"
+          mkdir -p build/source
+          unzip -q "$archive" -d build/source
+          manifest="$(find build/source -type f -path '*/asset_lab/runtime/full_asset_matrix_manifest.json' -print -quit)"
+          test -n "$manifest"
+          source_root="$(dirname "$(dirname "$(dirname "$manifest")")")"
+          test -f "$source_root/project.godot"
+          test "$(sha256sum "$manifest" | cut -d' ' -f1)" = '6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff'
+          echo "root=$source_root" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$source_root" > build/final/SOURCE_ROOT.txt
+
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+          check-latest: false
+
+      - uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Re-inventory and re-inspect unchanged original APKs
+        shell: bash
+        env:
+          SOURCE_ROOT: ${{ steps.source.outputs.root }}
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/34.0.0"
+          AAPT="$BUILD_TOOLS/aapt"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          for side in primary secondary; do
+            mkdir -p "build/final/$side"
+            apk="build/$side/artifacts/bahrain-brick-pr59-$side-debug.apk"
+            unzip -t "$apk" > "build/final/$side/APK_ZIP_INTEGRITY.txt"
+            "$AAPT" dump badging "$apk" > "build/final/$side/APK_BADGING.txt"
+            "$AAPT" dump xmltree "$apk" AndroidManifest.xml > "build/final/$side/APK_MANIFEST_XMLTREE.txt"
+            "$APKSIGNER" verify --verbose --print-certs "$apk" > "build/final/$side/APK_SIGNING.txt" 2>&1
+            "$ZIPALIGN" -c -v 4 "$apk" > "build/final/$side/APK_ZIPALIGN.txt" 2>&1
+            python3 candidate/tools/vertical_slice/inventory_godot_android_apk_assets.py \
+              --apk "$apk" \
+              --source-root "$SOURCE_ROOT" \
+              --output "build/final/$side/APK_PROJECT_ASSETS.json" \
+              --compat-output "build/final/$side/PCK_CONTENTS.json"
+            python3 candidate/tools/vertical_slice/manama_souq_apk_evidence.py inspect \
+              --apk "$apk" \
+              --report-dir "build/final/$side" \
+              --source-root "$SOURCE_ROOT" \
+              --badging "build/final/$side/APK_BADGING.txt" \
+              --manifest-xml "build/final/$side/APK_MANIFEST_XMLTREE.txt" \
+              --signing "build/final/$side/APK_SIGNING.txt" \
+              --pck-inventory "build/final/$side/PCK_CONTENTS.json"
+          done
+          python3 candidate/tools/vertical_slice/manama_souq_apk_evidence.py compare \
+            --primary build/primary/artifacts/bahrain-brick-pr59-primary-debug.apk \
+            --secondary build/secondary/artifacts/bahrain-brick-pr59-secondary-debug.apk \
+            --primary-record build/final/primary/APK_EXPORT_RECORD.json \
+            --secondary-record build/final/secondary/APK_EXPORT_RECORD.json \
+            --output build/final/EXISTING_TOOL_APK_COMPARISON.json
+
+      - name: Complete matrix, comparison, and provenance closure
+        shell: bash
+        env:
+          SOURCE_ROOT: ${{ steps.source.outputs.root }}
+        run: |
+          set -euo pipefail
+          python3 tooling/.github/forensics/pr59_existing_apk_gate_closure.py \
+            "$SOURCE_ROOT" build/primary build/secondary build/final "$CORRECTION_HEAD"
+          sha256sum build/primary/artifacts/bahrain-brick-pr59-primary-debug.apk build/secondary/artifacts/bahrain-brick-pr59-secondary-debug.apk > build/final/APK_SHA256_AFTER.txt
+          cmp build/final/APK_SHA256_BEFORE.txt build/final/APK_SHA256_AFTER.txt
+          stat -c '%n %s %a' build/primary/artifacts/bahrain-brick-pr59-primary-debug.apk build/secondary/artifacts/bahrain-brick-pr59-secondary-debug.apk > build/final/APK_SIZE_MODE_AFTER.txt
+
+      - name: Finalize compact evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/final')
+          forbidden=[p for p in root.rglob('*') if p.is_file() and p.suffix.lower() in {'.apk','.glb','.pck'}]
+          assert not forbidden, forbidden
+          records=[]
+          for path in sorted(p for p in root.rglob('*') if p.is_file() and p.name!='COMPACT_EVIDENCE_INVENTORY.json'):
+            records.append({'path':path.relative_to(root).as_posix(),'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
+          value={'schema_version':1,'file_count':len(records),'total_bytes':sum(item['bytes'] for item in records),'files':records}
+          assert value['total_bytes'] < 50*1024*1024, value['total_bytes']
+          (root/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+          test -s build/final/GATE_CLOSURE_SUMMARY.json
+          test -s build/final/FINAL_PROVENANCE.json
+          test -s build/final/FINAL_PROVENANCE_SHA256.txt
+
+      - name: Record retrieval-only run locator
+        if: always()
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_EXISTING_APK_GATE_CLOSURE_RUN.json <<JSON
+          {
+            "workflow_name": "Bahrain Brick PR59 Existing APK Gate Closure",
+            "run_id": ${{ github.run_id }},
+            "run_attempt": ${{ github.run_attempt }},
+            "workflow_commit": "${{ github.sha }}",
+            "correction_head": "$CORRECTION_HEAD",
+            "original_export_run": 29589205147,
+            "summary_present": $(test -s ../build/final/GATE_CLOSURE_SUMMARY.json && echo true || echo false)
+          }
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_EXISTING_APK_GATE_CLOSURE_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(forensics): record existing-APK closure run ${{ github.run_id }}"
+            git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+          fi
+
+      - name: Upload compact existing-APK gate closure evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-existing-apk-gate-closure-${{ github.run_id }}
+          path: build/final
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
