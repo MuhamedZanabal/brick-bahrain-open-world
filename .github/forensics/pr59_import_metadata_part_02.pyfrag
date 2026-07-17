@@ -1,0 +1,70 @@
+                'failure_reason': reason,
+                'path_transformation_history': current_row.get('path_transformation_history', []) + [
+                    {'stage': 'glb_import_metadata_lookup', 'path': import_path, 'exists': import_exists},
+                    {'stage': 'glb_import_source_validation', 'source_file': metadata.get('source_file') if metadata else None, 'matches_expected': source_matches},
+                    {'stage': 'glb_import_target_validation', 'candidates': target_candidates, 'existing_exact_targets': existing_targets},
+                    {'stage': 'actual_packaging_result', 'packaged': actual_packaged},
+                ],
+            })
+            rows.append(row)
+    report = {'records': rows}
+    write_json(current_path, report)
+    summary = {
+        'side': side,
+        'apk_filename': apk.name,
+        'apk_bytes': apk.stat().st_size,
+        'apk_sha256': sha256_file(apk),
+        'expected_count': len(rows),
+        'current_inventory_matched_count': sum(1 for r in rows if r.get('inspector_considered_present')),
+        'current_inventory_missing_count': sum(1 for r in rows if not r.get('inspector_considered_present')),
+        'actual_packaged_matched_count': sum(1 for r in rows if r.get('actual_resource_packaged')),
+        'actual_packaged_missing_count': sum(1 for r in rows if not r.get('actual_resource_packaged')),
+        'glb_import_metadata_count': sum(1 for r in rows if r.get('import_metadata_exists_in_apk')),
+        'source_file_exact_match_count': sum(1 for r in rows if r.get('import_metadata_source_matches_expected')),
+        'verified_imported_target_count': sum(1 for r in rows if r.get('exact_imported_target_verified')),
+        'mismatch_category_counts': dict(sorted(counts.items())),
+    }
+    write_json(output / f'{side.upper()}_IMPORT_METADATA_RECONCILIATION_SUMMARY.json', summary)
+    return rows, summary
+
+
+def main() -> int:
+    if len(sys.argv) != 4:
+        raise SystemExit('usage: script PRIMARY_ROOT SECONDARY_ROOT OUTPUT')
+    primary_root, secondary_root, output = map(Path, sys.argv[1:])
+    expected = read_json(output / 'EXPECTED_MATRIX_PATHS.json')['records']
+    p_rows, p_summary = reconcile_side('primary', primary_root, expected, output)
+    s_rows, s_summary = reconcile_side('secondary', secondary_root, expected, output)
+    p_map = {r['expected_normalized_logical_path']: r for r in p_rows}
+    s_map = {r['expected_normalized_logical_path']: r for r in s_rows}
+    paths = sorted(set(p_map) | set(s_map))
+    p_missing = [p for p in paths if not p_map[p]['actual_resource_packaged']]
+    s_missing = [p for p in paths if not s_map[p]['actual_resource_packaged']]
+    current_missing = [p for p in paths if not p_map[p].get('inspector_considered_present')]
+    category_counts = collections.Counter()
+    for p in paths:
+        pc = p_map[p].get('failure_category')
+        sc = s_map[p].get('failure_category')
+        if pc == sc and pc:
+            category_counts[pc] += 1
+        elif pc or sc:
+            category_counts[f'PRIMARY:{pc}|SECONDARY:{sc}'] += 1
+    comparison = {
+        'expected_count': len(paths),
+        'primary_matched_count': len(paths) - len(p_missing),
+        'primary_missing_count': len(p_missing),
+        'secondary_matched_count': len(paths) - len(s_missing),
+        'secondary_missing_count': len(s_missing),
+        'missing_sets_identical': p_missing == s_missing,
+        'intersection_of_missing_paths': sorted(set(p_missing) & set(s_missing)),
+        'paths_missing_only_in_primary': sorted(set(p_missing) - set(s_missing)),
+        'paths_missing_only_in_secondary': sorted(set(s_missing) - set(p_missing)),
+        'exact_missing_path_list': sorted(set(p_missing) | set(s_missing)),
+        'exact_matching_path_list': [p for p in paths if p_map[p]['actual_resource_packaged'] and s_map[p]['actual_resource_packaged']],
+        'current_inventory_matched_count_primary': p_summary['current_inventory_matched_count'],
+        'current_inventory_missing_count_primary': p_summary['current_inventory_missing_count'],
+        'current_inventory_matched_count_secondary': s_summary['current_inventory_matched_count'],
+        'current_inventory_missing_count_secondary': s_summary['current_inventory_missing_count'],
+        'current_inventory_missing_paths': current_missing,
+        'mismatch_categories_and_counts': dict(sorted(category_counts.items())),
+    }
