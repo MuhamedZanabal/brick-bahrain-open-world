@@ -7,7 +7,8 @@ EVIDENCE="${3:?Gate 4 evidence directory is required}"
 SLOT="${4:?export slot is required}"
 REPORTS="$EVIDENCE/reports"
 LOGS="$EVIDENCE/logs"
-RUNNER="$REPO_ROOT/tools/vertical_slice/run_manama_souq_gate4_export.sh"
+BASE_RUNNER="$REPO_ROOT/tools/vertical_slice/run_manama_souq_gate4_export.sh"
+PATCHED_RUNNER="$SOURCE_ROOT/run_manama_souq_gate4_export_patched.sh"
 GAME="$SOURCE_ROOT/game"
 RECON_EVIDENCE="$SOURCE_ROOT/evidence"
 SIGNING_KEYSTORE="$REPO_ROOT/debug.keystore"
@@ -46,17 +47,42 @@ value={
 out.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
 PY
 
+python3 - "$BASE_RUNNER" "$PATCHED_RUNNER" "$REPORTS/GATE4_HARNESS_CORRECTION.json" <<'PY'
+from pathlib import Path
+import hashlib,json,sys
+source=Path(sys.argv[1]); target=Path(sys.argv[2]); report=Path(sys.argv[3])
+text=source.read_text(encoding='utf-8')
+old="grep -q '^VERSION=\"24.04.4 LTS\"' /etc/os-release"
+new="test \"$(. /etc/os-release; printf '%s' \"$PRETTY_NAME\")\" = \"Ubuntu 24.04.4 LTS\""
+count=text.count(old)
+if count != 1:
+    raise SystemExit(f'host OS identity assertion replacement count={count}')
+patched=text.replace(old,new,1)
+target.write_text(patched,encoding='utf-8')
+target.chmod(0o755)
+report.write_text(json.dumps({
+ 'classification':'Gate 4 harness host-identity assertion defect',
+ 'first_causal_command':old,
+ 'correction':new,
+ 'replacement_count':count,
+ 'base_runner_sha256':hashlib.sha256(text.encode()).hexdigest(),
+ 'patched_runner_sha256':hashlib.sha256(patched.encode()).hexdigest(),
+ 'product_source_modified':False,
+ 'export_preset_modified':False,
+},indent=2,sort_keys=True)+'\n')
+PY
+
 TRACE="$LOGS/gate4-runner-xtrace.log"
 PS4='+ ${BASH_SOURCE}:${LINENO}:${FUNCNAME[0]:-main}: '
 export PS4
 set +e
-bash -x "$RUNNER" "$REPO_ROOT" "$SOURCE_ROOT" "$EVIDENCE" "$SLOT" > >(tee "$TRACE") 2>&1
+bash -x "$PATCHED_RUNNER" "$REPO_ROOT" "$SOURCE_ROOT" "$EVIDENCE" "$SLOT" > >(tee "$TRACE") 2>&1
 CODE=${PIPESTATUS[0]}
 set -e
 
 if [[ "$CODE" -ne 0 ]]; then
-  LAST_TRACE="$(tail -n 120 "$TRACE" 2>/dev/null || true)"
-  python3 - "$REPORTS/GATE4_FAILURE.json" "$CODE" "$RUNNER" "$SLOT" "$TRACE" "$LAST_TRACE" <<'PY'
+  LAST_TRACE="$(tail -n 160 "$TRACE" 2>/dev/null || true)"
+  python3 - "$REPORTS/GATE4_FAILURE.json" "$CODE" "$PATCHED_RUNNER" "$SLOT" "$TRACE" "$LAST_TRACE" <<'PY'
 from pathlib import Path
 import json,os,sys
 out=Path(sys.argv[1])
