@@ -11,7 +11,10 @@ GATE2 = ROOT / ".github" / "workflows" / "manama-souq-gate2-source-runtime.yml"
 RUNNER = ROOT / "tools" / "vertical_slice" / "run_manama_souq_gate2_source_runtime.sh"
 PROJECT_SCRIPT = ROOT / "tests" / "gate2" / "souq_population_project_context_runtime.gd"
 PROJECT_SCENE = ROOT / "tests" / "gate2" / "souq_population_project_context_runtime.tscn"
+SLICE_PROJECT_SCRIPT = ROOT / "tests" / "gate2" / "manama_souq_slice_project_context_runtime.gd"
+SLICE_PROJECT_SCENE = ROOT / "tests" / "gate2" / "manama_souq_slice_project_context_runtime.tscn"
 HISTORICAL_RUNTIME = ROOT / "tests" / "souq_population_runtime.gd"
+HISTORICAL_SLICE_RUNTIME = ROOT / "tests" / "manama_souq_slice_runtime.gd"
 
 ACCEPTED_GATE1_SHA256 = "ada88cb2d6a19282124f2e836f574dc59d1d61c85348e27f61fb42a59712fdbd"
 ACCEPTED_HEAD = "b12e1e012e256036e71066260a4c6392d26c3839"
@@ -29,7 +32,16 @@ class ManamaSouqGate2WorkflowContractTests(unittest.TestCase):
         self.assertEqual(sha256(GATE1), ACCEPTED_GATE1_SHA256)
 
     def test_gate2_workflow_and_harness_are_separate_components(self) -> None:
-        for path in (GATE2, RUNNER, PROJECT_SCRIPT, PROJECT_SCENE, HISTORICAL_RUNTIME):
+        for path in (
+            GATE2,
+            RUNNER,
+            PROJECT_SCRIPT,
+            PROJECT_SCENE,
+            SLICE_PROJECT_SCRIPT,
+            SLICE_PROJECT_SCENE,
+            HISTORICAL_RUNTIME,
+            HISTORICAL_SLICE_RUNTIME,
+        ):
             self.assertTrue(path.is_file(), f"Gate 2 component missing: {path}")
         self.assertNotEqual(GATE1, GATE2)
 
@@ -86,16 +98,43 @@ class ManamaSouqGate2WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("placeholder", script.lower())
         self.assertIn("SOUQ_POPULATION_RUNTIME_PASS", historical)
 
+    def test_complete_slice_autoload_boundary_has_script_and_project_context_evidence(self) -> None:
+        runner = RUNNER.read_text(encoding="utf-8")
+        script = SLICE_PROJECT_SCRIPT.read_text(encoding="utf-8")
+        historical = HISTORICAL_SLICE_RUNTIME.read_text(encoding="utf-8")
+        self.assertIn(
+            '--script "res://tests/manama_souq_slice_runtime.gd"',
+            runner,
+        )
+        self.assertIn(
+            'res://tests/gate2/manama_souq_slice_project_context_runtime.tscn',
+            runner,
+        )
+        for fragment in (
+            "MANAMA_SOUQ_SLICE_HARNESS_CLASSIFICATION.json",
+            "MANAMA_SOUQ_SLICE_PROJECT_CONTEXT_PASS",
+            "slice.is_slice_ready()",
+            'get_nodes_in_group("souq_pedestrians").size() == 12',
+            'get_nodes_in_group("souq_traffic").size() == 6',
+            'mission_vehicle.name == "MissionVehicle"',
+            'player.name == "Player"',
+        ):
+            self.assertIn(fragment, runner + script)
+        self.assertIn("MANAMA_SOUQ_SLICE_RUNTIME_PASS", historical)
+        self.assertNotIn("mock", script.lower())
+        self.assertNotIn("placeholder", script.lower())
+
     def test_gate2_does_not_perform_android_or_product_source_mutations(self) -> None:
         combined = "\n".join(
             path.read_text(encoding="utf-8")
-            for path in (GATE2, RUNNER, PROJECT_SCRIPT, PROJECT_SCENE)
+            for path in (GATE2, RUNNER, PROJECT_SCRIPT, PROJECT_SCENE, SLICE_PROJECT_SCRIPT, SLICE_PROJECT_SCENE)
         )
         self.assertNotIn("android", combined.lower())
         for prohibited in (
             "project.godot <<",
             "scripts/brick_factory.gd <<",
             "scripts/souq_population_controller.gd <<",
+            "scripts/manama_souq_vertical_slice.gd <<",
             "gh pr merge",
             "git push --force",
         ):
