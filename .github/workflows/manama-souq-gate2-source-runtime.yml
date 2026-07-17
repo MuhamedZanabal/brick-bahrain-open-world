@@ -1,0 +1,115 @@
+name: Bahrain Brick Manama Souq Gate 2 Source Runtime
+
+on:
+  push:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    paths:
+      - .github/workflows/manama-souq-gate2-source-runtime.yml
+      - tools/vertical_slice/run_manama_souq_gate2_source_runtime.sh
+      - tests/gate2/**
+      - tests/test_manama_souq_gate2_workflow_contract.py
+      - tests/souq_population_runtime.gd
+      - scripts/brick_factory.gd
+      - scripts/souq_population_controller.gd
+  pull_request:
+    branches: [work/bahrain-brick-asset-lab-integration-v1]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/manama-souq-gate2-source-runtime.yml
+      - tools/vertical_slice/run_manama_souq_gate2_source_runtime.sh
+      - tests/gate2/**
+      - tests/test_manama_souq_gate2_workflow_contract.py
+      - tests/souq_population_runtime.gd
+      - scripts/brick_factory.gd
+      - scripts/souq_population_controller.gd
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-gate2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ACCEPTED_HEAD: b12e1e012e256036e71066260a4c6392d26c3839
+  ACCEPTED_MANIFEST_SHA256: ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab
+  ACCEPTED_TREE_SHA256: e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e
+  ACCEPTED_FILE_COUNT: '1502'
+  ACCEPTED_SOURCE_BYTES: '369162800'
+
+jobs:
+  gate2_contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Run all vertical-slice Python contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gate2-contract-evidence
+          shopt -s nullglob
+          tests=(tests/test_manama_souq_*.py tests/test_karak_delivery_*.py tests/test_souq_population_*.py)
+          [[ ${#tests[@]} -gt 0 ]]
+          for test_file in "${tests[@]}"; do
+            python3 "$test_file" 2>&1
+          done | tee build/gate2-contract-evidence/all-python-contracts.log
+      - name: Upload Python contract evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate2-contracts-${{ github.run_id }}
+          path: build/gate2-contract-evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  gate2_source_runtime:
+    needs: gate2_contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Reconstruct accepted composite authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh A "$PWD/build/gate2-source" "$PWD/authority/manama_souq_composite_source.json" "$ACCEPTED_HEAD"
+      - name: Run bounded Gate 2 and Gate 3 source/runtime sequence
+        id: gate2
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          bash tools/vertical_slice/run_manama_souq_gate2_source_runtime.sh "$PWD" "$PWD/build/gate2-source" "$PWD/build/gate2-evidence" 2>&1 | tee build/gate2-runner.log
+      - name: Finalize evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/gate2-evidence
+          cp build/gate2-runner.log build/gate2-evidence/GATE2_RUNNER.log || true
+          python3 tools/vertical_slice/composite_source_authority.py inventory --root build/gate2-evidence --output build/gate2-evidence/EVIDENCE_INVENTORY.json
+          python3 tools/vertical_slice/composite_source_authority.py verify-inventory --root build/gate2-evidence --inventory build/gate2-evidence/EVIDENCE_INVENTORY.json
+      - name: Upload Gate 2 and Gate 3 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-gate2-source-runtime-${{ github.run_id }}
+          path: build/gate2-evidence
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+      - name: Enforce Gate 2 and Gate 3 conclusion
+        if: always()
+        shell: bash
+        run: test '${{ steps.gate2.outcome }}' = success
