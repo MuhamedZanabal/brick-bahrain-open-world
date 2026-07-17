@@ -83,6 +83,44 @@ jobs:
           }
           JSON
 
+      - name: Retrieve exact matrix manifest from pinned 436-asset authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/downloads build/extracted/primary/forensic-source-authority/asset_lab/runtime build/forensic-output
+          authority_zip=build/downloads/bahrain-brick-full-asset-matrix-authority.zip
+          authority_url=https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/v1.4.0.3-graphics-qa/bahrain-brick-full-asset-matrix-authority-76964c58c283caca.zip
+          curl --fail --location --retry 4 --retry-delay 5 "$authority_url" --output "$authority_zip"
+          test "$(stat -c %s "$authority_zip")" = "312008776"
+          printf '%s  %s\n' 76964c58c283caca8bd61d6a3f24b68ef8db1999f039a18a0929cb68e6068849 "$authority_zip" | sha256sum -c -
+          mapfile -t entries < <(unzip -Z1 "$authority_zip" | grep -E '(^|/)asset_lab/runtime/full_asset_matrix_manifest\.json$')
+          test "${#entries[@]}" = "1"
+          manifest=build/extracted/primary/forensic-source-authority/asset_lab/runtime/full_asset_matrix_manifest.json
+          unzip -p "$authority_zip" "${entries[0]}" > "$manifest"
+          final_tree="$(find build/extracted/primary -type f -name FINAL_TREE_MANIFEST.json -print -quit)"
+          test -n "$final_tree"
+          python3 - "$manifest" "$final_tree" "$authority_url" "${entries[0]}" <<'PY'
+          import hashlib,json,sys
+          from pathlib import Path
+          manifest,tree,url,entry=Path(sys.argv[1]),Path(sys.argv[2]),sys.argv[3],sys.argv[4]
+          digest=hashlib.sha256(manifest.read_bytes()).hexdigest()
+          records=json.loads(tree.read_text())['files']
+          expected=next(r for r in records if r['path']=='asset_lab/runtime/full_asset_matrix_manifest.json')
+          value={
+            'authority_url':url,
+            'authority_archive_bytes':312008776,
+            'authority_archive_sha256':'76964c58c283caca8bd61d6a3f24b68ef8db1999f039a18a0929cb68e6068849',
+            'archive_entry':entry,
+            'manifest_bytes':manifest.stat().st_size,
+            'manifest_sha256':digest,
+            'final_tree_expected_bytes':expected['bytes'],
+            'final_tree_expected_sha256':expected['sha256'],
+            'verified_against_final_tree':manifest.stat().st_size==expected['bytes'] and digest==expected['sha256'],
+          }
+          Path('build/forensic-output/MATRIX_MANIFEST_SOURCE_AUTHORITY.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          assert value['verified_against_final_tree']
+          PY
+
       - name: Reconcile expected matrix against both retained APKs
         shell: bash
         run: |
