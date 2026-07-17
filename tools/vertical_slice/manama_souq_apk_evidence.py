@@ -274,7 +274,7 @@ def parse_signing(text: str) -> dict[str, Any]:
     valid_until = re.search(r"Signer #1 certificate valid until:\s*(.+)", text)
     return {
         "verified": "DOES NOT VERIFY" not in text.upper(),
-        "v1": scheme("v1 (JAR signing)"),
+        "v1": scheme("v1"),
         "v2": scheme("v2"),
         "v3": scheme("v3"),
         "v4": scheme("v4"),
