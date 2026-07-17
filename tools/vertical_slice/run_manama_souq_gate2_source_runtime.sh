@@ -36,7 +36,7 @@ actual={
  'total_bytes':report['total_bytes'],
  'frozen_check_count':frozen['checks'],
  'frozen_failures':frozen['failures'],
- 'frozen_all_results_passed':all(item['passed'] for item in frozen['results']),
+ 'frozen_all_results_passed':all(item['pass'] for item in frozen['results']),
 }
 expected={
  'manifest_sha256':'ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab',
