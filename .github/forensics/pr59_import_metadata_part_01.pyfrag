@@ -20,6 +20,7 @@
                 source_binding_verified = metadata['source_file'] is None or explicit_source_matches
                 target_candidates = metadata['target_candidates']
                 existing_targets = sorted(t for t in target_candidates if t in asset_raw)
+            source_matches = source_binding_verified
             exact_target_verified = bool(import_exists and source_binding_verified and existing_targets)
             current_row = current_map[logical]
             current_present = bool(current_row.get('inspector_considered_present'))
