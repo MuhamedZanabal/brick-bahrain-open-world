@@ -1,3 +1,4 @@
+# Exact import-sidecar binding forensic pass; retrieval-only, no export.
 name: Bahrain Brick PR59 Gate 4 Matrix Forensics
 
 on:
