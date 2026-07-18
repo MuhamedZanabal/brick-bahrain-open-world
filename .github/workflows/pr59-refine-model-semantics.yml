@@ -1,0 +1,28 @@
+name: Bahrain Brick PR59 Refine Model Semantics
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/workflows/pr59-refine-model-semantics.yml, .github/forensics/pr59_refine_model_semantics.py]
+  workflow_dispatch:
+permissions: {actions: read, contents: read}
+jobs:
+  refine:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: bahrain-brick-pr59-fast-model-pairs-29637267072, path: b/p, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29637267072', github-token: '${{ github.token }}'}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p b/o
+          python3 t/.github/forensics/pr59_refine_model_semantics.py --input b/p --output b/o
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          p=Path('b/o/MODEL_SEMANTIC_COMPARISON_REFINED.json')
+          (Path('b/o/REFINED_SEMANTIC_EVIDENCE_INVENTORY.json')).write_text(json.dumps({'workflow_run_id':int('${{ github.run_id }}'),'source_pair_artifact_id':8427541347,'source_pair_artifact_digest':'b65b0cdd76bb5fc7b4a3994ac4bedab82032ba6ed767e9e90072c4cb7b9009ce','report_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'no_import_rerun':True,'no_pr_correction':True},indent=2,sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-pr59-refined-model-semantics-${{ github.run_id }}', path: b/o, if-no-files-found: error, compression-level: 9, retention-days: 30}
