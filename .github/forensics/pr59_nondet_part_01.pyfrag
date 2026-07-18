@@ -1,0 +1,140 @@
+    target_to_sidecars: dict[str, list[str]] = collections.defaultdict(list)
+    for name, info in infos.items():
+        if not name.startswith("assets/") or not name.endswith(".import"):
+            continue
+        logical = name[len("assets/") : -len(".import")]
+        meta = parse_import_metadata_bytes(z.read(info))
+        row = {"apk_path": name, "logical_source": logical, **meta}
+        sidecars[name] = row
+        for target in meta["dest_files"]:
+            target_to_sidecars[f"assets/{target}"].append(name)
+    return sidecars, dict(target_to_sidecars)
+
+
+def exact_source(source_root: Path, logical: str | None) -> dict[str, Any]:
+    if not logical:
+        return {"logical_path": None, "exists": False, "bytes": None, "sha256": None}
+    p = source_root / logical
+    return {
+        "logical_path": logical,
+        "exists": p.is_file(),
+        "bytes": p.stat().st_size if p.is_file() else None,
+        "sha256": sha256_file(p) if p.is_file() else None,
+    }
+
+
+def first_diff(a: bytes, b: bytes) -> tuple[int | None, int]:
+    n = min(len(a), len(b))
+    first = None
+    count = abs(len(a) - len(b))
+    for i in range(n):
+        if a[i] != b[i]:
+            if first is None:
+                first = i
+            count += 1
+    if first is None and len(a) != len(b):
+        first = n
+    return first, count
+
+
+def strings_evidence(data: bytes) -> dict[str, Any]:
+    strings = [m.decode("utf-8", errors="replace") for m in PRINTABLE_RE.findall(data)]
+    joined = "\n".join(strings)
+    abs_paths = sorted(set(x.decode("utf-8", errors="replace") for x in ABS_PATH_RE.findall(data)))
+    job_names = sorted({s for s in strings if any(x in s for x in ("gate4-primary", "gate4-secondary", "export_primary", "export_secondary", "runner/work", "_temp"))})
+    timestamps = sorted(set(x.decode("ascii", errors="replace") for x in TIMESTAMP_RE.findall(data)))
+    uids = sorted(set(x.decode("utf-8", errors="replace") for x in UID_TEXT_RE.findall(data)))
+    hex_ids = sorted(set(x.decode("ascii") for x in HEX_ID_RE.findall(data)))
+    return {
+        "contains_readable_absolute_paths": bool(abs_paths),
+        "absolute_paths": abs_paths[:50],
+        "contains_job_specific_directory_names": bool(job_names),
+        "job_specific_strings": job_names[:50],
+        "contains_timestamps": bool(timestamps),
+        "timestamps": timestamps[:50],
+        "contains_resource_uids": bool(uids),
+        "resource_uid_strings": uids[:50],
+        "contains_differing_hashes_or_generated_identifiers": bool(hex_ids),
+        "hex_identifiers": hex_ids[:50],
+        "printable_string_count": len(strings),
+        "printable_sample": strings[:30],
+    }
+
+
+def category(path: str) -> str:
+    if path.endswith(".import"):
+        return "IMPORT_METADATA"
+    if path.startswith("assets/.godot/imported/"):
+        return "GODOT_IMPORTED_RESOURCE"
+    if path.startswith("assets/.godot/exported/"):
+        return "GODOT_EXPORTED_RESOURCE"
+    if path == "assets/.godot/uid_cache.bin":
+        return "GODOT_UID_CACHE"
+    if path.endswith(".gdc"):
+        return "COMPILED_SCRIPT"
+    if SIGNATURE_RE.match(path):
+        return "SIGNATURE"
+    return "OTHER_GODOT_ASSET"
+
+
+def infer_direct_logical(path: str) -> str | None:
+    if not path.startswith("assets/"):
+        return None
+    rel = path[len("assets/"):]
+    if rel.endswith(".import"):
+        return rel[:-7]
+    if rel.endswith(".gdc"):
+        return rel[:-4] + ".gd"
+    if not rel.startswith(".godot/"):
+        return rel
+    return None
+
+
+def map_entry(path: str, source_root: Path, p_sidecars: dict[str, dict[str, Any]], s_sidecars: dict[str, dict[str, Any]], p_targets: dict[str, list[str]], s_targets: dict[str, list[str]]) -> dict[str, Any]:
+    logical = infer_direct_logical(path)
+    associated_sidecars = sorted(set(p_targets.get(path, [])) | set(s_targets.get(path, [])))
+    mapping_basis = "direct_apk_path"
+    if associated_sidecars:
+        logical_candidates = sorted(set((p_sidecars.get(x) or s_sidecars.get(x) or {}).get("logical_source") for x in associated_sidecars if (p_sidecars.get(x) or s_sidecars.get(x))))
+        logical_candidates = [x for x in logical_candidates if x]
+        logical = logical_candidates[0] if len(logical_candidates) == 1 else None
+        mapping_basis = "exact_import_sidecar_target_reference"
+    exported_candidates: list[str] = []
+    if path.startswith("assets/.godot/exported/"):
+        base = PurePosixPath(path).name
+        suffix_name = base.split("-", 2)[-1] if base.startswith("export-") else base
+        stem = Path(suffix_name).stem
+        exported_candidates = sorted(p.relative_to(source_root).as_posix() for p in source_root.rglob(f"{stem}.tscn"))
+        if len(exported_candidates) == 1:
+            logical = exported_candidates[0]
+            mapping_basis = "unique_exact_source_scene_basename_candidate"
+        else:
+            logical = None
+            mapping_basis = "unresolved_exported_scene_mapping"
+    return {
+        "logical_source_path": logical,
+        "mapping_basis": mapping_basis,
+        "associated_import_sidecars": associated_sidecars,
+        "associated_godot_imported_target": path if path.startswith("assets/.godot/imported/") else None,
+        "associated_godot_exported_target": path if path.startswith("assets/.godot/exported/") else None,
+        "exported_source_candidates": exported_candidates,
+    }
+
+
+def zip_source_metadata(zip_path: Path, out_path: Path) -> dict[str, Any]:
+    rows = []
+    with zipfile.ZipFile(zip_path) as z:
+        for order, info in enumerate(z.infolist()):
+            mode = (info.external_attr >> 16) & 0xFFFF
+            is_symlink = stat.S_ISLNK(mode)
+            data_sha = None
+            if not info.is_dir():
+                data_sha = sha256_bytes(z.read(info))
+            rows.append({
+                "relative_path": info.filename,
+                "order": order,
+                "sha256": data_sha,
+                "bytes": info.file_size,
+                "compressed_bytes": info.compress_size,
+                "zip_datetime": list(info.date_time),
+                "mtime_ns": None,
