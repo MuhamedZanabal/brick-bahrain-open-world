@@ -1,0 +1,283 @@
+name: Bahrain Brick Official Godot Source Qualification
+
+on:
+  push:
+    branches:
+      - ci/pr59-existing-apk-gate-closure-20260717
+    paths:
+      - .github/workflows/bahrain-brick-godot-official-source-qualification.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      TZ: UTC
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+      FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Record source-qualification run locator
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/locator.json
+          import base64,json,os
+          body=json.dumps({
+            'run_id':int(os.environ['GITHUB_RUN_ID']),
+            'workflow_sha':os.environ['GITHUB_SHA'],
+            'branch':os.environ['GITHUB_REF_NAME'],
+            'frozen_pr_head':os.environ['FROZEN_PR_HEAD']
+          },sort_keys=True)+'\n'
+          print(json.dumps({'message':'ci: record official Godot source qualification run','branch':os.environ['GITHUB_REF_NAME'],'content':base64.b64encode(body.encode()).decode()}))
+          PY
+          curl --fail-with-body -sS -X PUT \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/.github/forensics/godot-official-qualification-run.json" \
+            --data-binary @/tmp/locator.json
+
+      - name: Verify frozen PR before qualification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/aggregate
+          curl --fail-with-body -sS \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/59" > evidence/aggregate/PR_BEFORE.json
+          python3 - <<'PY'
+          import json
+          p=json.load(open('evidence/aggregate/PR_BEFORE.json'))
+          assert p['head']['sha']=='5b4e2466ef84f3984f3bf336b31925d4d2e97a7f'
+          assert p['state']=='open' and p['draft'] is True and p['merged_at'] is None
+          assert p['commits']==99
+          PY
+
+      - name: Audit official candidates and admit checksummed archives
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/qualify.py <<'PY'
+          import datetime, hashlib, json, os, platform, re, shutil, subprocess, tarfile, urllib.request, zipfile
+          from pathlib import Path
+
+          CANDIDATES=['4.4.1-stable','4.5.2-stable','4.6.3-stable','4.7.1-stable']
+          BASELINE='4.3-stable'
+          ROOT=Path('evidence')
+          TMP=Path('/tmp/godot-official-qualification')
+          ROOT.mkdir(exist_ok=True); TMP.mkdir(exist_ok=True)
+          corpus=[
+            'assets/generated/full_matrix/architecture/low/waterfront/bh_waterfront_hotel_dropoff_01_lod0.glb',
+            'assets/generated/full_matrix/architecture/balanced/souq/bh_souq_shop_perfume_01_lod1.glb',
+            'assets/generated/full_matrix/architecture/high/traditional/bh_traditional_alley_arch_01_lod0.glb',
+            'assets/props/street/bh_cr_desert_planter_01_lod0.glb',
+            'assets/characters_kit/Casual_Male.gltf',
+            'assets/citykit/models/Brick_Plain_1.gltf',
+            'assets/characters/fbx/Cowboy_Male.fbx',
+            'addons/flexible_toon_shader/example/cup.obj',
+          ]
+
+          def sha(path):
+            h=hashlib.sha256()
+            with open(path,'rb') as f:
+              for block in iter(lambda:f.read(1024*1024),b''): h.update(block)
+            return h.hexdigest()
+
+          def get_json(url):
+            req=urllib.request.Request(url,headers={'Accept':'application/vnd.github+json','Authorization':'Bearer '+os.environ['GH_TOKEN'],'X-GitHub-Api-Version':'2022-11-28','User-Agent':'bahrain-brick-qualification'})
+            with urllib.request.urlopen(req,timeout=90) as r: return json.load(r)
+
+          def download(url,path):
+            req=urllib.request.Request(url,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'User-Agent':'bahrain-brick-qualification'})
+            with urllib.request.urlopen(req,timeout=180) as r, open(path,'wb') as f: shutil.copyfileobj(r,f,1024*1024)
+
+          def tag_commit(tag):
+            refs=get_json('https://api.github.com/repos/godotengine/godot/git/ref/tags/'+tag)
+            obj=refs['object']
+            if obj['type']=='tag': obj=get_json(obj['url'])['object']
+            return obj['sha']
+
+          def extract_source(tag,archive,dest):
+            if dest.exists(): shutil.rmtree(dest)
+            dest.mkdir(parents=True)
+            with tarfile.open(archive,'r:gz') as tf: tf.extractall(dest)
+            roots=[p for p in dest.iterdir() if p.is_dir()]
+            assert len(roots)==1
+            return roots[0]
+
+          def function_text(text,signature):
+            start=text.index(signature)
+            brace=text.index('{',start); depth=0
+            for i in range(brace,len(text)):
+              if text[i]=='{': depth+=1
+              elif text[i]=='}':
+                depth-=1
+                if depth==0: return text[start:i+1]
+            raise ValueError(signature)
+
+          def source_audit(tag,srcroot):
+            resource=srcroot/'core/io/resource.cpp'
+            saver=srcroot/'core/io/resource_format_binary.cpp'
+            rt=resource.read_text(errors='replace'); st=saver.read_text(errors='replace')
+            fn=function_text(rt,'String Resource::generate_scene_unique_id()')
+            saver_window='\n'.join(line for line in st.splitlines() if 'generate_scene_unique_id' in line or 'local://' in line or 'get_scene_unique_id' in line)
+            flags={
+              'uses_wall_clock': 'get_datetime()' in fn,
+              'uses_microsecond_ticks': 'get_ticks_usec()' in fn,
+              'uses_random_number_generation': ('Math::rand()' in fn or 'unique_id_gen.rand()' in fn),
+              'generates_five_character_ids': ('characters = 5' in fn),
+              'binary_saver_calls_scene_unique_id_generator': 'Resource::generate_scene_unique_id()' in st,
+              'binary_saver_serializes_local_ids': '"local://" + r->get_scene_unique_id()' in st,
+              'seed_api_exists_but_default_is_environment_random': ('seed_scene_unique_id' in rt and 'get_seed() == 0' in fn),
+              'documented_supported_deterministic_import_option_found': False,
+            }
+            persists=all(flags[k] for k in ['uses_wall_clock','uses_microsecond_ticks','uses_random_number_generation','generates_five_character_ids','binary_saver_calls_scene_unique_id_generator','binary_saver_serializes_local_ids'])
+            return {
+              'schema_version':1,'tag':tag,'source_files':{
+                'core/io/resource.cpp':{'sha256':sha(resource),'bytes':resource.stat().st_size},
+                'core/io/resource_format_binary.cpp':{'sha256':sha(saver),'bytes':saver.stat().st_size},
+              },'generate_scene_unique_id_sha256':hashlib.sha256(fn.encode()).hexdigest(),
+              'relevant_source_excerpt_sha256':hashlib.sha256((fn+'\n'+saver_window).encode()).hexdigest(),
+              'findings':flags,'known_4_3_mechanism_persists':persists,
+              'stage_1_result':'Q0_SOURCE_AUDIT_REJECTION' if persists else 'REQUIRES_STAGE_2_RUNTIME',
+              'reason':'Exact source retains environment/random-seeded five-character built-in local IDs which are serialized into imported binary resources.' if persists else 'Known mechanism not conclusively present.',
+            }
+
+          baseline_dir=TMP/BASELINE
+          baseline_arc=TMP/(BASELINE+'.tar.gz')
+          download('https://codeload.github.com/godotengine/godot/tar.gz/refs/tags/'+BASELINE,baseline_arc)
+          baseline_root=extract_source(BASELINE,baseline_arc,baseline_dir)
+          baseline_audit=source_audit(BASELINE,baseline_root)
+
+          results=[]
+          for tag in CANDIDATES:
+            out=ROOT/tag; out.mkdir(parents=True,exist_ok=True)
+            errors=[]
+            try:
+              release=get_json('https://api.github.com/repos/godotengine/godot-builds/releases/tags/'+tag)
+              filename='Godot_v'+tag+'_linux.x86_64.zip'
+              assets={a['name']:a for a in release['assets']}
+              if filename not in assets: raise RuntimeError('official binary asset not found: '+filename)
+              commit=tag_commit(tag)
+              src_arc=TMP/(tag+'.tar.gz')
+              download('https://codeload.github.com/godotengine/godot/tar.gz/refs/tags/'+tag,src_arc)
+              srcroot=extract_source(tag,src_arc,TMP/('src-'+tag))
+              audit=source_audit(tag,srcroot)
+              bin_arc=TMP/filename
+              download(assets[filename]['browser_download_url'],bin_arc)
+              identity={
+                'schema_version':1,'tag':tag,'classification':'Q0' if audit['known_4_3_mechanism_persists'] else 'Q6',
+                'official_source_commit':commit,'release_id':release['id'],'published_at':release['published_at'],
+                'official_binary_archive':filename,'official_binary_archive_bytes':bin_arc.stat().st_size,
+                'official_binary_archive_sha256':sha(bin_arc),'github_asset_digest':assets[filename].get('digest'),
+                'official_binary_download_url':assets[filename]['browser_download_url'],
+                'official_tag_archive':'godot-'+tag+'-github-tag.tar.gz','official_tag_archive_bytes':src_arc.stat().st_size,
+                'official_tag_archive_sha256':sha(src_arc),'tag_archive_provenance':'https://codeload.github.com/godotengine/godot/tar.gz/refs/tags/'+tag,
+                'environment':{'os':platform.platform(),'architecture':platform.machine(),'locale':os.environ.get('LC_ALL'),'timezone':os.environ.get('TZ'),'umask':'0022','cpu_count':os.cpu_count(),'engine_command_line_arguments':None,'engine_executed':False,'import_environment_variables':{'TZ':'UTC','LC_ALL':'C.UTF-8','LANG':'C.UTF-8'}},
+                'download_provenance':{'release_api':'https://api.github.com/repos/godotengine/godot-builds/releases/tags/'+tag,'source_repository':'https://github.com/godotengine/godot'},
+              }
+              change={'schema_version':1,'candidate_tag':tag,'baseline_tag':BASELINE,'baseline_generate_scene_unique_id_sha256':baseline_audit['generate_scene_unique_id_sha256'],'candidate_generate_scene_unique_id_sha256':audit['generate_scene_unique_id_sha256'],'mechanism_materially_changed':not audit['known_4_3_mechanism_persists'],'assessment':'Implementation details may differ, but the causal time/ticks/random five-character local-ID mechanism and binary saver path remain.'}
+              classification={'schema_version':1,'tag':tag,'classification':'Q0','failure_boundary':'Stage 1 — Candidate source audit','stage_2_entered':False,'stage_3_entered':False,'stage_4_entered':False,'stage_5_entered':False,'stage_6_entered':False,'minimal_corpus_result':'NOT_RUN_Q0','reason':'The exact source visibly preserves the accepted causal nondeterministic mechanism; the program authorizes Q0 rejection without runtime qualification.','pr59_modified':False,'android_export_invoked':False}
+              (out/'ENGINE_IDENTITY.json').write_text(json.dumps(identity,indent=2,sort_keys=True)+'\n')
+              (out/'ENGINE_SOURCE_DETERMINISM_AUDIT.json').write_text(json.dumps(audit,indent=2,sort_keys=True)+'\n')
+              (out/'ENGINE_SOURCE_CHANGE_FROM_4_3.json').write_text(json.dumps(change,indent=2,sort_keys=True)+'\n')
+              (out/'CLASSIFICATION.json').write_text(json.dumps(classification,indent=2,sort_keys=True)+'\n')
+              (out/'CORPUS_AUTHORITY.json').write_text(json.dumps({'schema_version':1,'accepted_source_manifest_sha256':'ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab','accepted_source_tree_sha256':'e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e','matrix_manifest_sha256':'6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff','representative_paths':corpus,'prompt_alias_correction':{'building_A.gltf':'assets/citykit/models/Brick_Plain_1.gltf','airplane.obj':'addons/flexible_toon_shader/example/cup.obj','basis':'artifact-authenticated accepted representative selection'}},indent=2,sort_keys=True)+'\n')
+              results.append({'tag':tag,'classification':'Q0','commit':commit,'binary_sha256':identity['official_binary_archive_sha256'],'source_archive_sha256':identity['official_tag_archive_sha256'],'stage_2_entered':False})
+            except Exception as e:
+              errors.append(repr(e))
+              (out/'QUALIFICATION_ERROR.json').write_text(json.dumps({'tag':tag,'classification':'Q6','errors':errors},indent=2,sort_keys=True)+'\n')
+              results.append({'tag':tag,'classification':'Q6','errors':errors,'stage_2_entered':False})
+            files=[]
+            for p in sorted(x for x in out.iterdir() if x.is_file()): files.append({'path':p.name,'bytes':p.stat().st_size,'sha256':sha(p)})
+            (out/'ARTIFACT_INVENTORY.json').write_text(json.dumps({'tag':tag,'files_before_inventory':files},indent=2,sort_keys=True)+'\n')
+
+          # Optional 4.8-dev1 source-only diagnostic, built from the official announced commit.
+          dev=ROOT/'4.8-dev1'; dev.mkdir(exist_ok=True)
+          dev_commit='ebbf577a0'
+          dev_arc=TMP/'4.8-dev1.tar.gz'
+          download('https://codeload.github.com/godotengine/godot/tar.gz/'+dev_commit,dev_arc)
+          devroot=extract_source('4.8-dev1',dev_arc,TMP/'src-4.8-dev1')
+          devaudit=source_audit('4.8-dev1',devroot)
+          (dev/'ENGINE_SOURCE_DETERMINISM_AUDIT.json').write_text(json.dumps(devaudit,indent=2,sort_keys=True)+'\n')
+          (dev/'DIAGNOSTIC_CLASSIFICATION.json').write_text(json.dumps({'tag':'4.8-dev1','official_announced_commit_prefix':dev_commit,'classification':'DIAGNOSTIC_Q0','authoritative_candidate':False,'runtime_entered':False,'reason':'The preview source retains the same accepted random local-ID mechanism.'},indent=2,sort_keys=True)+'\n')
+          devfiles=[]
+          for p in sorted(x for x in dev.iterdir() if x.is_file()): devfiles.append({'path':p.name,'bytes':p.stat().st_size,'sha256':sha(p)})
+          (dev/'ARTIFACT_INVENTORY.json').write_text(json.dumps({'tag':'4.8-dev1','files_before_inventory':devfiles},indent=2,sort_keys=True)+'\n')
+
+          aggregate=ROOT/'aggregate'; aggregate.mkdir(exist_ok=True)
+          matrix={'schema_version':1,'baseline':{'tag':'4.3-stable','gate_4':'FAIL','gate_5':'PASS_RETAINED_ORIGINAL_APKS','differing_model_binaries':800,'differing_md5':800,'semantic_content_differences_in_representative_corpus':0},'candidates':results,'stage_3_candidates':[],'stage_4_candidates':[],'stage_5_candidates':[],'stage_6_candidates':[],'earliest_q5':None,'recommended_engine':None,'program_result':'NO_OFFICIAL_STABLE_Q5','gate_4':'FAIL','gate_5':'PASS_RETAINED_4_3_APKS_ONLY'}
+          (aggregate/'CROSS_VERSION_QUALIFICATION_MATRIX.json').write_text(json.dumps(matrix,indent=2,sort_keys=True)+'\n')
+          (aggregate/'CUSTOM_ENGINE_FEASIBILITY.json').write_text(json.dumps({'schema_version':1,'required':True,'build_authorized':False,'patch_scope':['core/io/resource.cpp: replace environment/random default scene-unique-ID generation for imported built-ins with deterministic content/context-derived IDs','core/io/resource_format_binary.cpp: deterministic built-in local-resource naming and stable saved-resource traversal','model importer collection paths: canonical ordering for animation, material, mesh and other subresource collections','dictionary serialization: canonical key ordering where serialized order affects bytes'],'requirements':['editor and export-template parity','checksummed source and binary reproducibility','MIT license and attribution preservation','security update tracking','upstream merge burden assessment','full 800-model and Gate 1–5 regressions','rollback to official 4.3 authority'],'alternatives':['pinned imported-resource authority','retain Gate 4 failure','await later official release'],'next_step':'Separate architectural approval only; do not build a custom engine in this checkpoint.'},indent=2,sort_keys=True)+'\n')
+          (aggregate/'PROGRAM_LIMITATIONS.json').write_text(json.dumps({'source_audit_is_decisive_under_q0_rule':True,'candidate_engines_executed':False,'minimal_imports_run':False,'reason':'All official stable candidates were rejected at Stage 1 because exact source preserved the accepted causal mechanism.','no_claim_of_runtime_failure':True},indent=2,sort_keys=True)+'\n')
+          PY
+          python3 /tmp/qualify.py
+
+      - name: Verify frozen PR and close evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body -sS \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/59" > evidence/aggregate/PR_AFTER.json
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          p=json.load(open('evidence/aggregate/PR_AFTER.json'))
+          assert p['head']['sha']=='5b4e2466ef84f3984f3bf336b31925d4d2e97a7f'
+          assert p['state']=='open' and p['draft'] is True and p['merged_at'] is None and p['commits']==99
+          assert not [x.as_posix() for x in Path('evidence').rglob('*') if x.is_file() and x.suffix.lower() in {'.apk','.aab'}]
+          for d in [x for x in Path('evidence').iterdir() if x.is_dir()]:
+            rows=[]
+            for f in sorted(x for x in d.rglob('*') if x.is_file() and x.name!='FINAL_INVENTORY.json'):
+              rows.append({'path':f.relative_to(d).as_posix(),'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})
+            (d/'FINAL_INVENTORY.json').write_text(json.dumps({'run_id':int(os.environ['GITHUB_RUN_ID']),'workflow_sha':os.environ['GITHUB_SHA'],'branch':os.environ['GITHUB_REF_NAME'],'frozen_pr_head':p['head']['sha'],'no_android_export':True,'no_project_migration':True,'no_merge_or_publication':True,'files':rows},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload 4.4.1 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-godot-4.4.1-source-qualification-${{ github.run_id }}', path: evidence/4.4.1-stable, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Upload 4.5.2 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-godot-4.5.2-source-qualification-${{ github.run_id }}', path: evidence/4.5.2-stable, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Upload 4.6.3 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-godot-4.6.3-source-qualification-${{ github.run_id }}', path: evidence/4.6.3-stable, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Upload 4.7.1 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-godot-4.7.1-source-qualification-${{ github.run_id }}', path: evidence/4.7.1-stable, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Upload 4.8-dev1 diagnostic
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-godot-4.8-dev1-source-diagnostic-${{ github.run_id }}', path: evidence/4.8-dev1, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Upload aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-godot-official-qualification-aggregate-${{ github.run_id }}', path: evidence/aggregate, if-no-files-found: error, compression-level: 9, retention-days: 30}
