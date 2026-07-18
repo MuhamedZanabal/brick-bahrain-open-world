@@ -1,0 +1,83 @@
+name: Bahrain Brick Strict Godot 4.5.2 Stage 2
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/forensics/pr59-strict-452-stage2-trigger.txt]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  strict_stage2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: qualification
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-godot-engine-qualification-aggregate-29649173483
+          path: build/aggregate
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29649173483'
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-godot-4.5.2-qualification-29649173483
+          path: build/v5-452
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29649173483'
+          github-token: ${{ github.token }}
+      - name: Download and verify official Godot 4.5.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/engine
+          curl -fL --retry 4 --retry-all-errors \
+            https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_linux.x86_64.zip \
+            -o build/engine/Godot_v4.5.2-stable_linux.x86_64.zip
+          test "$(sha256sum build/engine/Godot_v4.5.2-stable_linux.x86_64.zip | cut -d' ' -f1)" = 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03
+          unzip -q build/engine/Godot_v4.5.2-stable_linux.x86_64.zip -d build/engine/bin
+          ENGINE=$(find build/engine/bin -type f -name 'Godot*' -print -quit)
+          chmod +x "$ENGINE"
+          test "$($ENGINE --version | head -1)" = 4.5.2.stable.official.6ce3de25a
+          echo "ENGINE=$ENGINE" >> "$GITHUB_ENV"
+      - name: Run strict exact-source Stage 2
+        shell: bash
+        env:
+          TZ: UTC
+          LC_ALL: C.UTF-8
+          LANG: C.UTF-8
+        run: |
+          set +e
+          CORPUS=$(find build/aggregate -name BAHRAIN_BRICK_ENGINE_QUALIFICATION_CORPUS.zip -type f -print -quit)
+          SIDECARS=$(find build/v5-452 -name CANDIDATE_IMPORT_SIDECAR_AUTHORITY.zip -type f -print -quit)
+          test -n "$CORPUS" -a -n "$SIDECARS"
+          mkdir -p build/strict-result
+          python3 qualification/.github/forensics/pr59_strict_452_stage2.py \
+            --engine "$ENGINE" \
+            --corpus-zip "$CORPUS" \
+            --source-sidecar-zip "$SIDECARS" \
+            --semantic-script qualification/.github/forensics/pr59_model_semantic_dump.gd \
+            --output build/strict-result \
+            --work-root build/strict-work
+          code=$?
+          echo "$code" > build/strict-result/EXIT_CODE.txt
+          exit 0
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.5.2-strict-stage2-${{ github.run_id }}
+          path: build/strict-result
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - name: Enforce strict Stage 2 result
+        shell: bash
+        run: test "$(cat build/strict-result/EXIT_CODE.txt)" = 0
