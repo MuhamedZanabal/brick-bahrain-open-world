@@ -1,0 +1,99 @@
+name: Bahrain Brick Official Godot Engine Qualification V2
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/workflows/pr59-engine-qualification-v2.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  INPUT_RUN: '29627302405'
+  INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+  FORENSIC_RUN: '29636586197'
+  FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: qualification
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.FORENSIC_ARTIFACT }}
+          path: build/forensic
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.FORENSIC_RUN }}
+          github-token: ${{ github.token }}
+      - name: Reconstruct and verify qualification harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat qualification/.github/forensics/engine_qualification_parts/part*.b64 | tr -d '\n' > /tmp/qualification.py.gz.b64
+          test "$(wc -c < /tmp/qualification.py.gz.b64)" = 12652
+          base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py
+          test "$(sha256sum /tmp/pr59_engine_qualification.py | cut -d' ' -f1)" = c7c54ec58f2ede9c6a0c0082a913bcefdc67f55225d74a0280be00eee83823bf
+          chmod +x /tmp/pr59_engine_qualification.py
+          python3 -m py_compile /tmp/pr59_engine_qualification.py
+          bash -n qualification/.github/forensics/pr59_engine_qualification_driver.sh
+          test "$(sha256sum qualification/.github/forensics/pr59_engine_qualification_driver.sh | cut -d' ' -f1)" = 26eb8bf04197c445ffff5865d7fba0863afe758dbc1f6a8dfee55ebc2cbc5c6b
+      - name: Qualify official candidates
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TZ: UTC
+          LC_ALL: C.UTF-8
+          LANG: C.UTF-8
+        run: bash qualification/.github/forensics/pr59_engine_qualification_driver.sh
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.4.1-qualification-${{ github.run_id }}
+          path: build/candidates/4.4.1-stable
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.5.2-qualification-${{ github.run_id }}
+          path: build/candidates/4.5.2-stable
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.6.3-qualification-${{ github.run_id }}
+          path: build/candidates/4.6.3-stable
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-engine-qualification-aggregate-${{ github.run_id }}
+          path: |
+            build/aggregate
+            build/candidates/4.7.1-stable
+            build/candidates/4.8-dev1
+            build/corpus
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
