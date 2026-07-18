@@ -1,0 +1,120 @@
+    corpus = corpus_from_selection(source_zip, selection_path)
+    write_json(output / "CORPUS_AUTHORITY.json", corpus)
+    if corpus["resource_count"] != 8:
+        raise RuntimeError(f"expected 8 resources, found {corpus['resource_count']}")
+
+    resource_results = []
+    overall_generated_differences = 0
+    any_binary_difference = False
+    any_md5_difference = False
+    any_uid_difference = False
+    any_path_difference = False
+    sidecar_authority_records = []
+
+    for resource in corpus["resources"]:
+        rid = resource["selection_id"]
+        resource_work = work / rid
+        source_paths = [resource["logical_source"], *[row["path"] for row in resource["dependencies"]]]
+
+        authority_project = resource_work / "authority_project"
+        authority_input = materialize_files(source_zip, authority_project, source_paths)
+        project_hash_before = sha256_file(authority_project / "project.godot")
+        env = deterministic_env(resource_work / "authority_xdg")
+        authority_run = run_command([
+            str(godot), "--headless", "--path", str(authority_project), "--editor", "--import", "--quit", "--verbose"
+        ], output / "logs" / f"{rid}_authority.log", env)
+        if authority_run["exit_code"] != 0 or authority_run["error_pattern_count"]:
+            raise RuntimeError({"resource": rid, "authority_run": authority_run})
+        if sha256_file(authority_project / "project.godot") != project_hash_before:
+            raise RuntimeError(f"candidate rewrote project.godot during authority import: {rid}")
+        authority_dir = resource_work / "sidecar_authority"
+        sidecar_authority = copy_sidecar_authority(authority_project, authority_dir)
+        main_sidecar_rel = resource["logical_source"] + ".import"
+        main_sidecar = authority_dir / main_sidecar_rel
+        if not main_sidecar.is_file():
+            raise RuntimeError(f"main sidecar absent: {main_sidecar_rel}")
+        main_sidecar_meta = parse_sidecar(main_sidecar)
+        target_rel = main_sidecar_meta["path"]
+        if not target_rel or not target_rel.startswith(".godot/imported/"):
+            raise RuntimeError({"resource": rid, "main_sidecar": main_sidecar_meta})
+        md5_rel = str(PurePosixPath(target_rel).with_suffix(".md5"))
+        sidecar_authority_records.append({
+            "selection_id": rid,
+            "logical_source": resource["logical_source"],
+            "main_sidecar": {"path": main_sidecar_rel, **main_sidecar_meta},
+            "authority_sidecar_count": sidecar_authority["sidecar_count"],
+            "all_sidecars": sidecar_authority["records"],
+        })
+
+        runs: list[dict[str, Any]] = []
+        projects: list[Path] = []
+        for run_label in ("D1", "D2"):
+            project = resource_work / run_label.lower() / "project"
+            projects.append(project)
+            input_manifest = materialize_files(source_zip, project, source_paths)
+            overlay_authority(authority_dir, project)
+            project_before = sha256_file(project / "project.godot")
+            env = deterministic_env(resource_work / run_label.lower() / "xdg")
+            run_result = run_command([
+                str(godot), "--headless", "--path", str(project), "--editor", "--import", "--quit", "--verbose"
+            ], output / "logs" / f"{rid}_{run_label}.log", env)
+            if run_result["exit_code"] != 0 or run_result["error_pattern_count"]:
+                raise RuntimeError({"resource": rid, "run": run_label, "result": run_result})
+            if sha256_file(project / "project.godot") != project_before:
+                raise RuntimeError(f"candidate rewrote project.godot: {rid}/{run_label}")
+            imported = project / target_rel
+            md5 = project / md5_rel
+            sidecar = project / main_sidecar_rel
+            if not imported.is_file() or not md5.is_file() or not sidecar.is_file():
+                raise RuntimeError({"resource": rid, "run": run_label, "imported": imported.is_file(), "md5": md5.is_file(), "sidecar": sidecar.is_file()})
+            inventory = generated_inventory(project)
+            graph, semantic_run = run_semantic(godot, project, semantic_script, resource, output / "logs" / f"{rid}_{run_label}_semantic.log", f"{rid}_{run_label}")
+            runs.append({
+                "label": run_label,
+                "input_manifest": input_manifest,
+                "run": run_result,
+                "sidecar": parse_sidecar(sidecar),
+                "imported": {"path": target_rel, "bytes": imported.stat().st_size, "sha256": sha256_file(imported)},
+                "md5": {"path": md5_rel, **parse_md5(md5)},
+                "inventory": inventory,
+                "semantic_graph": graph,
+                "semantic_run": semantic_run,
+            })
+
+        d1, d2 = runs
+        imported_a = (projects[0] / target_rel).read_bytes()
+        imported_b = (projects[1] / target_rel).read_bytes()
+        binary_diff = compare_bytes(imported_a, imported_b)
+        inventory_comparison = compare_inventories(d1["inventory"], d2["inventory"])
+        semantic_equal = None
+        semantic_section_comparison = None
+        if d1["semantic_graph"] is not None and d2["semantic_graph"] is not None:
+            r1 = d1["semantic_graph"]["resources"][0]
+            r2 = d2["semantic_graph"]["resources"][0]
+            sections1 = r1.get("section_sha256", {})
+            sections2 = r2.get("section_sha256", {})
+            semantic_section_comparison = {key: sections1.get(key) == sections2.get(key) for key in sorted(set(sections1) | set(sections2))}
+            semantic_equal = all(semantic_section_comparison.values()) and not r1.get("failures") and not r2.get("failures")
+        sidecar_equal = d1["sidecar"] == d2["sidecar"]
+        imported_equal = d1["imported"] == d2["imported"]
+        md5_equal = d1["md5"]["fields"] == d2["md5"]["fields"] and d1["md5"]["sha256"] == d2["md5"]["sha256"]
+        uid_equal = d1["inventory"]["uid_cache"] == d2["inventory"]["uid_cache"]
+        path_equal = inventory_comparison["path_sets_equal"]
+        any_binary_difference |= not imported_equal
+        any_md5_difference |= not md5_equal
+        any_uid_difference |= not uid_equal
+        any_path_difference |= not path_equal
+        overall_generated_differences += inventory_comparison["content_difference_count"]
+
+        resource_results.append({
+            "selection_id": rid,
+            "source_type": resource["source_type"],
+            "logical_source": resource["logical_source"],
+            "source_bytes": resource["source_bytes"],
+            "source_sha256": resource["source_sha256"],
+            "dependencies": resource["dependencies"],
+            "sidecar_authority": {"main": main_sidecar_meta, "count": sidecar_authority["sidecar_count"]},
+            "d1": d1,
+            "d2": d2,
+            "sidecars_identical": sidecar_equal,
+            "imported_paths_identical": d1["imported"]["path"] == d2["imported"]["path"],
