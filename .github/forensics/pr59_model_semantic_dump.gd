@@ -97,14 +97,24 @@ func _resource(res: Resource, context: String) -> Dictionary:
         "local_to_scene": res.resource_local_to_scene,
     }
     _sections["identifiers"].append(ident)
-    var result := {"type": "Resource", "identity": ident}
+    # Keep all resource identifiers in the dedicated identifiers section while
+    # using traversal-stable references in semantic content sections. This does
+    # not discard identifiers; it prevents random local:// IDs from polluting
+    # geometry/material/animation/skeleton/node content comparisons.
+    var result := {
+        "type": "Resource",
+        "ref": token,
+        "class": res.get_class(),
+        "resource_name": res.resource_name,
+        "local_to_scene": res.resource_local_to_scene,
+    }
     if res is PackedScene:
         result["packed_scene"] = _packed_scene(res, context)
     elif res is Mesh:
         result["mesh"] = _mesh(res, context)
     elif res is Material:
         result["material"] = _storage_properties(res, context + ".material")
-        _sections["materials"].append({"identity": ident, "properties": result["material"]})
+        _sections["materials"].append({"ref": token, "class": res.get_class(), "properties": result["material"]})
     elif res is Animation:
         result["animation"] = _animation(res, context)
     elif res is AnimationLibrary:
@@ -289,7 +299,14 @@ func _run() -> void:
         var graph = _resource(res, String(item["selection_id"])) if res != null else null
         var section_hashes := {}
         for key in _sections.keys():
-            section_hashes[key] = _sha_text(JSON.stringify(_sections[key]))
+            var canonical_section: Variant = _sections[key].duplicate(true)
+            # Resource discovery order is retained separately in the full graph
+            # and order section. Sort order-insensitive semantic collections for
+            # their comparison hash so binary saver ordering can be classified
+            # independently from actual content.
+            if key in ["geometry", "materials", "animations", "skeletons", "identifiers", "floats"]:
+                canonical_section.sort_custom(func(a: Variant, b: Variant) -> bool: return JSON.stringify(a) < JSON.stringify(b))
+            section_hashes[key] = _sha_text(JSON.stringify(canonical_section))
         output["resources"].append({
             "selection_id": item["selection_id"],
             "logical_source": item["logical_source"],
