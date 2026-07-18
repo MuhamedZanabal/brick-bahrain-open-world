@@ -1,0 +1,84 @@
+165-2026-07-18T14:34:41.1391248Z   github-token: ***
+166-2026-07-18T14:34:41.1391609Z   merge-multiple: false
+167-2026-07-18T14:34:41.1391949Z env:
+168-2026-07-18T14:34:41.1392336Z   FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+169-2026-07-18T14:34:41.1392896Z   INPUT_RUN: 29627302405
+170-2026-07-18T14:34:41.1393413Z   INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+171-2026-07-18T14:34:41.1394197Z   FORENSIC_RUN: 29636586197
+172-2026-07-18T14:34:41.1394751Z   FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+173-2026-07-18T14:34:41.1395366Z ##[endgroup]
+174-2026-07-18T14:34:41.2931212Z Downloading single artifact
+175-2026-07-18T14:34:41.3007424Z (node:2191) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+176-2026-07-18T14:34:41.3008585Z (Use `node --trace-deprecation ...` to show where the warning was created)
+177-2026-07-18T14:34:41.3245835Z (node:2191) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+178-2026-07-18T14:34:41.4596573Z Preparing to download the following artifacts:
+179-2026-07-18T14:34:41.4598258Z - bahrain-brick-pr59-model-forensics-29636586197 (ID: 8427517843, Size: 12706282, Expected Digest: sha256:6e8881894fab267c82d7a421b505c2334354269beeb139fd736ab6a473a016c0)
+180-2026-07-18T14:34:41.4645717Z Downloading artifact '8427517843' from 'MuhamedZanabal/brick-bahrain-open-world'
+181-2026-07-18T14:34:41.5918814Z Redirecting to blob download url: https://productionresultssa11.blob.core.windows.net/actions-results/34a4399e-1e9b-443d-9763-14b5fad67bfa/workflow-job-run-b0064ccf-b369-5071-8935-be50175ba0bc/artifacts/d0ad83eaf62de3b543f6eaa99beceb5c7fc7baaa8cf1f4261f2c633ea4e3259d.zip
+182-2026-07-18T14:34:41.5921719Z Starting download of artifact to: /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/forensic
+183-2026-07-18T14:34:41.6617960Z (node:2191) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+184-2026-07-18T14:34:42.6747235Z SHA256 digest of downloaded artifact is 6e8881894fab267c82d7a421b505c2334354269beeb139fd736ab6a473a016c0
+185-2026-07-18T14:34:42.6748676Z Artifact download completed successfully.
+186-2026-07-18T14:34:42.6749573Z Total of 1 artifact(s) downloaded
+187-2026-07-18T14:34:42.6757030Z Download artifact has finished successfully
+188-2026-07-18T14:34:42.6924775Z ##[group]Run set -euo pipefail
+189-2026-07-18T14:34:42.6925510Z [36;1mset -euo pipefail[0m
+190:2026-07-18T14:34:42.6926446Z [36;1mcat qualification/.github/forensics/engine_qualification_parts/part*.b64 | tr -d '\n' > /tmp/qualification.py.gz.b64[0m
+191:2026-07-18T14:34:42.6927535Z [36;1mtest "$(wc -c < /tmp/qualification.py.gz.b64)" = 12652[0m
+192:2026-07-18T14:34:42.6928383Z [36;1mbase64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py[0m
+193:2026-07-18T14:34:42.6929711Z [36;1mtest "$(sha256sum /tmp/pr59_engine_qualification.py | cut -d' ' -f1)" = c7c54ec58f2ede9c6a0c0082a913bcefdc67f55225d74a0280be00eee83823bf[0m
+194-2026-07-18T14:34:42.6930805Z [36;1mchmod +x /tmp/pr59_engine_qualification.py[0m
+195-2026-07-18T14:34:42.6931437Z [36;1mpython3 -m py_compile /tmp/pr59_engine_qualification.py[0m
+196-2026-07-18T14:34:42.6932258Z [36;1mbash -n qualification/.github/forensics/pr59_engine_qualification_driver.sh[0m
+197:2026-07-18T14:34:42.6934010Z [36;1mtest "$(sha256sum qualification/.github/forensics/pr59_engine_qualification_driver.sh | cut -d' ' -f1)" = 26eb8bf04197c445ffff5865d7fba0863afe758dbc1f6a8dfee55ebc2cbc5c6b[0m
+198-2026-07-18T14:34:42.7032094Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+199-2026-07-18T14:34:42.7032442Z env:
+200-2026-07-18T14:34:42.7032690Z   FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+201-2026-07-18T14:34:42.7033013Z   INPUT_RUN: 29627302405
+202-2026-07-18T14:34:42.7033330Z   INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+203-2026-07-18T14:34:42.7033923Z   FORENSIC_RUN: 29636586197
+204-2026-07-18T14:34:42.7034274Z   FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+205-2026-07-18T14:34:42.7034645Z ##[endgroup]
+206:2026-07-18T14:34:42.7695749Z ##[error]Process completed with exit code 1.
+207-2026-07-18T14:34:42.7784007Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+208-2026-07-18T14:34:42.7785425Z ##[group]Run actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+209-2026-07-18T14:34:42.7785804Z with:
+210-2026-07-18T14:34:42.7786037Z   name: pr59-godot-4.4.1-qualification-29648293345
+211-2026-07-18T14:34:42.7786355Z   path: build/candidates/4.4.1-stable
+212-2026-07-18T14:34:42.7786619Z   if-no-files-found: warn
+213-2026-07-18T14:34:42.7786849Z   compression-level: 9
+214-2026-07-18T14:34:42.7787063Z   retention-days: 30
+215-2026-07-18T14:34:42.7787267Z   overwrite: false
+216-2026-07-18T14:34:42.7787450Z env:
+217-2026-07-18T14:34:42.7787682Z   FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+218-2026-07-18T14:34:42.7787989Z   INPUT_RUN: 29627302405
+219-2026-07-18T14:34:42.7788324Z   INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+220-2026-07-18T14:34:42.7788670Z   FORENSIC_RUN: 29636586197
+221-2026-07-18T14:34:42.7788991Z   FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+222-2026-07-18T14:34:42.7789342Z ##[endgroup]
+223-2026-07-18T14:34:42.9436389Z (node:2220) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+224-2026-07-18T14:34:42.9438031Z (Use `node --trace-deprecation ...` to show where the warning was created)
+225-2026-07-18T14:34:42.9472429Z ##[warning]No files were found with the provided path: build/candidates/4.4.1-stable. No artifacts will be uploaded.
+226-2026-07-18T14:34:42.9606134Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+227-2026-07-18T14:34:42.9607517Z ##[group]Run actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+228-2026-07-18T14:34:42.9607889Z with:
+229-2026-07-18T14:34:42.9608122Z   name: pr59-godot-4.5.2-qualification-29648293345
+230-2026-07-18T14:34:42.9608437Z   path: build/candidates/4.5.2-stable
+231-2026-07-18T14:34:42.9608879Z   if-no-files-found: warn
+232-2026-07-18T14:34:42.9609104Z   compression-level: 9
+233-2026-07-18T14:34:42.9609318Z   retention-days: 30
+234-2026-07-18T14:34:42.9609518Z   overwrite: false
+235-2026-07-18T14:34:42.9609706Z env:
+236-2026-07-18T14:34:42.9609939Z   FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+237-2026-07-18T14:34:42.9610246Z   INPUT_RUN: 29627302405
+238-2026-07-18T14:34:42.9610581Z   INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+239-2026-07-18T14:34:42.9610929Z   FORENSIC_RUN: 29636586197
+240-2026-07-18T14:34:42.9611251Z   FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+241-2026-07-18T14:34:42.9611603Z ##[endgroup]
+
+--- matching test commands ---
+191:2026-07-18T14:34:42.6927535Z [36;1mtest "$(wc -c < /tmp/qualification.py.gz.b64)" = 12652[0m
+193:2026-07-18T14:34:42.6929711Z [36;1mtest "$(sha256sum /tmp/pr59_engine_qualification.py | cut -d' ' -f1)" = c7c54ec58f2ede9c6a0c0082a913bcefdc67f55225d74a0280be00eee83823bf[0m
+195:2026-07-18T14:34:42.6931437Z [36;1mpython3 -m py_compile /tmp/pr59_engine_qualification.py[0m
+196:2026-07-18T14:34:42.6932258Z [36;1mbash -n qualification/.github/forensics/pr59_engine_qualification_driver.sh[0m
+197:2026-07-18T14:34:42.6934010Z [36;1mtest "$(sha256sum qualification/.github/forensics/pr59_engine_qualification_driver.sh | cut -d' ' -f1)" = 26eb8bf04197c445ffff5865d7fba0863afe758dbc1f6a8dfee55ebc2cbc5c6b[0m
