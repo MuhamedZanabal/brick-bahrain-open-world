@@ -17,23 +17,24 @@ jobs:
         with:
           ref: ci/pr59-godot-engine-qualification-20260718
           fetch-depth: 0
-      - name: Extract V2 failed integrity-gate log tail
+      - name: Extract V2 integrity-gate failure context
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p .github/forensics/run-locators /tmp/joblog
-          curl -fL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'User-Agent: pr59-engine-qualification-v2-logtail' \
+          curl -fL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'User-Agent: pr59-engine-qualification-v2-log-context' \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/88090161216/logs" -o /tmp/joblog/raw
-          file /tmp/joblog/raw > /tmp/joblog/file.txt
           if unzip -t /tmp/joblog/raw >/dev/null 2>&1; then unzip -p /tmp/joblog/raw > /tmp/joblog/decoded.txt; else cp /tmp/joblog/raw /tmp/joblog/decoded.txt; fi
-          tail -n 100 /tmp/joblog/decoded.txt > .github/forensics/run-locators/pr59-engine-qualification-v2-failed-log-tail.txt
-          printf '\n--- file identity ---\n' >> .github/forensics/run-locators/pr59-engine-qualification-v2-failed-log-tail.txt
-          cat /tmp/joblog/file.txt >> .github/forensics/run-locators/pr59-engine-qualification-v2-failed-log-tail.txt
+          {
+            grep -n -B 25 -A 35 -E 'Reconstruct and verify qualification harness|qualification.py.gz.b64|gzip:|sha256sum|Process completed with exit code|##\[error\]' /tmp/joblog/decoded.txt || true
+            printf '\n--- matching test commands ---\n'
+            grep -n -E 'wc -c|c7c54ec|26eb8bf|py_compile|bash -n' /tmp/joblog/decoded.txt || true
+          } > .github/forensics/run-locators/pr59-engine-qualification-v2-failed-log-context.txt
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .github/forensics/run-locators/pr59-engine-qualification-v2-failed-log-tail.txt
-          git commit -m 'ci: record qualification V2 failed log tail [skip ci]'
+          git add .github/forensics/run-locators/pr59-engine-qualification-v2-failed-log-context.txt
+          git commit -m 'ci: record qualification V2 failure context [skip ci]'
           git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
           git push origin HEAD:ci/pr59-godot-engine-qualification-20260718
