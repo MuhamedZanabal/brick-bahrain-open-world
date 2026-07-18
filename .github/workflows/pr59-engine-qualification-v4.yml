@@ -1,0 +1,126 @@
+name: Bahrain Brick Official Godot Engine Qualification V4
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/forensics/pr59-engine-qualification-v4-trigger.txt]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  INPUT_RUN: '29627302405'
+  INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+  FORENSIC_RUN: '29636586197'
+  FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: qualification
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.FORENSIC_ARTIFACT }}
+          path: build/forensic
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.FORENSIC_RUN }}
+          github-token: ${{ github.token }}
+      - name: Reconstruct and verify qualification authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/qualification-authority
+          cat qualification/.github/forensics/engine_qualification_parts/part*.b64 | tr -d '\n' > /tmp/qualification.py.gz.b64
+          test "$(wc -c < /tmp/qualification.py.gz.b64)" = 12652
+          test "$(sha256sum /tmp/qualification.py.gz.b64 | cut -d' ' -f1)" = 6fa505ae448ec99ea2157a5b329c1551901cc25aeb81ab823a3f443c42d4526e
+          base64 -d /tmp/qualification.py.gz.b64 > /tmp/qualification.py.gz
+          test "$(sha256sum /tmp/qualification.py.gz | cut -d' ' -f1)" = 087ef8ffb3956a54fd8d10dd1e37795456b1612fd02df0d2cbe1aad92eea3536
+          gzip -t /tmp/qualification.py.gz
+          gzip -dc /tmp/qualification.py.gz > /tmp/pr59_engine_qualification.py
+          test "$(wc -c < /tmp/pr59_engine_qualification.py)" = 33834
+          test "$(sha256sum /tmp/pr59_engine_qualification.py | cut -d' ' -f1)" = c7c54ec58f2ede9c6a0c0082a913bcefdc67f55225d74a0280be00eee83823bf
+          chmod +x /tmp/pr59_engine_qualification.py
+          python3 -m py_compile /tmp/pr59_engine_qualification.py
+
+          cp qualification/.github/forensics/pr59_engine_qualification_driver.sh /tmp/pr59_engine_qualification_driver.sh
+          test "$(wc -c < /tmp/pr59_engine_qualification_driver.sh)" = 6988
+          test "$(sha256sum /tmp/pr59_engine_qualification_driver.sh | cut -d' ' -f1)" = 26eb8bf04197c445ffff5865d7fba0863afe758dbc1f6a8dfee55ebc2cbc5c6b
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/pr59_engine_qualification_driver.sh')
+          s=p.read_text()
+          old='  local TAG="$1" OUT="$CANDIDATES/$TAG" DL="$DOWNLOADS/$TAG" SRC="$SOURCES/$TAG" W="$WORK/$TAG"\n'
+          new='  local TAG="$1"\n  local OUT="$CANDIDATES/$TAG"\n  local DL="$DOWNLOADS/$TAG"\n  local SRC="$SOURCES/$TAG"\n  local W="$WORK/$TAG"\n'
+          if s.count(old)!=1: raise SystemExit(f'expected one declaration defect, found {s.count(old)}')
+          p.write_text(s.replace(old,new))
+          PY
+          chmod +x /tmp/pr59_engine_qualification_driver.sh
+          bash -n /tmp/pr59_engine_qualification_driver.sh
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          h=Path('/tmp/pr59_engine_qualification.py'); d=Path('/tmp/pr59_engine_qualification_driver.sh')
+          out={'workflow_run_id':int(os.environ['GITHUB_RUN_ID']),'workflow_sha':os.environ['GITHUB_SHA'],'frozen_pr_head':os.environ['FROZEN_PR_HEAD'],'harness':{'bytes':h.stat().st_size,'sha256':hashlib.sha256(h.read_bytes()).hexdigest(),'compile_pass':True},'stored_driver':{'bytes':6988,'sha256':'26eb8bf04197c445ffff5865d7fba0863afe758dbc1f6a8dfee55ebc2cbc5c6b'},'runtime_driver':{'bytes':d.stat().st_size,'sha256':hashlib.sha256(d.read_bytes()).hexdigest(),'bash_syntax_pass':True},'runtime_patch':'split one Bash local declaration into five ordered declarations to prevent set -u expansion before assignment','no_product_change':True,'no_android_export':True}
+          Path('build/qualification-authority/QUALIFICATION_HARNESS_AUTHORITY.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Qualify official candidates
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TZ: UTC
+          LC_ALL: C.UTF-8
+          LANG: C.UTF-8
+        run: bash /tmp/pr59_engine_qualification_driver.sh
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.4.1-qualification-${{ github.run_id }}
+          path: build/candidates/4.4.1-stable
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.5.2-qualification-${{ github.run_id }}
+          path: build/candidates/4.5.2-stable
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.6.3-qualification-${{ github.run_id }}
+          path: build/candidates/4.6.3-stable
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-engine-qualification-aggregate-${{ github.run_id }}
+          path: |
+            build/aggregate
+            build/candidates/4.7.1-stable
+            build/candidates/4.8-dev1
+            build/corpus
+            build/qualification-authority
+          if-no-files-found: warn
+          compression-level: 9
+          retention-days: 30
