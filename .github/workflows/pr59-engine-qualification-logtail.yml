@@ -1,0 +1,39 @@
+name: Bahrain Brick Engine Qualification Log Tail
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/workflows/pr59-engine-qualification-logtail.yml]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-godot-engine-qualification-20260718
+          fetch-depth: 0
+      - name: Extract failed decode log tail
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics/run-locators /tmp/joblog
+          curl -fL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'User-Agent: pr59-engine-qualification-logtail' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/88088209347/logs" -o /tmp/joblog/raw
+          file /tmp/joblog/raw > /tmp/joblog/file.txt
+          if unzip -t /tmp/joblog/raw >/dev/null 2>&1; then unzip -p /tmp/joblog/raw > /tmp/joblog/decoded.txt; else cp /tmp/joblog/raw /tmp/joblog/decoded.txt; fi
+          tail -n 80 /tmp/joblog/decoded.txt > .github/forensics/run-locators/pr59-engine-qualification-failed-log-tail.txt
+          printf '\n--- file identity ---\n' >> .github/forensics/run-locators/pr59-engine-qualification-failed-log-tail.txt
+          cat /tmp/joblog/file.txt >> .github/forensics/run-locators/pr59-engine-qualification-failed-log-tail.txt
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/run-locators/pr59-engine-qualification-failed-log-tail.txt
+          git commit -m 'ci: record qualification failed log tail [skip ci]'
+          git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
+          git push origin HEAD:ci/pr59-godot-engine-qualification-20260718
