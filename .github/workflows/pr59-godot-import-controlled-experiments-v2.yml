@@ -1,0 +1,180 @@
+name: Bahrain Brick PR59 Godot Import Controlled Experiments V2
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-godot-import-controlled-experiments-v2.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-godot-import-controlled-experiments-v2
+  cancel-in-progress: false
+
+env:
+  INPUT_RUN_ID: '29627302405'
+  INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+  SOURCE_ZIP: build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+
+jobs:
+  same_runner_a_b_c_e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Run Experiments A B C and E
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"
+          test -n "$godot"; chmod +x "$godot"
+          test "$($godot --version)" = '4.3.stable.official.77dcf97d8'
+          test "$(sha256sum "$SOURCE_ZIP" | awk '{print $1}')" = '5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7'
+          python3 tooling/.github/forensics/pr59_import_experiments.py suite --source-zip "$SOURCE_ZIP" --godot "$godot" --work-root /tmp/bahrain-brick-import-suite --output build/suite
+      - name: Remove binary diagnostics
+        if: always()
+        shell: bash
+        run: find build/suite -type f \( -name '*.pck' -o -name '*.scn' -o -name '*.ctex' -o -name '*.mesh' \) -delete 2>/dev/null || true
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with:
+          name: pr59-import-experiments-v2-suite-${{ github.run_id }}
+          path: build/suite
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  independent_runner_d1:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN_ID }}
+          github-token: ${{ github.token }}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; test -n "$godot"; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_import_experiments.py single --source-zip "$SOURCE_ZIP" --godot "$godot" --work-root /tmp/bahrain-brick-independent-import --output build/d1 --label D1_independent_runner
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with:
+          name: pr59-import-experiment-v2-d1-${{ github.run_id }}
+          path: build/d1
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  independent_runner_d2:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN_ID }}
+          github-token: ${{ github.token }}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; test -n "$godot"; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_import_experiments.py single --source-zip "$SOURCE_ZIP" --godot "$godot" --work-root /tmp/bahrain-brick-independent-import --output build/d2 --label D2_independent_runner
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with:
+          name: pr59-import-experiment-v2-d2-${{ github.run_id }}
+          path: build/d2
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  aggregate:
+    needs: [same_runner_a_b_c_e, independent_runner_d1, independent_runner_d2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-import-experiments-v2-suite-${{ github.run_id }}
+          path: build/suite
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-import-experiment-v2-d1-${{ github.run_id }}
+          path: build/d1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-import-experiment-v2-d2-${{ github.run_id }}
+          path: build/d2
+      - name: Aggregate results
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/final
+          python3 tooling/.github/forensics/pr59_import_experiments.py aggregate --suite build/suite --d1 build/d1 --d2 build/d2 --output build/final
+          cp build/suite/EXPERIMENT_A.json build/suite/EXPERIMENT_B.json build/suite/EXPERIMENT_C.json build/suite/EXPERIMENT_E.json build/final/
+          cp build/d1/EXPERIMENT_D_SINGLE.json build/final/EXPERIMENT_D1.json
+          cp build/d2/EXPERIMENT_D_SINGLE.json build/final/EXPERIMENT_D2.json
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/final');records=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name!='COMPACT_EVIDENCE_INVENTORY.json'):
+            records.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps({'schema_version':1,'file_count':len(records),'total_bytes':sum(r['bytes'] for r in records),'files':records},indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Record run locator
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          printf '{"run_id":%s,"workflow_commit":"%s"}\n' '${{ github.run_id }}' '${{ github.sha }}' > .github/forensics/LATEST_IMPORT_EXPERIMENT_V2_RUN.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_IMPORT_EXPERIMENT_V2_RUN.json
+          git commit -m "ci(forensics): record controlled import v2 run ${{ github.run_id }}"
+          git pull --rebase origin ci/pr59-existing-apk-gate-closure-20260717
+          git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-import-experiments-v2-${{ github.run_id }}
+          path: build/final
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
