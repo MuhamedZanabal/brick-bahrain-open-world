@@ -21,6 +21,7 @@ jobs:
       TZ: UTC
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
+      QUALIFICATION_TRIGGER: '2'
       INPUT_RUN: '29627302405'
       INPUT_NAME: pr59-godot-import-experiment-input-29627302405
       SELECTION_RUN: '29636586197'
