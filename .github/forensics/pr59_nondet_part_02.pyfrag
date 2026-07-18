@@ -1,0 +1,140 @@
+                "atime_ns": None,
+                "mode": mode,
+                "directory_mode": mode if info.is_dir() else None,
+                "inode_order": None,
+                "uid": None,
+                "gid": None,
+                "symbolic_link": is_symlink,
+                "compression": info.compress_type,
+                "crc32": f"{info.CRC:08x}",
+                "header_offset": info.header_offset,
+                "external_attr": info.external_attr,
+                "extra_sha256": sha256_bytes(info.extra),
+                "metadata_source": "retained reconstruction ZIP central directory; nanosecond times, atime, inode, uid and gid were not retained",
+            })
+    report = {
+        "archive": str(zip_path),
+        "archive_bytes": zip_path.stat().st_size,
+        "archive_sha256": sha256_file(zip_path),
+        "record_count": len(rows),
+        "records": sorted(rows, key=lambda r: r["relative_path"]),
+    }
+    write_json(out_path, report)
+    return report
+
+
+def compare_source_metadata(p: dict[str, Any], s: dict[str, Any]) -> dict[str, Any]:
+    pm = {x["relative_path"]: x for x in p["records"]}
+    sm = {x["relative_path"]: x for x in s["records"]}
+    paths = sorted(set(pm) | set(sm))
+    fields = ["sha256", "bytes", "zip_datetime", "mode", "symbolic_link", "order", "compression", "crc32", "external_attr", "extra_sha256"]
+    differences = []
+    counts = collections.Counter()
+    for path in paths:
+        if path not in pm or path not in sm:
+            differences.append({"path": path, "missing_primary": path not in pm, "missing_secondary": path not in sm})
+            counts["path_presence"] += 1
+            continue
+        diff = {f: {"primary": pm[path][f], "secondary": sm[path][f]} for f in fields if pm[path][f] != sm[path][f]}
+        if diff:
+            for f in diff:
+                counts[f] += 1
+            differences.append({"path": path, "fields": diff})
+    return {
+        "content_differences": counts.get("sha256", 0),
+        "timestamp_differences": counts.get("zip_datetime", 0),
+        "mode_differences": counts.get("mode", 0),
+        "ordering_differences": counts.get("order", 0),
+        "path_root_differences": True,
+        "original_primary_absolute_root": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/gate4-primary-source/game",
+        "original_secondary_absolute_root": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/gate4-secondary-source/game",
+        "unavailable_original_metadata": ["mtime_ns", "atime_ns", "inode", "uid", "gid", "umask", "complete environment"],
+        "field_difference_counts": dict(sorted(counts.items())),
+        "differences": differences,
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--primary-root", required=True)
+    ap.add_argument("--secondary-root", required=True)
+    ap.add_argument("--source-root", required=True)
+    ap.add_argument("--comparison", required=True)
+    ap.add_argument("--output", required=True)
+    args = ap.parse_args()
+    primary_root, secondary_root, source_root, output = map(Path, [args.primary_root, args.secondary_root, args.source_root, args.output])
+    output.mkdir(parents=True, exist_ok=True)
+    comparison = json.loads(Path(args.comparison).read_text())
+    p_apk = locate_one(primary_root, "bahrain-brick-pr59-primary-debug.apk")
+    s_apk = locate_one(secondary_root, "bahrain-brick-pr59-secondary-debug.apk")
+    pz, pi = apk_infos(p_apk); sz, si = apk_infos(s_apk)
+    p_sidecars, p_targets = build_import_maps(pz, pi)
+    s_sidecars, s_targets = build_import_maps(sz, si)
+
+    entry_map = []
+    binary_first_100 = []
+    category_counts = collections.Counter()
+    imported_rows = []
+    imported_type_counts = collections.Counter()
+    source_alarm = []
+    import_field_counts = collections.Counter()
+    import_diff_rows = []
+
+    differing = comparison["content_differences"]
+    for path in differing:
+        if path not in pi or path not in si:
+            raise RuntimeError(f"comparison path absent from APK inventory: {path}")
+        pb, sb = pz.read(pi[path]), sz.read(si[path])
+        first, diff_count = first_diff(pb, sb)
+        cat = category(path)
+        category_counts[cat] += 1
+        mapping = map_entry(path, source_root, p_sidecars, s_sidecars, p_targets, s_targets)
+        source = exact_source(source_root, mapping["logical_source_path"])
+        importer = None
+        sidecar_path = mapping["associated_import_sidecars"][0] if len(mapping["associated_import_sidecars"]) == 1 else None
+        if path.endswith(".import"):
+            sidecar_path = path
+        if sidecar_path:
+            importer = (p_sidecars.get(sidecar_path) or s_sidecars.get(sidecar_path) or {}).get("importer")
+        row = {
+            "apk_path": path,
+            "logical_source_path": mapping["logical_source_path"],
+            "logical_mapping_basis": mapping["mapping_basis"],
+            "entry_category": cat,
+            "importer_type": importer,
+            "source_file_sha256": source["sha256"],
+            "source_file_bytes": source["bytes"],
+            "source_file_exists": source["exists"],
+            "primary_entry_sha256": sha256_bytes(pb),
+            "secondary_entry_sha256": sha256_bytes(sb),
+            "primary_uncompressed_bytes": pi[path].file_size,
+            "secondary_uncompressed_bytes": si[path].file_size,
+            "primary_compressed_bytes": pi[path].compress_size,
+            "secondary_compressed_bytes": si[path].compress_size,
+            "first_differing_byte_offset": first,
+            "total_differing_byte_count": diff_count,
+            "primary_zip_timestamp": list(pi[path].date_time),
+            "secondary_zip_timestamp": list(si[path].date_time),
+            "associated_import_sidecar_path": sidecar_path,
+            "associated_import_sidecars": mapping["associated_import_sidecars"],
+            "associated_godot_imported_target": mapping["associated_godot_imported_target"],
+            "associated_godot_exported_target": mapping["associated_godot_exported_target"],
+            "primary_content_evidence": strings_evidence(pb),
+            "secondary_content_evidence": strings_evidence(sb),
+            "exported_source_candidates": mapping["exported_source_candidates"],
+        }
+        entry_map.append(row)
+        if len(binary_first_100) < 100:
+            start = max(0, (first or 0) - 32); end = min(max(len(pb), len(sb)), (first or 0) + 96)
+            binary_first_100.append({
+                "apk_path": path,
+                "first_differing_byte_offset": first,
+                "total_differing_byte_count": diff_count,
+                "primary_hex_region": pb[start:end].hex(),
+                "secondary_hex_region": sb[start:end].hex(),
+                "region_start": start,
+                "region_end": end,
+            })
+
+        if path.endswith(".import"):
+            pm = p_sidecars[path]; sm = s_sidecars[path]
