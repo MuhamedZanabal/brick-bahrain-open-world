@@ -1,0 +1,35 @@
+name: Bahrain Brick PR59 Fix Import Experiment Layout V2
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/workflows/pr59-fix-import-experiment-layout-v2.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          fetch-depth: 1
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/pr59-godot-import-controlled-experiments.yml')
+          text=p.read_text()
+          needle='          path: |\n            build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip\n            build/input/Godot_v4.3-stable_linux.x86_64.zip\n            build/input/godot\n            build/evidence\n'
+          if needle not in text:
+              raise SystemExit('expected artifact path block not found')
+          p.write_text(text.replace(needle,'          path: build/input\n',1))
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/pr59-godot-import-controlled-experiments.yml
+          git commit -m "ci(forensics): flatten controlled experiment input artifact"
+          git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
