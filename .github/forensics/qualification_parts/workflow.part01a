@@ -1,0 +1,57 @@
+          tar -xf "b/download/$source_name" -C b/source
+          engine=$(find b/engine -maxdepth 2 -type f -name 'Godot*' ! -name '*.txt' | head -1)
+          source_root=$(find b/source -type f -path '*/core/io/resource.cpp' -printf '%h/../..\n' | head -1)
+          source_root=$(realpath "$source_root")
+          test -x "$engine" || chmod +x "$engine"
+          test -f "$source_root/core/io/resource.cpp"
+          ref_json=$(gh api "repos/godotengine/godot/git/ref/tags/$TAG")
+          object_type=$(jq -r '.object.type' <<<"$ref_json")
+          object_sha=$(jq -r '.object.sha' <<<"$ref_json")
+          if [ "$object_type" = tag ]; then
+            tag_json=$(gh api "repos/godotengine/godot/git/tags/$object_sha")
+            source_commit=$(jq -r '.object.sha' <<<"$tag_json")
+          else
+            source_commit=$object_sha
+          fi
+          version_output=$("$engine" --version | head -1)
+          jq -n \
+            --arg tag "$TAG" \
+            --arg release_id "$(jq -r .id b/download/release.json)" \
+            --arg release_url "$(jq -r .html_url b/download/release.json)" \
+            --arg binary_name "$binary_name" \
+            --arg binary_url "$binary_url" \
+            --arg binary_sha "${binary_digest#sha256:}" \
+            --arg source_name "$source_name" \
+            --arg source_url "$source_url" \
+            --arg source_sha "${source_digest#sha256:}" \
+            --arg source_commit "$source_commit" \
+            --arg version_output "$version_output" \
+            --arg engine_path "$(realpath "$engine")" \
+            --arg source_root "$source_root" \
+            '{tag:$tag,official_release_id:$release_id,official_release_url:$release_url,binary_archive_filename:$binary_name,binary_download_url:$binary_url,binary_archive_sha256:$binary_sha,source_archive_filename:$source_name,source_download_url:$source_url,source_archive_sha256:$source_sha,source_commit:$source_commit,version_output:$version_output,engine_path:$engine_path,source_root:$source_root,os:"ubuntu-24.04",architecture:"x86_64",locale:"C.UTF-8",timezone:"UTC",umask:"0022"}' > b/out/ENGINE_IDENTITY.json
+          echo "ENGINE=$engine" >> "$GITHUB_ENV"
+          echo "SOURCE_ROOT=$source_root" >> "$GITHUB_ENV"
+      - name: Run source audit and Stage 2 minimal corpus
+        env:
+          TAG: ${{ matrix.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 q/.github/forensics/godot_engine_qualification.py candidate \
+            --tag "$TAG" \
+            --engine "$ENGINE" \
+            --source-root "$SOURCE_ROOT" \
+            --corpus-zip b/corpus/BAHRAIN_BRICK_QUALIFICATION_CORPUS.zip \
+            --semantic-script q/.github/forensics/godot_qualification_semantic.gd \
+            --identity b/out/ENGINE_IDENTITY.json \
+            --output b/out \
+            --work-root "/tmp/bahrain-brick-engine-$TAG"
+      - name: Verify candidate evidence boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f b/out/ENGINE_SOURCE_DETERMINISM_AUDIT.json
+          test -f b/out/ENGINE_MINIMAL_CORPUS_RESULTS.json
+          test -f b/out/ENGINE_CANDIDATE_CLASSIFICATION.json
+          test "$(jq -r .resource_count b/out/ENGINE_MINIMAL_CORPUS_RESULTS.json)" = 8
+          test "$(jq -r .no_android_export b/out/ENGINE_MINIMAL_CORPUS_RESULTS.json)" = true
