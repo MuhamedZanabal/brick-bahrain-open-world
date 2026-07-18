@@ -1,0 +1,35 @@
+name: Bahrain Brick PR59 Query Import Experiment A
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/workflows/pr59-query-import-experiment-a.yml]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  query:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          fetch-depth: 1
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/pr59-godot-import-experiment-a-only.yml/runs?branch=ci/pr59-existing-apk-gate-closure-20260717&per_page=3" > /tmp/runs.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          runs=json.loads(Path('/tmp/runs.json').read_text()).get('workflow_runs',[]);assert runs
+          r=runs[0]
+          Path('.github/forensics/IMPORT_EXPERIMENT_A_STATUS.json').write_text(json.dumps({k:r.get(k) for k in ('id','head_sha','status','conclusion','run_started_at','updated_at')},indent=2,sort_keys=True)+'\n')
+          PY
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/IMPORT_EXPERIMENT_A_STATUS.json
+          git commit -m "ci(forensics): record experiment A status"
+          git pull --rebase origin ci/pr59-existing-apk-gate-closure-20260717
+          git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
