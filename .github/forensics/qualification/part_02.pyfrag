@@ -1,0 +1,120 @@
+
+
+def parse_md5(path: Path) -> dict[str, Any]:
+    fields: dict[str, str] = {}
+    malformed = []
+    for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = re.fullmatch(r'([A-Za-z0-9_./-]+)="([^"]*)"', stripped)
+        if not match:
+            malformed.append({"line": number, "text": stripped})
+        else:
+            fields[match.group(1)] = match.group(2)
+    return {"bytes": path.stat().st_size, "sha256": sha256_file(path), "fields": fields, "malformed": malformed}
+
+
+def generated_inventory(root: Path) -> dict[str, Any]:
+    records = []
+    for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith(".godot/editor/"):
+            continue
+        if rel.startswith(".godot/") or rel.endswith(".import"):
+            records.append({"path": rel, "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+    uid = root / ".godot/uid_cache.bin"
+    return {
+        "records": records,
+        "path_count": len(records),
+        "uid_cache": {"exists": uid.is_file(), "bytes": uid.stat().st_size if uid.is_file() else None, "sha256": sha256_file(uid) if uid.is_file() else None},
+    }
+
+
+def compare_bytes(a: bytes, b: bytes) -> dict[str, Any]:
+    maximum = max(len(a), len(b))
+    positions = []
+    for index in range(maximum):
+        av = a[index] if index < len(a) else None
+        bv = b[index] if index < len(b) else None
+        if av != bv:
+            positions.append(index)
+    return {
+        "first_differing_byte": positions[0] if positions else None,
+        "final_differing_byte": positions[-1] if positions else None,
+        "differing_byte_count": len(positions),
+    }
+
+
+def compare_inventories(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    am = {row["path"]: row for row in a["records"]}
+    bm = {row["path"]: row for row in b["records"]}
+    differences = []
+    for path in sorted(set(am) | set(bm)):
+        if path not in am or path not in bm:
+            differences.append({"path": path, "missing_d1": path not in am, "missing_d2": path not in bm})
+        elif am[path]["sha256"] != bm[path]["sha256"]:
+            differences.append({"path": path, "d1": am[path], "d2": bm[path]})
+    return {
+        "path_sets_equal": set(am) == set(bm),
+        "d1_count": len(am),
+        "d2_count": len(bm),
+        "content_difference_count": len(differences),
+        "uid_cache_equal": a["uid_cache"] == b["uid_cache"],
+        "differences": differences,
+    }
+
+
+def copy_sidecar_authority(authority_project: Path, output: Path) -> dict[str, Any]:
+    if output.exists():
+        shutil.rmtree(output)
+    output.mkdir(parents=True)
+    records = []
+    for sidecar in sorted(authority_project.rglob("*.import"), key=lambda p: p.relative_to(authority_project).as_posix()):
+        rel = sidecar.relative_to(authority_project).as_posix()
+        destination = output / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(sidecar, destination)
+        records.append({"path": rel, **parse_sidecar(destination)})
+    return {"sidecar_count": len(records), "records": records}
+
+
+def overlay_authority(authority: Path, project: Path) -> None:
+    for sidecar in sorted(authority.rglob("*.import"), key=lambda p: p.relative_to(authority).as_posix()):
+        rel = sidecar.relative_to(authority)
+        destination = project / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(sidecar, destination)
+        os.chmod(destination, 0o444)
+        os.utime(destination, (315532800, 315532800))
+
+
+def source_audit(source_root: Path, version: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    files = {
+        "resource": source_root / "core/io/resource.cpp",
+        "binary_saver": source_root / "core/io/resource_format_binary.cpp",
+        "text_saver": source_root / "scene/resources/resource_format_text.cpp",
+        "scene_importer": source_root / "editor/import/3d/resource_importer_scene.cpp",
+        "obj_importer": source_root / "editor/import/3d/resource_importer_obj.cpp",
+        "gltf_document": source_root / "modules/gltf/gltf_document.cpp",
+    }
+    for path in files.values():
+        if not path.is_file():
+            raise FileNotFoundError(path)
+    texts = {key: path.read_text(encoding="utf-8", errors="replace") for key, path in files.items()}
+
+    def occurrences(key: str, needle: str) -> list[dict[str, Any]]:
+        rows = []
+        lines = texts[key].splitlines()
+        for number, line in enumerate(lines, 1):
+            if needle in line:
+                lo = max(1, number - 4)
+                hi = min(len(lines), number + 7)
+                rows.append({
+                    "file": files[key].relative_to(source_root).as_posix(),
+                    "line": number,
+                    "line_start": lo,
+                    "line_end": hi,
+                    "snippet": "\n".join(f"{index}:{lines[index - 1]}" for index in range(lo, hi + 1)),
