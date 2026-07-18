@@ -1,0 +1,240 @@
+name: Bahrain Brick PR59 Godot Import Controlled Experiments
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-godot-import-controlled-experiments.yml
+      - .github/forensics/pr59_import_experiments.py
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-godot-import-controlled-experiments
+  cancel-in-progress: false
+
+env:
+  SOURCE_ZIP_SHA256: 5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7
+  SOURCE_ZIP_BYTES: '225721731'
+  GODOT_ARCHIVE_SHA512: fd52bb4ba8acc30ca5accd1c566d470ad7282f891ccc0995dfafabcf92bcf76280ce182bf9d80ebd885f3ed2165d01e1fc3f2928436b15498dfbd98656c2a45a
+  GODOT_URL: https://github.com/godotengine/godot-builds/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip
+  ORIGINAL_RUN_ID: '29589205147'
+  PRIMARY_ARTIFACT_NAME: bahrain-brick-pr59-gate4-primary-29589205147
+
+jobs:
+  prepare_exact_inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - name: Verify experiment harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tooling/.github/forensics/pr59_import_experiments.py
+          mkdir -p build/input build/evidence
+          sha256sum tooling/.github/forensics/pr59_import_experiments.py > build/evidence/EXPERIMENT_HARNESS_SHA256.txt
+      - name: Download retained source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.PRIMARY_ARTIFACT_NAME }}
+          path: build/primary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ORIGINAL_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Verify and stage exact accepted source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_zip="$(find build/primary -type f -name MANAMA_SOUQ_COMPOSITE_SOURCE.zip -print -quit)"
+          test -n "$source_zip"
+          test "$(stat -c %s "$source_zip")" = "$SOURCE_ZIP_BYTES"
+          printf '%s  %s\n' "$SOURCE_ZIP_SHA256" "$source_zip" | sha256sum -c -
+          cp "$source_zip" build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+      - name: Download and verify exact Godot 4.3 authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 4 --retry-delay 5 "$GODOT_URL" -o build/input/Godot_v4.3-stable_linux.x86_64.zip
+          printf '%s  %s\n' "$GODOT_ARCHIVE_SHA512" build/input/Godot_v4.3-stable_linux.x86_64.zip | sha512sum -c -
+          mkdir -p build/input/godot
+          unzip -q build/input/Godot_v4.3-stable_linux.x86_64.zip -d build/input/godot
+          godot="$(find build/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"
+          test -n "$godot"; chmod +x "$godot"
+          test "$($godot --version)" = '4.3.stable.official.77dcf97d8'
+          sha256sum "$godot" > build/evidence/GODOT_BINARY_SHA256.txt
+          "$godot" --version > build/evidence/GODOT_VERSION.txt
+          "$godot" --help > build/evidence/GODOT_HELP.txt
+          cat > build/evidence/INPUT_AUTHORITY.json <<JSON
+          {"source_zip_sha256":"$SOURCE_ZIP_SHA256","source_zip_bytes":$SOURCE_ZIP_BYTES,"godot_archive_sha512":"$GODOT_ARCHIVE_SHA512","godot_version":"4.3.stable.official.77dcf97d8","source_artifact_run":$ORIGINAL_RUN_ID,"source_artifact_id":8411002980}
+          JSON
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-import-experiment-input-${{ github.run_id }}
+          path: |
+            build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+            build/input/Godot_v4.3-stable_linux.x86_64.zip
+            build/input/godot
+            build/evidence
+          compression-level: 0
+          retention-days: 7
+
+  same_runner_a_b_c_e:
+    needs: prepare_exact_inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-godot-import-experiment-input-${{ github.run_id }}
+          path: build/input
+      - name: Run Experiments A B C and E
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"
+          chmod +x "$godot"
+          mkdir -p build/suite
+          python3 tooling/.github/forensics/pr59_import_experiments.py suite \
+            --source-zip build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --godot "$godot" \
+            --work-root /tmp/bahrain-brick-import-suite \
+            --output build/suite
+      - name: Remove generated binary diagnostics before upload
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          find build/suite -type f \( -name '*.pck' -o -name '*.scn' -o -name '*.ctex' -o -name '*.mesh' \) -delete
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with:
+          name: pr59-import-experiments-suite-${{ github.run_id }}
+          path: build/suite
+          compression-level: 9
+          retention-days: 30
+
+  independent_runner_d1:
+    needs: prepare_exact_inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-godot-import-experiment-input-${{ github.run_id }}
+          path: build/input
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_import_experiments.py single --source-zip build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$godot" --work-root /tmp/bahrain-brick-independent-import --output build/d1 --label D1_independent_runner
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with:
+          name: pr59-import-experiment-d1-${{ github.run_id }}
+          path: build/d1
+          compression-level: 9
+          retention-days: 30
+
+  independent_runner_d2:
+    needs: prepare_exact_inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-godot-import-experiment-input-${{ github.run_id }}
+          path: build/input
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_import_experiments.py single --source-zip build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$godot" --work-root /tmp/bahrain-brick-independent-import --output build/d2 --label D2_independent_runner
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with:
+          name: pr59-import-experiment-d2-${{ github.run_id }}
+          path: build/d2
+          compression-level: 9
+          retention-days: 30
+
+  aggregate_experiments:
+    needs: [same_runner_a_b_c_e, independent_runner_d1, independent_runner_d2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-import-experiments-suite-${{ github.run_id }}
+          path: build/suite
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-import-experiment-d1-${{ github.run_id }}
+          path: build/d1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: pr59-import-experiment-d2-${{ github.run_id }}
+          path: build/d2
+      - name: Aggregate controlled results
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/final
+          python3 tooling/.github/forensics/pr59_import_experiments.py aggregate --suite build/suite --d1 build/d1 --d2 build/d2 --output build/final
+          cp build/suite/EXPERIMENT_A.json build/suite/EXPERIMENT_B.json build/suite/EXPERIMENT_C.json build/suite/EXPERIMENT_E.json build/final/
+          cp build/d1/EXPERIMENT_D_SINGLE.json build/final/EXPERIMENT_D1.json
+          cp build/d2/EXPERIMENT_D_SINGLE.json build/final/EXPERIMENT_D2.json
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/final');records=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name!='COMPACT_EVIDENCE_INVENTORY.json'):
+            records.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (root/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps({'schema_version':1,'file_count':len(records),'total_bytes':sum(r['bytes'] for r in records),'files':records},indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Record experiment run locator
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_IMPORT_EXPERIMENT_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"workflow_commit":"${{ github.sha }}","pr_head":"5b4e2466ef84f3984f3bf336b31925d4d2e97a7f"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_IMPORT_EXPERIMENT_RUN.json
+          if ! git diff --cached --quiet; then git commit -m "ci(forensics): record import experiment run ${{ github.run_id }}"; git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717; fi
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-import-experiments-${{ github.run_id }}
+          path: build/final
+          compression-level: 9
+          retention-days: 30
