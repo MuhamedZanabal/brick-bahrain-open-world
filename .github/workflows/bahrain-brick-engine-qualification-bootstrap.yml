@@ -1,0 +1,223 @@
+name: Bahrain Brick Official Godot Engine Qualification
+
+on:
+  push:
+    branches:
+      - ci/godot-engine-determinism-qualification-20260718
+    paths:
+      - .github/forensics/engine-qualification-payload.b64
+      - .github/workflows/bahrain-brick-engine-qualification-bootstrap.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      TZ: UTC
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+      INPUT_RUN: '29627302405'
+      INPUT_NAME: pr59-godot-import-experiment-input-29627302405
+      SELECTION_RUN: '29636586197'
+      SELECTION_NAME: pr59-model-retained-29636586197
+      FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Record run locator
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/locator.json
+          import base64, json, os
+          payload = json.dumps({
+            "message": "ci: record Godot qualification run",
+            "branch": os.environ["GITHUB_REF_NAME"],
+            "content": base64.b64encode((json.dumps({
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "workflow_sha": os.environ["GITHUB_SHA"],
+              "branch": os.environ["GITHUB_REF_NAME"],
+              "frozen_pr_head": os.environ["FROZEN_PR_HEAD"]
+            }, sort_keys=True) + "\n").encode()).decode()
+          })
+          print(json.dumps(payload))
+          PY
+          curl --fail-with-body -sS -X PUT \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/.github/forensics/engine-qualification-run.json" \
+            --data-binary @/tmp/locator.json
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_NAME }}
+          path: b/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN }}
+          github-token: ${{ github.token }}
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SELECTION_NAME }}
+          path: b/selection
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SELECTION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Decode and verify qualification harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .github/forensics/engine-qualification-payload.b64 > /tmp/qualification.tar.gz
+          echo '639b83fa5d36cc4b6074de4e3a3996695374259e3f16693a1b0c103510d889d4  /tmp/qualification.tar.gz' | sha256sum -c -
+          mkdir -p /tmp/qualification
+          tar -xzf /tmp/qualification.tar.gz -C /tmp/qualification
+          echo '907c23444471a9a1959cc085368fb758da176272bd01a617dbad6e696ea44f0e  /tmp/qualification/engine_qualification.py' | sha256sum -c -
+          python3 -m py_compile /tmp/qualification/engine_qualification.py
+
+      - name: Verify frozen PR authority before qualification
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p b/aggregate
+          curl --fail-with-body -sS \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/59" > b/aggregate/PR_BEFORE.json
+          python3 - <<'PY'
+          import json
+          p=json.load(open('b/aggregate/PR_BEFORE.json'))
+          assert p['head']['sha']=='5b4e2466ef84f3984f3bf336b31925d4d2e97a7f'
+          assert p['state']=='open' and p['draft'] is True and p['merged_at'] is None
+          PY
+
+      - name: Qualify Godot 4.4.1 stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/qualification/engine_qualification.py qualify \
+            --tag 4.4.1-stable \
+            --source-zip b/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --selection b/selection/REPRESENTATIVE_SELECTION.json \
+            --semantic-script .github/forensics/pr59_model_semantic_dump.gd \
+            --base-module .github/forensics/pr59_model_binary_forensics.py \
+            --output b/results/4.4.1-stable \
+            --work-root /tmp/bahrain-q-441
+
+      - name: Qualify Godot 4.5.2 stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/qualification/engine_qualification.py qualify \
+            --tag 4.5.2-stable \
+            --source-zip b/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --selection b/selection/REPRESENTATIVE_SELECTION.json \
+            --semantic-script .github/forensics/pr59_model_semantic_dump.gd \
+            --base-module .github/forensics/pr59_model_binary_forensics.py \
+            --output b/results/4.5.2-stable \
+            --work-root /tmp/bahrain-q-452
+
+      - name: Qualify Godot 4.6.3 stable
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/qualification/engine_qualification.py qualify \
+            --tag 4.6.3-stable \
+            --source-zip b/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --selection b/selection/REPRESENTATIVE_SELECTION.json \
+            --semantic-script .github/forensics/pr59_model_semantic_dump.gd \
+            --base-module .github/forensics/pr59_model_binary_forensics.py \
+            --output b/results/4.6.3-stable \
+            --work-root /tmp/bahrain-q-463
+
+      - name: Aggregate and verify qualification evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 /tmp/qualification/engine_qualification.py aggregate --candidates-root b/results --output b/aggregate
+          curl --fail-with-body -sS \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/59" > b/aggregate/PR_AFTER.json
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          p=json.load(open('b/aggregate/PR_AFTER.json'))
+          assert p['head']['sha']=='5b4e2466ef84f3984f3bf336b31925d4d2e97a7f'
+          assert p['state']=='open' and p['draft'] is True and p['merged_at'] is None
+          forbidden=[x.as_posix() for x in Path('b').rglob('*') if x.is_file() and x.suffix.lower() in {'.apk','.aab'}]
+          assert forbidden==[], forbidden
+          rows=[]
+          for f in sorted(x for x in Path('b/aggregate').rglob('*') if x.is_file()):
+            rows.append({'path':f.relative_to('b/aggregate').as_posix(),'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()})
+          Path('b/aggregate/PROGRAM_PROVENANCE.json').write_text(json.dumps({
+            'run_id':int(os.environ['GITHUB_RUN_ID']),
+            'workflow_sha':os.environ['GITHUB_SHA'],
+            'branch':os.environ['GITHUB_REF_NAME'],
+            'frozen_pr_head':p['head']['sha'],
+            'pr_state':p['state'],
+            'pr_draft':p['draft'],
+            'no_android_export':True,
+            'no_apk_or_aab_outputs':True,
+            'no_project_migration':True,
+            'no_pr_merge_or_publication':True,
+            'files_before_provenance':rows
+          },indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload 4.4.1 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-godot-4.4.1-qualification-${{ github.run_id }}
+          path: b/results/4.4.1-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+      - name: Upload 4.5.2 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-godot-4.5.2-qualification-${{ github.run_id }}
+          path: b/results/4.5.2-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+      - name: Upload 4.6.3 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-godot-4.6.3-qualification-${{ github.run_id }}
+          path: b/results/4.6.3-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+      - name: Upload aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-godot-engine-qualification-aggregate-${{ github.run_id }}
+          path: b/aggregate
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
