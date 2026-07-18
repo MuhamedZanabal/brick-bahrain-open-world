@@ -1,0 +1,36 @@
+name: Bahrain Brick PR59 Fix Import Experiment Layout V3
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/workflows/pr59-fix-import-experiment-layout-v3.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          fetch-depth: 0
+      - shell: bash
+        run: |
+          set -euo pipefail
+          git pull --rebase origin ci/pr59-existing-apk-gate-closure-20260717
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/pr59-godot-import-controlled-experiments.yml')
+          text=p.read_text()
+          start=text.index('          name: pr59-godot-import-experiment-input-')
+          path_start=text.index('          path:',start)
+          end=text.index('          compression-level: 0',path_start)
+          current=text[path_start:end]
+          assert 'build/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip' in current,current
+          p.write_text(text[:path_start]+'          path: build/input\n'+text[end:])
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/pr59-godot-import-controlled-experiments.yml
+          git commit -m "ci(forensics): flatten controlled experiment input artifact"
+          git pull --rebase origin ci/pr59-existing-apk-gate-closure-20260717
+          git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
