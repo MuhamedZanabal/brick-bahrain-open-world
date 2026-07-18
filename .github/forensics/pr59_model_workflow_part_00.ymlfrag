@@ -1,0 +1,60 @@
+name: Bahrain Brick PR59 Seeded Model Import Binary Forensics
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-model-import-binary-forensics.yml
+      - .github/forensics/pr59_model_binary_forensics.py
+      - .github/forensics/pr59_model_semantic_dump.gd
+      - .github/forensics/pr59_godot_source_audit.py
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: bahrain-brick-pr59-model-import-binary-forensics
+  cancel-in-progress: false
+
+env:
+  DETACHED_BRANCH: ci/pr59-existing-apk-gate-closure-20260717
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  SOURCE_SHA256: 5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7
+  SOURCE_BYTES: '225721731'
+  GODOT_COMMIT: 77dcf97d82cbfe4e4615475fa52ca03da645dbd8
+  GODOT_VERSION: 4.3.stable.official.77dcf97d8
+  INPUT_RUN: '29627302405'
+  INPUT_NAME: pr59-godot-import-experiment-input-29627302405
+  SEED_RUN: '29629130600'
+  SEED_NAME: pr59-godot-uid-sidecar-authority-29629130600
+  ORIGINAL_D1_NAME: pr59-seeded-import-d1-29629130600
+  ORIGINAL_D2_NAME: pr59-seeded-import-d2-29629130600
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 20
+      - name: Record immutable workflow locator on detached branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_MODEL_BINARY_FORENSICS_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"$PR_HEAD","detached_branch":"$DETACHED_BRANCH"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout -B "$DETACHED_BRANCH" "$GITHUB_SHA"
+          git add .github/forensics/LATEST_MODEL_BINARY_FORENSICS_RUN.json
+          git commit -m "ci(forensics): record model import run ${{ github.run_id }}"
+          git fetch origin "$DETACHED_BRANCH"
+          git rebase "origin/$DETACHED_BRANCH"
+          git push origin HEAD:"$DETACHED_BRANCH"
