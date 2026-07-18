@@ -1,0 +1,63 @@
+name: Bahrain Brick Engine Qualification Materializer
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths:
+      - .github/workflows/pr59-engine-qualification-materialize.yml
+      - .github/forensics/qualification_parts/**
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-godot-engine-qualification-20260718
+          fetch-depth: 0
+      - name: Materialize exact qualification files
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            .github/forensics/qualification_parts/python2.part00 \
+            .github/forensics/qualification_parts/python2.part01 \
+            .github/forensics/qualification_parts/python2.part02 \
+            .github/forensics/qualification_parts/python2.part03 \
+            > .github/forensics/godot_engine_qualification.py
+          cat \
+            .github/forensics/qualification_parts/semantic.part00 \
+            .github/forensics/qualification_parts/semantic.part01 \
+            > .github/forensics/godot_qualification_semantic.gd
+          cat \
+            .github/forensics/qualification_parts/workflow.part00 \
+            .github/forensics/qualification_parts/workflow.part01a \
+            .github/forensics/qualification_parts/workflow.part01b \
+            > .github/workflows/pr59-godot-engine-qualification.yml
+          echo 'ead904fa8f31430a0e0cfefda4bbeebad3612fefd1c48b6501fef3d879491bd1  .github/forensics/godot_engine_qualification.py' | sha256sum -c -
+          echo 'b9a669012f33f68e404c50c1e7db96467ef399dc51aa58e7fb0a14a35f0a4b1d  .github/forensics/godot_qualification_semantic.gd' | sha256sum -c -
+          echo '26ed2bb43f2540ce8984c1d69781bc63f9cafc404d6b254db4e84a05864df295  .github/workflows/pr59-godot-engine-qualification.yml' | sha256sum -c -
+          python3 -m py_compile .github/forensics/godot_engine_qualification.py
+          ruby -e 'require "yaml"; YAML.load_file(".github/workflows/pr59-godot-engine-qualification.yml"); puts "yaml-ok"'
+      - name: Commit generated qualification authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add \
+            .github/forensics/godot_engine_qualification.py \
+            .github/forensics/godot_qualification_semantic.gd \
+            .github/workflows/pr59-godot-engine-qualification.yml
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'ci(forensics): materialize engine qualification workflow'
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
+            git push origin HEAD:ci/pr59-godot-engine-qualification-20260718 && exit 0
+            sleep $((i*2))
+          done
+          exit 1
