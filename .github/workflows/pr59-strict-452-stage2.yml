@@ -48,6 +48,20 @@ jobs:
           chmod +x "$ENGINE"
           test "$($ENGINE --version | head -1)" = 4.5.2.stable.official.6ce3de25a
           echo "ENGINE=$ENGINE" >> "$GITHUB_ENV"
+      - name: Validate strict Stage 2 harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('qualification/.github/forensics/pr59_strict_452_stage2.py')
+          s=p.read_text()
+          old='        fields1 = dict(MD5_RE.findall(md51.read_text())), fields2 = dict(MD5_RE.findall(md52.read_text()))\n'
+          new='        fields1 = dict(MD5_RE.findall(md51.read_text()))\n        fields2 = dict(MD5_RE.findall(md52.read_text()))\n'
+          if s.count(old)!=1: raise SystemExit(f'expected one syntax defect, found {s.count(old)}')
+          p.write_text(s.replace(old,new))
+          PY
+          python3 -m py_compile qualification/.github/forensics/pr59_strict_452_stage2.py
       - name: Run strict exact-source Stage 2
         shell: bash
         env:
