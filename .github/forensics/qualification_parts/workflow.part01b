@@ -1,0 +1,58 @@
+          test "$(jq -r .no_project_migration b/out/ENGINE_MINIMAL_CORPUS_RESULTS.json)" = true
+          test "$(jq -r .no_pr59_change b/out/ENGINE_MINIMAL_CORPUS_RESULTS.json)" = true
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-engine-${{ matrix.tag }}-${{ github.run_id }}
+          path: b/out
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  aggregate:
+    needs: [prepare_corpus, candidate]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: q
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: bahrain-brick-engine-*-*-${{ github.run_id }}
+          path: b/candidates
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-engine-qualification-corpus-${{ github.run_id }}
+          path: b/corpus
+      - name: Aggregate qualification evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p b/aggregate
+          python3 q/.github/forensics/godot_engine_qualification.py aggregate --inputs b/candidates --output b/aggregate
+          cp b/corpus/OFFICIAL_RELEASE_AVAILABILITY.json b/aggregate/
+          cp b/corpus/FROZEN_PR_AUTHORITY.json b/aggregate/
+          cp b/corpus/BAHRAIN_BRICK_QUALIFICATION_CORPUS.inventory.json b/aggregate/
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('b/aggregate')
+          rows=[]
+          for p in sorted(x for x in root.iterdir() if x.is_file() and x.name!='AGGREGATE_PROVENANCE.json'):
+              rows.append({'path':p.name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          provenance={'workflow_run_id':int('${{ github.run_id }}'),'workflow_head':'${{ github.sha }}','qualification_branch':'ci/pr59-godot-engine-qualification-20260718','frozen_pr_head':'5b4e2466ef84f3984f3bf336b31925d4d2e97a7f','files':rows,'no_android_export':True,'no_project_migration':True,'no_pr59_change':True}
+          data=(json.dumps(provenance,indent=2,sort_keys=True)+'\n').encode()
+          (root/'AGGREGATE_PROVENANCE.json').write_bytes(data)
+          (root/'AGGREGATE_PROVENANCE_SHA256.txt').write_text(hashlib.sha256(data).hexdigest()+'  AGGREGATE_PROVENANCE.json\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-engine-qualification-aggregate-${{ github.run_id }}
+          path: b/aggregate
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
