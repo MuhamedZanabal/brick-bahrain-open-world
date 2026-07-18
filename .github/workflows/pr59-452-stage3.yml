@@ -1,0 +1,112 @@
+name: Bahrain Brick Godot 4.5.2 Stage 3 Repeatability
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/forensics/pr59-452-stage3-trigger.txt]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN: '29649173483'
+  SOURCE_AGGREGATE: pr59-godot-engine-qualification-aggregate-29649173483
+  STRICT_RUN: '29649884857'
+  STRICT_ARTIFACT: pr59-godot-4.5.2-strict-stage2-v2-29649884857
+
+jobs:
+  same_runner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: qualification, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SOURCE_AGGREGATE }}', path: build/source, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SOURCE_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.STRICT_ARTIFACT }}', path: build/strict, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STRICT_RUN }}', github-token: '${{ github.token }}'}
+      - name: Download verified official engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/engine
+          curl -fL --retry 4 --retry-all-errors https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_linux.x86_64.zip -o build/engine/godot.zip
+          test "$(sha256sum build/engine/godot.zip | cut -d' ' -f1)" = 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03
+          unzip -q build/engine/godot.zip -d build/engine/bin
+          ENGINE=$(find build/engine/bin -type f -name 'Godot*' -print -quit); chmod +x "$ENGINE"
+          test "$($ENGINE --version | head -1)" = 4.5.2.stable.official.6ce3de25a
+          echo "ENGINE=$ENGINE" >> "$GITHUB_ENV"
+      - name: Run same-runner controls A and B
+        shell: bash
+        env: {TZ: UTC, LC_ALL: C.UTF-8, LANG: C.UTF-8}
+        run: |
+          set -euo pipefail
+          python3 -m py_compile qualification/.github/forensics/pr59_452_repeatability.py
+          CORPUS=$(find build/source -name BAHRAIN_BRICK_ENGINE_QUALIFICATION_CORPUS.zip -type f -print -quit)
+          SIDECARS=$(find build/strict -name STRICT_MODEL_SIDECAR_AUTHORITY.zip -type f -print -quit)
+          python3 qualification/.github/forensics/pr59_452_repeatability.py same-runner --engine "$ENGINE" --corpus-zip "$CORPUS" --sidecar-zip "$SIDECARS" --work-root /tmp/pr59-452-stage3-same --output build/result
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-452-stage3-input-same-${{ github.run_id }}', path: build/result, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  cross_runner:
+    strategy:
+      fail-fast: false
+      matrix:
+        label: [C1, C2, D1, D2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: qualification, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SOURCE_AGGREGATE }}', path: build/source, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SOURCE_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.STRICT_ARTIFACT }}', path: build/strict, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STRICT_RUN }}', github-token: '${{ github.token }}'}
+      - name: Download verified official engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/engine
+          curl -fL --retry 4 --retry-all-errors https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_linux.x86_64.zip -o build/engine/godot.zip
+          test "$(sha256sum build/engine/godot.zip | cut -d' ' -f1)" = 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03
+          unzip -q build/engine/godot.zip -d build/engine/bin
+          ENGINE=$(find build/engine/bin -type f -name 'Godot*' -print -quit); chmod +x "$ENGINE"
+          echo "ENGINE=$ENGINE" >> "$GITHUB_ENV"
+      - name: Run isolated cross-runner import
+        shell: bash
+        env: {TZ: UTC, LC_ALL: C.UTF-8, LANG: C.UTF-8}
+        run: |
+          set -euo pipefail
+          python3 -m py_compile qualification/.github/forensics/pr59_452_repeatability.py
+          CORPUS=$(find build/source -name BAHRAIN_BRICK_ENGINE_QUALIFICATION_CORPUS.zip -type f -print -quit)
+          SIDECARS=$(find build/strict -name STRICT_MODEL_SIDECAR_AUTHORITY.zip -type f -print -quit)
+          python3 qualification/.github/forensics/pr59_452_repeatability.py one --label '${{ matrix.label }}' --engine "$ENGINE" --corpus-zip "$CORPUS" --sidecar-zip "$SIDECARS" --work-root /tmp/pr59-452-stage3-'${{ matrix.label }}' --output build/result
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-452-stage3-input-${{ matrix.label }}-${{ github.run_id }}', path: build/result, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  aggregate:
+    needs: [same_runner, cross_runner]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: qualification, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {pattern: 'pr59-452-stage3-input-*-${{ github.run_id }}', path: build/inputs, merge-multiple: false}
+      - name: Compare all nine independent imports
+        shell: bash
+        run: |
+          set +e
+          mkdir -p build/final
+          python3 qualification/.github/forensics/pr59_452_repeatability.py compare --input-root build/inputs --output build/final
+          code=$?
+          echo "$code" > build/final/EXIT_CODE.txt
+          exit 0
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-godot-4.5.2-stage3-${{ github.run_id }}', path: build/final, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Enforce Stage 3
+        shell: bash
+        run: test "$(cat build/final/EXIT_CODE.txt)" = 0
