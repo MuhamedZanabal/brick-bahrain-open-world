@@ -1,0 +1,131 @@
+name: Official Godot Engine Determinism Qualification
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths:
+      - .github/workflows/pr59-godot-engine-qualification.yml
+      - .github/forensics/godot_engine_qualification.py
+      - .github/forensics/godot_qualification_semantic.gd
+      - .github/forensics/qualification_corpus.json
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_INPUT_RUN: '29627302405'
+  SOURCE_INPUT_NAME: pr59-godot-import-experiment-input-29627302405
+  FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  SOURCE_ARCHIVE_SHA256: 5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7
+
+jobs:
+  prepare_corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: q
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_INPUT_NAME }}
+          path: b/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_INPUT_RUN }}
+          github-token: ${{ github.token }}
+      - name: Verify frozen PR authority remains unchanged
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head=$(gh api repos/MuhamedZanabal/brick-bahrain-open-world/pulls/59 --jq .head.sha)
+          state=$(gh api repos/MuhamedZanabal/brick-bahrain-open-world/pulls/59 --jq .state)
+          draft=$(gh api repos/MuhamedZanabal/brick-bahrain-open-world/pulls/59 --jq .draft)
+          commits=$(gh api repos/MuhamedZanabal/brick-bahrain-open-world/pulls/59 --jq .commits)
+          test "$head" = "$FROZEN_PR_HEAD"
+          test "$state" = open
+          test "$draft" = true
+          test "$commits" = 99
+          mkdir -p b/prep
+          jq -n --arg head "$head" --arg state "$state" --argjson draft "$draft" --argjson commits "$commits" '{head:$head,state:$state,draft:$draft,commits:$commits}' > b/prep/FROZEN_PR_AUTHORITY.json
+      - name: Build compact exact corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_zip=b/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+          test -f "$source_zip"
+          echo "$SOURCE_ARCHIVE_SHA256  $source_zip" | sha256sum -c -
+          python3 q/.github/forensics/godot_engine_qualification.py prepare-corpus \
+            --source-zip "$source_zip" \
+            --manifest q/.github/forensics/qualification_corpus.json \
+            --output b/prep/BAHRAIN_BRICK_QUALIFICATION_CORPUS.zip
+      - name: Record official release availability
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess
+          requested=['4.4.1-stable','4.5.2-stable','4.6.3-stable','4.7.1-stable','4.8-dev1']
+          rows=[]
+          for tag in requested:
+              p=subprocess.run(['gh','api',f'repos/godotengine/godot-builds/releases/tags/{tag}'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+              rows.append({'tag':tag,'available':p.returncode==0,'api_exit_code':p.returncode,'stderr':p.stderr.strip()[:500]})
+          open('b/prep/OFFICIAL_RELEASE_AVAILABILITY.json','w').write(json.dumps({'checked_at_run':int(os.environ['GITHUB_RUN_ID']),'requested':rows},indent=2,sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-engine-qualification-corpus-${{ github.run_id }}
+          path: b/prep
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  candidate:
+    needs: prepare_corpus
+    strategy:
+      fail-fast: false
+      matrix:
+        tag: [4.4.1-stable, 4.5.2-stable, 4.6.3-stable]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: q
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: bahrain-brick-engine-qualification-corpus-${{ github.run_id }}
+          path: b/corpus
+      - name: Resolve and verify official engine and source archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ matrix.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p b/download b/engine b/source b/out
+          gh api "repos/godotengine/godot-builds/releases/tags/$TAG" > b/download/release.json
+          binary_name=$(jq -r --arg tag "$TAG" '.assets[] | select(.name == ("Godot_v"+$tag+"_linux.x86_64.zip")) | .name' b/download/release.json)
+          source_name=$(jq -r --arg tag "$TAG" '.assets[] | select(.name == ("godot-"+$tag+".tar.xz")) | .name' b/download/release.json)
+          test -n "$binary_name" -a "$binary_name" != null
+          test -n "$source_name" -a "$source_name" != null
+          binary_url=$(jq -r --arg n "$binary_name" '.assets[] | select(.name==$n) | .browser_download_url' b/download/release.json)
+          binary_digest=$(jq -r --arg n "$binary_name" '.assets[] | select(.name==$n) | .digest' b/download/release.json)
+          source_url=$(jq -r --arg n "$source_name" '.assets[] | select(.name==$n) | .browser_download_url' b/download/release.json)
+          source_digest=$(jq -r --arg n "$source_name" '.assets[] | select(.name==$n) | .digest' b/download/release.json)
+          test "${binary_digest#sha256:}" != "$binary_digest"
+          test "${source_digest#sha256:}" != "$source_digest"
+          curl --fail --location --retry 4 --output "b/download/$binary_name" "$binary_url"
+          curl --fail --location --retry 4 --output "b/download/$source_name" "$source_url"
+          echo "${binary_digest#sha256:}  b/download/$binary_name" | sha256sum -c -
+          echo "${source_digest#sha256:}  b/download/$source_name" | sha256sum -c -
+          unzip -q "b/download/$binary_name" -d b/engine
