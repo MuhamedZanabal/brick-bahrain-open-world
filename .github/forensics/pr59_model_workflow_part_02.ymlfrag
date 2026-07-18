@@ -1,0 +1,60 @@
+          printf '{"resources":[]}\n' > "$empty"
+          mkdir -p /tmp/semantic-contract
+          printf 'config_version=5\n[application]\nconfig/name="SemanticContract"\n' > /tmp/semantic-contract/project.godot
+          "$godot" --headless --path /tmp/semantic-contract --script "$PWD/tooling/.github/forensics/pr59_model_semantic_dump.gd" -- "$empty" /tmp/semantic-contract/output.json
+          python3 - <<'PY'
+          import json
+          assert json.load(open('/tmp/semantic-contract/output.json'))['resources']==[]
+          PY
+      - name: Materialize failed seeded comparison without rerunning imports
+        id: retained
+        shell: bash
+        run: |
+          set +e
+          python3 tooling/.github/forensics/pr59_model_binary_forensics.py retained \
+            --d1 build/original-d1/SEEDED_IMPORT_RESULT.json \
+            --d2 build/original-d2/SEEDED_IMPORT_RESULT.json \
+            --source-zip build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json \
+            --output build/retained
+          code=$?
+          printf '%s\n' "$code" > build/retained/EXIT_CODE.txt
+          exit 0
+      - name: Upload retained failure comparison and selection
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-model-retained-${{ github.run_id }}
+          path: build/retained
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - name: Enforce retained comparison integrity
+        shell: bash
+        run: |
+          test "$(cat build/retained/EXIT_CODE.txt)" = 0
+          python3 - <<'PY'
+          import json
+          x=json.load(open('build/retained/SEEDED_IMPORT_COMPARISON.json'))
+          assert x['total_content_differences']==1601,x
+          assert x['category_counts']=={'EDITOR_CACHE':1,'IMPORTED_BINARY':800,'IMPORTED_MD5':800},x
+          assert x['source_adjacent_import_uid_differences']==0
+          assert x['source_adjacent_import_content_differences']==0
+          assert x['uid_cache_equal'] is True
+          s=json.load(open('build/retained/REPRESENTATIVE_SELECTION.json'))
+          assert len(s['resources'])==8
+          PY
+
+  diagnostic_d1:
+    needs: retained_compare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: build/seed, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-retained-${{ github.run_id }}', path: build/retained}
