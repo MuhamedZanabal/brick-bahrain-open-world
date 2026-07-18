@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "accepted_source_authority": {
+    "composite_head": "b12e1e012e256036e71066260a4c6392d26c3839",
+    "source_archive_sha256": "5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7",
+    "source_archive_bytes": 225721731,
+    "source_manifest_sha256": "ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab",
+    "aggregate_source_tree_sha256": "e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e",
+    "source_file_count": 1502,
+    "source_bytes": 369162800,
+    "matrix_manifest_sha256": "6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff",
+    "required_matrix_resources": 436
+  },
+  "alias_discrepancies": [
+    {
+      "requested_alias": "building_A.gltf",
+      "accepted_artifact_path": "assets/citykit/models/Brick_Plain_1.gltf",
+      "reason": "requested alias is absent from the frozen 1502-file source archive; retained accepted representative-selection artifact names Brick_Plain_1.gltf"
+    },
+    {
+      "requested_alias": "airplane.obj",
+      "accepted_artifact_path": "addons/flexible_toon_shader/example/cup.obj",
+      "reason": "requested alias is absent from the frozen 1502-file source archive; retained accepted representative-selection artifact names cup.obj"
+    }
+  ],
+  "resources": [
+    {"selection_id":"glb_matrix_small","logical_source":"assets/generated/full_matrix/architecture/low/waterfront/bh_waterfront_hotel_dropoff_01_lod0.glb","source_type":"GLB","matrix_member":true,"source_bytes":92972,"source_sha256":"d00923a42403cbf46975c8001d6947e3a4a6cf0684c5856476ae43761c14d867","dependencies":[]},
+    {"selection_id":"glb_matrix_medium","logical_source":"assets/generated/full_matrix/architecture/balanced/souq/bh_souq_shop_perfume_01_lod1.glb","source_type":"GLB","matrix_member":true,"source_bytes":186872,"source_sha256":"2c1ea186757517da48a6dc6ba4d617cee5c84dd3470a966b06f1b9bcd74c4d0c","dependencies":[]},
+    {"selection_id":"glb_matrix_large","logical_source":"assets/generated/full_matrix/architecture/high/traditional/bh_traditional_alley_arch_01_lod0.glb","source_type":"GLB","matrix_member":true,"source_bytes":370196,"source_sha256":"0702307510a8477f50e819d4f146910a3f2bb4222c9a838a2c83bb880a0769d7","dependencies":[]},
+    {"selection_id":"glb_non_matrix","logical_source":"assets/props/street/bh_cr_desert_planter_01_lod0.glb","source_type":"GLB","matrix_member":false,"source_bytes":9928,"source_sha256":"08b10d89a9cb5109c2ee473dd0a06feb87ccf7327b213fc96d6e5d7b87bf1517","dependencies":[]},
+    {"selection_id":"gltf_character","logical_source":"assets/characters_kit/Casual_Male.gltf","source_type":"GLTF","matrix_member":false,"source_bytes":2048792,"source_sha256":"db66b2424af60d7799760795ca63c8a5be1c8af64e9f134217f0a3ff9e405379","dependencies":[]},
+    {"selection_id":"gltf_environment","logical_source":"assets/citykit/models/Brick_Plain_1.gltf","source_type":"GLTF","matrix_member":false,"source_bytes":4576,"source_sha256":"e5952b1fe4fce2d26b88e2e5363e8b6942608bc9fd43ec56e61df78f83db34ba","dependencies":["assets/citykit/models/Brick_Plain_1.bin","assets/citykit/models/T_RedBrick_BaseColor.png","assets/citykit/models/T_RedBrick_Normal.png","assets/citykit/models/T_RedBrick_ORM.png"]},
+    {"selection_id":"fbx_character","logical_source":"assets/characters/fbx/Cowboy_Male.fbx","source_type":"FBX","matrix_member":false,"source_bytes":2283980,"source_sha256":"14d239cc0debdb4b2be0009c1aeace403c3a4cf0ea8bff94c24a330ac02d0895","dependencies":[]},
+    {"selection_id":"obj_single","logical_source":"addons/flexible_toon_shader/example/cup.obj","source_type":"OBJ","matrix_member":false,"source_bytes":430687,"source_sha256":"b3e9ed9877dfa37f87e224f0db748643d11d384a365f2408a959c0eeb85fa334","dependencies":[]}
+  ]
+}
