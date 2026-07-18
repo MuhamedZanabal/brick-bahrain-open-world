@@ -1,0 +1,120 @@
+        'config_version=5\n\n[application]\nconfig/name="Bahrain Brick Engine Qualification"\n\n[rendering]\nrenderer/rendering_method="gl_compatibility"\nrenderer/rendering_method.mobile="gl_compatibility"\n',
+        encoding="utf-8",
+    )
+    os.chmod(project, 0o644)
+    os.utime(project, (epoch, epoch))
+    for directory in sorted((p for p in target.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
+        os.chmod(directory, 0o755)
+        os.utime(directory, (epoch, epoch))
+    os.chmod(target, 0o755)
+    os.utime(target, (epoch, epoch))
+    return {"files": rows, "project_sha256": sha256_file(project), "root": str(target.resolve())}
+
+
+def resolve_gltf_dependencies(archive: zipfile.ZipFile, logical: str) -> list[str]:
+    data = archive.read(logical)
+    document = json.loads(data.decode("utf-8"))
+    base = PurePosixPath(logical).parent
+    names = {info.filename for info in archive.infolist() if not info.is_dir()}
+    dependencies: set[str] = set()
+    for item in document.get("buffers", []):
+        uri = item.get("uri")
+        if uri and not uri.startswith(("data:", "http:", "https:")):
+            candidate = (base / PurePosixPath(uri)).as_posix()
+            if candidate in names:
+                dependencies.add(candidate)
+    for item in document.get("images", []):
+        uri = item.get("uri")
+        if uri and not uri.startswith(("data:", "http:", "https:")):
+            candidate = (base / PurePosixPath(uri)).as_posix()
+            if candidate in names:
+                dependencies.add(candidate)
+    return sorted(dependencies)
+
+
+def resolve_obj_dependencies(archive: zipfile.ZipFile, logical: str) -> list[str]:
+    names = {info.filename for info in archive.infolist() if not info.is_dir()}
+    base = PurePosixPath(logical).parent
+    text = archive.read(logical).decode("utf-8", errors="replace")
+    dependencies: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("mtllib "):
+            candidate = (base / stripped.split(None, 1)[1].strip()).as_posix()
+            if candidate in names:
+                dependencies.add(candidate)
+    for mtl in list(dependencies):
+        mtl_text = archive.read(mtl).decode("utf-8", errors="replace")
+        for line in mtl_text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            token = stripped.split(None, 1)[0].lower()
+            if token.startswith("map_") or token in {"bump", "disp", "decal"}:
+                candidate = (PurePosixPath(mtl).parent / stripped.split()[-1]).as_posix()
+                if candidate in names:
+                    dependencies.add(candidate)
+    return sorted(dependencies)
+
+
+def corpus_from_selection(source_zip: Path, selection_path: Path) -> dict[str, Any]:
+    selection = json.loads(selection_path.read_text())
+    resources = []
+    with zipfile.ZipFile(source_zip) as archive:
+        names = {info.filename for info in archive.infolist() if not info.is_dir()}
+        for entry in selection["resources"]:
+            logical = safe_relative(entry["logical_source"])
+            if logical not in names:
+                raise FileNotFoundError(logical)
+            dependencies = list(entry.get("dependencies", []))
+            extension = PurePosixPath(logical).suffix.lower()
+            if extension == ".gltf":
+                dependencies = sorted(set(dependencies) | set(resolve_gltf_dependencies(archive, logical)))
+            elif extension == ".obj":
+                dependencies = sorted(set(dependencies) | set(resolve_obj_dependencies(archive, logical)))
+            source_data = archive.read(logical)
+            dep_rows = []
+            for dep in dependencies:
+                dep = safe_relative(dep)
+                if dep not in names:
+                    raise FileNotFoundError(dep)
+                data = archive.read(dep)
+                dep_rows.append({"path": dep, "bytes": len(data), "sha256": sha256_bytes(data)})
+            resources.append({
+                "selection_id": entry["selection_id"],
+                "source_type": entry["source_type"],
+                "logical_source": logical,
+                "matrix_member": bool(entry.get("matrix_member", False)),
+                "selection_rule": entry.get("selection_rule"),
+                "source_bytes": len(source_data),
+                "source_sha256": sha256_bytes(source_data),
+                "dependencies": dep_rows,
+            })
+    return {"schema_version": 1, "resource_count": len(resources), "resources": resources}
+
+
+def parse_sidecar(path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    terminal_nul = data.endswith(b"\x00")
+    if terminal_nul:
+        data = data[:-1]
+    text = data.decode("utf-8", errors="replace")
+    path_match = PATH_RE.search(text)
+    source_match = SOURCE_RE.search(text)
+    uid_match = UID_RE.search(text)
+    targets = []
+    if path_match:
+        targets.append(path_match.group(1))
+    # Parse quoted res:// destinations from dest_files too.
+    for raw in re.findall(r'"res://([^"\r\n]+)"', text):
+        if raw.startswith(".godot/imported/"):
+            targets.append(raw)
+    return {
+        "bytes": path.stat().st_size,
+        "sha256": sha256_file(path),
+        "terminal_nul": terminal_nul,
+        "path": path_match.group(1) if path_match else None,
+        "source_file": source_match.group(1) if source_match else None,
+        "uid": uid_match.group(1) if uid_match else None,
+        "declared_targets": sorted(set(targets)),
+    }
