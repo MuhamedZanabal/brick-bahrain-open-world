@@ -1,0 +1,131 @@
+    for line in path.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = re.fullmatch(r'([A-Za-z0-9_./-]+)="([^"]*)"', line)
+        if not m:
+            malformed.append(line)
+        else:
+            fields[m.group(1)] = m.group(2)
+    return {"fields": fields, "malformed": malformed, "bytes": path.stat().st_size, "sha256": sha_file(path)}
+
+
+def generated_inventory(project: Path) -> dict[str, Any]:
+    rows = []
+    for p in sorted((x for x in project.rglob("*") if x.is_file()), key=lambda x: x.relative_to(project).as_posix()):
+        rel = p.relative_to(project).as_posix()
+        if rel.endswith(".import") or rel.startswith(".godot/imported/") or rel == ".godot/uid_cache.bin":
+            rows.append({"path": rel, "bytes": p.stat().st_size, "sha256": sha_file(p)})
+    return {
+        "file_count": len(rows),
+        "records": rows,
+        "aggregate_sha256": sha_bytes("\n".join(f"{r['path']}\0{r['bytes']}\0{r['sha256']}" for r in rows).encode()),
+    }
+
+
+def compare_inventory(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    am = {x["path"]: x for x in a["records"]}
+    bm = {x["path"]: x for x in b["records"]}
+    paths = sorted(set(am) | set(bm))
+    diffs = []
+    for p in paths:
+        if p not in am or p not in bm:
+            diffs.append({"path": p, "missing_d1": p not in am, "missing_d2": p not in bm})
+        elif am[p]["sha256"] != bm[p]["sha256"]:
+            diffs.append({"path": p, "d1": am[p], "d2": bm[p]})
+    return {"path_set_equal": set(am) == set(bm), "difference_count": len(diffs), "differences": diffs}
+
+
+def byte_diff(a: bytes, b: bytes) -> dict[str, Any]:
+    n = max(len(a), len(b))
+    pos = [i for i in range(n) if (a[i] if i < len(a) else None) != (b[i] if i < len(b) else None)]
+    return {"first_differing_byte": pos[0] if pos else None, "differing_byte_count": len(pos)}
+
+
+def audit_source(source_root: Path, tag: str) -> dict[str, Any]:
+    resource_cpp = source_root / "core/io/resource.cpp"
+    binary_cpp = source_root / "core/io/resource_format_binary.cpp"
+    assert resource_cpp.is_file() and binary_cpp.is_file()
+    rtext = resource_cpp.read_text(errors="replace")
+    btext = binary_cpp.read_text(errors="replace")
+    source_files = [p for p in source_root.rglob("*") if p.suffix in {".cpp", ".h"} and p.is_file()]
+    seed_calls = []
+    generate_calls = []
+    unordered_candidates = []
+    for p in source_files:
+        text = p.read_text(errors="replace")
+        rel = p.relative_to(source_root).as_posix()
+        for no, line in enumerate(text.splitlines(), 1):
+            if "seed_scene_unique_id(" in line and "void Resource::seed_scene_unique_id" not in line and "static void seed_scene_unique_id" not in line:
+                seed_calls.append({"file": rel, "line": no, "text": line.strip()[:300]})
+            if "generate_scene_unique_id(" in line and "String Resource::generate_scene_unique_id" not in line and "static String generate_scene_unique_id" not in line:
+                generate_calls.append({"file": rel, "line": no, "text": line.strip()[:300]})
+            if "get_key_list(" in line:
+                unordered_candidates.append({"file": rel, "line": no, "text": line.strip()[:300]})
+    m = re.search(r"String Resource::generate_scene_unique_id\(\)\s*\{(.{0,5000}?)\n\}", rtext, re.S)
+    body = m.group(0) if m else ""
+    local_lines = []
+    for no, line in enumerate(btext.splitlines(), 1):
+        if "generate_scene_unique_id" in line or '"local://"' in line or "get_scene_unique_id" in line:
+            local_lines.append({"line": no, "text": line.strip()})
+    flags = {
+        "uses_wall_clock": "get_datetime" in body,
+        "uses_microsecond_ticks": "get_ticks_usec" in body,
+        "uses_random_number_generation": ("Math::rand" in body or ".rand()" in body),
+        "five_character_local_ids": ("characters = 5" in body or "characters=5" in body.replace(" ", "")),
+        "binary_saver_generates_local_ids": "generate_scene_unique_id" in btext and '"local://"' in btext,
+        "has_seed_scene_unique_id_api": "seed_scene_unique_id" in rtext,
+        "seed_scene_unique_id_external_call_count": len(seed_calls),
+        "unsorted_dictionary_key_iteration_candidate_count": len(unordered_candidates),
+        "documented_deterministic_import_option_found": False,
+    }
+    return {
+        "tag": tag,
+        "source_root": str(source_root),
+        "flags": flags,
+        "generate_scene_unique_id_body_sha256": sha_bytes(body.encode()),
+        "generate_scene_unique_id_excerpt": body[:5000],
+        "binary_local_id_lines": local_lines[:100],
+        "seed_scene_unique_id_calls": seed_calls[:100],
+        "generate_scene_unique_id_calls": generate_calls[:200],
+        "get_key_list_candidates": unordered_candidates[:200],
+    }
+
+
+def overlay_sidecars(authority: Path, project: Path, required: list[str]) -> list[dict[str, Any]]:
+    rows = []
+    for rel in sorted(set(required)):
+        side = authority / f"{rel}.import"
+        if not side.is_file():
+            continue
+        dst = project / f"{rel}.import"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(side, dst)
+        os.utime(dst, (315532800, 315532800))
+        rows.append({"path": f"{rel}.import", "bytes": dst.stat().st_size, "sha256": sha_file(dst)})
+    return rows
+
+
+def semantic_run(engine: Path, script: Path, project: Path, row: dict[str, Any], target: str, output: Path, env: dict[str, str]) -> dict[str, Any]:
+    selection = output.with_suffix(".selection.json")
+    write_json(selection, {"resources": [{**row, "target_path": target}]})
+    rr = run([str(engine), "--headless", "--path", str(project), "--script", str(script.resolve()), "--", str(selection.resolve()), str(output.resolve())], output.with_suffix(".log"), env, 900)
+    graph = json.loads(output.read_text()) if output.is_file() else None
+    return {"run": rr, "graph": graph, "graph_sha256": sha_file(output) if output.is_file() else None}
+
+
+def candidate(args: argparse.Namespace) -> int:
+    engine = Path(args.engine).resolve()
+    source_root = Path(args.source_root).resolve()
+    corpus_zip = Path(args.corpus_zip).resolve()
+    semantic_script = Path(args.semantic_script).resolve()
+    identity = json.loads(Path(args.identity).read_text())
+    out = Path(args.output).resolve(); out.mkdir(parents=True, exist_ok=True)
+    work = Path(args.work_root).resolve()
+    corpus = work / "corpus"
+    manifest = extract_corpus(corpus_zip, corpus)
+    all_paths: list[str] = []
+    for r in manifest["resources"]:
+        all_paths += [r["logical_source"], *r.get("dependencies", [])]
+
+    # One candidate-specific sidecar authority is generated once. D1 and D2
