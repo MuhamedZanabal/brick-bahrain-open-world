@@ -1,0 +1,175 @@
+name: Bahrain Brick PR59 Godot Nondeterminism Taxonomy
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-godot-nondeterminism-taxonomy.yml
+      - .github/forensics/pr59_nondet_part_*.pyfrag
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-pr59-godot-nondeterminism-taxonomy
+  cancel-in-progress: false
+
+env:
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  ORIGINAL_RUN_ID: '29589205147'
+  PRIMARY_NAME: bahrain-brick-pr59-gate4-primary-29589205147
+  PRIMARY_APK_SHA256: 0956a0c8195dc9319238b1230ef3c0291a09742c357256ae29da46aa649bf455
+  SECONDARY_NAME: bahrain-brick-pr59-gate4-secondary-29589205147
+  SECONDARY_APK_SHA256: db42d1190957a244bec5745b3dbed82ba5707796075e5d828cfb0056cb3951d0
+  COMPARISON_RUN_ID: '29610612313'
+  COMPARISON_NAME: bahrain-brick-pr59-existing-apk-gate-closure-final-29610612313
+
+jobs:
+  classify_retained_apks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out detached forensic tooling
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          path: tooling
+          fetch-depth: 1
+
+      - name: Materialize and verify analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tooling/.github/forensics/pr59_nondet_part_*.pyfrag > /tmp/pr59_nondeterminism_forensics.py
+          python3 -m py_compile /tmp/pr59_nondeterminism_forensics.py
+          mkdir -p build/output
+          sha256sum /tmp/pr59_nondeterminism_forensics.py > build/output/ANALYZER_SHA256.txt
+          cat > build/output/RETAINED_ARTIFACT_AUTHORITY.json <<'JSON'
+          {
+            "original_run_id": 29589205147,
+            "primary": {"artifact_id": 8411002980, "github_digest_sha256": "40c1a54244deebe14d0ba3f48fd73e1d38c0389ed02fac9e68679d5391d72f4b"},
+            "secondary": {"artifact_id": 8410983642, "github_digest_sha256": "312e86b65a9090e6de097d56671434b5d0f8a6dddd93cf897d6b01f70785aea8"},
+            "comparison": {"artifact_id": 8418579625, "github_digest_sha256": "9029f2e3751a75d4b110ce9348d3c16f0b1e732046d898919322aaf0cc538039"}
+          }
+          JSON
+
+      - name: Download retained primary export evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.PRIMARY_NAME }}
+          path: build/primary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ORIGINAL_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained secondary export evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SECONDARY_NAME }}
+          path: build/secondary
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ORIGINAL_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Download accepted comparison evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.COMPARISON_NAME }}
+          path: build/comparison
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.COMPARISON_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Verify immutable APK and comparison authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          primary=build/primary/artifacts/bahrain-brick-pr59-primary-debug.apk
+          secondary=build/secondary/artifacts/bahrain-brick-pr59-secondary-debug.apk
+          test "$(stat -c %s "$primary")" = '347919106'
+          test "$(stat -c %s "$secondary")" = '347919106'
+          printf '%s  %s\n' "$PRIMARY_APK_SHA256" "$primary" | sha256sum -c -
+          printf '%s  %s\n' "$SECONDARY_APK_SHA256" "$secondary" | sha256sum -c -
+          chmod 0444 "$primary" "$secondary"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          value=json.loads(Path('build/comparison/EXISTING_TOOL_APK_COMPARISON.json').read_text())
+          assert value['classification']=='C'
+          assert len(value['payload_entry_differences'])==2324
+          assert len(value['signature_entry_differences'])==3
+          assert len(value['zip_structure_differences'])==3842
+          PY
+
+      - name: Extract accepted source authority from both retained artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          pzip="$(find build/primary -type f -name MANAMA_SOUQ_COMPOSITE_SOURCE.zip -print -quit)"
+          szip="$(find build/secondary -type f -name MANAMA_SOUQ_COMPOSITE_SOURCE.zip -print -quit)"
+          test -n "$pzip"; test -n "$szip"
+          mkdir -p build/source-primary build/source-secondary
+          unzip -q "$pzip" -d build/source-primary
+          unzip -q "$szip" -d build/source-secondary
+          pmanifest="$(find build/source-primary -type f -path '*/asset_lab/runtime/full_asset_matrix_manifest.json' -print -quit)"
+          smanifest="$(find build/source-secondary -type f -path '*/asset_lab/runtime/full_asset_matrix_manifest.json' -print -quit)"
+          test -n "$pmanifest"; test -n "$smanifest"
+          proot="$(dirname "$(dirname "$(dirname "$pmanifest")")")"
+          sroot="$(dirname "$(dirname "$(dirname "$smanifest")")")"
+          test -f "$proot/project.godot"; test -f "$sroot/project.godot"
+          diff -q "$pmanifest" "$smanifest"
+          test "$(sha256sum "$pmanifest" | awk '{print $1}')" = '6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff'
+          printf '%s\n' "$proot" > build/output/PRIMARY_EXTRACTED_SOURCE_ROOT.txt
+          printf '%s\n' "$sroot" > build/output/SECONDARY_EXTRACTED_SOURCE_ROOT.txt
+
+      - name: Generate complete retained-APK nondeterminism taxonomy
+        shell: bash
+        run: |
+          set +e
+          proot="$(cat build/output/PRIMARY_EXTRACTED_SOURCE_ROOT.txt)"
+          python3 /tmp/pr59_nondeterminism_forensics.py \
+            --primary-root build/primary \
+            --secondary-root build/secondary \
+            --source-root "$proot" \
+            --comparison build/comparison/EXISTING_TOOL_APK_COMPARISON.json \
+            --output build/output \
+            > build/output/ANALYZER_STDOUT.txt \
+            2> build/output/ANALYZER_STDERR.txt
+          code=$?
+          printf '%s\n' "$code" > build/output/ANALYZER_EXIT_CODE.txt
+          exit 0
+
+      - name: Finalize compact taxonomy evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/output')
+          records=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name!='COMPACT_EVIDENCE_INVENTORY.json'):
+            records.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          value={'schema_version':1,'file_count':len(records),'total_bytes':sum(r['bytes'] for r in records),'files':records}
+          (root/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          assert value['total_bytes'] < 50*1024*1024,value
+          forbidden=[p.as_posix() for p in root.rglob('*') if p.is_file() and p.suffix.lower() in {'.apk','.glb','.pck','.scn','.ctex','.mesh'}]
+          assert not forbidden,forbidden
+          PY
+          test "$(cat build/output/ANALYZER_EXIT_CODE.txt)" = '0'
+          for required in APK_NONDETERMINISM_ENTRY_MAP.json APK_NONDETERMINISM_CATEGORY_SUMMARY.json APK_FIRST_100_BINARY_DIFFS.json IMPORT_METADATA_FIELD_DIFFS.json IMPORT_METADATA_DIFFERING_FIELDS_SUMMARY.json IMPORTED_RESOURCE_CAUSE_MAP.json IMPORTED_RESOURCE_TYPE_SUMMARY.json PRIMARY_SOURCE_METADATA_MANIFEST.json SECONDARY_SOURCE_METADATA_MANIFEST.json SOURCE_METADATA_COMPARISON.json PIPELINE_FIRST_DIVERGENCE.json UID_CACHE_IDENTITIES.json; do
+            test -s "build/output/$required"
+          done
+
+      - name: Upload compact nondeterminism taxonomy
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-pr59-godot-nondeterminism-taxonomy-${{ github.run_id }}
+          path: build/output
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
