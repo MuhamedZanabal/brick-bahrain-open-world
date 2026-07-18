@@ -1,0 +1,94 @@
+        for j in range(state.get_node_property_count(i)):
+            props.append({"name": str(state.get_node_property_name(i, j)), "value": _canon(state.get_node_property_value(i, j), context + ".node[%d].property[%d]" % [i, j])})
+        props.sort_custom(func(a, b): return str(a["name"]) < str(b["name"]))
+        var groups = Array(state.get_node_groups(i))
+        groups.sort()
+        nodes.append({
+            "index": i,
+            "sibling_index": state.get_node_index(i),
+            "path": str(state.get_node_path(i)),
+            "parent_path": str(state.get_node_path(i, true)),
+            "name": str(state.get_node_name(i)),
+            "node_type": str(state.get_node_type(i)),
+            "owner_path": str(state.get_node_owner_path(i)),
+            "groups": groups,
+            "instance_placeholder": state.is_node_instance_placeholder(i),
+            "placeholder_path": str(state.get_node_instance_placeholder(i)),
+            "instance": _canon(state.get_node_instance(i), context + ".node[%d].instance" % i),
+            "properties": props
+        })
+    var connections := []
+    for i in range(state.get_connection_count()):
+        connections.append({
+            "source": str(state.get_connection_source(i)),
+            "signal": str(state.get_connection_signal(i)),
+            "target": str(state.get_connection_target(i)),
+            "method": str(state.get_connection_method(i)),
+            "flags": state.get_connection_flags(i),
+            "unbinds": state.get_connection_unbinds(i),
+            "binds": _canon(state.get_connection_binds(i), context + ".connection[%d]" % i)
+        })
+    connections.sort_custom(func(a, b): return JSON.stringify(a) < JSON.stringify(b))
+    return {"node_count": nodes.size(), "nodes": nodes, "connection_count": connections.size(), "connections": connections}
+
+func _mesh(mesh, context):
+    var surfaces := []
+    for i in range(mesh.get_surface_count()):
+        var arrays = mesh.surface_get_arrays(i)
+        var array_rows := []
+        for j in range(arrays.size()):
+            var value = arrays[j]
+            array_rows.append({"array_index": j, "is_null": value == null, "value": _canon(value, context + ".surface[%d].array[%d]" % [i, j])})
+        surfaces.append({
+            "index": i,
+            "primitive": mesh.surface_get_primitive_type(i),
+            "format": mesh.surface_get_format(i),
+            "arrays": array_rows,
+            "material": _canon(mesh.surface_get_material(i), context + ".surface[%d].material" % i)
+        })
+    return {"class": mesh.get_class(), "surface_count": mesh.get_surface_count(), "blend_shape_count": mesh.get_blend_shape_count(), "blend_shape_mode": mesh.get_blend_shape_mode(), "aabb": _canon(mesh.get_aabb(), context + ".aabb"), "surfaces": surfaces}
+
+func _animation(anim, context):
+    var tracks := []
+    for i in range(anim.get_track_count()):
+        var keys := []
+        for k in range(anim.track_get_key_count(i)):
+            keys.append({"index": k, "time": _canon(anim.track_get_key_time(i, k), context + ".time"), "value": _canon(anim.track_get_key_value(i, k), context + ".value"), "transition": _canon(anim.track_get_key_transition(i, k), context + ".transition")})
+        tracks.append({"index": i, "track_type": anim.track_get_type(i), "path": str(anim.track_get_path(i)), "interpolation": anim.track_get_interpolation_type(i), "enabled": anim.track_is_enabled(i), "keys": keys})
+    return {"length": _canon(anim.length, context + ".length"), "loop_mode": anim.loop_mode, "step": _canon(anim.step, context + ".step"), "tracks": tracks}
+
+func _run():
+    var args = OS.get_cmdline_user_args()
+    if args.size() != 2:
+        push_error("expected selection and output")
+        quit(2)
+        return
+    var selection = JSON.parse_string(FileAccess.get_file_as_string(args[0]))
+    if typeof(selection) != TYPE_DICTIONARY:
+        push_error("invalid selection")
+        quit(3)
+        return
+    var output = {"engine": Engine.get_version_info(), "resources": []}
+    for item in selection["resources"]:
+        seen.clear()
+        next_ref = 0
+        failures.clear()
+        var target = "res://" + str(item["target_path"])
+        var res = ResourceLoader.load(target, "", ResourceLoader.CACHE_MODE_IGNORE)
+        if res == null:
+            failures.append({"target": target, "reason": "load returned null"})
+        var graph = _resource(res, str(item["selection_id"])) if res != null else null
+        output["resources"].append({"selection_id": item["selection_id"], "logical_source": item["logical_source"], "target_path": item["target_path"], "graph": graph, "failures": failures.duplicate(true)})
+    var f = FileAccess.open(args[1], FileAccess.WRITE)
+    if f == null:
+        push_error("failed to open output")
+        quit(4)
+        return
+    f.store_string(JSON.stringify(output))
+    f.close()
+    for item in output["resources"]:
+        if not item["failures"].is_empty():
+            push_error("semantic failures")
+            quit(5)
+            return
+    quit(0)
