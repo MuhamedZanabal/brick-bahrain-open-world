@@ -1,0 +1,57 @@
+name: Bahrain Brick PR59 Fast Model Pair Comparison
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/workflows/pr59-model-pairs-fast.yml]
+  workflow_dispatch:
+permissions: {actions: read, contents: read}
+env:
+  INPUT_RUN: '29627302405'
+  INPUT_NAME: pr59-godot-import-experiment-input-29627302405
+  SEED_RUN: '29629130600'
+  SEED_NAME: pr59-godot-uid-sidecar-authority-29629130600
+  FORENSIC_RUN: '29636586197'
+  RETAINED_NAME: pr59-model-retained-29636586197
+  D2_NAME: pr59-model-d2-29636586197
+jobs:
+  d1_and_compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: b/s, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.RETAINED_NAME }}', path: b/r, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.FORENSIC_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.D2_NAME }}', path: b/d2, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.FORENSIC_RUN }}', github-token: '${{ github.token }}'}
+      - name: Run bounded D1 diagnostic without pack generation
+        shell: bash
+        run: |
+          set +e; mkdir -p b/d1
+          G=b/i/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$G"
+          python3 t/.github/forensics/pr59_model_binary_forensics.py seeded-run --source-zip b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$G" --seed-zip b/s/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest b/s/GODOT_IMPORT_UID_SIDECARS_V1.json --selection b/r/REPRESENTATIVE_SELECTION.json --semantic-script t/.github/forensics/pr59_model_semantic_dump.gd --output b/d1 --work-root /tmp/pr59-fast-d1 --label FAST_MODEL_D1
+          echo $? > b/d1/EXIT; exit 0
+      - name: Compare MD5, raw binary and semantic evidence
+        shell: bash
+        run: |
+          test "$(cat b/d1/EXIT)" = 0
+          mkdir -p b/p
+          python3 t/.github/forensics/pr59_model_binary_forensics.py compare-pairs --d1 b/d1 --d2 b/d2 --output b/p
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          r=Path('b/p'); rows=[]
+          for p in sorted(x for x in r.iterdir() if x.is_file()): rows.append({'path':p.name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (r/'PAIR_EVIDENCE_INVENTORY.json').write_text(json.dumps({'workflow_run_id':int('${{ github.run_id }}'),'parent_forensic_run':29636586197,'files':rows,'no_android_export':True,'no_pr_correction':True},indent=2,sort_keys=True)+'\n')
+          PY
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-pr59-fast-model-pairs-${{ github.run_id }}', path: b/p, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Record fast-pair run locator
+        if: always()
+        shell: bash
+        run: echo '${{ github.run_id }}' > /tmp/fast_run_id.txt
