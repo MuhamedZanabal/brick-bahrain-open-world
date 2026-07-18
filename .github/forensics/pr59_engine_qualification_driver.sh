@@ -50,6 +50,7 @@ qualify() {
     -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $GH_TOKEN" \
     "https://api.github.com/repos/godotengine/godot-builds/releases/tags/$TAG" > "$DL/release.json"
   release_assets "$TAG" "$DL/release.json" "$DL/assets.env"
+  # shellcheck disable=SC1090
   source "$DL/assets.env"
   curl -fL --retry 4 --retry-all-errors "$BINARY_URL" -o "$DL/$BINARY_NAME"
   curl -fL --retry 4 --retry-all-errors "$SOURCE_URL" -o "$DL/$SOURCE_NAME"
