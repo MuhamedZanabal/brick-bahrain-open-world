@@ -1,0 +1,268 @@
+181-2026-07-18T15:15:09.0810783Z [36;1mecho "ENGINE=$ENGINE" >> "$GITHUB_ENV"[0m
+182-2026-07-18T15:15:09.0882202Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+183-2026-07-18T15:15:09.0882495Z ##[endgroup]
+184-2026-07-18T15:15:09.1033053Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+185-2026-07-18T15:15:09.1033580Z                                  Dload  Upload   Total   Spent    Left  Speed
+186-2026-07-18T15:15:09.1033777Z 
+187-2026-07-18T15:15:09.2085388Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+188-2026-07-18T15:15:09.3219302Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+189-2026-07-18T15:15:09.3219778Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+190-2026-07-18T15:15:09.5887798Z 
+191-2026-07-18T15:15:09.5888535Z 100 67.2M  100 67.2M    0     0   138M      0 --:--:-- --:--:-- --:--:--  138M
+192-2026-07-18T15:15:10.5413351Z ##[group]Run set +e
+193-2026-07-18T15:15:10.5413573Z [36;1mset +e[0m
+194-2026-07-18T15:15:10.5413946Z [36;1mCORPUS=$(find build/aggregate -name BAHRAIN_BRICK_ENGINE_QUALIFICATION_CORPUS.zip -type f -print -quit)[0m
+195-2026-07-18T15:15:10.5414780Z [36;1mSIDECARS=$(find build/v5-452 -name CANDIDATE_IMPORT_SIDECAR_AUTHORITY.zip -type f -print -quit)[0m
+196-2026-07-18T15:15:10.5415217Z [36;1mtest -n "$CORPUS" -a -n "$SIDECARS"[0m
+197-2026-07-18T15:15:10.5415463Z [36;1mmkdir -p build/strict-result[0m
+198-2026-07-18T15:15:10.5415788Z [36;1mpython3 qualification/.github/forensics/pr59_strict_452_stage2.py \[0m
+199-2026-07-18T15:15:10.5416104Z [36;1m  --engine "$ENGINE" \[0m
+200-2026-07-18T15:15:10.5416330Z [36;1m  --corpus-zip "$CORPUS" \[0m
+201-2026-07-18T15:15:10.5416568Z [36;1m  --source-sidecar-zip "$SIDECARS" \[0m
+202-2026-07-18T15:15:10.5416927Z [36;1m  --semantic-script qualification/.github/forensics/pr59_model_semantic_dump.gd \[0m
+203-2026-07-18T15:15:10.5417304Z [36;1m  --output build/strict-result \[0m
+204-2026-07-18T15:15:10.5417534Z [36;1m  --work-root build/strict-work[0m
+205-2026-07-18T15:15:10.5417743Z [36;1mcode=$?[0m
+206-2026-07-18T15:15:10.5417954Z [36;1mecho "$code" > build/strict-result/EXIT_CODE.txt[0m
+207-2026-07-18T15:15:10.5418194Z [36;1mexit 0[0m
+208-2026-07-18T15:15:10.5469732Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+209-2026-07-18T15:15:10.5470018Z env:
+210-2026-07-18T15:15:10.5470235Z   ENGINE: build/engine/bin/Godot_v4.5.2-stable_linux.x86_64
+211-2026-07-18T15:15:10.5470495Z   TZ: UTC
+212-2026-07-18T15:15:10.5470649Z   LC_ALL: C.UTF-8
+213-2026-07-18T15:15:10.5470811Z   LANG: C.UTF-8
+214-2026-07-18T15:15:10.5470969Z ##[endgroup]
+215-2026-07-18T15:15:10.6895974Z   File "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/qualification/.github/forensics/pr59_strict_452_stage2.py", line 164
+216-2026-07-18T15:15:10.6896701Z     fields1 = dict(MD5_RE.findall(md51.read_text())), fields2 = dict(MD5_RE.findall(md52.read_text()))
+217-2026-07-18T15:15:10.6897107Z     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+218-2026-07-18T15:15:10.6897418Z SyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?
+219-2026-07-18T15:15:10.7067440Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+220-2026-07-18T15:15:10.7068492Z ##[group]Run actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+221-2026-07-18T15:15:10.7068791Z with:
+222-2026-07-18T15:15:10.7068990Z   name: pr59-godot-4.5.2-strict-stage2-29649605645
+223-2026-07-18T15:15:10.7069247Z   path: build/strict-result
+224-2026-07-18T15:15:10.7069447Z   if-no-files-found: error
+225-2026-07-18T15:15:10.7069638Z   compression-level: 9
+226-2026-07-18T15:15:10.7069822Z   retention-days: 30
+227-2026-07-18T15:15:10.7069995Z   overwrite: false
+228-2026-07-18T15:15:10.7070153Z env:
+229-2026-07-18T15:15:10.7070357Z   ENGINE: build/engine/bin/Godot_v4.5.2-stable_linux.x86_64
+230-2026-07-18T15:15:10.7070613Z ##[endgroup]
+231-2026-07-18T15:15:10.8315466Z (node:2098) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+232-2026-07-18T15:15:10.8316014Z (Use `node --trace-deprecation ...` to show where the warning was created)
+233-2026-07-18T15:15:10.8375022Z With the provided path, there will be 1 file uploaded
+234-2026-07-18T15:15:10.8435254Z Artifact name is valid!
+235-2026-07-18T15:15:10.8466288Z Root directory input is valid!
+236-2026-07-18T15:15:11.3116318Z Beginning upload of artifact content to blob storage
+237-2026-07-18T15:15:11.3213680Z (node:2098) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+238-2026-07-18T15:15:11.5912004Z Uploaded bytes 144
+239-2026-07-18T15:15:11.6716747Z Finished uploading artifact content to blob storage!
+240-2026-07-18T15:15:11.6717495Z SHA256 hash of uploaded artifact zip is 8d365c735ed4e509feb438f391790736d071a3454b0b9cf8d3968251cb97cf2e
+241-2026-07-18T15:15:11.6718418Z Finalizing artifact upload
+242-2026-07-18T15:15:11.8862935Z Artifact pr59-godot-4.5.2-strict-stage2-29649605645.zip successfully finalized. Artifact ID 8431064300
+243-2026-07-18T15:15:11.8864004Z Artifact pr59-godot-4.5.2-strict-stage2-29649605645 has been successfully uploaded! Final size is 144 bytes. Artifact ID is 8431064300
+244-2026-07-18T15:15:11.8876727Z Artifact download URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/actions/runs/29649605645/artifacts/8431064300
+245-2026-07-18T15:15:11.8960098Z ##[group]Run test "$(cat build/strict-result/EXIT_CODE.txt)" = 0
+246-2026-07-18T15:15:11.8960451Z [36;1mtest "$(cat build/strict-result/EXIT_CODE.txt)" = 0[0m
+247-2026-07-18T15:15:11.9011889Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+248-2026-07-18T15:15:11.9012171Z env:
+249-2026-07-18T15:15:11.9012388Z   ENGINE: build/engine/bin/Godot_v4.5.2-stable_linux.x86_64
+250-2026-07-18T15:15:11.9012653Z ##[endgroup]
+251:2026-07-18T15:15:11.9094254Z ##[error]Process completed with exit code 1.
+252-2026-07-18T15:15:11.9174144Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+253-2026-07-18T15:15:11.9175189Z Post job cleanup.
+254-2026-07-18T15:15:11.9858298Z [command]/usr/bin/git version
+255-2026-07-18T15:15:11.9892834Z git version 2.54.0
+256-2026-07-18T15:15:11.9921371Z Temporarily overriding HOME='/home/runner/work/_temp/84d4b54c-82b1-4a38-b27c-bd57681dba70' before making global git config changes
+257-2026-07-18T15:15:11.9922353Z Adding repository directory to the temporary git global config as a safe directory
+258-2026-07-18T15:15:11.9925884Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/qualification
+259-2026-07-18T15:15:11.9958542Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+260-2026-07-18T15:15:11.9987580Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+261-2026-07-18T15:15:12.0226564Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+262-2026-07-18T15:15:12.0247686Z http.https://github.com/.extraheader
+263-2026-07-18T15:15:12.0257332Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+264-2026-07-18T15:15:12.0289569Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+265-2026-07-18T15:15:12.0678083Z Cleaning up orphan processes
+266-2026-07-18T15:15:12.0913947Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683, actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093, actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+
+--- final 180 lines ---
+2026-07-18T15:15:00.2841306Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-18T15:15:00.3044549Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-07-18T15:15:00.3079649Z ##[endgroup]
+2026-07-18T15:15:00.3081533Z ##[group]Fetching the repository
+2026-07-18T15:15:00.3088511Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 2295d6bd96b4d0975f89892c06dd0c9d6fe07af4
+2026-07-18T15:15:04.0520589Z From https://github.com/MuhamedZanabal/brick-bahrain-open-world
+2026-07-18T15:15:04.0521552Z  * branch            2295d6bd96b4d0975f89892c06dd0c9d6fe07af4 -> FETCH_HEAD
+2026-07-18T15:15:04.0542142Z ##[endgroup]
+2026-07-18T15:15:04.0542689Z ##[group]Determining the checkout info
+2026-07-18T15:15:04.0543891Z ##[endgroup]
+2026-07-18T15:15:04.0549204Z [command]/usr/bin/git sparse-checkout disable
+2026-07-18T15:15:04.0590860Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-07-18T15:15:04.0617052Z ##[group]Checking out the ref
+2026-07-18T15:15:04.0620384Z [command]/usr/bin/git checkout --progress --force 2295d6bd96b4d0975f89892c06dd0c9d6fe07af4
+2026-07-18T15:15:04.5386358Z Note: switching to '2295d6bd96b4d0975f89892c06dd0c9d6fe07af4'.
+2026-07-18T15:15:04.5386847Z 
+2026-07-18T15:15:04.5387151Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-07-18T15:15:04.5388384Z changes and commit them, and you can discard any commits you make in this
+2026-07-18T15:15:04.5389078Z state without impacting any branches by switching back to a branch.
+2026-07-18T15:15:04.5389487Z 
+2026-07-18T15:15:04.5389771Z If you want to create a new branch to retain commits you create, you may
+2026-07-18T15:15:04.5390299Z do so (now or later) by using -c with the switch command. Example:
+2026-07-18T15:15:04.5390599Z 
+2026-07-18T15:15:04.5390746Z   git switch -c <new-branch-name>
+2026-07-18T15:15:04.5390973Z 
+2026-07-18T15:15:04.5391119Z Or undo this operation with:
+2026-07-18T15:15:04.5391330Z 
+2026-07-18T15:15:04.5391454Z   git switch -
+2026-07-18T15:15:04.5391638Z 
+2026-07-18T15:15:04.5392234Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-07-18T15:15:04.5392706Z 
+2026-07-18T15:15:04.5392908Z HEAD is now at 2295d6b ci: trigger strict 4.5.2 Stage 2
+2026-07-18T15:15:04.5450498Z ##[endgroup]
+2026-07-18T15:15:04.5490115Z [command]/usr/bin/git log -1 --format=%H
+2026-07-18T15:15:04.5512745Z 2295d6bd96b4d0975f89892c06dd0c9d6fe07af4
+2026-07-18T15:15:04.5689083Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T15:15:04.5690499Z ##[group]Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+2026-07-18T15:15:04.5690846Z with:
+2026-07-18T15:15:04.5691124Z   name: pr59-godot-engine-qualification-aggregate-29649173483
+2026-07-18T15:15:04.5691450Z   path: build/aggregate
+2026-07-18T15:15:04.5691712Z   repository: MuhamedZanabal/brick-bahrain-open-world
+2026-07-18T15:15:04.5692007Z   run-id: 29649173483
+2026-07-18T15:15:04.5694145Z   github-token: ***
+2026-07-18T15:15:04.5694587Z   merge-multiple: false
+2026-07-18T15:15:04.5694825Z ##[endgroup]
+2026-07-18T15:15:04.6839264Z Downloading single artifact
+2026-07-18T15:15:04.6897320Z (node:2052) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T15:15:04.6898357Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T15:15:04.7041667Z (node:2052) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-18T15:15:04.9796768Z Preparing to download the following artifacts:
+2026-07-18T15:15:04.9797822Z - pr59-godot-engine-qualification-aggregate-29649173483 (ID: 8430972139, Size: 25691610, Expected Digest: sha256:e01b14c63ec87fe3b03baf337da6c8b6a06b1a84069bcf687bace5c33e0b4eb0)
+2026-07-18T15:15:04.9828654Z Downloading artifact '8430972139' from 'MuhamedZanabal/brick-bahrain-open-world'
+2026-07-18T15:15:05.1403722Z Redirecting to blob download url: https://productionresultssa17.blob.core.windows.net/actions-results/9a4cea2e-e3af-4a5b-a68f-4d0942f47cb9/workflow-job-run-8b456946-768e-55e2-b3d2-5e003deabe9d/artifacts/32a6ded822bb9fb7d2704ba361494624332cf2f4cfa9ef1b39e396951153d945.zip
+2026-07-18T15:15:05.1405838Z Starting download of artifact to: /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/aggregate
+2026-07-18T15:15:05.4712212Z (node:2052) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-07-18T15:15:07.1222760Z SHA256 digest of downloaded artifact is e01b14c63ec87fe3b03baf337da6c8b6a06b1a84069bcf687bace5c33e0b4eb0
+2026-07-18T15:15:07.1223473Z Artifact download completed successfully.
+2026-07-18T15:15:07.1235434Z Total of 1 artifact(s) downloaded
+2026-07-18T15:15:07.1235965Z Download artifact has finished successfully
+2026-07-18T15:15:07.1390762Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T15:15:07.1391938Z ##[group]Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+2026-07-18T15:15:07.1392253Z with:
+2026-07-18T15:15:07.1392457Z   name: pr59-godot-4.5.2-qualification-29649173483
+2026-07-18T15:15:07.1392719Z   path: build/v5-452
+2026-07-18T15:15:07.1392940Z   repository: MuhamedZanabal/brick-bahrain-open-world
+2026-07-18T15:15:07.1393187Z   run-id: 29649173483
+2026-07-18T15:15:07.1395783Z   github-token: ***
+2026-07-18T15:15:07.1395990Z   merge-multiple: false
+2026-07-18T15:15:07.1396180Z ##[endgroup]
+2026-07-18T15:15:07.2581241Z Downloading single artifact
+2026-07-18T15:15:07.2638261Z (node:2064) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T15:15:07.2638944Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T15:15:07.2797993Z (node:2064) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-18T15:15:07.5613064Z Preparing to download the following artifacts:
+2026-07-18T15:15:07.5614518Z - pr59-godot-4.5.2-qualification-29649173483 (ID: 8430970563, Size: 12267319, Expected Digest: sha256:b7b5ba6742bb6ee2f09b43bc17cc3aecb44e2afd0ee6bdfdc0600a88c205c8d4)
+2026-07-18T15:15:07.5645079Z Downloading artifact '8430970563' from 'MuhamedZanabal/brick-bahrain-open-world'
+2026-07-18T15:15:07.7201059Z Redirecting to blob download url: https://productionresultssa17.blob.core.windows.net/actions-results/9a4cea2e-e3af-4a5b-a68f-4d0942f47cb9/workflow-job-run-8b456946-768e-55e2-b3d2-5e003deabe9d/artifacts/4268177529f4910b0337c7361248276ba2fa693dbbdaa9b56a6c4f91154319a5.zip
+2026-07-18T15:15:07.7202980Z Starting download of artifact to: /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/v5-452
+2026-07-18T15:15:08.0007248Z (node:2064) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-07-18T15:15:09.0675926Z SHA256 digest of downloaded artifact is b7b5ba6742bb6ee2f09b43bc17cc3aecb44e2afd0ee6bdfdc0600a88c205c8d4
+2026-07-18T15:15:09.0676545Z Artifact download completed successfully.
+2026-07-18T15:15:09.0676867Z Total of 1 artifact(s) downloaded
+2026-07-18T15:15:09.0682241Z Download artifact has finished successfully
+2026-07-18T15:15:09.0806432Z ##[group]Run set -euo pipefail
+2026-07-18T15:15:09.0806729Z [36;1mset -euo pipefail[0m
+2026-07-18T15:15:09.0806950Z [36;1mmkdir -p build/engine[0m
+2026-07-18T15:15:09.0807209Z [36;1mcurl -fL --retry 4 --retry-all-errors \[0m
+2026-07-18T15:15:09.0807717Z [36;1m  https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_linux.x86_64.zip \[0m
+2026-07-18T15:15:09.0808227Z [36;1m  -o build/engine/Godot_v4.5.2-stable_linux.x86_64.zip[0m
+2026-07-18T15:15:09.0808786Z [36;1mtest "$(sha256sum build/engine/Godot_v4.5.2-stable_linux.x86_64.zip | cut -d' ' -f1)" = 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03[0m
+2026-07-18T15:15:09.0809402Z [36;1munzip -q build/engine/Godot_v4.5.2-stable_linux.x86_64.zip -d build/engine/bin[0m
+2026-07-18T15:15:09.0809831Z [36;1mENGINE=$(find build/engine/bin -type f -name 'Godot*' -print -quit)[0m
+2026-07-18T15:15:09.0810142Z [36;1mchmod +x "$ENGINE"[0m
+2026-07-18T15:15:09.0810461Z [36;1mtest "$($ENGINE --version | head -1)" = 4.5.2.stable.official.6ce3de25a[0m
+2026-07-18T15:15:09.0810783Z [36;1mecho "ENGINE=$ENGINE" >> "$GITHUB_ENV"[0m
+2026-07-18T15:15:09.0882202Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-18T15:15:09.0882495Z ##[endgroup]
+2026-07-18T15:15:09.1033053Z   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+2026-07-18T15:15:09.1033580Z                                  Dload  Upload   Total   Spent    Left  Speed
+2026-07-18T15:15:09.1033777Z 
+2026-07-18T15:15:09.2085388Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-07-18T15:15:09.3219302Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-07-18T15:15:09.3219778Z   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+2026-07-18T15:15:09.5887798Z 
+2026-07-18T15:15:09.5888535Z 100 67.2M  100 67.2M    0     0   138M      0 --:--:-- --:--:-- --:--:--  138M
+2026-07-18T15:15:10.5413351Z ##[group]Run set +e
+2026-07-18T15:15:10.5413573Z [36;1mset +e[0m
+2026-07-18T15:15:10.5413946Z [36;1mCORPUS=$(find build/aggregate -name BAHRAIN_BRICK_ENGINE_QUALIFICATION_CORPUS.zip -type f -print -quit)[0m
+2026-07-18T15:15:10.5414780Z [36;1mSIDECARS=$(find build/v5-452 -name CANDIDATE_IMPORT_SIDECAR_AUTHORITY.zip -type f -print -quit)[0m
+2026-07-18T15:15:10.5415217Z [36;1mtest -n "$CORPUS" -a -n "$SIDECARS"[0m
+2026-07-18T15:15:10.5415463Z [36;1mmkdir -p build/strict-result[0m
+2026-07-18T15:15:10.5415788Z [36;1mpython3 qualification/.github/forensics/pr59_strict_452_stage2.py \[0m
+2026-07-18T15:15:10.5416104Z [36;1m  --engine "$ENGINE" \[0m
+2026-07-18T15:15:10.5416330Z [36;1m  --corpus-zip "$CORPUS" \[0m
+2026-07-18T15:15:10.5416568Z [36;1m  --source-sidecar-zip "$SIDECARS" \[0m
+2026-07-18T15:15:10.5416927Z [36;1m  --semantic-script qualification/.github/forensics/pr59_model_semantic_dump.gd \[0m
+2026-07-18T15:15:10.5417304Z [36;1m  --output build/strict-result \[0m
+2026-07-18T15:15:10.5417534Z [36;1m  --work-root build/strict-work[0m
+2026-07-18T15:15:10.5417743Z [36;1mcode=$?[0m
+2026-07-18T15:15:10.5417954Z [36;1mecho "$code" > build/strict-result/EXIT_CODE.txt[0m
+2026-07-18T15:15:10.5418194Z [36;1mexit 0[0m
+2026-07-18T15:15:10.5469732Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-18T15:15:10.5470018Z env:
+2026-07-18T15:15:10.5470235Z   ENGINE: build/engine/bin/Godot_v4.5.2-stable_linux.x86_64
+2026-07-18T15:15:10.5470495Z   TZ: UTC
+2026-07-18T15:15:10.5470649Z   LC_ALL: C.UTF-8
+2026-07-18T15:15:10.5470811Z   LANG: C.UTF-8
+2026-07-18T15:15:10.5470969Z ##[endgroup]
+2026-07-18T15:15:10.6895974Z   File "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/qualification/.github/forensics/pr59_strict_452_stage2.py", line 164
+2026-07-18T15:15:10.6896701Z     fields1 = dict(MD5_RE.findall(md51.read_text())), fields2 = dict(MD5_RE.findall(md52.read_text()))
+2026-07-18T15:15:10.6897107Z     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-07-18T15:15:10.6897418Z SyntaxError: invalid syntax. Maybe you meant '==' or ':=' instead of '='?
+2026-07-18T15:15:10.7067440Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T15:15:10.7068492Z ##[group]Run actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+2026-07-18T15:15:10.7068791Z with:
+2026-07-18T15:15:10.7068990Z   name: pr59-godot-4.5.2-strict-stage2-29649605645
+2026-07-18T15:15:10.7069247Z   path: build/strict-result
+2026-07-18T15:15:10.7069447Z   if-no-files-found: error
+2026-07-18T15:15:10.7069638Z   compression-level: 9
+2026-07-18T15:15:10.7069822Z   retention-days: 30
+2026-07-18T15:15:10.7069995Z   overwrite: false
+2026-07-18T15:15:10.7070153Z env:
+2026-07-18T15:15:10.7070357Z   ENGINE: build/engine/bin/Godot_v4.5.2-stable_linux.x86_64
+2026-07-18T15:15:10.7070613Z ##[endgroup]
+2026-07-18T15:15:10.8315466Z (node:2098) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T15:15:10.8316014Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T15:15:10.8375022Z With the provided path, there will be 1 file uploaded
+2026-07-18T15:15:10.8435254Z Artifact name is valid!
+2026-07-18T15:15:10.8466288Z Root directory input is valid!
+2026-07-18T15:15:11.3116318Z Beginning upload of artifact content to blob storage
+2026-07-18T15:15:11.3213680Z (node:2098) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-18T15:15:11.5912004Z Uploaded bytes 144
+2026-07-18T15:15:11.6716747Z Finished uploading artifact content to blob storage!
+2026-07-18T15:15:11.6717495Z SHA256 hash of uploaded artifact zip is 8d365c735ed4e509feb438f391790736d071a3454b0b9cf8d3968251cb97cf2e
+2026-07-18T15:15:11.6718418Z Finalizing artifact upload
+2026-07-18T15:15:11.8862935Z Artifact pr59-godot-4.5.2-strict-stage2-29649605645.zip successfully finalized. Artifact ID 8431064300
+2026-07-18T15:15:11.8864004Z Artifact pr59-godot-4.5.2-strict-stage2-29649605645 has been successfully uploaded! Final size is 144 bytes. Artifact ID is 8431064300
+2026-07-18T15:15:11.8876727Z Artifact download URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/actions/runs/29649605645/artifacts/8431064300
+2026-07-18T15:15:11.8960098Z ##[group]Run test "$(cat build/strict-result/EXIT_CODE.txt)" = 0
+2026-07-18T15:15:11.8960451Z [36;1mtest "$(cat build/strict-result/EXIT_CODE.txt)" = 0[0m
+2026-07-18T15:15:11.9011889Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-18T15:15:11.9012171Z env:
+2026-07-18T15:15:11.9012388Z   ENGINE: build/engine/bin/Godot_v4.5.2-stable_linux.x86_64
+2026-07-18T15:15:11.9012653Z ##[endgroup]
+2026-07-18T15:15:11.9094254Z ##[error]Process completed with exit code 1.
+2026-07-18T15:15:11.9174144Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T15:15:11.9175189Z Post job cleanup.
+2026-07-18T15:15:11.9858298Z [command]/usr/bin/git version
+2026-07-18T15:15:11.9892834Z git version 2.54.0
+2026-07-18T15:15:11.9921371Z Temporarily overriding HOME='/home/runner/work/_temp/84d4b54c-82b1-4a38-b27c-bd57681dba70' before making global git config changes
+2026-07-18T15:15:11.9922353Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-18T15:15:11.9925884Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/qualification
+2026-07-18T15:15:11.9958542Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-18T15:15:11.9987580Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-18T15:15:12.0226564Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-18T15:15:12.0247686Z http.https://github.com/.extraheader
+2026-07-18T15:15:12.0257332Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-18T15:15:12.0289569Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-18T15:15:12.0678083Z Cleaning up orphan processes
+2026-07-18T15:15:12.0913947Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683, actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093, actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
