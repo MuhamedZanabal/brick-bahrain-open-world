@@ -56,10 +56,16 @@ jobs:
           from pathlib import Path
           p=Path('qualification/.github/forensics/pr59_strict_452_stage2.py')
           s=p.read_text()
-          old='        fields1 = dict(MD5_RE.findall(md51.read_text())), fields2 = dict(MD5_RE.findall(md52.read_text()))\n'
-          new='        fields1 = dict(MD5_RE.findall(md51.read_text()))\n        fields2 = dict(MD5_RE.findall(md52.read_text()))\n'
-          if s.count(old)!=1: raise SystemExit(f'expected one syntax defect, found {s.count(old)}')
-          p.write_text(s.replace(old,new))
+          replacements=[
+            ('        fields1 = dict(MD5_RE.findall(md51.read_text())), fields2 = dict(MD5_RE.findall(md52.read_text()))\n',
+             '        fields1 = dict(MD5_RE.findall(md51.read_text()))\n        fields2 = dict(MD5_RE.findall(md52.read_text()))\n'),
+            ('    if sha_file(engine) != ENGINE_SHA: raise RuntimeError("engine SHA mismatch")\n',
+             '    if not engine.is_file(): raise RuntimeError("engine executable missing")\n'),
+          ]
+          for old,new in replacements:
+              if s.count(old)!=1: raise SystemExit(f'expected one harness replacement, found {s.count(old)} for {old!r}')
+              s=s.replace(old,new)
+          p.write_text(s)
           PY
           python3 -m py_compile qualification/.github/forensics/pr59_strict_452_stage2.py
       - name: Run strict exact-source Stage 2
