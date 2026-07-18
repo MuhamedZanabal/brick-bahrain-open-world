@@ -1,0 +1,44 @@
+name: Bahrain Brick Godot 4.5.2 Stage 3 Locator
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/forensics/pr59-452-stage3-trigger.txt]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  locate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-godot-engine-qualification-20260718
+          fetch-depth: 0
+      - name: Record Stage 3 run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sleep 12
+          mkdir -p .github/forensics/run-locators
+          python3 - <<'PY'
+          import json,os,urllib.request
+          repo=os.environ['GITHUB_REPOSITORY']; token=os.environ['GH_TOKEN']; sha=os.environ['GITHUB_SHA']
+          url=f'https://api.github.com/repos/{repo}/actions/workflows/pr59-452-stage3.yml/runs?branch=ci/pr59-godot-engine-qualification-20260718&event=push&per_page=20'
+          req=urllib.request.Request(url,headers={'Authorization':f'Bearer {token}','Accept':'application/vnd.github+json','User-Agent':'pr59-452-stage3-locator'})
+          with urllib.request.urlopen(req) as r:data=json.load(r)
+          rows=[x for x in data.get('workflow_runs',[]) if x.get('head_sha')==sha]
+          if len(rows)!=1: raise SystemExit(f'expected one Stage 3 run for {sha}, got {len(rows)}')
+          x=rows[0]
+          open('.github/forensics/run-locators/pr59-452-stage3.json','w').write(json.dumps({'run_id':x['id'],'head_sha':sha,'status':x['status'],'conclusion':x['conclusion'],'created_at':x['created_at'],'html_url':x['html_url']},sort_keys=True)+'\n')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/run-locators/pr59-452-stage3.json
+          git commit -m 'ci: record Godot 4.5.2 Stage 3 run [skip ci]'
+          git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
+          git push origin HEAD:ci/pr59-godot-engine-qualification-20260718
