@@ -1,0 +1,54 @@
+name: Bahrain Brick Engine Qualification Materialization Fix V2
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/workflows/pr59-engine-qualification-materialize-fix-v2.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-godot-engine-qualification-20260718
+          fetch-depth: 0
+      - name: Replace both corrupt single-payload decoders
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/pr59-engine-qualification.yml')
+          lines=p.read_text().splitlines()
+          out=[]; replaced=0; i=0
+          while i < len(lines):
+              line=lines[i]
+              if line.strip()=='cp qualification/.github/forensics/pr59_engine_qualification.py.gz.b64 /tmp/qualification.py.gz.b64':
+                  if i+1>=len(lines) or lines[i+1].strip()!='base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py':
+                      raise SystemExit('decode command adjacency mismatch')
+                  indent=line[:len(line)-len(line.lstrip())]
+                  out.extend([
+                      indent+"cat qualification/.github/forensics/engine_qualification_parts/part*.b64 | tr -d '\\n' > /tmp/qualification.py.gz.b64",
+                      indent+'test "$(wc -c < /tmp/qualification.py.gz.b64)" = 12652',
+                      indent+'base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py',
+                      indent+'test "$(sha256sum /tmp/pr59_engine_qualification.py | cut -d\' \' -f1)" = c7c54ec58f2ede9c6a0c0082a913bcefdc67f55225d74a0280be00eee83823bf',
+                  ])
+                  replaced+=1; i+=2; continue
+              out.append(line); i+=1
+          if replaced!=2: raise SystemExit(f'expected 2 replacements, got {replaced}')
+          text='\n'.join(out)+'\n'
+          if text.count('engine_qualification_parts/part*.b64')!=2: raise SystemExit('fragment gate count mismatch')
+          p.write_text(text)
+          PY
+          git diff --check
+          git diff -- .github/workflows/pr59-engine-qualification.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/pr59-engine-qualification.yml
+          git commit -m 'ci: fix qualification harness materialization v2'
+          git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
+          git push origin HEAD:ci/pr59-godot-engine-qualification-20260718
