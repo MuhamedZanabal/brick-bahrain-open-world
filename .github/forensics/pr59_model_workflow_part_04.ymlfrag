@@ -1,0 +1,60 @@
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-diagnostic-d1-${{ github.run_id }}', path: build/d1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-diagnostic-d2-${{ github.run_id }}', path: build/d2}
+      - name: Compare all MD5 records and selected binary/semantic pairs
+        shell: bash
+        run: |
+          set +e
+          mkdir -p build/pairs
+          python3 tooling/.github/forensics/pr59_model_binary_forensics.py compare-pairs --d1 build/d1 --d2 build/d2 --output build/pairs
+          code=$?; printf '%s\n' "$code" > build/pairs/EXIT_CODE.txt; exit 0
+      - name: Upload pair-comparison evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-pair-comparison-${{ github.run_id }}', path: build/pairs, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Enforce source-hash and semantic inspection integrity
+        shell: bash
+        run: |
+          test "$(cat build/pairs/EXIT_CODE.txt)" = 0
+          python3 - <<'PY'
+          import json
+          m=json.load(open('build/pairs/IMPORTED_MD5_SUMMARY.json'))
+          assert m['record_count']==800 and m['source_hash_alarm_count']==0,m
+          s=json.load(open('build/pairs/MODEL_SEMANTIC_COMPARISON.json'))
+          assert len(s['resources'])==8,s
+          PY
+
+  preseed_authority:
+    needs: retained_compare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: build/seed, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - name: Generate one verified diagnostic UID cache
+        shell: bash
+        run: |
+          godot=build/input/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_model_binary_forensics.py seeded-run --source-zip build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$godot" --seed-zip build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json --output build/preseed --work-root /tmp/pr59-preseed-authority --label PRESEED_AUTHORITY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-model-preseed-authority-${{ github.run_id }}
+          path: |
+            build/preseed/uid_cache.bin
+            build/preseed/SEEDED_DIAGNOSTIC_RESULT.json
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  preseed_d1:
+    needs: preseed_authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
