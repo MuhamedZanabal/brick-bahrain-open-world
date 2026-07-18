@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import collections
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import zipfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+SOURCE_ARCHIVE_SHA = "5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7"
+PROJECT_TEXT = '''; Disposable engine qualification project. Never write back to PR #59.\nconfig_version=5\n\n[application]\nconfig/name="Bahrain Brick Engine Qualification"\n\n[rendering]\nrenderer/rendering_method="gl_compatibility"\nrenderer/rendering_method.mobile="gl_compatibility"\n'''
+PATH_RE = re.compile(r'(?m)^path="res://([^"\r\n]+)"\s*$')
+SOURCE_RE = re.compile(r'(?m)^source_file="res://([^"\r\n]+)"\s*$')
+UID_RE = re.compile(r'(?m)^uid="(uid://[^"\r\n]+)"\s*$')
+ERROR_RE = re.compile(r"SCRIPT ERROR|Parse Error|Parser Error|Failed to load script|FATAL|Fatal signal", re.I)
+
+
+def sha_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def safe_rel(value: str) -> str:
+    p = PurePosixPath(value)
+    if value.startswith("/") or "\\" in value or ".." in p.parts:
+        raise ValueError(f"unsafe path: {value}")
+    return p.as_posix()
+
+
+def run(cmd: list[str], log: Path, env: dict[str, str], timeout: int = 1800) -> dict[str, Any]:
+    log.parent.mkdir(parents=True, exist_ok=True)
+    start = time.time()
+    with log.open("wb") as out:
+        try:
+            p = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, env=env, timeout=timeout, check=False)
+            code = p.returncode
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            code = 124
+            timed_out = True
+    data = log.read_bytes()
+    return {
+        "command": cmd,
+        "exit_code": code,
+        "timed_out": timed_out,
+        "elapsed_seconds": round(time.time() - start, 3),
+        "log_sha256": sha_bytes(data),
+        "log_bytes": len(data),
+        "error_pattern_count": len(ERROR_RE.findall(data.decode("utf-8", "replace"))),
+    }
+
+
+def env_for(root: Path) -> dict[str, str]:
+    if root.exists():
+        shutil.rmtree(root)
+    root.mkdir(parents=True)
+    env = os.environ.copy()
+    env.update({
+        "TZ": "UTC",
+        "LC_ALL": "C.UTF-8",
+        "LANG": "C.UTF-8",
+        "XDG_DATA_HOME": str(root.resolve()),
+        "GODOT_SILENCE_ROOT_WARNING": "1",
+    })
+    return env
+
+
+def deterministic_zip(output: Path, files: dict[str, bytes]) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for name in sorted(files):
+            info = zipfile.ZipInfo(safe_rel(name), (1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = (0o100444 << 16)
+            z.writestr(info, files[name])
+
+
+def prepare_corpus(args: argparse.Namespace) -> int:
+    source = Path(args.source_zip)
+    manifest_path = Path(args.manifest)
+    output = Path(args.output)
+    manifest = json.loads(manifest_path.read_text())
+    assert sha_file(source) == SOURCE_ARCHIVE_SHA
+    files: dict[str, bytes] = {"QUALIFICATION_CORPUS.json": manifest_path.read_bytes()}
+    with zipfile.ZipFile(source) as z:
+        names = {i.filename for i in z.infolist() if not i.is_dir()}
+        for row in manifest["resources"]:
+            required = [row["logical_source"], *row.get("dependencies", [])]
+            for rel in required:
+                assert rel in names, rel
+                data = z.read(rel)
+                if rel == row["logical_source"]:
+                    assert len(data) == row["source_bytes"], rel
+                    assert sha_bytes(data) == row["source_sha256"], rel
+                files[rel] = data
+    deterministic_zip(output, files)
+    write_json(output.with_suffix(".inventory.json"), {
+        "archive": output.name,
+        "archive_bytes": output.stat().st_size,
+        "archive_sha256": sha_file(output),
+        "files": [{"path": k, "bytes": len(v), "sha256": sha_bytes(v)} for k, v in sorted(files.items())],
+        "alias_discrepancies": manifest.get("alias_discrepancies", []),
+    })
+    return 0
+
+
+def extract_corpus(corpus_zip: Path, target: Path) -> dict[str, Any]:
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True)
+    with zipfile.ZipFile(corpus_zip) as z:
+        names = [i.filename for i in z.infolist() if not i.is_dir()]
+        assert len(names) == len(set(names))
+        for info in sorted((i for i in z.infolist() if not i.is_dir()), key=lambda x: x.filename):
+            rel = safe_rel(info.filename)
+            dst = target / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(z.read(info))
+            os.chmod(dst, 0o644)
+            os.utime(dst, (315532800, 315532800))
+    manifest = json.loads((target / "QUALIFICATION_CORPUS.json").read_text())
+    return manifest
+
+
+def make_project(corpus: Path, project: Path, paths: list[str]) -> None:
+    if project.exists():
+        shutil.rmtree(project)
+    project.mkdir(parents=True)
+    (project / "project.godot").write_text(PROJECT_TEXT)
+    os.utime(project / "project.godot", (315532800, 315532800))
+    for rel in sorted(set(paths)):
+        rel = safe_rel(rel)
+        src = corpus / rel
+        assert src.is_file(), rel
+        dst = project / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        os.chmod(dst, 0o644)
+        os.utime(dst, (315532800, 315532800))
+    for d in sorted([p for p in project.rglob("*") if p.is_dir()], key=lambda p: len(p.parts), reverse=True):
+        os.chmod(d, 0o755)
+        os.utime(d, (315532800, 315532800))
+
+
+def parse_import(path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    if data.endswith(b"\0"):
+        data = data[:-1]
+    text = data.decode("utf-8", "replace")
+    p = PATH_RE.search(text)
+    s = SOURCE_RE.search(text)
+    u = UID_RE.search(text)
+    return {
+        "path": p.group(1) if p else None,
+        "source_file": s.group(1) if s else None,
+        "uid": u.group(1) if u else None,
+        "bytes": path.stat().st_size,
+        "sha256": sha_file(path),
+    }
+
+
+def parse_md5(path: Path) -> dict[str, Any]:
+    fields: dict[str, str] = {}
+    malformed: list[str] = []
