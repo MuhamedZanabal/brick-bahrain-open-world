@@ -20,6 +20,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          echo 'materialization-fix-v2-triggered'
           python3 - <<'PY'
           from pathlib import Path
           p=Path('.github/workflows/pr59-engine-qualification.yml')
