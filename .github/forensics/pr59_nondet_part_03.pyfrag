@@ -1,0 +1,130 @@
+            all_fields = sorted(set(pm["field_map"]) | set(sm["field_map"]))
+            field_diffs = {}
+            for fld in all_fields:
+                pv, sv = pm["field_map"].get(fld), sm["field_map"].get(fld)
+                if pv != sv:
+                    field_diffs[fld] = {"primary": pv, "secondary": sv}
+                    import_field_counts[fld] += 1
+            for special in ("sections", "field_order", "line_ending", "terminal_nul", "embedded_nul"):
+                if pm[special] != sm[special]:
+                    field_diffs[special] = {"primary": pm[special], "secondary": sm[special]}
+                    import_field_counts[special] += 1
+            if pm.get("source_md5") != sm.get("source_md5"):
+                source_alarm.append({"path": path, "primary": pm.get("source_md5"), "secondary": sm.get("source_md5")})
+            import_diff_rows.append({
+                "apk_path": path,
+                "logical_source": pm["logical_source"],
+                "primary": {k: pm[k] for k in ("sections", "field_order", "line_ending", "terminal_nul", "path", "uid", "source_file", "dest_files", "source_md5", "dest_md5", "importer", "type", "metadata", "params", "text_sha256")},
+                "secondary": {k: sm[k] for k in ("sections", "field_order", "line_ending", "terminal_nul", "path", "uid", "source_file", "dest_files", "source_md5", "dest_md5", "importer", "type", "metadata", "params", "text_sha256")},
+                "differing_fields": field_diffs,
+            })
+
+        if cat == "GODOT_IMPORTED_RESOURCE":
+            sidecars = mapping["associated_import_sidecars"]
+            pmeta = p_sidecars.get(sidecars[0]) if len(sidecars) == 1 else None
+            smeta = s_sidecars.get(sidecars[0]) if len(sidecars) == 1 else None
+            ext = Path(mapping["logical_source_path"] or "").suffix.lower() or "unmapped"
+            imported_type_counts[ext] += 1
+            imported_rows.append({
+                "apk_path": path,
+                "logical_source": mapping["logical_source_path"],
+                "source_type": ext,
+                "source_authority": source,
+                "associated_sidecars": sidecars,
+                "importer": (pmeta or smeta or {}).get("importer"),
+                "primary_import_metadata_sha256": pmeta.get("text_sha256") if pmeta else None,
+                "secondary_import_metadata_sha256": smeta.get("text_sha256") if smeta else None,
+                "importer_settings_identical": bool(pmeta and smeta and pmeta.get("params") == smeta.get("params") and pmeta.get("metadata") == smeta.get("metadata") and pmeta.get("importer") == smeta.get("importer")),
+                "primary_bytes": len(pb), "secondary_bytes": len(sb),
+                "size_differs": len(pb) != len(sb),
+                "first_differing_byte_offset": first,
+                "total_differing_byte_count": diff_count,
+                "primary_content_evidence": row["primary_content_evidence"],
+                "secondary_content_evidence": row["secondary_content_evidence"],
+            })
+
+    write_json(output / "APK_NONDETERMINISM_ENTRY_MAP.json", {"record_count": len(entry_map), "records": entry_map})
+    write_json(output / "APK_NONDETERMINISM_CATEGORY_SUMMARY.json", {
+        "accepted_comparison_classification": comparison["classification"],
+        "content_difference_count": len(differing),
+        "non_signature_difference_count": len(comparison["payload_entry_differences"]),
+        "signature_difference_count": len(comparison["signature_entry_differences"]),
+        "category_counts": dict(sorted(category_counts.items())),
+    })
+    write_json(output / "APK_FIRST_100_BINARY_DIFFS.json", {"records": binary_first_100})
+    write_json(output / "IMPORT_METADATA_FIELD_DIFFS.json", {"record_count": len(import_diff_rows), "records": import_diff_rows})
+    write_json(output / "IMPORT_METADATA_DIFFERING_FIELDS_SUMMARY.json", {
+        "differing_import_files": len(import_diff_rows),
+        "differing_field_counts": dict(sorted(import_field_counts.items())),
+        "source_md5_alarm_count": len(source_alarm),
+        "source_md5_alarms": source_alarm,
+        "all_import_files_same_differing_field_set": len({tuple(sorted(r["differing_fields"])) for r in import_diff_rows}) == 1,
+    })
+    write_json(output / "IMPORTED_RESOURCE_CAUSE_MAP.json", {"record_count": len(imported_rows), "records": imported_rows})
+    write_json(output / "IMPORTED_RESOURCE_TYPE_SUMMARY.json", {
+        "differing_imported_resources": len(imported_rows),
+        "source_type_counts": dict(sorted(imported_type_counts.items())),
+        "mapped_exactly": sum(1 for r in imported_rows if r["logical_source"] and r["source_authority"]["exists"]),
+        "source_bytes_identical_by_authority": all(r["source_authority"]["exists"] for r in imported_rows),
+        "importer_settings_identical_count": sum(1 for r in imported_rows if r["importer_settings_identical"]),
+        "size_difference_count": sum(1 for r in imported_rows if r["size_differs"]),
+    })
+
+    p_source_zip = locate_one(primary_root, "MANAMA_SOUQ_COMPOSITE_SOURCE.zip")
+    s_source_zip = locate_one(secondary_root, "MANAMA_SOUQ_COMPOSITE_SOURCE.zip")
+    pm = zip_source_metadata(p_source_zip, output / "PRIMARY_SOURCE_METADATA_MANIFEST.json")
+    sm = zip_source_metadata(s_source_zip, output / "SECONDARY_SOURCE_METADATA_MANIFEST.json")
+    source_cmp = compare_source_metadata(pm, sm)
+    source_cmp["environment_comparison"] = {
+        "runner_image": {"primary": "ubuntu-24.04 20260714.240.1", "secondary": "ubuntu-24.04 20260714.240.1", "identical": True},
+        "runner_region": {"primary": "northcentralus", "secondary": "northcentralus", "identical": True},
+        "job_name": {"primary": "export_primary", "secondary": "export_secondary", "identical": False},
+        "source_root": {"primary": source_cmp["original_primary_absolute_root"], "secondary": source_cmp["original_secondary_absolute_root"], "identical": False},
+        "locale_timezone_umask_cpu_environment": "not retained by original evidence; must be captured in controlled experiments",
+    }
+    write_json(output / "SOURCE_METADATA_COMPARISON.json", source_cmp)
+
+    first_ten = [r["apk_path"] for r in entry_map if r["entry_category"] != "SIGNATURE"][:10]
+    if source_cmp["content_differences"]:
+        last_identical, first_divergent = "source authority declaration", "reconstructed source bytes"
+    elif source_cmp["timestamp_differences"] or source_cmp["mode_differences"] or source_cmp["ordering_differences"]:
+        last_identical, first_divergent = "reconstructed source bytes", "reconstructed filesystem/archive metadata"
+    else:
+        last_identical, first_divergent = "reconstructed source bytes and retained archive metadata", "generated .godot import metadata"
+    pipeline = {
+        "last_identical_stage": last_identical,
+        "first_divergent_stage": first_divergent,
+        "exact_first_divergent_files": first_ten,
+        "exact_differing_fields_or_bytes": {
+            "import_metadata_field_counts": dict(sorted(import_field_counts.items())),
+            "first_binary_diffs_report": "APK_FIRST_100_BINARY_DIFFS.json",
+        },
+        "variables_capable_of_influencing_stage": ["absolute source root", "source filesystem metadata", "UID cache generation", "import order/concurrency", "runner environment", "Godot serialization"],
+        "variables_proven_not_to_influence_it": ["accepted source file bytes", "Godot version", "runner image version", "runner region", "Android manifest/resources/DEX/native payload"],
+        "source_md5_alarm_count": len(source_alarm),
+    }
+    write_json(output / "PIPELINE_FIRST_DIVERGENCE.json", pipeline)
+    write_json(output / "ORIGINAL_JOB_AUTHORITY.json", {
+        "primary_job_id": 87913824602,
+        "secondary_job_id": 87913824650,
+        "primary_runner_region": "northcentralus",
+        "secondary_runner_region": "northcentralus",
+        "primary_absolute_workspace_root": source_cmp["original_primary_absolute_root"],
+        "secondary_absolute_workspace_root": source_cmp["original_secondary_absolute_root"],
+        "runner_image": "ubuntu-24.04 20260714.240.1",
+        "godot": "4.3.stable.official.77dcf97d8",
+    })
+    p_uid = pi.get("assets/.godot/uid_cache.bin"); s_uid = si.get("assets/.godot/uid_cache.bin")
+    write_json(output / "UID_CACHE_IDENTITIES.json", {
+        "primary": {"sha256": sha256_bytes(pz.read(p_uid)) if p_uid else None, "bytes": p_uid.file_size if p_uid else None},
+        "secondary": {"sha256": sha256_bytes(sz.read(s_uid)) if s_uid else None, "bytes": s_uid.file_size if s_uid else None},
+        "identical": bool(p_uid and s_uid and sha256_bytes(pz.read(p_uid)) == sha256_bytes(sz.read(s_uid))),
+    })
+    pz.close(); sz.close()
+    if source_alarm:
+        return 3
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
