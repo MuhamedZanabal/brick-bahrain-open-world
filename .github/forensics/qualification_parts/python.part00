@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import collections
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import zipfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+SOURCE_ARCHIVE_SHA = "5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7"
+PROJECT_TEXT = '''; Disposable engine qualification project. Never write back to PR #59.\nconfig_version=5\n\n[application]\nconfig/name="Bahrain Brick Engine Qualification"\n\n[rendering]\nrenderer/rendering_method="gl_compatibility"\nrenderer/rendering_method.mobile="gl_compatibility"\n'''
+PATH_RE = re.compile(r'(?m)^path="res://([^"\r\n]+)"\s*$')
+SOURCE_RE = re.compile(r'(?m)^source_file="res://([^"\r\n]+)"\s*$')
+UID_RE = re.compile(r'(?m)^uid="(uid://[^"\r\n]+)"\s*$')
+ERROR_RE = re.compile(r"SCRIPT ERROR|Parse Error|Parser Error|Failed to load script|FATAL|Fatal signal", re.I)
+
+
+def sha_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def safe_rel(value: str) -> str:
+    p = PurePosixPath(value)
+    if value.startswith("/") or "\\" in value or ".." in p.parts:
+        raise ValueError(f"unsafe path: {value}")
+    return p.as_posix()
+
+
+def run(cmd: list[str], log: Path, env: dict[str, str], timeout: int = 1800) -> dict[str, Any]:
+    log.parent.mkdir(parents=True, exist_ok=True)
+    start = time.time()
+    with log.open("wb") as out:
+        try:
+            p = subprocess.run(cmd, stdout=out, stderr=subprocess.STDOUT, env=env, timeout=timeout, check=False)
+            code = p.returncode
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            code = 124
+            timed_out = True
+    data = log.read_bytes()
+    return {
+        "command": cmd,
+        "exit_code": code,
+        "timed_out": timed_out,
+        "elapsed_seconds": round(time.time() - start, 3),
+        "log_sha256": sha_bytes(data),
+        "log_bytes": len(data),
+        "error_pattern_count": len(ERROR_RE.findall(data.decode("utf-8", "replace"))),
+    }
