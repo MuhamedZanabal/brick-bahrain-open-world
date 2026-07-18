@@ -1,4 +1,4 @@
-name: Bahrain Brick Engine Qualification V3 Failure Context
+name: Bahrain Brick Engine Qualification V4 Failure Context
 
 on:
   push:
@@ -17,24 +17,24 @@ jobs:
         with:
           ref: ci/pr59-godot-engine-qualification-20260718
           fetch-depth: 0
-      - name: Extract V3 candidate-step failure context
+      - name: Extract V4 candidate-step failure context
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p .github/forensics/run-locators /tmp/joblog
-          curl -fL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'User-Agent: pr59-engine-qualification-v3-log-context' \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/88091072668/logs" -o /tmp/joblog/raw
+          curl -fL -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' -H 'User-Agent: pr59-engine-qualification-v4-log-context' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/jobs/88091356571/logs" -o /tmp/joblog/raw
           if unzip -t /tmp/joblog/raw >/dev/null 2>&1; then unzip -p /tmp/joblog/raw > /tmp/joblog/decoded.txt; else cp /tmp/joblog/raw /tmp/joblog/decoded.txt; fi
           {
-            grep -n -B 45 -A 65 -E 'Qualify official candidates|prepare-corpus|CORPUS|Traceback|AssertionError|expected one official asset|missing official|curl:|tar:|unzip:|Process completed with exit code|##\[error\]' /tmp/joblog/decoded.txt || true
-            printf '\n--- final 140 lines ---\n'
-            tail -n 140 /tmp/joblog/decoded.txt
-          } > .github/forensics/run-locators/pr59-engine-qualification-v3-failure-context.txt
+            grep -n -B 60 -A 90 -E 'Qualify official candidates|prepare-corpus|Traceback|AssertionError|expected one official asset|missing official|curl:|tar:|unzip:|unbound variable|Process completed with exit code|##\[error\]' /tmp/joblog/decoded.txt || true
+            printf '\n--- final 170 lines ---\n'
+            tail -n 170 /tmp/joblog/decoded.txt
+          } > .github/forensics/run-locators/pr59-engine-qualification-v4-failure-context.txt
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add .github/forensics/run-locators/pr59-engine-qualification-v3-failure-context.txt
-          git commit -m 'ci: record qualification V3 failure context [skip ci]'
+          git add .github/forensics/run-locators/pr59-engine-qualification-v4-failure-context.txt
+          git commit -m 'ci: record qualification V4 failure context [skip ci]'
           git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
           git push origin HEAD:ci/pr59-godot-engine-qualification-20260718
