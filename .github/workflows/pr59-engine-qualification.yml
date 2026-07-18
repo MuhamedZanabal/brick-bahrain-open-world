@@ -1,0 +1,220 @@
+name: Bahrain Brick Official Godot Engine Qualification
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/workflows/pr59-engine-qualification.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  INPUT_RUN: '29627302405'
+  INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+  FORENSIC_RUN: '29636586197'
+  FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+
+jobs:
+  prepare_corpus:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: qualification
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.FORENSIC_ARTIFACT }}
+          path: build/forensic
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.FORENSIC_RUN }}
+          github-token: ${{ github.token }}
+      - name: Decode qualification harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp qualification/.github/forensics/pr59_engine_qualification.py.gz.b64 /tmp/qualification.py.gz.b64
+          base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py
+          chmod +x /tmp/pr59_engine_qualification.py
+          python3 -m py_compile /tmp/pr59_engine_qualification.py
+          sha256sum /tmp/pr59_engine_qualification.py | tee build/HARNESS_SHA256.txt
+      - name: Prepare exact accepted eight-resource corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=$(find build/input -name MANAMA_SOUQ_COMPOSITE_SOURCE.zip -type f -print -quit)
+          SELECT=$(find build/forensic -name REPRESENTATIVE_SELECTION.json -type f -print -quit)
+          test -n "$SOURCE" -a -n "$SELECT"
+          python3 /tmp/pr59_engine_qualification.py prepare-corpus --source-zip "$SOURCE" --selection "$SELECT" --output build/corpus
+          cp build/HARNESS_SHA256.txt build/corpus/
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          r=Path('build/corpus'); rows=[]
+          for p in sorted(x for x in r.rglob('*') if x.is_file() and x.name!='CORPUS_ARTIFACT_INVENTORY.json'):
+              rows.append({'path':p.relative_to(r).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (r/'CORPUS_ARTIFACT_INVENTORY.json').write_text(json.dumps({'workflow_run_id':int('${{ github.run_id }}'),'frozen_pr_head':'${{ env.FROZEN_PR_HEAD }}','files':rows},indent=2,sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-engine-qualification-corpus-${{ github.run_id }}
+          path: build/corpus
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  qualify_stable_candidates:
+    needs: prepare_corpus
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      CORPUS_ARTIFACT: pr59-engine-qualification-corpus-${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: qualification
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.CORPUS_ARTIFACT }}
+          path: build/corpus
+      - name: Decode qualification harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp qualification/.github/forensics/pr59_engine_qualification.py.gz.b64 /tmp/qualification.py.gz.b64
+          base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py
+          chmod +x /tmp/pr59_engine_qualification.py
+          python3 -m py_compile /tmp/pr59_engine_qualification.py
+          test "$(sha256sum /tmp/pr59_engine_qualification.py | cut -d' ' -f1)" = "$(cut -d' ' -f1 build/corpus/HARNESS_SHA256.txt)"
+      - name: Qualify official stable releases in order
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CORPUS=$(find build/corpus -name BAHRAIN_BRICK_ENGINE_QUALIFICATION_CORPUS.zip -type f -print -quit)
+          SEMANTIC="$GITHUB_WORKSPACE/qualification/.github/forensics/pr59_model_semantic_dump.gd"
+          test -f "$CORPUS" -a -f "$SEMANTIC"
+          mkdir -p build/candidates build/downloads build/sources build/work
+
+          qualify() {
+            local TAG="$1"
+            local OUT="build/candidates/$TAG"
+            local DL="build/downloads/$TAG"
+            local SRC="build/sources/$TAG"
+            local WORK="build/work/$TAG"
+            local ASSET="Godot_v${TAG}_linux.x86_64.zip"
+            mkdir -p "$OUT" "$DL" "$SRC" "$WORK"
+
+            curl -fsSL -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/godotengine/godot-builds/releases/tags/$TAG" > "$DL/release.json"
+            python3 - "$DL/release.json" "$ASSET" "$OUT/ENGINE_IDENTITY.json" <<'PY'
+          import json,sys
+          p,asset_name,out=sys.argv[1:]
+          r=json.load(open(p)); matches=[a for a in r.get('assets',[]) if a.get('name')==asset_name]
+          if len(matches)!=1: raise SystemExit(f'official asset not found exactly once: {asset_name}')
+          a=matches[0]
+          obj={'tag':r['tag_name'],'release_id':r['id'],'release_url':r['html_url'],'published_at':r['published_at'],'prerelease':r['prerelease'],'draft':r['draft'],'binary_archive_filename':a['name'],'binary_download_url':a['browser_download_url'],'binary_official_digest':a.get('digest'),'binary_asset_id':a['id'],'binary_asset_bytes':a['size']}
+          json.dump(obj,open(out,'w'),indent=2,sort_keys=True);open(out,'a').write('\n')
+          PY
+            URL=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["binary_download_url"])' "$OUT/ENGINE_IDENTITY.json")
+            curl -fL --retry 4 --retry-all-errors "$URL" -o "$DL/$ASSET"
+            ACTUAL=$(sha256sum "$DL/$ASSET" | cut -d' ' -f1)
+            EXPECTED=$(python3 -c 'import json,sys;d=json.load(open(sys.argv[1])).get("binary_official_digest") or "";print(d.removeprefix("sha256:"))' "$OUT/ENGINE_IDENTITY.json")
+            test -n "$EXPECTED" && test "$ACTUAL" = "$EXPECTED"
+            unzip -q "$DL/$ASSET" -d "$DL/engine"
+            ENGINE=$(find "$DL/engine" -maxdepth 2 -type f -name 'Godot*' ! -name '*.txt' -print -quit)
+            chmod +x "$ENGINE"
+            VERSION_OUTPUT=$("$ENGINE" --version | head -1)
+
+            SOURCE_URL="https://github.com/godotengine/godot/archive/refs/tags/$TAG.tar.gz"
+            curl -fL --retry 4 --retry-all-errors "$SOURCE_URL" -o "$DL/godot-$TAG-source.tar.gz"
+            SOURCE_SHA=$(sha256sum "$DL/godot-$TAG-source.tar.gz" | cut -d' ' -f1)
+            tar -xzf "$DL/godot-$TAG-source.tar.gz" -C "$SRC"
+            SOURCE_ROOT=$(find "$SRC" -mindepth 1 -maxdepth 1 -type d -print -quit)
+            TAG_COMMIT=$(git ls-remote https://github.com/godotengine/godot.git "refs/tags/$TAG^{}" | awk 'NR==1{print $1}')
+            if [ -z "$TAG_COMMIT" ]; then TAG_COMMIT=$(git ls-remote https://github.com/godotengine/godot.git "refs/tags/$TAG" | awk 'NR==1{print $1}'); fi
+            python3 - "$OUT/ENGINE_IDENTITY.json" "$ACTUAL" "$SOURCE_URL" "$SOURCE_SHA" "$TAG_COMMIT" "$VERSION_OUTPUT" <<'PY'
+          import json,os,platform,sys
+          p,bsha,surl,ssha,commit,version=sys.argv[1:]
+          d=json.load(open(p));d.update({'binary_archive_sha256':bsha,'source_archive_url':surl,'source_archive_sha256':ssha,'source_tag_commit':commit,'runtime_version_output':version,'operating_system':platform.platform(),'architecture':platform.machine(),'locale':'C.UTF-8','timezone':'UTC','umask':'0022','cpu_count':os.cpu_count(),'download_provenance':'official godotengine/godot-builds release API and official godotengine/godot tag archive'})
+          json.dump(d,open(p,'w'),indent=2,sort_keys=True);open(p,'a').write('\n')
+          PY
+
+            python3 /tmp/pr59_engine_qualification.py stage2 \
+              --engine "$ENGINE" --identity "$OUT/ENGINE_IDENTITY.json" --source-root "$SOURCE_ROOT" \
+              --corpus-zip "$CORPUS" --semantic-script "$SEMANTIC" --output "$OUT" --work-root "$WORK"
+            rm -rf "$DL" "$SRC" "$WORK"
+          }
+
+          qualify 4.4.1-stable
+          qualify 4.5.2-stable
+          qualify 4.6.3-stable
+
+          check_unavailable() {
+            local TAG="$1"; local OUT="build/candidates/$TAG"; mkdir -p "$OUT"
+            local STATUS
+            STATUS=$(curl -sS -o "$OUT/release-api-response.json" -w '%{http_code}' -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/godotengine/godot-builds/releases/tags/$TAG")
+            test "$STATUS" = 404
+            python3 /tmp/pr59_engine_qualification.py unavailable --version "$TAG" --checked-at "$(date -u +%FT%TZ)" --evidence "official godotengine/godot-builds release API HTTP $STATUS" --reason "No official release exists for the requested tag as of the qualification run." --output "$OUT"
+          }
+          check_unavailable 4.7.1-stable
+          check_unavailable 4.8-dev1
+
+          python3 /tmp/pr59_engine_qualification.py aggregate --candidate-root build/candidates --output build/aggregate
+          cp build/corpus/CORPUS_AUTHORITY_RESOLUTION.json build/aggregate/
+          cp build/corpus/QUALIFICATION_CORPUS_ARCHIVE.json build/aggregate/
+          cp build/corpus/HARNESS_SHA256.txt build/aggregate/
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          r=Path('build/aggregate'); rows=[]
+          for p in sorted(x for x in r.rglob('*') if x.is_file() and x.name!='FINAL_AGGREGATE_INVENTORY.json'):
+              rows.append({'path':p.relative_to(r).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          (r/'FINAL_AGGREGATE_INVENTORY.json').write_text(json.dumps({'workflow_run_id':int('${{ github.run_id }}'),'workflow_sha':'${{ github.sha }}','frozen_pr_head':'${{ env.FROZEN_PR_HEAD }}','files':rows,'no_android_export':True,'no_project_migration':True},indent=2,sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.4.1-qualification-${{ github.run_id }}
+          path: build/candidates/4.4.1-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.5.2-qualification-${{ github.run_id }}
+          path: build/candidates/4.5.2-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-4.6.3-qualification-${{ github.run_id }}
+          path: build/candidates/4.6.3-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-engine-qualification-aggregate-${{ github.run_id }}
+          path: |
+            build/aggregate
+            build/candidates/4.7.1-stable
+            build/candidates/4.8-dev1
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
