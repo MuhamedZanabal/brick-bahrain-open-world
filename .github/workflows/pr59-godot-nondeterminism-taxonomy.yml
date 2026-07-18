@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
@@ -163,6 +163,24 @@ jobs:
           for required in APK_NONDETERMINISM_ENTRY_MAP.json APK_NONDETERMINISM_CATEGORY_SUMMARY.json APK_FIRST_100_BINARY_DIFFS.json IMPORT_METADATA_FIELD_DIFFS.json IMPORT_METADATA_DIFFERING_FIELDS_SUMMARY.json IMPORTED_RESOURCE_CAUSE_MAP.json IMPORTED_RESOURCE_TYPE_SUMMARY.json PRIMARY_SOURCE_METADATA_MANIFEST.json SECONDARY_SOURCE_METADATA_MANIFEST.json SOURCE_METADATA_COMPARISON.json PIPELINE_FIRST_DIVERGENCE.json UID_CACHE_IDENTITIES.json; do
             test -s "build/output/$required"
           done
+
+      - name: Record taxonomy run locator
+        if: always()
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          cat > .github/forensics/LATEST_NONDETERMINISM_TAXONOMY_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"conclusion":"${{ job.status }}","head_sha":"${{ github.sha }}","analyzer_exit_code":"$(cat ../build/output/ANALYZER_EXIT_CODE.txt 2>/dev/null || printf unavailable)"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_NONDETERMINISM_TAXONOMY_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(forensics): record nondeterminism taxonomy run ${{ github.run_id }}"
+            git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+          fi
 
       - name: Upload compact nondeterminism taxonomy
         if: always()
