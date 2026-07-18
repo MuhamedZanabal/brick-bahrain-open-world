@@ -1,0 +1,11 @@
+{
+  "artifacts_url": "https://api.github.com/repos/MuhamedZanabal/brick-bahrain-open-world/actions/runs/29627302405/artifacts",
+  "conclusion": "failure",
+  "head_sha": "e53e243b0cda8c27e16377a7461cc417fb0eb410",
+  "id": 29627302405,
+  "jobs_url": "https://api.github.com/repos/MuhamedZanabal/brick-bahrain-open-world/actions/runs/29627302405/jobs",
+  "name": "Bahrain Brick PR59 Godot Import Controlled Experiments",
+  "run_started_at": "2026-07-18T02:35:05Z",
+  "status": "completed",
+  "updated_at": "2026-07-18T02:35:50Z"
+}
