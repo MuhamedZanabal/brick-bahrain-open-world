@@ -1,0 +1,81 @@
+            "imported_sizes_identical": d1["imported"]["bytes"] == d2["imported"]["bytes"],
+            "imported_sha256_identical": d1["imported"]["sha256"] == d2["imported"]["sha256"],
+            "destination_md5_identical": d1["md5"]["fields"].get("dest_md5") == d2["md5"]["fields"].get("dest_md5"),
+            "source_md5_identical": d1["md5"]["fields"].get("source_md5") == d2["md5"]["fields"].get("source_md5"),
+            "uid_cache_identical": uid_equal,
+            "generated_path_sets_identical": path_equal,
+            "generated_content_difference_count": inventory_comparison["content_difference_count"],
+            "binary_difference": binary_diff,
+            "canonical_semantic_equal": semantic_equal,
+            "semantic_section_comparison": semantic_section_comparison,
+            "stage2_pass": sidecar_equal and imported_equal and md5_equal and uid_equal and path_equal and inventory_comparison["content_difference_count"] == 0,
+        })
+
+    write_json(output / "CANDIDATE_SIDECAR_AUTHORITY.json", {"candidate_version": args.version, "resources": sidecar_authority_records})
+    stage2_pass = all(row["stage2_pass"] for row in resource_results)
+    classification = "STAGE2_PASS_PENDING_STAGE3" if stage2_pass else "Q1"
+    result = {
+        "schema_version": 1,
+        "candidate_version": args.version,
+        "runtime_version_output": version_output,
+        "resource_count": len(resource_results),
+        "resources": resource_results,
+        "summary": {
+            "stage1_pass": True,
+            "stage2_pass": stage2_pass,
+            "differing_imported_binaries": sum(not row["imported_sha256_identical"] for row in resource_results),
+            "differing_destination_md5": sum(not row["destination_md5_identical"] for row in resource_results),
+            "differing_uid_caches": sum(not row["uid_cache_identical"] for row in resource_results),
+            "path_set_failures": sum(not row["generated_path_sets_identical"] for row in resource_results),
+            "generated_content_differences_total": overall_generated_differences,
+            "semantic_inequality_or_failure_count": sum(row["canonical_semantic_equal"] is not True for row in resource_results),
+            "source_hash_alarms": sum(not row["source_md5_identical"] for row in resource_results),
+        },
+        "classification": classification,
+        "later_stages_entered": [],
+    }
+    write_json(output / "ENGINE_MINIMAL_CORPUS_RESULTS.json", result)
+    artifact_inventory(output)
+    return 0
+
+
+def artifact_inventory(root: Path) -> None:
+    rows = []
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and p.name != "ARTIFACT_INVENTORY.json"):
+        rows.append({"path": path.relative_to(root).as_posix(), "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+    write_json(root / "ARTIFACT_INVENTORY.json", {
+        "schema_version": 1,
+        "file_count": len(rows),
+        "total_bytes": sum(row["bytes"] for row in rows),
+        "files": rows,
+        "no_android_export": True,
+        "no_apk": True,
+        "no_project_migration": True,
+        "pr_head": PR_HEAD,
+    })
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    minimal = sub.add_parser("minimal")
+    minimal.add_argument("--version", required=True)
+    minimal.add_argument("--source-zip", required=True)
+    minimal.add_argument("--selection", required=True)
+    minimal.add_argument("--godot", required=True)
+    minimal.add_argument("--engine-source", required=True)
+    minimal.add_argument("--semantic-script", required=True)
+    minimal.add_argument("--identity", required=True)
+    minimal.add_argument("--work-root", required=True)
+    minimal.add_argument("--output", required=True)
+    minimal.set_defaults(function=minimal_candidate)
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    return args.function(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
