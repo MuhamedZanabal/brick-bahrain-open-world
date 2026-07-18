@@ -1,0 +1,120 @@
+                })
+        return rows
+
+    resource_text = texts["resource"]
+    binary_text = texts["binary_saver"]
+    dictionary_unsorted = "get_key_list(&keys)" in binary_text and not re.search(r"get_key_list\(&keys\).*?keys\.sort", binary_text, re.S)
+    audit = {
+        "schema_version": 1,
+        "candidate_version": version,
+        "source_files": {key: {"path": path.relative_to(source_root).as_posix(), "sha256": sha256_file(path), "bytes": path.stat().st_size} for key, path in files.items()},
+        "fallback_scene_unique_id": {
+            "uses_wall_clock": "get_datetime" in resource_text,
+            "uses_microsecond_ticks": "get_ticks_usec" in resource_text,
+            "uses_random_number": "Math::rand" in resource_text or "rand()" in resource_text,
+            "uses_five_characters": "characters = 5" in resource_text,
+            "occurrences": occurrences("resource", "generate_scene_unique_id"),
+        },
+        "deterministic_seed_path": {
+            "binary_saver_seeds_from_output_path_hash": "seed_scene_unique_id(p_path.hash())" in binary_text,
+            "binary_occurrences": occurrences("binary_saver", "seed_scene_unique_id"),
+            "text_saver_seeds_from_output_path_hash": "seed_scene_unique_id(p_path.hash())" in texts["text_saver"],
+            "text_occurrences": occurrences("text_saver", "seed_scene_unique_id"),
+        },
+        "built_in_local_id_assignment": {
+            "calls_generate_scene_unique_id": "generate_scene_unique_id()" in binary_text,
+            "occurrences": occurrences("binary_saver", "generate_scene_unique_id"),
+            "serializes_local_scheme": '"local://"' in binary_text,
+        },
+        "dictionary_serialization": {
+            "uses_get_key_list": "get_key_list(&keys)" in binary_text,
+            "explicit_sort_detected_near_get_key_list": not dictionary_unsorted,
+            "unsorted_candidate": dictionary_unsorted,
+            "occurrences": occurrences("binary_saver", "get_key_list(&keys)"),
+        },
+        "documented_deterministic_import_option_found": False,
+        "import_path_traces": {
+            "scene_resource_save": occurrences("scene_importer", "ResourceSaver::save"),
+            "obj_resource_save": occurrences("obj_importer", "ResourceSaver::save"),
+            "gltf_scene_generation": occurrences("gltf_document", "generate_scene"),
+        },
+    }
+    changes = {
+        "schema_version": 1,
+        "candidate_version": version,
+        "baseline": "4.3.stable.official.77dcf97d8",
+        "changes": [
+            {
+                "mechanism": "binary_saver_path_hash_seed",
+                "baseline_4_3": False,
+                "candidate": audit["deterministic_seed_path"]["binary_saver_seeds_from_output_path_hash"],
+                "impact": "Candidate seeds the thread-local scene unique ID generator from the deterministic output path before binary save.",
+            },
+            {
+                "mechanism": "random_fallback_generator",
+                "baseline_4_3": True,
+                "candidate": audit["fallback_scene_unique_id"]["uses_wall_clock"] and audit["fallback_scene_unique_id"]["uses_random_number"],
+                "impact": "Fallback still mixes clock/ticks/randomness if deterministic seeding is not applied.",
+            },
+            {
+                "mechanism": "unsorted_dictionary_key_iteration_candidate",
+                "baseline_4_3": True,
+                "candidate": audit["dictionary_serialization"]["unsorted_candidate"],
+                "impact": "Potential serialization-order variance remains unless runtime output proves stable.",
+            },
+        ],
+    }
+    return audit, changes
+
+
+def run_semantic(godot: Path, project: Path, semantic_script: Path, resource: dict[str, Any], output: Path, label: str) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    selection = output.parent / f"{label}_selection.json"
+    graph = output.parent / f"{label}_semantic.json"
+    write_json(selection, {"resources": [{
+        "selection_id": resource["selection_id"],
+        "logical_source": resource["logical_source"],
+        "source_type": resource["source_type"],
+        "matrix_member": resource["matrix_member"],
+    }]})
+    env = deterministic_env(output.parent / f"{label}_semantic_xdg")
+    result = run_command([
+        str(godot), "--headless", "--path", str(project), "--script", str(semantic_script.resolve()), "--", str(selection.resolve()), str(graph.resolve())
+    ], output, env, timeout=900)
+    if result["exit_code"] != 0 or not graph.is_file():
+        return None, result
+    return json.loads(graph.read_text()), result
+
+
+def minimal_candidate(args: argparse.Namespace) -> int:
+    source_zip = Path(args.source_zip)
+    godot = Path(args.godot)
+    source_root = Path(args.engine_source)
+    selection_path = Path(args.selection)
+    semantic_script = Path(args.semantic_script)
+    output = Path(args.output)
+    work = Path(args.work_root)
+    identity = json.loads(Path(args.identity).read_text())
+    output.mkdir(parents=True, exist_ok=True)
+    work.mkdir(parents=True, exist_ok=True)
+
+    assert source_zip.is_file() and source_zip.stat().st_size == SOURCE_ZIP_BYTES and sha256_file(source_zip) == SOURCE_ZIP_SHA256
+    assert godot.is_file()
+    version_output = subprocess.check_output([str(godot), "--version"], text=True).strip()
+    identity["runtime_version_output"] = version_output
+    identity["qualification_environment"] = {
+        "os_release": Path("/etc/os-release").read_text(),
+        "architecture": subprocess.check_output(["uname", "-m"], text=True).strip(),
+        "kernel": subprocess.check_output(["uname", "-srvo"], text=True).strip(),
+        "locale": "C.UTF-8",
+        "timezone": "UTC",
+        "umask": "0022",
+        "cpu_count": os.cpu_count(),
+        "command_line": ["--headless", "--path", "<minimal-project>", "--editor", "--import", "--quit", "--verbose"],
+        "environment_variables": {"TZ": "UTC", "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8", "XDG_DATA_HOME": "isolated-per-run"},
+    }
+    write_json(output / "ENGINE_IDENTITY.json", identity)
+
+    audit, changes = source_audit(source_root, args.version)
+    write_json(output / "ENGINE_SOURCE_DETERMINISM_AUDIT.json", audit)
+    write_json(output / "ENGINE_SOURCE_CHANGE_FROM_4_3.json", changes)
+
