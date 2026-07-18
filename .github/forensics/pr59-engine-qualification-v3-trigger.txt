@@ -1,0 +1,5 @@
+Bahrain Brick official Godot engine qualification V3
+Frozen PR head: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+Purpose: trigger detached, import-only official stable-engine qualification.
+Android export: forbidden.
+Project migration: forbidden.
