@@ -1,0 +1,3 @@
+Authorized by Experiment A run 29628534721.
+Cause: ResourceUID random generation under identical same-runner same-path conditions.
+This trigger authorizes only the staged import-only preservation experiment.
