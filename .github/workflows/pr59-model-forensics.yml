@@ -1,0 +1,238 @@
+name: Bahrain Brick PR59 Model Import Forensics
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths:
+      - .github/workflows/pr59-model-forensics.yml
+      - .github/forensics/pr59_model_binary_forensics.py
+      - .github/forensics/pr59_model_semantic_dump.gd
+      - .github/forensics/pr59_godot_source_audit.py
+  workflow_dispatch:
+permissions: {actions: read, contents: read}
+concurrency: {group: pr59-model-forensics, cancel-in-progress: false}
+env:
+  BRANCH: ci/pr59-existing-apk-gate-closure-20260717
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  INPUT_RUN: '29627302405'
+  INPUT_NAME: pr59-godot-import-experiment-input-29627302405
+  SEED_RUN: '29629130600'
+  SEED_NAME: pr59-godot-uid-sidecar-authority-29629130600
+  D1_NAME: pr59-seeded-import-d1-29629130600
+  D2_NAME: pr59-seeded-import-d2-29629130600
+  GODOT_COMMIT: 77dcf97d82cbfe4e4615475fa52ca03da645dbd8
+
+jobs:
+  locator:
+    runs-on: ubuntu-24.04
+    permissions: {contents: write}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', fetch-depth: 20}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          printf '{"run_id":%s,"workflow_sha":"%s","pr_head":"%s"}\n' '${{ github.run_id }}' '${{ github.sha }}' "$PR_HEAD" > .github/forensics/LATEST_MODEL_BINARY_FORENSICS_RUN.json
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git checkout -B "$BRANCH" "$GITHUB_SHA"; git add .github/forensics/LATEST_MODEL_BINARY_FORENSICS_RUN.json
+          git commit -m 'ci(forensics): record model import run ${{ github.run_id }}'
+          git fetch origin "$BRANCH"; git rebase "origin/$BRANCH"; git push origin HEAD:"$BRANCH"
+
+  retained:
+    needs: locator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: b/s, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.D1_NAME }}', path: b/o1, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.D2_NAME }}', path: b/o2, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - shell: bash
+        run: |
+          set +e; mkdir -p b/r
+          python3 -m py_compile t/.github/forensics/pr59_model_binary_forensics.py t/.github/forensics/pr59_godot_source_audit.py
+          G=b/i/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$G"; test "$($G --version)" = 4.3.stable.official.77dcf97d8
+          printf '%s  %s\n' 5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7 b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip | sha256sum -c -
+          printf '{"seed":{"id":8424941278,"digest":"60cae818fe07f9ad022e250dc74efda3eb590d1a3dc4b6ef192c1c8d7f50d87b"},"d1":{"id":8425001064,"digest":"e92102a644284427dd541cfb320a1fd02355902c12a6c1dae30a642a0edbf371"},"d2":{"id":8424999903,"digest":"097a3a86e4bc3bcda1a4e3a85f8b9eac06717787cf29f93a9eea43c271076d3d"},"negative":{"id":8424944826,"digest":"c2910d1a22b84e9bb7ad6cb4aa24af38ae98729f0f975cdbdef0dc5b07bf96d3"}}\n' > b/r/RETAINED_ARTIFACT_AUTHORITY.json
+          mkdir -p /tmp/sc; printf 'config_version=5\n' >/tmp/sc/project.godot; printf '{"resources":[]}\n' >/tmp/empty.json
+          "$G" --headless --path /tmp/sc --script "$PWD/t/.github/forensics/pr59_model_semantic_dump.gd" -- /tmp/empty.json /tmp/sc/out.json
+          python3 t/.github/forensics/pr59_model_binary_forensics.py retained --d1 b/o1/SEEDED_IMPORT_RESULT.json --d2 b/o2/SEEDED_IMPORT_RESULT.json --source-zip b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --seed-manifest b/s/GODOT_IMPORT_UID_SIDECARS_V1.json --output b/r
+          echo $? > b/r/EXIT; exit 0
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-retained-${{ github.run_id }}', path: b/r, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - shell: bash
+        run: |
+          test "$(cat b/r/EXIT)" = 0
+          python3 - <<'PY'
+          import json
+          x=json.load(open('b/r/SEEDED_IMPORT_COMPARISON.json')); assert x['category_counts']=={'EDITOR_CACHE':1,'IMPORTED_BINARY':800,'IMPORTED_MD5':800}; assert x['source_adjacent_import_uid_differences']==0 and x['uid_cache_equal']; assert len(json.load(open('b/r/REPRESENTATIVE_SELECTION.json'))['resources'])==8
+          PY
+
+  diagnostic:
+    needs: retained
+    strategy: {fail-fast: false, matrix: {slot: [d1, d2]}}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 160
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: b/s, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-retained-${{ github.run_id }}', path: b/r}
+      - shell: bash
+        run: |
+          set +e; O=b/${{ matrix.slot }}; mkdir -p "$O"; G=b/i/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$G"; E=''
+          test '${{ matrix.slot }}' != d1 || E=--corrected-e
+          python3 t/.github/forensics/pr59_model_binary_forensics.py seeded-run --source-zip b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$G" --seed-zip b/s/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest b/s/GODOT_IMPORT_UID_SIDECARS_V1.json --selection b/r/REPRESENTATIVE_SELECTION.json --semantic-script t/.github/forensics/pr59_model_semantic_dump.gd --output "$O" --work-root /tmp/pr59-${{ matrix.slot }} --label MODEL_${{ matrix.slot }} $E
+          echo $? > "$O/EXIT"; exit 0
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-${{ matrix.slot }}-${{ github.run_id }}', path: 'b/${{ matrix.slot }}', if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - run: test "$(cat b/${{ matrix.slot }}/EXIT)" = 0
+
+  pairs:
+    needs: diagnostic
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-d1-${{ github.run_id }}', path: b/d1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-d2-${{ github.run_id }}', path: b/d2}
+      - shell: bash
+        run: |
+          set +e; mkdir -p b/p; python3 t/.github/forensics/pr59_model_binary_forensics.py compare-pairs --d1 b/d1 --d2 b/d2 --output b/p; echo $? > b/p/EXIT; exit 0
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-pairs-${{ github.run_id }}', path: b/p, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - run: test "$(cat b/p/EXIT)" = 0
+
+  preseed_authority:
+    needs: retained
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: b/s, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - shell: bash
+        run: |
+          G=b/i/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$G"; python3 t/.github/forensics/pr59_model_binary_forensics.py seeded-run --source-zip b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$G" --seed-zip b/s/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest b/s/GODOT_IMPORT_UID_SIDECARS_V1.json --output b/a --work-root /tmp/pr59-preseed-a --label PRESEED_AUTHORITY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-preseed-a-${{ github.run_id }}', path: 'b/a/uid_cache.bin', if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  preseed:
+    needs: preseed_authority
+    strategy: {fail-fast: false, matrix: {slot: [d1, d2]}}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: b/s, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-preseed-a-${{ github.run_id }}', path: b/a}
+      - shell: bash
+        run: |
+          G=b/i/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$G"; python3 t/.github/forensics/pr59_model_binary_forensics.py seeded-run --source-zip b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --godot "$G" --seed-zip b/s/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest b/s/GODOT_IMPORT_UID_SIDECARS_V1.json --preseed-cache b/a/uid_cache.bin --output b/${{ matrix.slot }} --work-root /tmp/pr59-preseed-${{ matrix.slot }} --label PRESEED_${{ matrix.slot }}
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-preseed-${{ matrix.slot }}-${{ github.run_id }}', path: 'b/${{ matrix.slot }}/SEEDED_DIAGNOSTIC_RESULT.json', if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  preseed_compare:
+    needs: preseed
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-preseed-d1-${{ github.run_id }}', path: b/d1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-preseed-d2-${{ github.run_id }}', path: b/d2}
+      - run: python3 t/.github/forensics/pr59_model_binary_forensics.py preseed-compare --d1 b/d1 --d2 b/d2 --output b/PRESEED_COMPARISON.json
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-preseed-compare-${{ github.run_id }}', path: b/PRESEED_COMPARISON.json, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  minimal:
+    needs: retained
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: b/s, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-retained-${{ github.run_id }}', path: b/r}
+      - shell: bash
+        run: |
+          set +e; mkdir -p b/m; G=b/i/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$G"; python3 t/.github/forensics/pr59_model_binary_forensics.py minimal --source-zip b/i/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --seed-zip b/s/GODOT_IMPORT_UID_SIDECARS_V1.zip --godot "$G" --selection b/r/REPRESENTATIVE_SELECTION.json --output b/m --work-root /tmp/pr59-minimal; echo $? > b/m/EXIT; exit 0
+      - if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-minimal-${{ github.run_id }}', path: b/m, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - run: test "$(cat b/m/EXIT)" = 0
+
+  audit:
+    needs: locator
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {repository: godotengine/godot, ref: '${{ env.GODOT_COMMIT }}', path: g, fetch-depth: 1}
+      - shell: bash
+        run: |
+          mkdir -p b/a; test "$(git -C g rev-parse HEAD)" = "$GODOT_COMMIT"; python3 t/.github/forensics/pr59_godot_source_audit.py --source-root g --output b/a
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-audit-${{ github.run_id }}', path: b/a, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  final:
+    needs: [retained, diagnostic, pairs, preseed_compare, minimal, audit]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-retained-${{ github.run_id }}', path: b/r}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-d1-${{ github.run_id }}', path: b/d1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-d2-${{ github.run_id }}', path: b/d2}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-pairs-${{ github.run_id }}', path: b/p}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-preseed-compare-${{ github.run_id }}', path: b/ps}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-minimal-${{ github.run_id }}', path: b/m}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-audit-${{ github.run_id }}', path: b/a}
+      - shell: bash
+        run: |
+          set -euo pipefail; mkdir -p b/f
+          python3 t/.github/forensics/pr59_model_binary_forensics.py aggregate --retained b/r --pairs b/p --d1 b/d1 --d2 b/d2 --preseed b/ps/PRESEED_COMPARISON.json --minimal b/m --audit b/a --output b/f
+          cp b/r/SEEDED_IMPORT_* b/r/REPRESENTATIVE_SELECTION.json b/f/; cp b/p/*.json b/f/; cp b/ps/PRESEED_COMPARISON.json b/m/MINIMAL_MODEL_IMPORT_RESULTS.json b/d1/CORRECTED_EXPERIMENT_E.json b/a/*.json b/f/
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          r=Path('b/f'); xs=[{'path':p.relative_to(r).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in sorted(r.iterdir()) if p.is_file() and p.name!='COMPACT_EVIDENCE_INVENTORY.json']; (r/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps({'run_id':int('${{ github.run_id }}'),'workflow_sha':'${{ github.sha }}','files':xs,'total_bytes':sum(x['bytes'] for x in xs),'no_android_export':True,'no_apk_mutation':True,'no_pr_correction':True},indent=2,sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-pr59-model-forensics-${{ github.run_id }}', path: b/f, if-no-files-found: error, compression-level: 9, retention-days: 30}
