@@ -1,4 +1,5 @@
 name: Bahrain Brick Official Godot Engine Qualification V2
+# Triggered only on detached CI-forensics authority.
 
 on:
   push:
