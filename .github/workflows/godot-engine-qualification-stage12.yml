@@ -1,0 +1,384 @@
+name: Bahrain Brick Official Godot Engine Qualification Stage 1-2
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths:
+      - .github/workflows/godot-engine-qualification-stage12.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: bahrain-brick-official-godot-engine-qualification-stage12
+  cancel-in-progress: false
+
+env:
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  INPUT_RUN_ID: '29627302405'
+  INPUT_ARTIFACT_NAME: pr59-godot-import-experiment-input-29627302405
+  INPUT_ARTIFACT_ID: '8424275568'
+  INPUT_ARTIFACT_DIGEST: 0292e1686ac49aaad7523f4c1011d506149b98c2227f099a2348b2e3afac185b
+  SELECTION_RUN_ID: '29636586197'
+  SELECTION_ARTIFACT_NAME: pr59-model-retained-29636586197
+  SELECTION_ARTIFACT_ID: '8427294301'
+  SELECTION_ARTIFACT_DIGEST: 9b235e822c234441881b5ba2f84dcb1609effeec244e857443772f2440b27e1f
+  ANALYZER_SHA256: a20aa5d34b7260209e8afb743208e39e304e91a8484619ed9f831b6288b0afa4
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out qualification workflow commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 20
+      - name: Record Stage 1-2 run locator on detached branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics/qualification
+          cat > .github/forensics/qualification/LATEST_STAGE12_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"$PR_HEAD","branch":"ci/godot-engine-determinism-qualification-20260719"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/qualification/LATEST_STAGE12_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(qualification): record Stage 1-2 run ${{ github.run_id }}"
+            git fetch origin ci/godot-engine-determinism-qualification-20260719
+            git rebase origin/ci/godot-engine-determinism-qualification-20260719
+            git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+          fi
+
+  qualify:
+    needs: record_locator
+    name: qualify-${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - 4.4.1-stable
+          - 4.5.2-stable
+          - 4.6.3-stable
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out detached qualification authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+
+      - name: Materialize and verify qualification analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tooling/.github/forensics/qualification/part_*.pyfrag > /tmp/godot_engine_qualification.py
+          python3 -m py_compile /tmp/godot_engine_qualification.py
+          printf '%s  %s\n' "$ANALYZER_SHA256" /tmp/godot_engine_qualification.py | sha256sum -c -
+
+      - name: Download accepted Bahrain Brick source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT_NAME }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Download accepted representative-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SELECTION_ARTIFACT_NAME }}
+          path: build/selection
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SELECTION_RUN_ID }}
+          github-token: ${{ github.token }}
+
+      - name: Verify retained input artifact metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/authority
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${INPUT_ARTIFACT_ID}" > build/authority/input-artifact.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SELECTION_ARTIFACT_ID}" > build/authority/selection-artifact.json
+          python3 - <<'PY'
+          import json, os
+          checks=[
+            ('input', int(os.environ['INPUT_ARTIFACT_ID']), os.environ['INPUT_ARTIFACT_NAME'], 'sha256:'+os.environ['INPUT_ARTIFACT_DIGEST'], int(os.environ['INPUT_RUN_ID'])),
+            ('selection', int(os.environ['SELECTION_ARTIFACT_ID']), os.environ['SELECTION_ARTIFACT_NAME'], 'sha256:'+os.environ['SELECTION_ARTIFACT_DIGEST'], int(os.environ['SELECTION_RUN_ID'])),
+          ]
+          for key, aid, name, digest, run_id in checks:
+              value=json.load(open(f'build/authority/{key}-artifact.json'))
+              assert value['id']==aid, value
+              assert value['name']==name, value
+              assert value['digest']==digest, value
+              assert value['workflow_run']['id']==run_id, value
+              assert value['expired'] is False, value
+          PY
+
+      - name: Resolve and verify official candidate release authority
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "build/engine/${VERSION}" "build/output/${VERSION}"
+          release_json="build/engine/${VERSION}/release.json"
+          gh api "repos/godotengine/godot-builds/releases/tags/${VERSION}" > "$release_json"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          version=os.environ['VERSION']
+          value=json.load(open(f'build/engine/{version}/release.json'))
+          assets={a['name']:a for a in value['assets']}
+          expected=[f'Godot_v{version}_linux.x86_64.zip',f'godot-{version}.tar.xz',f'godot-{version}.tar.xz.sha256','SHA512-SUMS.txt']
+          missing=[x for x in expected if x not in assets]
+          assert not missing, {'missing':missing,'available':sorted(assets)}
+          Path(f'build/engine/{version}/release-assets.json').write_text(json.dumps({x:assets[x] for x in expected},indent=2,sort_keys=True)+'\n')
+          PY
+          python3 - <<'PY'
+          import json, os, subprocess
+          version=os.environ['VERSION']
+          assets=json.load(open(f'build/engine/{version}/release-assets.json'))
+          for name, asset in assets.items():
+              out=f'build/engine/{version}/{name}'
+              subprocess.run(['gh','api','-H','Accept: application/octet-stream',asset['url']],stdout=open(out,'wb'),check=True)
+          PY
+          cd "build/engine/${VERSION}"
+          source_expected="$(awk '{print $1}' "godot-${VERSION}.tar.xz.sha256")"
+          test -n "$source_expected"
+          printf '%s  %s\n' "$source_expected" "godot-${VERSION}.tar.xz" | sha256sum -c -
+          binary_expected="$(awk -v n="Godot_v${VERSION}_linux.x86_64.zip" '$2==n {print $1}' SHA512-SUMS.txt)"
+          test -n "$binary_expected"
+          printf '%s  %s\n' "$binary_expected" "Godot_v${VERSION}_linux.x86_64.zip" | sha512sum -c -
+          cd - >/dev/null
+
+      - name: Resolve exact candidate source commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "build/engine/${VERSION}/source-ref"
+          gh api "repos/godotengine/godot/git/ref/tags/${VERSION}" > "build/engine/${VERSION}/source-ref/ref.json"
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          version=os.environ['VERSION']
+          ref=json.load(open(f'build/engine/{version}/source-ref/ref.json'))['object']
+          if ref['type']=='tag':
+              tag=json.loads(subprocess.check_output(['gh','api',f"repos/godotengine/godot/git/tags/{ref['sha']}"]))
+              commit=tag['object']['sha']
+              tag_object=ref['sha']
+          else:
+              commit=ref['sha']; tag_object=None
+          Path(f'build/engine/{version}/source-ref/identity.json').write_text(json.dumps({'tag':version,'tag_object_sha':tag_object,'commit_sha':commit},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Extract official candidate engine and source
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p "build/engine/${VERSION}/binary" "build/engine/${VERSION}/source"
+          unzip -q "build/engine/${VERSION}/Godot_v${VERSION}_linux.x86_64.zip" -d "build/engine/${VERSION}/binary"
+          tar -xf "build/engine/${VERSION}/godot-${VERSION}.tar.xz" -C "build/engine/${VERSION}/source" --strip-components=1
+          godot="$(find "build/engine/${VERSION}/binary" -maxdepth 1 -type f -name 'Godot*' -print -quit)"
+          test -n "$godot"
+          chmod +x "$godot"
+          printf '%s\n' "$godot" > "build/engine/${VERSION}/GODOT_PATH.txt"
+          "$godot" --version > "build/engine/${VERSION}/VERSION_OUTPUT.txt"
+
+      - name: Record complete official engine identity
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, platform
+          from pathlib import Path
+          v=os.environ['VERSION']; root=Path('build/engine')/v
+          assets=json.load(open(root/'release-assets.json')); release=json.load(open(root/'release.json')); source=json.load(open(root/'source-ref/identity.json'))
+          godot=Path((root/'GODOT_PATH.txt').read_text().strip())
+          def h(path,algo):
+              x=hashlib.new(algo); x.update(Path(path).read_bytes()); return x.hexdigest()
+          identity={
+              'requested_version':v,
+              'runtime_version_output':(root/'VERSION_OUTPUT.txt').read_text().strip(),
+              'official_release_id':release['id'],
+              'official_release_url':release['html_url'],
+              'published_at':release['published_at'],
+              'binary_archive':{'filename':f'Godot_v{v}_linux.x86_64.zip','bytes':(root/f'Godot_v{v}_linux.x86_64.zip').stat().st_size,'sha512':h(root/f'Godot_v{v}_linux.x86_64.zip','sha512'),'github_digest':assets[f'Godot_v{v}_linux.x86_64.zip'].get('digest'),'download_url':assets[f'Godot_v{v}_linux.x86_64.zip']['browser_download_url']},
+              'source_archive':{'filename':f'godot-{v}.tar.xz','bytes':(root/f'godot-{v}.tar.xz').stat().st_size,'sha256':h(root/f'godot-{v}.tar.xz','sha256'),'github_digest':assets[f'godot-{v}.tar.xz'].get('digest'),'download_url':assets[f'godot-{v}.tar.xz']['browser_download_url']},
+              'source_tag':source,
+              'runtime_binary':{'filename':godot.name,'bytes':godot.stat().st_size,'sha256':h(godot,'sha256')},
+              'download_provenance':'Official godotengine/godot-builds GitHub release assets, verified against official checksum assets and GitHub digest fields.',
+          }
+          Path(f'build/output/{v}/ENGINE_IDENTITY_INPUT.json').write_text(json.dumps(identity,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Run Stage 1 source audit and Stage 2 eight-resource qualification
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+        run: |
+          set +e
+          godot="$(cat "build/engine/${VERSION}/GODOT_PATH.txt")"
+          python3 /tmp/godot_engine_qualification.py minimal \
+            --version "$VERSION" \
+            --source-zip build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --selection build/selection/REPRESENTATIVE_SELECTION.json \
+            --godot "$godot" \
+            --engine-source "build/engine/${VERSION}/source" \
+            --semantic-script tooling/.github/forensics/pr59_model_semantic_dump.gd \
+            --identity "build/output/${VERSION}/ENGINE_IDENTITY_INPUT.json" \
+            --work-root "/tmp/bahrain-brick-engine-qualification/${VERSION}" \
+            --output "build/output/${VERSION}" \
+            > "build/output/${VERSION}/ANALYZER_STDOUT.txt" \
+            2> "build/output/${VERSION}/ANALYZER_STDERR.txt"
+          code=$?
+          printf '%s\n' "$code" > "build/output/${VERSION}/ANALYZER_EXIT_CODE.txt"
+          exit 0
+
+      - name: Upload per-version qualification evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: godot-engine-qualification-${{ matrix.version }}-${{ github.run_id }}
+          path: build/output/${{ matrix.version }}
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+      - name: Enforce qualification harness completion
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+        run: |
+          set -euo pipefail
+          test "$(cat "build/output/${VERSION}/ANALYZER_EXIT_CODE.txt")" = 0
+          test -s "build/output/${VERSION}/ENGINE_SOURCE_DETERMINISM_AUDIT.json"
+          test -s "build/output/${VERSION}/ENGINE_MINIMAL_CORPUS_RESULTS.json"
+          python3 - <<'PY'
+          import json, os
+          value = json.load(open(f"build/output/{os.environ['VERSION']}/ENGINE_MINIMAL_CORPUS_RESULTS.json"))
+          assert value['resource_count'] == 8
+          assert value['summary']['source_hash_alarms'] == 0
+          assert value['classification'] in {'Q1', 'STAGE2_PASS_PENDING_STAGE3'}
+          PY
+
+  aggregate_stage12:
+    if: always()
+    needs: qualify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out detached qualification authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+
+      - name: Download 4.4.1 evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: godot-engine-qualification-4.4.1-stable-${{ github.run_id }}
+          path: build/candidates/4.4.1-stable
+
+      - name: Download 4.5.2 evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: godot-engine-qualification-4.5.2-stable-${{ github.run_id }}
+          path: build/candidates/4.5.2-stable
+
+      - name: Download 4.6.3 evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: godot-engine-qualification-4.6.3-stable-${{ github.run_id }}
+          path: build/candidates/4.6.3-stable
+
+      - name: Generate Stage 1-2 cross-version matrix
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/aggregate
+          python3 - <<'PY'
+          import hashlib, json, subprocess
+          from pathlib import Path
+          versions = ['4.4.1-stable','4.5.2-stable','4.6.3-stable']
+          rows=[]
+          for version in versions:
+              root=Path('build/candidates')/version
+              result=json.load(open(root/'ENGINE_MINIMAL_CORPUS_RESULTS.json'))
+              identity=json.load(open(root/'ENGINE_IDENTITY.json'))
+              audit=json.load(open(root/'ENGINE_SOURCE_DETERMINISM_AUDIT.json'))
+              rows.append({
+                  'version':version,
+                  'identity':identity,
+                  'source_audit':{
+                      'path_hash_seed':audit['deterministic_seed_path']['binary_saver_seeds_from_output_path_hash'],
+                      'random_fallback':audit['fallback_scene_unique_id']['uses_random_number'],
+                      'unsorted_dictionary_candidate':audit['dictionary_serialization']['unsorted_candidate'],
+                  },
+                  'stage2':result['summary'],
+                  'classification':result['classification'],
+                  'entered_stage3':result['summary']['stage2_pass'],
+              })
+          unavailable=[]
+          for version in ['4.7.1-stable','4.8-dev1']:
+              completed=subprocess.run(['gh','api',f'repos/godotengine/godot-builds/releases/tags/{version}'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+              unavailable.append({'version':version,'official_release_exists':completed.returncode==0,'api_exit_code':completed.returncode,'stderr':completed.stderr[-1000:]})
+          corpus_discrepancy={
+              'listed_but_absent_from_accepted_source':['building_A.gltf','airplane.obj'],
+              'immutable_accepted_selection_used':{
+                  'gltf_environment':'assets/citykit/models/Brick_Plain_1.gltf',
+                  'obj':'addons/flexible_toon_shader/example/cup.obj',
+              },
+              'reason':'The current source ZIP and accepted representative-selection artifact contain no building_A.gltf or airplane.obj. Qualification used the exact immutable accepted selection artifact rather than inventing or substituting untracked bytes.',
+          }
+          aggregate={
+              'schema_version':1,
+              'workflow_run_id':int('${{ github.run_id }}'),
+              'workflow_sha':'${{ github.sha }}',
+              'pr_head':'5b4e2466ef84f3984f3bf336b31925d4d2e97a7f',
+              'candidates':rows,
+              'unavailable_requested_versions':unavailable,
+              'corpus_authority_discrepancy':corpus_discrepancy,
+              'stage3_candidates':[r['version'] for r in rows if r['entered_stage3']],
+              'no_android_export':True,
+              'no_project_migration':True,
+              'no_pr_change':True,
+          }
+          Path('build/aggregate/ENGINE_QUALIFICATION_STAGE12_MATRIX.json').write_text(json.dumps(aggregate,indent=2,sort_keys=True)+'\n')
+          files=[]
+          for p in sorted(Path('build/aggregate').glob('*')):
+              if p.is_file() and p.name!='ARTIFACT_INVENTORY.json':
+                  files.append({'path':p.name,'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          Path('build/aggregate/ARTIFACT_INVENTORY.json').write_text(json.dumps({'schema_version':1,'files':files,'no_android_export':True,'no_project_migration':True},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload aggregate Stage 1-2 evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: godot-engine-qualification-stage12-aggregate-${{ github.run_id }}
+          path: build/aggregate
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
