@@ -1,0 +1,60 @@
+
+  retained_compare:
+    needs: record_locator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_NAME }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SEED_NAME }}
+          path: build/seed
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SEED_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ORIGINAL_D1_NAME }}
+          path: build/original-d1
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SEED_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ORIGINAL_D2_NAME }}
+          path: build/original-d2
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SEED_RUN }}
+          github-token: ${{ github.token }}
+      - name: Verify forensic tools and retained authorities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tooling/.github/forensics/pr59_model_binary_forensics.py tooling/.github/forensics/pr59_godot_source_audit.py
+          source_zip=build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+          godot=build/input/input/godot/Godot_v4.3-stable_linux.x86_64
+          chmod +x "$godot"
+          test "$($godot --version)" = "$GODOT_VERSION"
+          test "$(stat -c %s "$source_zip")" = "$SOURCE_BYTES"
+          printf '%s  %s\n' "$SOURCE_SHA256" "$source_zip" | sha256sum -c -
+          mkdir -p build/retained
+          cat > build/retained/RETAINED_ARTIFACT_AUTHORITY.json <<'JSON'
+          {
+            "seed":{"artifact_id":8424941278,"digest":"sha256:60cae818fe07f9ad022e250dc74efda3eb590d1a3dc4b6ef192c1c8d7f50d87b"},
+            "d1":{"artifact_id":8425001064,"digest":"sha256:e92102a644284427dd541cfb320a1fd02355902c12a6c1dae30a642a0edbf371"},
+            "d2":{"artifact_id":8424999903,"digest":"sha256:097a3a86e4bc3bcda1a4e3a85f8b9eac06717787cf29f93a9eea43c271076d3d"},
+            "negative":{"artifact_id":8424944826,"digest":"sha256:c2910d1a22b84e9bb7ad6cb4aa24af38ae98729f0f975cdbdef0dc5b07bf96d3"}
+          }
+          JSON
+          empty=/tmp/empty-selection.json
