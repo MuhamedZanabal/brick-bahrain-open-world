@@ -4,7 +4,7 @@ on:
     branches: [ci/pr59-existing-apk-gate-closure-20260717]
     paths: [.github/workflows/pr59-model-pairs-fast.yml]
   workflow_dispatch:
-permissions: {actions: read, contents: read}
+permissions: {actions: read, contents: write}
 env:
   INPUT_RUN: '29627302405'
   INPUT_NAME: pr59-godot-import-experiment-input-29627302405
@@ -19,7 +19,17 @@ jobs:
     timeout-minutes: 150
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 1}
+        with: {ref: '${{ github.sha }}', path: t, fetch-depth: 20}
+      - name: Record fast-pair run locator
+        shell: bash
+        working-directory: t
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          printf '{"run_id":%s,"workflow_sha":"%s","parent_forensic_run":29636586197}\n' '${{ github.run_id }}' '${{ github.sha }}' > .github/forensics/LATEST_FAST_MODEL_PAIR_RUN.json
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_FAST_MODEL_PAIR_RUN.json; git commit -m 'ci(forensics): record fast model pair run ${{ github.run_id }}'
+          git fetch origin ci/pr59-existing-apk-gate-closure-20260717; git rebase origin/ci/pr59-existing-apk-gate-closure-20260717; git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with: {name: '${{ env.INPUT_NAME }}', path: b/i, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -51,7 +61,3 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with: {name: 'bahrain-brick-pr59-fast-model-pairs-${{ github.run_id }}', path: b/p, if-no-files-found: error, compression-level: 9, retention-days: 30}
-      - name: Record fast-pair run locator
-        if: always()
-        shell: bash
-        run: echo '${{ github.run_id }}' > /tmp/fast_run_id.txt
