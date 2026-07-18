@@ -1,0 +1,39 @@
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-preseed-comparison-${{ github.run_id }}', path: build/preseed}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-minimal-controls-${{ github.run_id }}', path: build/minimal}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-source-audit-${{ github.run_id }}', path: build/audit}
+      - name: Generate final forensic classification and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.retained_compare.result }}" = success
+          test "${{ needs.diagnostic_d1.result }}" = success
+          test "${{ needs.diagnostic_d2.result }}" = success
+          test "${{ needs.compare_pairs.result }}" = success
+          test "${{ needs.preseed_compare.result }}" = success
+          test "${{ needs.minimal_controls.result }}" = success
+          test "${{ needs.source_audit.result }}" = success
+          mkdir -p build/final
+          python3 tooling/.github/forensics/pr59_model_binary_forensics.py aggregate --retained build/retained --pairs build/pairs --d1 build/d1 --d2 build/d2 --preseed build/preseed/PRESEED_COMPARISON.json --minimal build/minimal --audit build/audit --output build/final
+          cp build/retained/SEEDED_IMPORT_COMPARISON.json build/retained/SEEDED_IMPORT_CATEGORY_SUMMARY.json build/retained/SEEDED_IMPORT_DIFFERING_PATHS.txt build/retained/REPRESENTATIVE_SELECTION.json build/final/
+          cp build/pairs/IMPORTED_MD5_FIELD_COMPARISON.json build/pairs/IMPORTED_MD5_SUMMARY.json build/pairs/MODEL_BINARY_RAW_DIFFS.json build/pairs/MODEL_BINARY_STRING_DIFFS.json build/pairs/MODEL_BINARY_HEX_WINDOWS.json build/pairs/D1_MODEL_SEMANTIC_GRAPH.json build/pairs/D2_MODEL_SEMANTIC_GRAPH.json build/pairs/MODEL_SEMANTIC_COMPARISON.json build/final/
+          cp build/preseed/PRESEED_COMPARISON.json build/final/
+          cp build/minimal/MINIMAL_MODEL_IMPORT_RESULTS.json build/final/
+          cp build/d1/CORRECTED_EXPERIMENT_E.json build/final/
+          cp build/audit/GODOT_4_3_IMPORT_SOURCE_TRACE.json build/audit/GODOT_4_3_NONDETERMINISM_CANDIDATES.json build/final/
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/final');rows=[]
+          for p in sorted(x for x in root.rglob('*') if x.is_file() and x.name!='COMPACT_EVIDENCE_INVENTORY.json'):
+            rows.append({'path':p.relative_to(root).as_posix(),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()})
+          value={'schema_version':1,'workflow_run_id':int('${{ github.run_id }}'),'workflow_sha':'${{ github.sha }}','file_count':len(rows),'total_bytes':sum(x['bytes'] for x in rows),'files':rows,'no_android_export':True,'no_apk_mutation':True,'no_pr_correction':True}
+          (root/'COMPACT_EVIDENCE_INVENTORY.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          assert value['total_bytes'] < 100*1024*1024,value
+          PY
+      - name: Upload final compact forensic evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-pr59-model-import-forensics-${{ github.run_id }}', path: build/final, if-no-files-found: error, compression-level: 9, retention-days: 30}
