@@ -1,0 +1,83 @@
+2026-07-18T14:11:08.4720669Z ##[endgroup]
+2026-07-18T14:11:08.6429733Z Downloading single artifact
+2026-07-18T14:11:08.6529730Z (node:2252) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T14:11:08.6531316Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T14:11:08.6790256Z (node:2252) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-18T14:11:08.8141564Z Preparing to download the following artifacts:
+2026-07-18T14:11:08.8143237Z - pr59-godot-import-experiment-input-29627302405 (ID: 8424275568, Size: 387893644, Expected Digest: sha256:0292e1686ac49aaad7523f4c1011d506149b98c2227f099a2348b2e3afac185b)
+2026-07-18T14:11:08.8196646Z Downloading artifact '8424275568' from 'MuhamedZanabal/brick-bahrain-open-world'
+2026-07-18T14:11:08.9496415Z Redirecting to blob download url: https://productionresultssa9.blob.core.windows.net/actions-results/ccbcef04-0b1e-4f49-95e7-c7548e698284/workflow-job-run-3c2f2cf8-c55e-5fef-bfc9-95387ecf4f22/artifacts/14c94327f1fb8690220771dfd13abe460d5acdaadfa0f424ef408b5b0648722d.zip
+2026-07-18T14:11:08.9498361Z Starting download of artifact to: /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/input
+2026-07-18T14:11:09.0199390Z (node:2252) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-07-18T14:11:12.2006822Z SHA256 digest of downloaded artifact is 0292e1686ac49aaad7523f4c1011d506149b98c2227f099a2348b2e3afac185b
+2026-07-18T14:11:12.2007720Z Artifact download completed successfully.
+2026-07-18T14:11:12.2008399Z Total of 1 artifact(s) downloaded
+2026-07-18T14:11:12.2015201Z Download artifact has finished successfully
+2026-07-18T14:11:12.2226226Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T14:11:12.2227574Z ##[group]Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+2026-07-18T14:11:12.2227976Z with:
+2026-07-18T14:11:12.2228233Z   name: bahrain-brick-pr59-model-forensics-29636586197
+2026-07-18T14:11:12.2228550Z   path: build/forensic
+2026-07-18T14:11:12.2228816Z   repository: MuhamedZanabal/brick-bahrain-open-world
+2026-07-18T14:11:12.2229115Z   run-id: 29636586197
+2026-07-18T14:11:12.2231865Z   github-token: ***
+2026-07-18T14:11:12.2232117Z   merge-multiple: false
+2026-07-18T14:11:12.2232344Z env:
+2026-07-18T14:11:12.2232599Z   FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+2026-07-18T14:11:12.2232971Z   INPUT_RUN: 29627302405
+2026-07-18T14:11:12.2233290Z   INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+2026-07-18T14:11:12.2233643Z   FORENSIC_RUN: 29636586197
+2026-07-18T14:11:12.2233976Z   FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+2026-07-18T14:11:12.2234338Z ##[endgroup]
+2026-07-18T14:11:12.3926967Z Downloading single artifact
+2026-07-18T14:11:12.4027851Z (node:2264) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-18T14:11:12.4062255Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-18T14:11:12.4299164Z (node:2264) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-07-18T14:11:12.5610130Z Preparing to download the following artifacts:
+2026-07-18T14:11:12.5611741Z - bahrain-brick-pr59-model-forensics-29636586197 (ID: 8427517843, Size: 12706282, Expected Digest: sha256:6e8881894fab267c82d7a421b505c2334354269beeb139fd736ab6a473a016c0)
+2026-07-18T14:11:12.5678189Z Downloading artifact '8427517843' from 'MuhamedZanabal/brick-bahrain-open-world'
+2026-07-18T14:11:12.6939155Z Redirecting to blob download url: https://productionresultssa11.blob.core.windows.net/actions-results/34a4399e-1e9b-443d-9763-14b5fad67bfa/workflow-job-run-b0064ccf-b369-5071-8935-be50175ba0bc/artifacts/d0ad83eaf62de3b543f6eaa99beceb5c7fc7baaa8cf1f4261f2c633ea4e3259d.zip
+2026-07-18T14:11:12.6941741Z Starting download of artifact to: /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/forensic
+2026-07-18T14:11:12.7890195Z (node:2264) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+2026-07-18T14:11:13.6514468Z SHA256 digest of downloaded artifact is 6e8881894fab267c82d7a421b505c2334354269beeb139fd736ab6a473a016c0
+2026-07-18T14:11:13.6515869Z Artifact download completed successfully.
+2026-07-18T14:11:13.6516465Z Total of 1 artifact(s) downloaded
+2026-07-18T14:11:13.6524454Z Download artifact has finished successfully
+2026-07-18T14:11:13.6771524Z ##[group]Run set -euo pipefail
+2026-07-18T14:11:13.6772282Z [36;1mset -euo pipefail[0m
+2026-07-18T14:11:13.6773139Z [36;1mcp qualification/.github/forensics/pr59_engine_qualification.py.gz.b64 /tmp/qualification.py.gz.b64[0m
+2026-07-18T14:11:13.6774500Z [36;1mbase64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py[0m
+2026-07-18T14:11:13.6775321Z [36;1mchmod +x /tmp/pr59_engine_qualification.py[0m
+2026-07-18T14:11:13.6776424Z [36;1mpython3 -m py_compile /tmp/pr59_engine_qualification.py[0m
+2026-07-18T14:11:13.6777206Z [36;1msha256sum /tmp/pr59_engine_qualification.py | tee build/HARNESS_SHA256.txt[0m
+2026-07-18T14:11:13.6888579Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-07-18T14:11:13.6888940Z env:
+2026-07-18T14:11:13.6889217Z   FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+2026-07-18T14:11:13.6889541Z   INPUT_RUN: 29627302405
+2026-07-18T14:11:13.6889935Z   INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+2026-07-18T14:11:13.6890289Z   FORENSIC_RUN: 29636586197
+2026-07-18T14:11:13.6890629Z   FORENSIC_ARTIFACT: bahrain-brick-pr59-model-forensics-29636586197
+2026-07-18T14:11:13.6890981Z ##[endgroup]
+2026-07-18T14:11:13.7047358Z 
+2026-07-18T14:11:13.7047780Z gzip: stdin: invalid compressed data--crc error
+2026-07-18T14:11:13.7048070Z 
+2026-07-18T14:11:13.7048210Z gzip: stdin: invalid compressed data--length error
+2026-07-18T14:11:13.7064963Z ##[error]Process completed with exit code 1.
+2026-07-18T14:11:13.7184669Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-18T14:11:13.7186050Z Post job cleanup.
+2026-07-18T14:11:13.8166264Z [command]/usr/bin/git version
+2026-07-18T14:11:13.8226684Z git version 2.54.0
+2026-07-18T14:11:13.8265417Z Temporarily overriding HOME='/home/runner/work/_temp/fb11d974-669f-49fa-b8d5-60f021f185c0' before making global git config changes
+2026-07-18T14:11:13.8266957Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-18T14:11:13.8272957Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/qualification
+2026-07-18T14:11:13.8338184Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-07-18T14:11:13.8403307Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-07-18T14:11:13.8777948Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-18T14:11:13.8816436Z http.https://github.com/.extraheader
+2026-07-18T14:11:13.8832245Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-07-18T14:11:13.8882778Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-07-18T14:11:13.9446512Z Cleaning up orphan processes
+2026-07-18T14:11:13.9759467Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683, actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+
+--- file identity ---
+/tmp/joblog/raw: Unicode text, UTF-8 (with BOM) text, with very long lines (392), with escape sequences
