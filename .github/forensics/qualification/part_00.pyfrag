@@ -1,0 +1,120 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import collections
+import hashlib
+import json
+import os
+import re
+import shutil
+import stat
+import subprocess
+import time
+import zipfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+SOURCE_ZIP_SHA256 = "5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7"
+SOURCE_ZIP_BYTES = 225721731
+SOURCE_FILE_COUNT = 1502
+SOURCE_TOTAL_BYTES = 369162800
+MATRIX_SHA256 = "6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff"
+PR_HEAD = "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f"
+MODEL_EXTENSIONS = {".glb", ".gltf", ".fbx", ".obj"}
+ERROR_RE = re.compile(r"SCRIPT ERROR|Parse Error|Parser Error|Failed to load script|Failed to create an autoload|\bFATAL\b|Fatal signal", re.I)
+PATH_RE = re.compile(r'(?m)^path="res://([^"\r\n]+)"\s*$')
+SOURCE_RE = re.compile(r'(?m)^source_file="res://([^"\r\n]+)"\s*$')
+UID_RE = re.compile(r'(?m)^uid=("uid://[^"\r\n]+")\s*$')
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def safe_relative(value: str) -> str:
+    if not value or value.startswith("/") or "\\" in value or "\x00" in value:
+        raise ValueError(f"unsafe path: {value!r}")
+    path = PurePosixPath(value)
+    if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
+        raise ValueError(f"unsafe path: {value!r}")
+    normalized = path.as_posix()
+    if normalized != value:
+        raise ValueError(f"noncanonical path: {value!r}")
+    return normalized
+
+
+def run_command(command: list[str], log: Path, env: dict[str, str], timeout: int = 1800) -> dict[str, Any]:
+    log.parent.mkdir(parents=True, exist_ok=True)
+    started = time.time()
+    timed_out = False
+    with log.open("wb") as stream:
+        try:
+            completed = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, env=env, timeout=timeout, check=False)
+            exit_code = completed.returncode
+        except subprocess.TimeoutExpired:
+            exit_code = 124
+            timed_out = True
+    data = log.read_bytes()
+    text = data.decode("utf-8", errors="replace")
+    return {
+        "command": command,
+        "exit_code": exit_code,
+        "timed_out": timed_out,
+        "elapsed_seconds": round(time.time() - started, 3),
+        "log_path": str(log),
+        "log_bytes": len(data),
+        "log_sha256": sha256_bytes(data),
+        "error_pattern_count": len(ERROR_RE.findall(text)),
+        "error_excerpt": [line for line in text.splitlines() if ERROR_RE.search(line)][:50],
+    }
+
+
+def deterministic_env(xdg: Path) -> dict[str, str]:
+    if xdg.exists():
+        shutil.rmtree(xdg)
+    xdg.mkdir(parents=True)
+    env = os.environ.copy()
+    env.update({
+        "TZ": "UTC",
+        "LC_ALL": "C.UTF-8",
+        "LANG": "C.UTF-8",
+        "XDG_DATA_HOME": str(xdg.resolve()),
+        "GODOT_SILENCE_ROOT_WARNING": "1",
+    })
+    return env
+
+
+def materialize_files(source_zip: Path, target: Path, paths: list[str], epoch: int = 315532800) -> dict[str, Any]:
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True)
+    rows = []
+    with zipfile.ZipFile(source_zip) as archive:
+        names = {info.filename for info in archive.infolist() if not info.is_dir()}
+        for raw in sorted(set(paths)):
+            rel = safe_relative(raw)
+            if rel not in names:
+                raise FileNotFoundError(rel)
+            data = archive.read(rel)
+            destination = target / rel
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(data)
+            os.chmod(destination, 0o644)
+            os.utime(destination, (epoch, epoch))
+            rows.append({"path": rel, "bytes": len(data), "sha256": sha256_bytes(data)})
+    project = target / "project.godot"
+    project.write_text(
