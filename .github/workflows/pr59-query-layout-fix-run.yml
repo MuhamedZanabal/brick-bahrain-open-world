@@ -1,0 +1,38 @@
+name: Bahrain Brick PR59 Query Layout Fix Run
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/workflows/pr59-query-layout-fix-run.yml]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  query:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-existing-apk-gate-closure-20260717
+          fetch-depth: 1
+      - shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/pr59-fix-import-experiment-layout.yml/runs?branch=ci/pr59-existing-apk-gate-closure-20260717&per_page=3" > /tmp/runs.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          runs=json.loads(Path('/tmp/runs.json').read_text()).get('workflow_runs',[])
+          assert runs
+          r=runs[0]
+          Path('.github/forensics/LAYOUT_FIX_RUN_QUERY.json').write_text(json.dumps({k:r.get(k) for k in ('id','head_sha','status','conclusion','run_started_at','updated_at')},indent=2,sort_keys=True)+'\n')
+          PY
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LAYOUT_FIX_RUN_QUERY.json
+          git commit -m "ci(forensics): record layout fix status"
+          git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
