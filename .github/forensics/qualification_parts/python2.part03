@@ -1,0 +1,119 @@
+        result["pass"] = all(result[k] for k in ["source_hash_equal", "source_md5_equal", "sidecar_equal", "imported_path_equal", "imported_size_equal", "imported_sha256_equal", "destination_md5_equal", "canonical_semantic_equal"])
+        results.append(result)
+
+    uid_cache_equal = runs["D1"]["uid_cache"] == runs["D2"]["uid_cache"]
+    stage2_pass = all(r["pass"] for r in results) and len(results) == 8 and uid_cache_equal and inv_cmp["path_set_equal"] and inv_cmp["difference_count"] == 0
+    summary = {
+        "identity": identity,
+        "environment": {
+            "os": os.uname().sysname,
+            "os_release": os.uname().release,
+            "architecture": os.uname().machine,
+            "locale": "C.UTF-8",
+            "timezone": "UTC",
+            "umask": "0022",
+            "cpu_count": os.cpu_count(),
+            "import_command": ["ENGINE", "--headless", "--path", "PROJECT", "--editor", "--import", "--quit", "--verbose"],
+            "shared_global_editor_settings_only": True,
+            "shared_project_import_cache": False,
+        },
+        "corpus": manifest,
+        "source_audit": audit,
+        "sidecar_authority": sidecar_authority,
+        "resource_count": len(results),
+        "resources_passed": sum(r["pass"] for r in results),
+        "differing_imported_binaries": sum(not r["imported_sha256_equal"] for r in results),
+        "differing_destination_md5": sum(not r["destination_md5_equal"] for r in results),
+        "uid_cache_equal": uid_cache_equal,
+        "generated_path_set_equal": inv_cmp["path_set_equal"],
+        "generated_content_difference_count": inv_cmp["difference_count"],
+        "semantic_mismatches": sum(not r["canonical_semantic_equal"] for r in results),
+        "stage2_pass": stage2_pass,
+        "classification": "STAGE2_PASS" if stage2_pass else "Q1_MINIMAL_CORPUS_FAILURE",
+        "later_stages_entered": False,
+        "runs": runs,
+        "resources": results,
+        "generated_differences": inv_cmp["differences"],
+        "no_android_export": True,
+        "no_project_migration": True,
+        "no_pr59_change": True,
+    }
+    write_json(out / "ENGINE_MINIMAL_CORPUS_RESULTS.json", summary)
+    write_json(out / "ENGINE_CANDIDATE_CLASSIFICATION.json", {
+        "tag": args.tag,
+        "classification": summary["classification"],
+        "exact_failure_boundary": None if stage2_pass else "Stage 2 minimal model-import determinism",
+        "stage2_pass": stage2_pass,
+        "stage3_entered": False,
+        "stage4_entered": False,
+        "stage5_entered": False,
+        "stage6_entered": False,
+    })
+    inventory = []
+    for p in sorted(x for x in out.rglob("*") if x.is_file()):
+        inventory.append({"path": p.relative_to(out).as_posix(), "bytes": p.stat().st_size, "sha256": sha_file(p)})
+    write_json(out / "ARTIFACT_INVENTORY.json", {"tag": args.tag, "files": inventory, "no_android_export": True})
+    return 0
+
+def aggregate(args: argparse.Namespace) -> int:
+    root = Path(args.inputs)
+    out = Path(args.output); out.mkdir(parents=True, exist_ok=True)
+    rows = []
+    for p in sorted(root.rglob("ENGINE_MINIMAL_CORPUS_RESULTS.json")):
+        obj = json.loads(p.read_text())
+        rows.append({
+            "tag": obj["identity"]["tag"],
+            "version_output": obj["identity"].get("version_output"),
+            "official_binary_sha256": obj["identity"].get("binary_archive_sha256"),
+            "official_source_sha256": obj["identity"].get("source_archive_sha256"),
+            "source_commit": obj["identity"].get("source_commit"),
+            "source_audit_flags": obj["source_audit"]["flags"],
+            "stage2_pass": obj["stage2_pass"],
+            "resources_passed": obj["resources_passed"],
+            "differing_imported_binaries": obj["differing_imported_binaries"],
+            "differing_destination_md5": obj["differing_destination_md5"],
+            "differing_uid_cache": 0 if obj["uid_cache_equal"] else 1,
+            "semantic_mismatches": obj["semantic_mismatches"],
+            "classification": obj["classification"],
+        })
+    requested = ["4.4.1-stable", "4.5.2-stable", "4.6.3-stable", "4.7.1-stable"]
+    available = {r["tag"] for r in rows}
+    unavailable = [{"tag": x, "reason": "no official release tag or checksummed stable binary exists at qualification time"} for x in requested if x not in available]
+    matrix = {"baseline_4_3": {"classification": "Gate 4 FAIL / Gate 5 PASS", "differing_model_binaries_after_uid_stabilization": 800}, "candidates": rows, "unavailable_requested_versions": unavailable, "optional_4_8_dev1": {"tested": False, "reason": "no official 4.8-dev1 release exists; development builds cannot qualify"}}
+    q5 = [r for r in rows if r["classification"] == "Q5_QUALIFIED_MIGRATION_CANDIDATE"]
+    write_json(out / "CROSS_VERSION_QUALIFICATION_MATRIX.json", matrix)
+    write_json(out / "ENGINE_QUALIFICATION_AGGREGATE.json", {
+        "candidate_count_tested": len(rows),
+        "candidates": rows,
+        "stage3_candidates": [r["tag"] for r in rows if r["stage2_pass"]],
+        "stage4_candidates": [],
+        "stage5_candidates": [],
+        "earliest_q5_candidate": q5[0]["tag"] if q5 else None,
+        "recommended_engine": q5[0]["tag"] if q5 else None,
+        "migration_safe_to_propose": bool(q5),
+        "custom_engine_study_required": not bool(q5),
+        "gate4_status": "FAIL",
+        "gate5_status": "PASS for retained original APKs only",
+        "first_remaining_blocker": "No official stable candidate passed Stage 2" if not q5 else "Separate migration authorization",
+        "no_android_export": True,
+        "no_project_migration": True,
+        "no_pr59_change": True,
+    })
+    inv=[]
+    for p in sorted(x for x in out.rglob('*') if x.is_file()): inv.append({'path':p.relative_to(out).as_posix(),'bytes':p.stat().st_size,'sha256':sha_file(p)})
+    write_json(out/'AGGREGATE_ARTIFACT_INVENTORY.json',{'files':inv})
+    return 0
+
+
+def main() -> int:
+    p = argparse.ArgumentParser()
+    sub = p.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("prepare-corpus"); s.add_argument("--source-zip", required=True); s.add_argument("--manifest", required=True); s.add_argument("--output", required=True); s.set_defaults(fn=prepare_corpus)
+    s = sub.add_parser("candidate"); s.add_argument("--tag", required=True); s.add_argument("--engine", required=True); s.add_argument("--source-root", required=True); s.add_argument("--corpus-zip", required=True); s.add_argument("--semantic-script", required=True); s.add_argument("--identity", required=True); s.add_argument("--output", required=True); s.add_argument("--work-root", required=True); s.set_defaults(fn=candidate)
+    s = sub.add_parser("aggregate"); s.add_argument("--inputs", required=True); s.add_argument("--output", required=True); s.set_defaults(fn=aggregate)
+    a = p.parse_args()
+    return a.fn(a)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
