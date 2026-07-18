@@ -1,0 +1,113 @@
+    # then receive byte-identical copies of those source-adjacent sidecars.
+    authority = work / "authority"
+    make_project(corpus, authority, all_paths)
+    shared_env_root = work / "xdg"
+    env = env_for(shared_env_root)
+    version = run([str(engine), "--version"], out / "ENGINE_VERSION.txt", env, 120)
+    authority_run = run([str(engine), "--headless", "--path", str(authority), "--editor", "--import", "--quit", "--verbose"], out / "SIDECAR_AUTHORITY_IMPORT.log", env, 1800)
+    assert version["exit_code"] == 0 and authority_run["exit_code"] == 0 and authority_run["error_pattern_count"] == 0
+    sidecar_files: dict[str, bytes] = {}
+    for p in sorted(authority.rglob("*.import")):
+        sidecar_files[p.relative_to(authority).as_posix()] = p.read_bytes()
+    sidecar_zip = out / "CANDIDATE_SIDECAR_AUTHORITY.zip"
+    deterministic_zip(sidecar_zip, sidecar_files)
+    sidecar_authority = {
+        "count": len(sidecar_files),
+        "archive_bytes": sidecar_zip.stat().st_size,
+        "archive_sha256": sha_file(sidecar_zip),
+        "records": [{"path": p, "bytes": len(b), "sha256": sha_bytes(b)} for p, b in sorted(sidecar_files.items())],
+    }
+    write_json(out / "CANDIDATE_SIDECAR_AUTHORITY.json", sidecar_authority)
+
+    audit = audit_source(source_root, args.tag)
+    write_json(out / "ENGINE_SOURCE_DETERMINISM_AUDIT.json", {"identity": identity, **audit})
+    write_json(out / "ENGINE_SOURCE_CHANGE_FROM_4_3.json", {
+        "baseline_4_3": {"uses_wall_clock": True, "uses_microsecond_ticks": True, "uses_random_number_generation": True, "five_character_local_ids": True, "binary_saver_generates_local_ids": True, "unsorted_dictionary_keys": True},
+        "candidate": audit["flags"],
+        "known_mechanism_removed": not any(audit["flags"][k] for k in ["uses_wall_clock", "uses_microsecond_ticks", "uses_random_number_generation", "binary_saver_generates_local_ids"]),
+    })
+
+    runs: dict[str, dict[str, Any]] = {}
+    semantic_graphs: dict[str, dict[str, Any]] = {}
+    for label in ["D1", "D2"]:
+        project = work / label / "game"
+        make_project(corpus, project, all_paths)
+        applied = overlay_sidecars(authority, project, all_paths)
+        # The global editor settings directory is normalized and shared, but
+        # project .godot import caches remain independent and start absent.
+        rr = run([str(engine), "--headless", "--path", str(project), "--editor", "--import", "--quit", "--verbose"], out / f"{label}_IMPORT.log", env, 1800)
+        assert rr["exit_code"] == 0 and rr["error_pattern_count"] == 0, rr
+        resources = []
+        sem_selection = []
+        for row in manifest["resources"]:
+            sidecar = project / f"{row['logical_source']}.import"
+            assert sidecar.is_file(), row["logical_source"]
+            meta = parse_import(sidecar)
+            assert meta["path"] and meta["source_file"] in (None, row["logical_source"])
+            target = project / meta["path"]
+            md5_path = target.with_suffix(".md5")
+            assert target.is_file() and md5_path.is_file(), (target, md5_path)
+            resources.append({
+                "selection_id": row["selection_id"],
+                "logical_source": row["logical_source"],
+                "source_type": row["source_type"],
+                "matrix_member": row["matrix_member"],
+                "source_sha256": sha_file(project / row["logical_source"]),
+                "source_bytes": (project / row["logical_source"]).stat().st_size,
+                "sidecar": meta,
+                "imported_path": meta["path"],
+                "imported_bytes": target.stat().st_size,
+                "imported_sha256": sha_file(target),
+                "md5": parse_md5(md5_path),
+            })
+            sem_selection.append({**row, "target_path": meta["path"]})
+        sem_manifest = out / f"{label}_SEMANTIC_SELECTION.json"
+        write_json(sem_manifest, {"resources": sem_selection})
+        sem_out = out / f"{label}_SEMANTIC_GRAPH.json"
+        sem_rr = run([str(engine), "--headless", "--path", str(project), "--script", str(semantic_script), "--", str(sem_manifest), str(sem_out)], out / f"{label}_SEMANTIC.log", env, 1800)
+        assert sem_rr["exit_code"] == 0 and sem_out.is_file(), sem_rr
+        uid = project / ".godot/uid_cache.bin"
+        semantic_graphs[label] = json.loads(sem_out.read_text())
+        runs[label] = {
+            "project_root": str(project),
+            "run": rr,
+            "applied_sidecars": applied,
+            "resources": resources,
+            "uid_cache": {"exists": uid.is_file(), "bytes": uid.stat().st_size if uid.is_file() else None, "sha256": sha_file(uid) if uid.is_file() else None},
+            "generated": generated_inventory(project),
+            "semantic_run": sem_rr,
+            "semantic_graph_sha256": sha_file(sem_out),
+        }
+
+    inv_cmp = compare_inventory(runs["D1"]["generated"], runs["D2"]["generated"])
+    d1_rows = {r["selection_id"]: r for r in runs["D1"]["resources"]}
+    d2_rows = {r["selection_id"]: r for r in runs["D2"]["resources"]}
+    d1_sem = {r["selection_id"]: r for r in semantic_graphs["D1"]["resources"]}
+    d2_sem = {r["selection_id"]: r for r in semantic_graphs["D2"]["resources"]}
+    results = []
+    for row in manifest["resources"]:
+        sid = row["selection_id"]
+        a = d1_rows[sid]; b = d2_rows[sid]
+        p1 = work / "D1/game" / a["imported_path"]
+        p2 = work / "D2/game" / b["imported_path"]
+        imported_diff = byte_diff(p1.read_bytes(), p2.read_bytes())
+        md5_a = a["md5"]["fields"]; md5_b = b["md5"]["fields"]
+        semantic_equal = d1_sem[sid] == d2_sem[sid]
+        result = {
+            "selection_id": sid,
+            "logical_source": row["logical_source"],
+            "source_type": row["source_type"],
+            "matrix_member": row["matrix_member"],
+            "source_hash_equal": a["source_sha256"] == b["source_sha256"] == row["source_sha256"],
+            "source_md5_equal": md5_a.get("source_md5") == md5_b.get("source_md5"),
+            "sidecar_equal": a["sidecar"]["sha256"] == b["sidecar"]["sha256"],
+            "imported_path_equal": a["imported_path"] == b["imported_path"],
+            "imported_size_equal": a["imported_bytes"] == b["imported_bytes"],
+            "imported_sha256_equal": a["imported_sha256"] == b["imported_sha256"],
+            "destination_md5_equal": md5_a.get("dest_md5") == md5_b.get("dest_md5"),
+            "canonical_semantic_equal": semantic_equal,
+            "first_differing_byte": imported_diff["first_differing_byte"],
+            "differing_byte_count": imported_diff["differing_byte_count"],
+            "d1": a,
+            "d2": b,
+        }
