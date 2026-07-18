@@ -1,0 +1,113 @@
+extends SceneTree
+
+var seen := {}
+var next_ref := 0
+var failures := []
+
+func _initialize():
+    call_deferred("_run")
+
+func _sha_bytes(data):
+    var context = HashingContext.new()
+    context.start(HashingContext.HASH_SHA256)
+    context.update(data)
+    return context.finish().hex_encode()
+
+func _encoded(value):
+    var data = var_to_bytes(value)
+    return {"bytes": data.size(), "sha256": _sha_bytes(data)}
+
+func _canon(value, context := ""):
+    var t = typeof(value)
+    match t:
+        TYPE_NIL:
+            return {"type": "nil"}
+        TYPE_BOOL, TYPE_INT, TYPE_STRING, TYPE_STRING_NAME, TYPE_NODE_PATH:
+            return {"type": type_string(t), "value": str(value)}
+        TYPE_FLOAT:
+            return {"type": "float", "text": String.num(value, 17), "encoding": _encoded(value)}
+        TYPE_VECTOR2, TYPE_VECTOR2I, TYPE_RECT2, TYPE_RECT2I, TYPE_VECTOR3, TYPE_VECTOR3I, TYPE_TRANSFORM2D, TYPE_VECTOR4, TYPE_VECTOR4I, TYPE_PLANE, TYPE_QUATERNION, TYPE_AABB, TYPE_BASIS, TYPE_TRANSFORM3D, TYPE_PROJECTION, TYPE_COLOR:
+            return {"type": type_string(t), "text": str(value), "encoding": _encoded(value)}
+        TYPE_ARRAY:
+            var rows := []
+            for i in range(value.size()):
+                rows.append(_canon(value[i], context + "[%d]" % i))
+            return {"type": "Array", "size": value.size(), "values": rows}
+        TYPE_DICTIONARY:
+            var rows := []
+            for key in value.keys():
+                var ck = _canon(key, context + ".key")
+                rows.append({"key": ck, "value": _canon(value[key], context + ".value"), "sort": JSON.stringify(ck)})
+            rows.sort_custom(func(a, b): return str(a["sort"]) < str(b["sort"]))
+            for row in rows:
+                row.erase("sort")
+            return {"type": "Dictionary", "size": value.size(), "entries": rows}
+        TYPE_PACKED_BYTE_ARRAY, TYPE_PACKED_INT32_ARRAY, TYPE_PACKED_INT64_ARRAY, TYPE_PACKED_FLOAT32_ARRAY, TYPE_PACKED_FLOAT64_ARRAY, TYPE_PACKED_STRING_ARRAY, TYPE_PACKED_VECTOR2_ARRAY, TYPE_PACKED_VECTOR3_ARRAY, TYPE_PACKED_COLOR_ARRAY, TYPE_PACKED_VECTOR4_ARRAY:
+            return {"type": type_string(t), "size": value.size(), "encoding": _encoded(value)}
+        TYPE_OBJECT:
+            if value == null:
+                return {"type": "Object", "value": null}
+            if value is Resource:
+                return _resource(value, context)
+            return {"type": "Object", "class": value.get_class(), "excluded": "process-local non-resource object"}
+        _:
+            failures.append({"context": context, "reason": "unhandled type", "type": type_string(t)})
+            return {"type": type_string(t), "failure": true}
+
+func _properties(obj, context):
+    var props = obj.get_property_list()
+    props.sort_custom(func(a, b): return str(a.get("name", "")) < str(b.get("name", "")))
+    var rows := []
+    for prop in props:
+        var usage = int(prop.get("usage", 0))
+        if (usage & PROPERTY_USAGE_STORAGE) == 0:
+            continue
+        var name = str(prop.get("name", ""))
+        if name in ["resource_path", "resource_name", "resource_local_to_scene", "resource_scene_unique_id"]:
+            continue
+        rows.append({"name": name, "type": int(prop.get("type", TYPE_NIL)), "usage": usage, "value": _canon(obj.get(name), context + "." + name)})
+    return rows
+
+func _resource(res, context):
+    var iid = res.get_instance_id()
+    if seen.has(iid):
+        return {"type": "ResourceRef", "ref": seen[iid]}
+    var token = "r%06d" % next_ref
+    next_ref += 1
+    seen[iid] = token
+    var result = {
+        "type": "Resource",
+        "ref": token,
+        "class": res.get_class(),
+        "resource_path": res.resource_path,
+        "resource_name": res.resource_name,
+        "scene_unique_id": res.resource_scene_unique_id,
+        "local_to_scene": res.resource_local_to_scene
+    }
+    if res is PackedScene:
+        result["packed_scene"] = _packed_scene(res, context)
+    elif res is Mesh:
+        result["mesh"] = _mesh(res, context)
+    elif res is Animation:
+        result["animation"] = _animation(res, context)
+    elif res is AnimationLibrary:
+        var names = Array(res.get_animation_list())
+        names.sort()
+        var rows := []
+        for name in names:
+            rows.append({"name": str(name), "animation": _resource(res.get_animation(name), context + ".animation." + str(name))})
+        result["animation_library"] = rows
+    elif res is Skin:
+        var binds := []
+        for i in range(res.get_bind_count()):
+            binds.append({"index": i, "bone": res.get_bind_bone(i), "name": str(res.get_bind_name(i)), "pose": _canon(res.get_bind_pose(i), context + ".bind[%d]" % i)})
+        result["skin"] = binds
+    else:
+        result["properties"] = _properties(res, context)
+    return result
+
+func _packed_scene(scene, context):
+    var state = scene.get_state()
+    var nodes := []
+    for i in range(state.get_node_count()):
+        var props := []
