@@ -1,0 +1,47 @@
+name: Bahrain Brick Engine Qualification Materialization Fix
+
+on:
+  push:
+    branches: [ci/pr59-godot-engine-qualification-20260718]
+    paths: [.github/workflows/pr59-engine-qualification-materialize-fix.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ci/pr59-godot-engine-qualification-20260718
+          fetch-depth: 0
+      - name: Patch qualification harness materialization fail-closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/pr59-engine-qualification.yml')
+          s=p.read_text()
+          old="""cp qualification/.github/forensics/pr59_engine_qualification.py.gz.b64 /tmp/qualification.py.gz.b64
+          base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py
+          chmod +x /tmp/pr59_engine_qualification.py
+          python3 -m py_compile /tmp/pr59_engine_qualification.py"""
+          new="""cat qualification/.github/forensics/engine_qualification_parts/part*.b64 | tr -d '\\n' > /tmp/qualification.py.gz.b64
+          test \"$(wc -c < /tmp/qualification.py.gz.b64)\" = 12652
+          base64 -d /tmp/qualification.py.gz.b64 | gzip -d > /tmp/pr59_engine_qualification.py
+          test \"$(sha256sum /tmp/pr59_engine_qualification.py | cut -d' ' -f1)\" = c7c54ec58f2ede9c6a0c0082a913bcefdc67f55225d74a0280be00eee83823bf
+          chmod +x /tmp/pr59_engine_qualification.py
+          python3 -m py_compile /tmp/pr59_engine_qualification.py"""
+          count=s.count(old)
+          if count != 2: raise SystemExit(f'expected 2 exact decode blocks, found {count}')
+          p.write_text(s.replace(old,new))
+          PY
+          grep -c 'engine_qualification_parts/part' .github/workflows/pr59-engine-qualification.yml | grep -qx 2
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/pr59-engine-qualification.yml
+          git commit -m 'ci: fix qualification harness materialization'
+          git pull --rebase origin ci/pr59-godot-engine-qualification-20260718
+          git push origin HEAD:ci/pr59-godot-engine-qualification-20260718
