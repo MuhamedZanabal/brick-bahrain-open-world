@@ -1,0 +1,126 @@
+name: Bahrain Brick PR59 Godot UID Sidecar Preservation Experiment
+
+on:
+  push:
+    branches: [ci/pr59-existing-apk-gate-closure-20260717]
+    paths: [.github/forensics/TRIGGER_UID_SIDECAR_PRESERVATION]
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  INPUT_RUN_ID: '29627302405'
+  INPUT_ARTIFACT: pr59-godot-import-experiment-input-29627302405
+  SOURCE_ZIP: build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip
+
+jobs:
+  generate_uid_sidecar_authority:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: ci/pr59-existing-apk-gate-closure-20260717, path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_ARTIFACT }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN_ID }}', github-token: '${{ github.token }}'}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; test -n "$godot"; chmod +x "$godot"
+          python3 -m py_compile tooling/.github/forensics/pr59_uid_seed_experiment.py
+          python3 tooling/.github/forensics/pr59_uid_seed_experiment.py generate --source-zip "$SOURCE_ZIP" --godot "$godot" --work-root /tmp/bahrain-brick-seed-generation --output build/seed
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: pr59-godot-uid-sidecar-authority-${{ github.run_id }}
+          path: |
+            build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip
+            build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json
+            build/seed/SOURCE_CONTENT_MANIFEST.json
+            build/seed/seed_generation.godot.log
+          compression-level: 9
+          retention-days: 30
+
+  seeded_import_d1:
+    needs: generate_uid_sidecar_authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: ci/pr59-existing-apk-gate-closure-20260717, path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_ARTIFACT }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN_ID }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-godot-uid-sidecar-authority-${{ github.run_id }}', path: build/seed}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_uid_seed_experiment.py run --source-zip "$SOURCE_ZIP" --godot "$godot" --seed-zip build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json --source-manifest build/seed/SOURCE_CONTENT_MANIFEST.json --work-root /tmp/bahrain-brick-seeded-import --output build/d1 --label SEEDED_D1
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with: {name: 'pr59-seeded-import-d1-${{ github.run_id }}', path: build/d1, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  seeded_import_d2:
+    needs: generate_uid_sidecar_authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: ci/pr59-existing-apk-gate-closure-20260717, path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_ARTIFACT }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN_ID }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-godot-uid-sidecar-authority-${{ github.run_id }}', path: build/seed}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          godot="$(find build/input/input/godot -maxdepth 1 -type f -name 'Godot*' -print -quit)"; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_uid_seed_experiment.py run --source-zip "$SOURCE_ZIP" --godot "$godot" --seed-zip build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json --source-manifest build/seed/SOURCE_CONTENT_MANIFEST.json --work-root /tmp/bahrain-brick-seeded-import --output build/d2 --label SEEDED_D2
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with: {name: 'pr59-seeded-import-d2-${{ github.run_id }}', path: build/d2, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  negative_controls:
+    needs: generate_uid_sidecar_authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: ci/pr59-existing-apk-gate-closure-20260717, path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_ARTIFACT }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN_ID }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-godot-uid-sidecar-authority-${{ github.run_id }}', path: build/seed}
+      - shell: bash
+        run: python3 tooling/.github/forensics/pr59_uid_seed_experiment.py negative --source-zip "$SOURCE_ZIP" --seed-zip build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json --source-manifest build/seed/SOURCE_CONTENT_MANIFEST.json --work-root /tmp/bahrain-brick-negative-controls --output build/negative
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-seeded-import-negative-${{ github.run_id }}', path: build/negative, compression-level: 9, retention-days: 30}
+
+  compare_seeded_imports:
+    needs: [seeded_import_d1, seeded_import_d2, negative_controls]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: ci/pr59-existing-apk-gate-closure-20260717, path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-seeded-import-d1-${{ github.run_id }}', path: build/d1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-seeded-import-d2-${{ github.run_id }}', path: build/d2}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-seeded-import-negative-${{ github.run_id }}', path: build/negative}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 tooling/.github/forensics/pr59_uid_seed_experiment.py compare --a build/d1 --b build/d2 --output build/final
+          cp build/negative/NEGATIVE_TESTS.json build/final/
+      - name: Record preservation run
+        shell: bash
+        working-directory: tooling
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics
+          printf '{"run_id":%s,"workflow_commit":"%s"}\n' '${{ github.run_id }}' '${{ github.sha }}' > .github/forensics/LATEST_UID_SIDECAR_EXPERIMENT_RUN.json
+          git config user.name github-actions[bot]; git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/LATEST_UID_SIDECAR_EXPERIMENT_RUN.json; git commit -m "ci(forensics): record UID sidecar experiment ${{ github.run_id }}"; git pull --rebase origin ci/pr59-existing-apk-gate-closure-20260717; git push origin HEAD:ci/pr59-existing-apk-gate-closure-20260717
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'bahrain-brick-pr59-uid-sidecar-preservation-${{ github.run_id }}', path: build/final, if-no-files-found: error, compression-level: 9, retention-days: 30}
