@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import collections
+import hashlib
+import json
+import os
+import re
+import stat
+import struct
+import sys
+import zipfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+SIGNATURE_RE = re.compile(r"^META-INF/(?:.*\.(?:RSA|DSA|EC|SF)|MANIFEST\.MF)$", re.I)
+HEX_ID_RE = re.compile(rb"(?<![0-9a-fA-F])[0-9a-fA-F]{16,64}(?![0-9a-fA-F])")
+ABS_PATH_RE = re.compile(rb"/(?:home|tmp|var|opt|usr|workspace|__w)/[^\x00\r\n\t ]+")
+TIMESTAMP_RE = re.compile(rb"(?:20\d{2}[-/:]\d{2}[-/:]\d{2}[T ]\d{2}:\d{2}(?::\d{2})?|\b1[6-9]\d{8}\b)")
+UID_TEXT_RE = re.compile(rb"(?:uid://[A-Za-z0-9_\-]+|uid\s*=\s*\"?[^\r\n\"]+)", re.I)
+PRINTABLE_RE = re.compile(rb"[ -~]{8,}")
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def normalize_res(value: str) -> str:
+    value = value.strip().strip('"').replace("\\", "/")
+    if value.startswith("res://"):
+        value = value[6:]
+    return value.lstrip("/")
+
+
+def parse_quoted_strings(raw: str) -> list[str]:
+    return [bytes(m, "utf-8").decode("unicode_escape") for m in re.findall(r'"((?:[^"\\]|\\.)*)"', raw)]
+
+
+def parse_import_metadata_bytes(data: bytes) -> dict[str, Any]:
+    terminal_nul = data.endswith(b"\x00")
+    if terminal_nul:
+        data = data[:-1]
+    embedded_nul = b"\x00" in data
+    text = data.decode("utf-8", errors="replace")
+    line_ending = "CRLF" if "\r\n" in text else "LF"
+    section: str | None = None
+    sections: list[str] = []
+    fields: list[dict[str, Any]] = []
+    field_map: dict[str, list[str]] = collections.defaultdict(list)
+    malformed: list[str] = []
+    for index, raw_line in enumerate(text.splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith(";") or line.startswith("#"):
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            section = line[1:-1].strip()
+            sections.append(section)
+            continue
+        if "=" not in line or section is None:
+            malformed.append(f"line:{index}:{raw_line}")
+            continue
+        key, raw_value = line.split("=", 1)
+        key = key.strip()
+        raw_value = raw_value.strip()
+        identity = f"{section}.{key}"
+        field_map[identity].append(raw_value)
+        fields.append({"section": section, "key": key, "raw_value": raw_value, "identity": identity, "line": index})
+    def first(identity: str) -> str | None:
+        vals = field_map.get(identity)
+        return vals[0] if vals else None
+    def scalar_path(identity: str) -> str | None:
+        raw = first(identity)
+        if raw is None:
+            return None
+        strings = parse_quoted_strings(raw)
+        if strings:
+            return normalize_res(strings[0])
+        return None
+    targets: list[str] = []
+    p = scalar_path("remap.path")
+    if p:
+        targets.append(p)
+    raw_dest = first("deps.dest_files")
+    if raw_dest is not None:
+        targets.extend(normalize_res(x) for x in parse_quoted_strings(raw_dest))
+    return {
+        "terminal_nul": terminal_nul,
+        "embedded_nul": embedded_nul,
+        "line_ending": line_ending,
+        "sections": sections,
+        "fields": fields,
+        "field_map": dict(field_map),
+        "field_order": [f["identity"] for f in fields],
+        "malformed": malformed,
+        "path": p,
+        "uid": first("remap.uid"),
+        "source_file": scalar_path("deps.source_file"),
+        "dest_files": sorted(set(targets)),
+        "source_md5": first("deps.source_md5") or first("remap.source_md5"),
+        "dest_md5": first("deps.dest_md5") or first("remap.dest_md5"),
+        "importer": first("remap.importer"),
+        "type": first("remap.type"),
+        "metadata": {k: v for k, v in field_map.items() if k.startswith("metadata.")},
+        "params": {k: v for k, v in field_map.items() if k.startswith("params.")},
+        "text_sha256": sha256_bytes(data),
+        "bytes_without_terminal_nul": len(data),
+    }
+
+
+def locate_one(root: Path, name: str) -> Path:
+    matches = list(root.rglob(name))
+    if len(matches) != 1:
+        raise RuntimeError(f"expected one {name} beneath {root}, found {matches[:10]}")
+    return matches[0]
+
+
+def apk_infos(apk: Path) -> tuple[zipfile.ZipFile, dict[str, zipfile.ZipInfo]]:
+    z = zipfile.ZipFile(apk)
+    infos = {i.filename: i for i in z.infolist() if not i.is_dir()}
+    if len(infos) != len([i for i in z.infolist() if not i.is_dir()]):
+        raise RuntimeError(f"duplicate APK paths in {apk}")
+    return z, infos
+
+
+def build_import_maps(z: zipfile.ZipFile, infos: dict[str, zipfile.ZipInfo]) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
+    sidecars: dict[str, dict[str, Any]] = {}
