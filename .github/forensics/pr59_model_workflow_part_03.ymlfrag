@@ -1,0 +1,60 @@
+      - name: Import D1, retain representative pairs, canonicalize semantics, and correct Experiment E
+        shell: bash
+        run: |
+          set +e
+          godot=build/input/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_model_binary_forensics.py seeded-run \
+            --source-zip build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --godot "$godot" \
+            --seed-zip build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip \
+            --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json \
+            --selection build/retained/REPRESENTATIVE_SELECTION.json \
+            --semantic-script tooling/.github/forensics/pr59_model_semantic_dump.gd \
+            --output build/d1 --work-root /tmp/pr59-model-d1 --label MODEL_D1 --corrected-e
+          code=$?; mkdir -p build/d1; printf '%s\n' "$code" > build/d1/EXIT_CODE.txt; exit 0
+      - name: Upload D1 bounded exact pairs and diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-diagnostic-d1-${{ github.run_id }}', path: build/d1, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Enforce D1 diagnostic success
+        run: test "$(cat build/d1/EXIT_CODE.txt)" = 0
+
+  diagnostic_d2:
+    needs: retained_compare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.INPUT_NAME }}', path: build/input, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.INPUT_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ env.SEED_NAME }}', path: build/seed, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SEED_RUN }}', github-token: '${{ github.token }}'}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'pr59-model-retained-${{ github.run_id }}', path: build/retained}
+      - name: Import D2, retain representative pairs, and canonicalize semantics
+        shell: bash
+        run: |
+          set +e
+          godot=build/input/input/godot/Godot_v4.3-stable_linux.x86_64; chmod +x "$godot"
+          python3 tooling/.github/forensics/pr59_model_binary_forensics.py seeded-run \
+            --source-zip build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip \
+            --godot "$godot" \
+            --seed-zip build/seed/GODOT_IMPORT_UID_SIDECARS_V1.zip \
+            --seed-manifest build/seed/GODOT_IMPORT_UID_SIDECARS_V1.json \
+            --selection build/retained/REPRESENTATIVE_SELECTION.json \
+            --semantic-script tooling/.github/forensics/pr59_model_semantic_dump.gd \
+            --output build/d2 --work-root /tmp/pr59-model-d2 --label MODEL_D2
+          code=$?; mkdir -p build/d2; printf '%s\n' "$code" > build/d2/EXIT_CODE.txt; exit 0
+      - name: Upload D2 bounded exact pairs and diagnostics
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'pr59-model-diagnostic-d2-${{ github.run_id }}', path: build/d2, if-no-files-found: error, compression-level: 9, retention-days: 30}
+      - name: Enforce D2 diagnostic success
+        run: test "$(cat build/d2/EXIT_CODE.txt)" = 0
+
+  compare_pairs:
+    needs: [diagnostic_d1, diagnostic_d2]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
