@@ -1,0 +1,84 @@
+    if len(seen)!=SOURCE_FILE_COUNT or actual!=seen or total!=SOURCE_BYTES:raise AuthorityError('source tree mismatch')
+    return {'result':'PASS','manifest_sha256':SOURCE_MANIFEST_SHA256,'aggregate_tree_sha256':SOURCE_AGGREGATE_TREE_SHA256,'source_archive_sha256':SOURCE_ARCHIVE_SHA256,'file_count':SOURCE_FILE_COUNT,'total_bytes':SOURCE_BYTES,'candidate_commit':COMPOSITE_SOURCE_HEAD,'duplicate_paths':0,'unsafe_paths':0,'case_collisions':0,'missing_source_files':0,'source_hash_alarms':0}
+
+def build_full_corpus_authority(source:Path,out:Path,source_verification:dict[str,Any]|None=None)->dict[str,Any]:
+    matrix_file=source/'asset_lab/runtime/full_asset_matrix_manifest.json'
+    if sha256_file(matrix_file)!=MATRIX_MANIFEST_SHA256:raise AuthorityError('matrix SHA mismatch')
+    matrix=matrix_paths_from_manifest(load_json(matrix_file))
+    if len(matrix)!=MATRIX_MODEL_COUNT:raise AuthorityError(f'matrix count:{len(matrix)}')
+    paths=sorted((x.relative_to(source).as_posix() for x in source.rglob('*') if x.is_file() and x.suffix.lower() in ('.glb','.gltf','.fbx','.obj')),key=lambda x:x.encode())
+    if len(paths)!=TOTAL_MODELS or len(set(paths))!=TOTAL_MODELS:raise AuthorityError(f'model count:{len(paths)}')
+    folds={};models=[];deps_out=[];formats=Counter()
+    for idx,rel in enumerate(paths):
+        normalize_relative_path(rel);low=rel.casefold()
+        if low in folds and folds[low]!=rel:raise AuthorityError(f'case collision:{rel}')
+        folds[low]=rel;path=source/rel;typ=source_type_for(path);formats[typ]+=1;deps=[]
+        for d in extract_dependencies(path,rel,source):
+            dp=source/d
+            if not dp.is_file():raise AuthorityError(f'missing dependency:{rel}->{d}')
+            deps.append({'path':d,'bytes':dp.stat().st_size,'sha256':sha256_file(dp),'md5':md5_file(dp)})
+        row={'global_index':idx,'logical_source_path':rel,'source_type':typ,'matrix_member':rel in matrix,'source_byte_size':path.stat().st_size,'source_sha256':sha256_file(path),'source_md5':md5_file(path),'dependencies':deps,'expected_sidecar_path':rel+'.import','expected_importer':'scene','expected_imported_resource_type':'PackedScene'}
+        models.append(row);deps_out.append({'global_index':idx,'logical_source_path':rel,'dependencies':deps})
+    if dict(formats)!=MODEL_COUNTS:raise AuthorityError(f'format counts:{dict(formats)}')
+    found={x['logical_source_path'] for x in models if x['matrix_member']};missing=sorted(matrix-found,key=lambda x:x.encode())
+    if len(found)!=MATRIX_MODEL_COUNT or missing:raise AuthorityError('matrix subset mismatch')
+    result={'schema_version':1,'result':'PASS','frozen_pr_head':PR_HEAD,'composite_source_head':COMPOSITE_SOURCE_HEAD,'source_verification':source_verification or {},'matrix_manifest_sha256':MATRIX_MANIFEST_SHA256,'total_model_records':TOTAL_MODELS,'unique_model_paths':TOTAL_MODELS,'format_counts':MODEL_COUNTS,'matrix_paths_found':MATRIX_MODEL_COUNT,'missing_matrix_paths':[],'duplicate_paths':0,'unsafe_paths':0,'case_collisions':0,'missing_source_files':0,'missing_dependencies':0,'source_hash_alarms':0,'models':models,'no_stage5':True,'no_project_compatibility':True,'no_migration':True,'no_pack_generation':True,'no_android':True,'no_apk':True}
+    out.mkdir(parents=True,exist_ok=True);write_json(out/'FULL_MODEL_CORPUS_AUTHORITY.json',result)
+    (out/'FULL_MODEL_CORPUS_PATHS.txt').write_text(''.join(x['logical_source_path']+'\n' for x in models))
+    write_json(out/'FULL_MODEL_DEPENDENCY_AUTHORITY.json',{'schema_version':1,'model_count':TOTAL_MODELS,'models':deps_out})
+    return result
+def _section(text:str,name:str)->list[str]:
+    current=None;out=[]
+    for raw in text.splitlines():
+        line=raw.strip()
+        if line.startswith('[') and line.endswith(']'):current=line[1:-1];continue
+        if current==name and line and not line.startswith(';'):out.append(line)
+    return out
+def _assign(rows:list[str],key:str)->str|None:
+    for line in rows:
+        if line.startswith(key+'='):return line[len(key)+1:].strip()
+    return None
+def _lit(raw:str|None)->Any:
+    try:return ast.literal_eval(raw) if raw is not None else None
+    except Exception as e:raise AuthorityError(f'invalid literal:{raw}') from e
+def parse_import_sidecar(data:bytes)->dict[str,Any]:
+    text=data.decode('utf-8-sig');remap=_section(text,'remap');deps=_section(text,'deps');params=_section(text,'params')
+    importer=_lit(_assign(remap,'importer'));typ=_lit(_assign(remap,'type'));uid=_lit(_assign(remap,'uid'));path=_lit(_assign(remap,'path'));source=_lit(_assign(deps,'source_file'));dest=_lit(_assign(deps,'dest_files')) or []
+    if not all(isinstance(x,str) and x for x in (importer,typ,uid,path,source)):raise AuthorityError('sidecar fields missing')
+    if not path.startswith('res://.godot/imported/'):raise AuthorityError('unsafe imported path')
+    if not source.startswith('res://'):raise AuthorityError('unsafe source')
+    dests=[]
+    if not isinstance(dest,list) or not dest:raise AuthorityError('destinations missing')
+    for raw in dest:
+        if not isinstance(raw,str) or not raw.startswith('res://.godot/imported/'):raise AuthorityError('unsafe destination')
+        dests.append(normalize_relative_path(raw[6:]))
+    param_text='\n'.join(params)+'\n'
+    return {'importer':importer,'type':typ,'uid':uid,'source_file':normalize_relative_path(source[6:]),'imported_relative_path':normalize_relative_path(path[6:]),'dest_files':dests,'parameters':params,'parameters_sha256':sha256_bytes(param_text.encode()),'sidecar_sha256':sha256_bytes(data)}
+def parse_md5_companion(data:bytes)->dict[str,str]:
+    text=data.decode();out={}
+    for key in ('source_md5','dest_md5'):
+        m=re.search(rf'(?m)^{key}="([0-9a-f]{{32}})"$',text)
+        if not m:raise AuthorityError(f'missing {key}')
+        out[key]=m.group(1)
+    return out
+def md5_companion_path(imported:str)->str:return PurePosixPath(imported).with_suffix('.md5').as_posix()
+def _strings(data:bytes,prefix:bytes)->list[str]:
+    return sorted({m.group(0).decode('ascii','replace') for m in re.finditer(re.escape(prefix)+rb'[\x20-\x7e]{1,240}',data)})[:100]
+def bounded_byte_diagnostic(left:bytes,right:bytes)->dict[str,Any]:
+    positions=[i for i in range(max(len(left),len(right))) if (left[i] if i<len(left) else None)!=(right[i] if i<len(right) else None)]
+    ranges=[]
+    for x in positions:
+        if not ranges or x!=ranges[-1][1]+1:ranges.append([x,x])
+        else:ranges[-1][1]=x
+    windows=[]
+    for x in positions[:20]:
+        a=max(0,x-16);b=min(max(len(left),len(right)),x+17);windows.append({'offset':x,'start':a,'d1_hex':left[a:min(b,len(left))].hex(),'d2_hex':right[a:min(b,len(right))].hex()})
+    joined=left+b'\0'+right
+    return {'first_differing_byte_offset':positions[0] if positions else None,'final_differing_byte_offset':positions[-1] if positions else None,'differing_byte_position_count':len(positions),'contiguous_difference_range_count':len(ranges),'first_20_difference_windows':windows,'output_size_difference':len(right)-len(left),'local_strings':_strings(joined,b'local://'),'uid_strings':_strings(joined,b'uid://'),'resource_order_indications':_strings(joined,b'res://')}
+def build_inventory(root:Path)->dict[str,Any]:
+    files=[{'path':x.relative_to(root).as_posix(),'bytes':x.stat().st_size,'sha256':sha256_file(x)} for x in sorted((p for p in root.rglob('*') if p.is_file()),key=lambda p:p.relative_to(root).as_posix().encode())]
+    return {'schema_version':1,'file_count':len(files),'total_bytes':sum(x['bytes'] for x in files),'files':files,'inventory_sha256':sha256_bytes(canonical_json_bytes({'schema_version':1,'files':files}))}
+def verify_inventory(root:Path,inv:dict[str,Any])->None:
+    actual=build_inventory(root)
+    if actual['files']!=inv.get('files') or actual['inventory_sha256']!=inv.get('inventory_sha256'):raise AuthorityError('inventory mismatch')
+def compare_model_records(left:dict[str,Any]|None,right:dict[str,Any]|None)->dict[str,Any]:
