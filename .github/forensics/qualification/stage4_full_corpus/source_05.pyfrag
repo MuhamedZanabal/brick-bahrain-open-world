@@ -1,0 +1,47 @@
+    write_json(out/'STAGE4_SHARD_COMPARISON.json',summary);differing=sorted((x.get('logical_source_path','') for x in summary.get('models',[]) if x.get('result')!='PASS'),key=lambda x:x.encode());(out/'STAGE4_SHARD_DIFFERING_PATHS.txt').write_text(''.join(x+'\n' for x in differing if x));write_json(out/'STAGE4_SHARD_SUMMARY.json',{k:v for k,v in summary.items() if k!='models'});return summary
+def import_summary(root:Path,side:str)->dict[str,Any]:return load_json(find_one(root,f'FULL_IMPORT_{side}_MODEL_MANIFEST.json'))
+def locate_shard(root:Path,side:str,index:int)->Path:
+    found=[]
+    for mp in root.rglob('SHARD_MANIFEST.json'):
+        try:
+            d=load_json(mp)
+            if d.get('side')==side and d.get('shard_index')==index:found.append(mp.parent)
+        except Exception:pass
+    if len(found)!=1:raise AuthorityError(f'{side} shard {index} missing/ambiguous')
+    return found[0]
+def aggregate_from_roots(comparison_root:Path,d1_manifest_root:Path,d2_manifest_root:Path,out:Path,d1_shards_root:Path|None=None,d2_shards_root:Path|None=None)->dict[str,Any]:
+    reports=[load_json(x) for x in comparison_root.rglob('STAGE4_SHARD_COMPARISON.json')];d1=import_summary(d1_manifest_root,'D1');d2=import_summary(d2_manifest_root,'D2');result=aggregate_stage4(reports,{'D1':d1,'D2':d2});out.mkdir(parents=True,exist_ok=True);write_json(out/'GODOT_4_4_1_STAGE4_RESULT.json',result)
+    models=[]
+    for r in sorted(reports,key=lambda x:x.get('shard_index',999)):models.extend(r.get('models',[]))
+    write_json(out/'GODOT_4_4_1_FULL_CORPUS_COMPARISON.json',{'schema_version':1,'models':models,'summary':result});differing=sorted((x['logical_source_path'] for x in models if x.get('result')!='PASS'),key=lambda x:x.encode());(out/'GODOT_4_4_1_FULL_CORPUS_DIFFERING_PATHS.txt').write_text(''.join(x+'\n' for x in differing))
+    write_json(out/'GODOT_4_4_1_FULL_CORPUS_FORMAT_SUMMARY.json',{'schema_version':1,'format_comparisons':result['format_comparisons'],'differing_by_format':{k:sum(x.get('source_type')==k and x.get('imported_binary_equal') is False for x in models) for k in MODEL_COUNTS}})
+    matrix=[x for x in models if x.get('matrix_member')];write_json(out/'GODOT_4_4_1_MATRIX_SUBSET_RESULT.json',{'schema_version':1,'expected_matrix_models':MATRIX_MODEL_COUNT,'completed_matrix_models':len(matrix),'differing_imported_binaries':sum(x.get('imported_binary_equal') is False for x in matrix),'result':'PASS' if len(matrix)==MATRIX_MODEL_COUNT and all(x.get('result')=='PASS' for x in matrix) else 'FAIL'})
+    if differing and d1_shards_root and d2_shards_root:
+        pairs=out/'differing_pairs';idx={x['logical_source_path']:x for x in models}
+        for n,path in enumerate(differing[:20]):
+            row=idx[path];shard=int(row['global_index'])//20;b1=locate_shard(d1_shards_root,'D1',shard);b2=locate_shard(d2_shards_root,'D2',shard);m1=load_json(b1/'SHARD_MANIFEST.json');m2=load_json(b2/'SHARD_MANIFEST.json');l=next((x for x in m1['models'] if x['logical_source_path']==path),None);r=next((x for x in m2['models'] if x['logical_source_path']==path),None)
+            if l and r:
+                dst=pairs/f'{n:02d}';dst.mkdir(parents=True,exist_ok=True);shutil.copy2(b1/'payload'/l['imported_relative_path'],dst/'D1.bin');shutil.copy2(b2/'payload'/r['imported_relative_path'],dst/'D2.bin');write_json(dst/'PAIR.json',{'logical_source_path':path,'global_index':row['global_index'],'shard_index':shard})
+        if pairs.exists():write_json(out/'DIFFERING_PAIR_EVIDENCE_INVENTORY.json',build_inventory(pairs))
+    return result
+def command_build_authority(a):
+    project=a.work_root/'accepted-source';v=verify_source_authority(a.authority_root,project,True);r=build_full_corpus_authority(project,a.output,v);print(json.dumps({k:r[k] for k in ('result','total_model_records','format_counts','matrix_paths_found')},sort_keys=True))
+def command_build_sidecars(a):
+    r=build_sidecar_authority(a.authority_root,a.corpus_authority,a.engine_root,a.work_root,a.output,a.timeout_seconds);print(json.dumps(r,sort_keys=True));raise SystemExit(0 if r['result']=='PASS' else 2)
+def command_run_import(a):
+    r=run_full_import(a.side,a.authority_root,a.corpus_authority,a.sidecar_root,a.engine_root,a.project_root,a.output,a.timeout_seconds);print(json.dumps({k:r[k] for k in ('side','import_completed','imported_model_count','import_duration_seconds','import_exit_code')},sort_keys=True));raise SystemExit(0 if r['import_completed'] else 2)
+def command_compare(a):print(json.dumps(compare_shard(a.d1_root,a.d2_root,a.shard_index,a.output),sort_keys=True))
+def command_aggregate(a):print(json.dumps(aggregate_from_roots(a.comparison_root,a.d1_manifest_root,a.d2_manifest_root,a.output,a.d1_shards_root,a.d2_shards_root),sort_keys=True))
+def command_inventory(a):write_json(a.output,build_inventory(a.root))
+def parser():
+    p=argparse.ArgumentParser();s=p.add_subparsers(required=True)
+    a=s.add_parser('build-authority');a.add_argument('--authority-root',type=Path,required=True);a.add_argument('--work-root',type=Path,required=True);a.add_argument('--output',type=Path,required=True);a.set_defaults(func=command_build_authority)
+    a=s.add_parser('build-sidecars');a.add_argument('--authority-root',type=Path,required=True);a.add_argument('--corpus-authority',type=Path,required=True);a.add_argument('--engine-root',type=Path,required=True);a.add_argument('--work-root',type=Path,required=True);a.add_argument('--output',type=Path,required=True);a.add_argument('--timeout-seconds',type=int,default=10800);a.set_defaults(func=command_build_sidecars)
+    a=s.add_parser('run-import');a.add_argument('--side',choices=('D1','D2'),required=True);a.add_argument('--authority-root',type=Path,required=True);a.add_argument('--corpus-authority',type=Path,required=True);a.add_argument('--sidecar-root',type=Path,required=True);a.add_argument('--engine-root',type=Path,required=True);a.add_argument('--project-root',type=Path,required=True);a.add_argument('--output',type=Path,required=True);a.add_argument('--timeout-seconds',type=int,default=14400);a.set_defaults(func=command_run_import)
+    a=s.add_parser('compare-shard');a.add_argument('--d1-root',type=Path,required=True);a.add_argument('--d2-root',type=Path,required=True);a.add_argument('--shard-index',type=int,required=True);a.add_argument('--output',type=Path,required=True);a.set_defaults(func=command_compare)
+    a=s.add_parser('aggregate');a.add_argument('--comparison-root',type=Path,required=True);a.add_argument('--d1-manifest-root',type=Path,required=True);a.add_argument('--d2-manifest-root',type=Path,required=True);a.add_argument('--d1-shards-root',type=Path);a.add_argument('--d2-shards-root',type=Path);a.add_argument('--output',type=Path,required=True);a.set_defaults(func=command_aggregate)
+    a=s.add_parser('inventory');a.add_argument('--root',type=Path,required=True);a.add_argument('--output',type=Path,required=True);a.set_defaults(func=command_inventory)
+    return p
+def main():
+    a=parser().parse_args();a.func(a)
+if __name__=='__main__':main()
