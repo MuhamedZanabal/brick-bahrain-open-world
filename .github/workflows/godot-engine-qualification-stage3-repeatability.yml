@@ -1,0 +1,291 @@
+name: Bahrain Brick Godot Engine Qualification Stage 3 Repeatability
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths: [.github/workflows/godot-engine-qualification-stage3-repeatability.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: bahrain-brick-godot-stage3-repeatability
+  cancel-in-progress: false
+
+env:
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  STAGE2_RUN_ID: '29685721858'
+  STAGE2_WORKFLOW_SHA: 23efeab85489ef1efafca60a0c0791507fc3f5dc
+  ANALYZER_SHA256: 60c6fbd33a330fa094e8c8cf76b009d573d3fa87e2ea17b64124e81e952e1b2c
+  ANALYZER_TEST_SHA256: f3701935cf863b772b49987ce1aa6e749a2f82936b1191e96a16bd1758bb5a98
+  AUTHORITY_SHA256: 2ab06cf672160cf0c9f3aa2c4700ff034ddb39f266d98ecd3833b19d9ce7b4c1
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', fetch-depth: 30}
+      - name: Record Stage 3 run locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics/qualification
+          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","stage2_run_id":29685721858}' > .github/forensics/qualification/LATEST_STAGE3_REPEATABILITY_RUN.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/qualification/LATEST_STAGE3_REPEATABILITY_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(stage3): record repeatability run ${{ github.run_id }}"
+            git fetch origin ci/godot-engine-determinism-qualification-20260719
+            git rebase origin/ci/godot-engine-determinism-qualification-20260719
+            git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+          fi
+
+  prepare_matrix:
+    needs: record_locator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      abd: ${{ steps.matrix.outputs.abd }}
+      c: ${{ steps.matrix.outputs.c }}
+      final: ${{ steps.matrix.outputs.final }}
+      engines: ${{ steps.matrix.outputs.engines }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - name: Verify harness, authority ledger, and Stage 2 artifacts
+        shell: bash
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          set -euo pipefail
+          root=tooling/.github/forensics/qualification/stage3_repeatability
+          printf '%s  %s\n' "$ANALYZER_SHA256" "$root/stage3_repeatability.py" | sha256sum -c -
+          printf '%s  %s\n' "$ANALYZER_TEST_SHA256" "$root/test_stage3_repeatability.py" | sha256sum -c -
+          printf '%s  %s\n' "$AUTHORITY_SHA256" "$root/stage3_authorities.json" | sha256sum -c -
+          cp "$root/stage3_repeatability.py" /tmp/
+          cp "$root"/payload_*.b64 /tmp/
+          cp "$root/test_stage3_repeatability.py" /tmp/
+          cp "$root/test_repeatability_payload.b64" /tmp/
+          cd /tmp && python3 -m py_compile stage3_repeatability.py test_stage3_repeatability.py && python3 -m unittest -v test_stage3_repeatability.py
+          cd "$GITHUB_WORKSPACE"
+          python3 - <<'PY'
+          import json,os,subprocess
+          from pathlib import Path
+          p=Path('tooling/.github/forensics/qualification/stage3_repeatability/stage3_authorities.json')
+          d=json.loads(p.read_text()); assert d['stage2_run_id']==29685721858; assert len(d['authorities'])==16
+          assert sorted({x['version'] for x in d['authorities']})==['4.4.1-stable','4.5.2-stable']
+          items=[d['corpus_artifact'],d['cross_artifact']]
+          seen=set()
+          for row in d['authorities']:
+              items += [row['engine_artifact'],row['resource_artifact']]
+          for expected in items:
+              if expected['id'] in seen: continue
+              seen.add(expected['id'])
+              actual=json.loads(subprocess.check_output(['gh','api',f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/artifacts/{expected['id']}"]))
+              assert actual['name']==expected['name']; assert actual['digest']=='sha256:'+expected['digest']; assert actual['expired'] is False
+              assert actual['workflow_run']['id']==29685721858; assert actual['workflow_run']['head_sha']=='23efeab85489ef1efafca60a0c0791507fc3f5dc'
+          PY
+      - name: Build exact Stage 3 matrices
+        id: matrix
+        shell: bash
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          d=json.load(open('tooling/.github/forensics/qualification/stage3_repeatability/stage3_authorities.json'))
+          rows=d['authorities']; c=[{**r,'side':s} for r in rows for s in ('C1','C2')]
+          final=[{'version':r['version'],'resource':r['resource']} for r in rows]
+          engines=[{'version':v} for v in ('4.4.1-stable','4.5.2-stable')]
+          assert len(rows)==16 and len(c)==32 and len(final)==16
+          for name,value in [('abd',rows),('c',c),('final',final),('engines',engines)]: print(name+'='+json.dumps({'include':value},separators=(',',':')))
+          PY
+
+  abd:
+    needs: prepare_matrix
+    name: stage3-abd-${{ matrix.version }}-${{ matrix.resource }}
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.abd) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - name: Seed A B D evidence
+        shell: bash
+        run: mkdir -p build/output && printf '%s\n' '{"schema_version":1,"kind":"ABD","result":"HARNESS_FAILURE","harness_error":"job did not complete"}' > build/output/ABD_RESULT.json
+      - continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ matrix.engine_artifact.name }}', path: build/engine, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: stage2-exact-corpus-29685721858, path: build/corpus, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ matrix.resource_artifact.name }}', path: build/resource, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+      - name: Run A B D byte experiments
+        if: always()
+        shell: bash
+        env:
+          V: ${{ matrix.version }}
+          R: ${{ matrix.resource }}
+          T: ${{ matrix.timeout_seconds }}
+          AID: ${{ matrix.resource_artifact.id }}
+          ANAME: ${{ matrix.resource_artifact.name }}
+          ADIGEST: ${{ matrix.resource_artifact.digest }}
+        run: |
+          set +e
+          printf '{"id":%s,"name":"%s","digest":"sha256:%s"}\n' "$AID" "$ANAME" "$ADIGEST" > build/resource/ARTIFACT_METADATA.json
+          a=tooling/.github/forensics/qualification/stage3_repeatability/stage3_repeatability.py
+          [[ -f "$a" && "$(sha256sum "$a"|cut -d' ' -f1)" == "$ANALYZER_SHA256" ]] && python3 "$a" abd --version "$V" --selection-id "$R" --engine-root build/engine --corpus-root build/corpus --stage2-resource-root build/resource --stage2-artifact-metadata build/resource/ARTIFACT_METADATA.json --timeout-seconds "$T" --work-root "/tmp/stage3-abd/$V/$R" --output build/output
+          exit 0
+      - name: Upload A B D evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage3-abd-${{ matrix.version }}-${{ matrix.resource }}-${{ github.run_id }}', path: build/output, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  c_side:
+    needs: prepare_matrix
+    name: stage3-${{ matrix.side }}-${{ matrix.version }}-${{ matrix.resource }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.c) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Seed independent runner evidence
+        shell: bash
+        run: mkdir -p build/output && printf '%s\n' '{"schema_version":1,"kind":"C_SIDE","result":"HARNESS_FAILURE","harness_error":"job did not complete"}' > build/output/C_SIDE_RESULT.json
+      - continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ matrix.engine_artifact.name }}', path: build/engine, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: stage2-exact-corpus-29685721858, path: build/corpus, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: '${{ matrix.resource_artifact.name }}', path: build/resource, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+      - name: Run one independent C import
+        if: always()
+        shell: bash
+        env:
+          V: ${{ matrix.version }}
+          R: ${{ matrix.resource }}
+          S: ${{ matrix.side }}
+          T: ${{ matrix.timeout_seconds }}
+          AID: ${{ matrix.resource_artifact.id }}
+          ANAME: ${{ matrix.resource_artifact.name }}
+          ADIGEST: ${{ matrix.resource_artifact.digest }}
+        run: |
+          set +e
+          printf '{"id":%s,"name":"%s","digest":"sha256:%s"}\n' "$AID" "$ANAME" "$ADIGEST" > build/resource/ARTIFACT_METADATA.json
+          a=tooling/.github/forensics/qualification/stage3_repeatability/stage3_repeatability.py
+          [[ -f "$a" && "$(sha256sum "$a"|cut -d' ' -f1)" == "$ANALYZER_SHA256" ]] && python3 "$a" c-side --version "$V" --selection-id "$R" --side "$S" --engine-root build/engine --corpus-root build/corpus --stage2-resource-root build/resource --stage2-artifact-metadata build/resource/ARTIFACT_METADATA.json --timeout-seconds "$T" --work-root "/tmp/stage3-$S/$V/$R" --output build/output
+          exit 0
+      - name: Upload independent C evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage3-c-${{ matrix.version }}-${{ matrix.resource }}-${{ matrix.side }}-${{ github.run_id }}', path: build/output, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  finalize_resource:
+    needs: [prepare_matrix, abd, c_side]
+    if: always() && needs.prepare_matrix.result == 'success'
+    name: stage3-compare-${{ matrix.version }}-${{ matrix.resource }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.final) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Seed resource comparison evidence
+        run: mkdir -p build/output && printf '%s\n' '{"schema_version":1,"kind":"STAGE3_RESOURCE","resource_stage3_decision":"Q6","harness_error":"comparison did not complete"}' > build/output/STAGE3_RESOURCE_RESULT.json
+      - continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage3-abd-${{ matrix.version }}-${{ matrix.resource }}-${{ github.run_id }}', path: build/abd}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage3-c-${{ matrix.version }}-${{ matrix.resource }}-C1-${{ github.run_id }}', path: build/c1}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage3-c-${{ matrix.version }}-${{ matrix.resource }}-C2-${{ github.run_id }}', path: build/c2}
+      - name: Compare A B C D evidence
+        if: always()
+        shell: bash
+        env: {V: '${{ matrix.version }}', R: '${{ matrix.resource }}'}
+        run: |
+          set +e; a=tooling/.github/forensics/qualification/stage3_repeatability/stage3_repeatability.py
+          [[ -f "$a" && "$(sha256sum "$a"|cut -d' ' -f1)" == "$ANALYZER_SHA256" ]] && python3 "$a" finalize-resource --version "$V" --selection-id "$R" --abd-root build/abd --c1-root build/c1 --c2-root build/c2 --output build/output
+          exit 0
+      - name: Upload final per-resource evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage3-resource-${{ matrix.version }}-${{ matrix.resource }}-${{ github.run_id }}', path: build/output, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  aggregate_engine:
+    needs: [prepare_matrix, finalize_resource]
+    if: always() && needs.prepare_matrix.result == 'success'
+    name: stage3-engine-${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.engines) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - run: mkdir -p build/output && printf '%s\n' '{"stage3_decision":"FAIL_INSUFFICIENT_EVIDENCE","classification":"Q6"}' > build/output/ENGINE_STAGE3_RESULT.json
+      - continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {pattern: 'stage3-resource-${{ matrix.version }}-*-${{ github.run_id }}', path: build/resources, merge-multiple: false}
+      - name: Aggregate engine result
+        if: always()
+        shell: bash
+        env: {V: '${{ matrix.version }}'}
+        run: |
+          set +e; a=tooling/.github/forensics/qualification/stage3_repeatability/stage3_repeatability.py
+          [[ -f "$a" && "$(sha256sum "$a"|cut -d' ' -f1)" == "$ANALYZER_SHA256" ]] && python3 "$a" aggregate-engine --version "$V" --input-root build/resources --output build/output
+          exit 0
+      - name: Upload engine aggregate
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage3-engine-result-${{ matrix.version }}-${{ github.run_id }}', path: build/output, if-no-files-found: error, compression-level: 9, retention-days: 30}
+
+  aggregate_cross:
+    needs: aggregate_engine
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - run: mkdir -p build/output && printf '%s\n' '{"stage4_eligible_engines":[],"harness_error":"aggregate did not complete"}' > build/output/STAGE3_CROSS_VERSION_QUALIFICATION.json
+      - continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', path: tooling, fetch-depth: 1}
+      - continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {pattern: 'stage3-engine-result-*-${{ github.run_id }}', path: build/engines, merge-multiple: false}
+      - name: Aggregate cross-version result
+        if: always()
+        shell: bash
+        run: |
+          set +e; a=tooling/.github/forensics/qualification/stage3_repeatability/stage3_repeatability.py
+          [[ -f "$a" && "$(sha256sum "$a"|cut -d' ' -f1)" == "$ANALYZER_SHA256" ]] && python3 "$a" aggregate-cross --input-root build/engines --output build/output --run-id '${{ github.run_id }}'
+          exit 0
+      - name: Upload cross-version aggregate
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage3-cross-version-result-${{ github.run_id }}', path: build/output, if-no-files-found: error, compression-level: 9, retention-days: 30}
