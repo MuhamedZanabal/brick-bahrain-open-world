@@ -1,0 +1,200 @@
+    actual_bytes = path.stat().st_size
+    actual_sha256 = sha256_file(path)
+    if actual_bytes != int(expected_bytes):
+        raise ValueError(f"byte-size mismatch for {path}: {actual_bytes} != {expected_bytes}")
+    if actual_sha256 != expected_sha256:
+        raise ValueError(f"sha256 mismatch for {path}: {actual_sha256} != {expected_sha256}")
+    value = {"path": str(path), "bytes": actual_bytes, "sha256": actual_sha256}
+    if expected_md5 is not None:
+        actual_md5 = md5_file(path)
+        if actual_md5 != expected_md5:
+            raise ValueError(f"md5 mismatch for {path}: {actual_md5} != {expected_md5}")
+        value["md5"] = actual_md5
+    return value
+
+
+def verify_authority(engine_version: str, selection_id: str, corpus_root: Path, stage2_resource_root: Path) -> dict[str, Any]:
+    if engine_version not in ENGINES:
+        raise ValueError(f"unauthorized engine: {engine_version}")
+    if selection_id not in RESOURCE_BY_ID:
+        raise ValueError(f"unauthorized resource: {selection_id}")
+    corpus_authority_path = corpus_root / "CORPUS_AUTHORITY.json"
+    stage2_report_path = stage2_resource_root / "RESOURCE_QUALIFICATION.json"
+    if not corpus_authority_path.is_file() or not stage2_report_path.is_file():
+        raise FileNotFoundError("missing Stage 2 corpus or resource authority")
+    corpus_authority = read_json(corpus_authority_path)
+    matches = [item for item in corpus_authority.get("resources", []) if item.get("selection_id") == selection_id]
+    if len(matches) != 1:
+        raise ValueError(f"expected one corpus resource for {selection_id}, got {len(matches)}")
+    corpus_resource = matches[0]
+    expected_type = RESOURCE_BY_ID[selection_id]["source_type"]
+    if corpus_resource.get("source_type") != expected_type:
+        raise ValueError("source type authority mismatch")
+    source_rel = str(corpus_resource["logical_source"])
+    source_path = corpus_root / "files" / safe_relative(source_rel)
+    source_verification = _verify_file(
+        source_path,
+        expected_sha256=str(corpus_resource["source_sha256"]),
+        expected_bytes=int(corpus_resource["source_bytes"]),
+        expected_md5=str(corpus_resource["source_md5"]),
+    )
+    dependency_verification: list[dict[str, Any]] = []
+    for dependency in corpus_resource.get("dependencies", []):
+        dependency_rel = str(dependency["path"])
+        dependency_verification.append(
+            _verify_file(
+                corpus_root / "files" / safe_relative(dependency_rel),
+                expected_sha256=str(dependency["sha256"]),
+                expected_bytes=int(dependency["bytes"]),
+                expected_md5=str(dependency["md5"]),
+            )
+            | {"logical_path": dependency_rel}
+        )
+    report = read_json(stage2_report_path)
+    required_report_values = {
+        "candidate_resource_result": "PASS",
+        "engine_version": engine_version,
+        "resource_selection_id": selection_id,
+        "logical_source_path": source_rel,
+        "source_sha256": corpus_resource["source_sha256"],
+        "source_md5": corpus_resource["source_md5"],
+        "source_byte_size": corpus_resource["source_bytes"],
+        "frozen_pr_head": FROZEN_PR_HEAD,
+    }
+    for key, expected in required_report_values.items():
+        actual = report.get(key)
+        if actual != expected:
+            raise ValueError(f"Stage 2 authority mismatch for {key}: {actual!r} != {expected!r}")
+    sidecar_manifest = report.get("sidecar_authority_manifest")
+    if not isinstance(sidecar_manifest, list) or not sidecar_manifest:
+        raise ValueError("missing sidecar authority manifest")
+    verified_sidecars: list[dict[str, Any]] = []
+    for item in sidecar_manifest:
+        relative = str(item["path"])
+        path = stage2_resource_root / "sidecar_authority" / safe_relative(relative)
+        verification = _verify_file(path, expected_sha256=str(item["sha256"]), expected_bytes=int(item["size"]))
+        verified_sidecars.append({"path": relative, "bytes": verification["bytes"], "sha256": verification["sha256"]})
+    primary_sidecar_rel = str(report["sidecar_path"])
+    primary_sidecar_path = stage2_resource_root / "sidecar_authority" / safe_relative(primary_sidecar_rel)
+    primary_sha = sha256_file(primary_sidecar_path)
+    if primary_sha != report.get("sidecar_sha256") or primary_sidecar_path.stat().st_size != int(report.get("sidecar_size", -1)):
+        raise ValueError("primary sidecar authority hash or size mismatch")
+    parsed_sidecar = parse_import_sidecar(primary_sidecar_path.read_text(encoding="utf-8"))
+    if parsed_sidecar["source_file"] != source_rel:
+        raise ValueError(f"sidecar source mismatch: {parsed_sidecar['source_file']} != {source_rel}")
+    if parsed_sidecar["imported_relative_path"] not in parsed_sidecar["dest_files"]:
+        raise ValueError("sidecar imported path is absent from dest_files")
+    stage2_imported_path = report.get("sidecar_metadata", {}).get("imported_path")
+    if stage2_imported_path and parsed_sidecar["imported_relative_path"] != stage2_imported_path:
+        raise ValueError("sidecar imported path does not match Stage 2 report")
+    authority = {
+        "schema_version": 3,
+        "frozen_pr_head": FROZEN_PR_HEAD,
+        "stage2_run_id": STAGE2_RUN_ID,
+        "stage2_workflow_sha": STAGE2_WORKFLOW_SHA,
+        "engine_version": engine_version,
+        "resource_selection_id": selection_id,
+        "source_type": expected_type,
+        "logical_source_path": source_rel,
+        "source_bytes": source_verification["bytes"],
+        "source_sha256": source_verification["sha256"],
+        "source_md5": source_verification["md5"],
+        "dependencies": [
+            {
+                "path": dependency["logical_path"],
+                "bytes": dependency["bytes"],
+                "sha256": dependency["sha256"],
+                "md5": dependency["md5"],
+            }
+            for dependency in dependency_verification
+        ],
+        "sidecar_path": primary_sidecar_rel,
+        "sidecar_sha256": primary_sha,
+        "sidecar_bytes": primary_sidecar_path.stat().st_size,
+        "sidecar": parsed_sidecar,
+        "sidecar_authority_count": len(verified_sidecars),
+        "sidecar_authority_manifest": verified_sidecars,
+        "stage2_resource_report_sha256": sha256_file(stage2_report_path),
+        "corpus_authority_sha256": sha256_file(corpus_authority_path),
+    }
+    authority["authority_manifest_sha256"] = sha256_bytes(canonical_json_bytes(authority))
+    authority["verified_at"] = utc_now()
+    return authority
+
+
+def verify_artifact_metadata(metadata_path: Path, *, expected_name: str, expected_run_id: int, expected_head_sha: str) -> dict[str, Any]:
+    value = read_json(metadata_path)
+    if isinstance(value, dict) and "artifacts" in value:
+        candidates = [item for item in value["artifacts"] if item.get("name") == expected_name]
+        if len(candidates) != 1:
+            raise ValueError(f"expected one artifact named {expected_name}, got {len(candidates)}")
+        value = candidates[0]
+    if value.get("name") != expected_name:
+        raise ValueError("artifact name mismatch")
+    if value.get("expired") is not False:
+        raise ValueError("artifact is expired")
+    workflow_run = value.get("workflow_run", {})
+    if int(workflow_run.get("id", -1)) != int(expected_run_id):
+        raise ValueError("artifact run mismatch")
+    if workflow_run.get("head_sha") != expected_head_sha:
+        raise ValueError("artifact head mismatch")
+    digest = value.get("digest")
+    if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+        raise ValueError("artifact digest missing or invalid")
+    return {
+        "artifact_id": int(value["id"]),
+        "artifact_name": value["name"],
+        "artifact_digest": digest.removeprefix("sha256:"),
+        "artifact_bytes": int(value["size_in_bytes"]),
+        "workflow_run_id": int(workflow_run["id"]),
+        "workflow_head_sha": workflow_run["head_sha"],
+        "expired": False,
+    }
+
+
+def verify_engine(engine_version: str, engine_root: Path, extract_root: Path) -> tuple[Path, dict[str, Any]]:
+    if engine_version not in ENGINES:
+        raise ValueError(f"unauthorized engine: {engine_version}")
+    expected = ENGINE_AUTHORITIES[engine_version]
+    identity_path = engine_root / "ENGINE_PACKAGE_IDENTITY.json"
+    identity = read_json(identity_path)
+    checks = {
+        "engine_version": engine_version,
+        "runtime_identity": expected["runtime_identity"],
+        "source_commit": expected["source_commit"],
+        "binary_archive_filename": expected["archive"],
+        "binary_archive_sha512": expected["archive_sha512"],
+        "extracted_runtime_sha256": expected["runtime_sha256"],
+    }
+    for key, expected_value in checks.items():
+        if identity.get(key) != expected_value:
+            raise ValueError(f"engine identity mismatch for {key}")
+    archive = engine_root / expected["archive"]
+    if sha512_file(archive) != expected["archive_sha512"]:
+        raise ValueError("engine archive SHA-512 mismatch")
+    if extract_root.exists():
+        shutil.rmtree(extract_root)
+    extract_root.mkdir(parents=True)
+    with zipfile.ZipFile(archive) as package:
+        package.extractall(extract_root)
+    candidates = [path for path in extract_root.iterdir() if path.is_file() and path.name.startswith("Godot")]
+    if len(candidates) != 1:
+        raise ValueError(f"expected one Godot runtime, got {len(candidates)}")
+    runtime = candidates[0]
+    runtime.chmod(runtime.stat().st_mode | 0o111)
+    runtime_sha = sha256_file(runtime)
+    if runtime_sha != expected["runtime_sha256"]:
+        raise ValueError("extracted engine runtime SHA-256 mismatch")
+    actual_version = subprocess.check_output([str(runtime), "--version"], text=True, timeout=60).strip()
+    if actual_version != expected["runtime_identity"]:
+        raise ValueError(f"runtime identity mismatch: {actual_version}")
+    verified = dict(identity)
+    verified.update(
+        {
+            "identity_manifest_sha256": sha256_file(identity_path),
+            "runtime_path": str(runtime),
+            "runtime_sha256": runtime_sha,
+            "runtime_version_output": actual_version,
+        }
+    )
+    return runtime, verified
