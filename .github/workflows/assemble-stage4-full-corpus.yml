@@ -1,0 +1,46 @@
+name: Assemble Godot Stage 4 Full Corpus Workflow
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths: [.github/workflows/assemble-stage4-full-corpus.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assemble-bahrain-brick-stage4-full-corpus
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact assembler authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 30
+      - name: Assemble and verify the Stage 4 workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=.github/forensics/qualification/stage4_workflow
+          target=.github/workflows/godot-engine-qualification-stage4-full-corpus.yml
+          cat "$root"/part_*.ymlfrag > "$target"
+          printf '%s  %s\n' b90fa4c51b2647c0f1ab68e761ced91dee6d259947c236635f582847d9b914d6 "$target" | sha256sum -c -
+          cd .github/forensics/qualification/stage4_full_corpus
+          python3 -m unittest -v test_stage4_full_corpus.py test_stage4_workflow.py
+      - name: Commit immutable Stage 4 workflow authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/godot-engine-qualification-stage4-full-corpus.yml
+          git commit -m "ci(stage4): install full 800-model qualification workflow"
+          git fetch origin ci/godot-engine-determinism-qualification-20260719
+          git rebase origin/ci/godot-engine-determinism-qualification-20260719
+          git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
