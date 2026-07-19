@@ -1,6 +1,14 @@
     memory_pressure = any(token in lower_log for token in ("out of memory", "oom-killer", "killed process"))
     disk_pressure = any(token in lower_log for token in ("no space left on device", "disk quota exceeded"))
-    timeout_match = duration is not None and abs(duration - timeout_seconds) <= 5 and job.get("conclusion") == "cancelled"
+    explicit_timeout = (
+        "exceeded the maximum execution time" in lower_log
+        or f"maximum execution time of {configured_timeout_minutes} minutes" in lower_log
+    )
+    timeout_match = explicit_timeout or (
+        duration is not None
+        and abs(duration - timeout_seconds) <= 5
+        and job.get("conclusion") == "cancelled"
+    )
     if timeout_match:
         cause = "JOB_TIMEOUT"
     elif concurrency:
