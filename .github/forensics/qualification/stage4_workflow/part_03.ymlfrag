@@ -1,0 +1,156 @@
+          - '31'
+          - '32'
+          - '33'
+          - '34'
+          - '35'
+          - '36'
+          - '37'
+          - '38'
+          - '39'
+    steps:
+      - name: Seed unconditional shard comparison evidence
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p build/comparison
+          printf '{"schema_version":1,"shard_index":%s,"result":"EVIDENCE_INSUFFICIENT","classification":"Q6","models":[]}\n' "$((10#$SHARD))" > build/comparison/STAGE4_SHARD_COMPARISON.json
+          : > build/comparison/STAGE4_SHARD_DIFFERING_PATHS.txt
+          cp build/comparison/STAGE4_SHARD_COMPARISON.json build/comparison/STAGE4_SHARD_SUMMARY.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Verify matching artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for side in d1 d2; do
+            name="stage4-${side}-shard-${SHARD}-${{ github.run_id }}"
+            gh api "repos/${{ github.repository }}/actions/artifacts?name=${name}&per_page=100" > "build/${side}-metadata.json"
+            SIDE="$side" NAME="$name" python3 - <<'PY'
+          import json,os
+          rows=[x for x in json.load(open('build/'+os.environ['SIDE']+'-metadata.json'))['artifacts'] if str(x['workflow_run']['id'])==os.environ['GITHUB_RUN_ID']]
+          assert len(rows)==1
+          a=rows[0];assert a['name']==os.environ['NAME'] and not a['expired']
+          assert a['digest'].startswith('sha256:') and len(a['digest'])==71
+          open('build/'+os.environ['SIDE']+'-artifact-digest.txt','w').write(a['digest']+'\n')
+          PY
+          done
+      - name: Download D1 shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d1-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: build/d1
+      - name: Download D2 shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d2-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: build/d2
+      - name: Compare exact shard bytes
+        env:
+          SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          python3 "$analyzer" compare-shard --d1-root build/d1 --d2-root build/d2 --shard-index "$((10#$SHARD))" --output build/comparison
+          cp build/d1-artifact-digest.txt build/comparison/D1_ARTIFACT_DIGEST.txt || true
+          cp build/d2-artifact-digest.txt build/comparison/D2_ARTIFACT_DIGEST.txt || true
+          python3 "$analyzer" inventory --root build/comparison --output build/COMPARISON_ARTIFACT_INVENTORY.json || true
+          exit 0
+      - name: Upload shard comparison evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-shard-comparison-${{ matrix.shard }}-${{ github.run_id }}
+          path: build
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+
+  aggregate_stage4:
+    needs: [import_d1, import_d2, compare_shards]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Seed unconditional aggregate evidence
+        shell: bash
+        run: |
+          mkdir -p build/aggregate/evidence
+          printf '%s\n' '{"schema_version":1,"stage4_decision":"FAIL_INSUFFICIENT_EVIDENCE","classification":"Q6","stage5_eligible":false}' > build/aggregate/evidence/GODOT_4_4_1_STAGE4_RESULT.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download all shard comparison reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage4-shard-comparison-*-${{ github.run_id }}
+          path: build/comparisons
+      - name: Download D1 compact manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d1-manifest-${{ github.run_id }}
+          path: build/d1-manifest
+      - name: Download D2 compact manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d2-manifest-${{ github.run_id }}
+          path: build/d2-manifest
+      - name: Download all D1 shards
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage4-d1-shard-*-${{ github.run_id }}
+          path: build/d1-shards
+      - name: Download all D2 shards
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage4-d2-shard-*-${{ github.run_id }}
+          path: build/d2-shards
+      - name: Aggregate exact full-corpus result
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          rm -rf build/aggregate/evidence
+          mkdir -p build/aggregate/evidence
+          python3 "$analyzer" aggregate --comparison-root build/comparisons --d1-manifest-root build/d1-manifest --d2-manifest-root build/d2-manifest --d1-shards-root build/d1-shards --d2-shards-root build/d2-shards --output build/aggregate/evidence
+          code=$?
+          if test -d build/aggregate/evidence/differing_pairs; then
+            mkdir -p build/differing-pairs/evidence
+            cp -a build/aggregate/evidence/differing_pairs/. build/differing-pairs/evidence/
+            python3 "$analyzer" inventory --root build/differing-pairs/evidence --output build/differing-pairs/ARTIFACT_INVENTORY.json || true
+          fi
+          python3 "$analyzer" inventory --root build/aggregate/evidence --output build/aggregate/ARTIFACT_INVENTORY.json || true
+          printf '%s\n' "$code" > build/aggregate/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Upload Stage 4 aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-aggregate-result-${{ github.run_id }}
+          path: build/aggregate
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+      - name: Upload bounded differing-pair evidence when present
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-differing-pairs-${{ github.run_id }}
+          path: build/differing-pairs
+          if-no-files-found: ignore
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
