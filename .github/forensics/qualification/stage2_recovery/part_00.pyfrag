@@ -1,0 +1,195 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import time
+import traceback
+import zipfile
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+SOURCE_ZIP_SHA256 = "5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7"
+SOURCE_ZIP_BYTES = 225721731
+PR_HEAD = "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f"
+INITIAL_RUN_ID = 29664068659
+INITIAL_WORKFLOW_SHA = "a7b189090be8ab884855b6c799edcaa8b3c2ea00"
+RESOURCE_IDS = [
+    "glb_matrix_small",
+    "glb_matrix_medium",
+    "glb_matrix_large",
+    "glb_non_matrix",
+    "gltf_character",
+    "gltf_environment",
+    "fbx_character",
+    "obj_single",
+]
+ALLOWED_RESOURCE_RESULTS = {"PASS", "NONDETERMINISTIC", "IMPORT_FAILURE", "TIMEOUT", "HARNESS_FAILURE"}
+PATH_RE = re.compile(r'(?m)^path="res://([^"\r\n]+)"\s*$')
+SOURCE_RE = re.compile(r'(?m)^source_file="res://([^"\r\n]+)"\s*$')
+UID_RE = re.compile(r'(?m)^uid=("uid://[^"\r\n]+")\s*$')
+LOCAL_ID_RE = re.compile(rb"(?:local://|local_)[A-Za-z0-9_\-]{3,64}")
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def sha512_file(path: Path) -> str:
+    h = hashlib.sha512()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def md5_file(path: Path) -> str:
+    h = hashlib.md5()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(path.suffix + ".tmp")
+    temp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temp.replace(path)
+
+
+def read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def parse_time(value: str | None) -> dt.datetime | None:
+    if not value:
+        return None
+    return dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def safe_relative(value: str) -> str:
+    if not value or value.startswith("/") or "\\" in value or "\x00" in value:
+        raise ValueError(f"unsafe path: {value!r}")
+    path = PurePosixPath(value)
+    if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
+        raise ValueError(f"unsafe path: {value!r}")
+    normalized = path.as_posix()
+    if normalized != value:
+        raise ValueError(f"noncanonical path: {value!r}")
+    return normalized
+
+
+def deterministic_env(xdg: Path) -> dict[str, str]:
+    if xdg.exists():
+        shutil.rmtree(xdg)
+    xdg.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env.update(
+        {
+            "TZ": "UTC",
+            "LC_ALL": "C.UTF-8",
+            "LANG": "C.UTF-8",
+            "XDG_DATA_HOME": str(xdg.resolve()),
+            "GODOT_SILENCE_ROOT_WARNING": "1",
+        }
+    )
+    return env
+
+
+def project_text() -> str:
+    return (
+        'config_version=5\n\n'
+        '[application]\n'
+        'config/name="Bahrain Brick Stage 2 Resource Qualification"\n\n'
+        '[rendering]\n'
+        'renderer/rendering_method="gl_compatibility"\n'
+        'renderer/rendering_method.mobile="gl_compatibility"\n'
+    )
+
+
+def resolve_gltf_dependencies(archive: zipfile.ZipFile, logical: str) -> list[str]:
+    document = json.loads(archive.read(logical).decode("utf-8"))
+    base = PurePosixPath(logical).parent
+    names = {info.filename for info in archive.infolist() if not info.is_dir()}
+    dependencies: set[str] = set()
+    for collection in (document.get("buffers", []), document.get("images", [])):
+        for item in collection:
+            uri = item.get("uri")
+            if uri and not uri.startswith(("data:", "http:", "https:")):
+                candidate = (base / PurePosixPath(uri)).as_posix()
+                if candidate in names:
+                    dependencies.add(candidate)
+    return sorted(dependencies)
+
+
+def resolve_obj_dependencies(archive: zipfile.ZipFile, logical: str) -> list[str]:
+    names = {info.filename for info in archive.infolist() if not info.is_dir()}
+    base = PurePosixPath(logical).parent
+    text = archive.read(logical).decode("utf-8", errors="replace")
+    dependencies: set[str] = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("mtllib "):
+            candidate = (base / stripped.split(None, 1)[1].strip()).as_posix()
+            if candidate in names:
+                dependencies.add(candidate)
+    for mtl in list(dependencies):
+        mtl_text = archive.read(mtl).decode("utf-8", errors="replace")
+        for line in mtl_text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            token = stripped.split(None, 1)[0].lower()
+            if token.startswith("map_") or token in {"bump", "disp", "decal"}:
+                candidate = (PurePosixPath(mtl).parent / stripped.split()[-1]).as_posix()
+                if candidate in names:
+                    dependencies.add(candidate)
+    return sorted(dependencies)
+
+
+def build_corpus_authority(source_zip: Path, selection_path: Path) -> dict[str, Any]:
+    if source_zip.stat().st_size != SOURCE_ZIP_BYTES:
+        raise RuntimeError(f"source ZIP byte-size mismatch: {source_zip.stat().st_size}")
+    if sha256_file(source_zip) != SOURCE_ZIP_SHA256:
+        raise RuntimeError("source ZIP SHA-256 mismatch")
+    selection = read_json(selection_path)
+    resources: list[dict[str, Any]] = []
+    with zipfile.ZipFile(source_zip) as archive:
+        names = {info.filename for info in archive.infolist() if not info.is_dir()}
+        for entry in selection["resources"]:
+            logical = safe_relative(entry["logical_source"])
+            if logical not in names:
+                raise FileNotFoundError(logical)
+            extension = PurePosixPath(logical).suffix.lower()
+            dependencies = set(entry.get("dependencies", []))
+            if extension == ".gltf":
+                dependencies.update(resolve_gltf_dependencies(archive, logical))
+            elif extension == ".obj":
+                dependencies.update(resolve_obj_dependencies(archive, logical))
+            source_data = archive.read(logical)
+            dependency_rows = []
+            for dep in sorted(dependencies):
+                dep = safe_relative(dep)
+                if dep not in names:
+                    raise FileNotFoundError(dep)
