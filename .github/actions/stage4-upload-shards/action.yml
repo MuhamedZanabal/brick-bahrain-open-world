@@ -1,0 +1,415 @@
+name: Upload Stage 4 model shards
+description: Upload exactly forty deterministic 20-model shard artifacts.
+inputs:
+  side:
+    description: Lowercase import side identifier.
+    required: true
+  root:
+    description: Root directory containing shard 00 through 39.
+    required: true
+  run-id:
+    description: Workflow run identifier.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Upload shard 00
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-00-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/00
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 01
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-01-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/01
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 02
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-02-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/02
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 03
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-03-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/03
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 04
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-04-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/04
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 05
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-05-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/05
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 06
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-06-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/06
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 07
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-07-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/07
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 08
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-08-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/08
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 09
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-09-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/09
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 10
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-10-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/10
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 11
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-11-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/11
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 12
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-12-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/12
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 13
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-13-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/13
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 14
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-14-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/14
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 15
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-15-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/15
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 16
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-16-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/16
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 17
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-17-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/17
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 18
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-18-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/18
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 19
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-19-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/19
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 20
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-20-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/20
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 21
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-21-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/21
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 22
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-22-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/22
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 23
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-23-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/23
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 24
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-24-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/24
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 25
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-25-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/25
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 26
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-26-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/26
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 27
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-27-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/27
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 28
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-28-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/28
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 29
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-29-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/29
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 30
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-30-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/30
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 31
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-31-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/31
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 32
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-32-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/32
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 33
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-33-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/33
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 34
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-34-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/34
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 35
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-35-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/35
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 36
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-36-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/36
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 37
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-37-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/37
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 38
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-38-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/38
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
+    - name: Upload shard 39
+      if: always()
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage4-${{ inputs.side }}-shard-39-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/39
+        if-no-files-found: error
+        compression-level: 9
+        retention-days: 14
+        include-hidden-files: true
