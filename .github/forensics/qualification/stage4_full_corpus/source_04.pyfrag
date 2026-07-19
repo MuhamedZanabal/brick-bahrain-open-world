@@ -1,0 +1,57 @@
+    return {'result':'PASS','verified_model_sidecars':TOTAL_MODELS,'models':verified,'zip_sha256':sha256_file(zips[0]),'map_sha256':sha256_file(maps[0])}
+def log_tail(path:Path,lines:int=200)->str:
+    try:return '\n'.join(path.read_text(errors='replace').splitlines()[-lines:])+'\n'
+    except Exception as e:return f'LOG_READ_ERROR:{e!r}\n'
+def run_full_import(side:str,authority_root:Path,corpus_path:Path,sidecar_root:Path,engine_root:Path,project:Path,out:Path,timeout:int)->dict[str,Any]:
+    if side not in ('D1','D2'):raise AuthorityError('invalid side')
+    out.mkdir(parents=True,exist_ok=True);shards=out/'shards';shutil.rmtree(shards,ignore_errors=True);shards.mkdir()
+    source_report=verify_source_authority(authority_root,project,True);corpus=load_corpus(corpus_path);models=corpus['models'];shutil.rmtree(project/'.godot',ignore_errors=True);sidecars=materialize_sidecars(project,sidecar_root,models);engine=verify_engine(engine_root,out/'verified-engine')
+    os.umask(0o022);before=environment_snapshot(project);log=out/f'FULL_IMPORT_{side}.log';run=run_import_process(Path(engine['runtime_path']),project,log,timeout);after=environment_snapshot(project);by={x['logical_source_path']:x for x in sidecars['models']};rows=[];imported_count=0
+    generated=sorted((x.relative_to(project).as_posix() for x in (project/'.godot').rglob('*') if x.is_file()),key=lambda x:x.encode()) if (project/'.godot').is_dir() else []
+    for auth in models:
+        row={'global_index':auth['global_index'],'logical_source_path':auth['logical_source_path'],'source_type':auth['source_type'],'matrix_member':auth['matrix_member'],'source_sha256':auth['source_sha256'],'authority_source_md5':auth['source_md5'],'sidecar_path':auth['expected_sidecar_path']}
+        try:
+            side_path=project/auth['expected_sidecar_path'];data=side_path.read_bytes();parsed=parse_import_sidecar(data);authority_side=by[auth['logical_source_path']]
+            row.update(sidecar_sha256=sha256_bytes(data),authority_sidecar_sha256=authority_side['sidecar_sha256'],sidecar_authority_equal=sha256_bytes(data)==authority_side['sidecar_sha256'],sidecar_uid=parsed['uid'],importer=parsed['importer'],resource_type=parsed['type'],imported_relative_path=parsed['imported_relative_path'])
+            imported=project/parsed['imported_relative_path'];comp_rel=md5_companion_path(parsed['imported_relative_path']);comp=project/comp_rel
+            if not imported.is_file():raise AuthorityError('imported file missing')
+            if not comp.is_file():raise AuthorityError('companion missing')
+            md5=parse_md5_companion(comp.read_bytes());row.update(imported_file_exists=True,imported_byte_size=imported.stat().st_size,imported_sha256=sha256_file(imported),md5_companion_relative_path=comp_rel,md5_companion_byte_size=comp.stat().st_size,md5_companion_sha256=sha256_file(comp),parsed_source_md5=md5['source_md5'],destination_md5=md5['dest_md5'])
+            if md5['source_md5']!=auth['source_md5']:raise AuthorityError('source MD5 mismatch')
+            shard=auth['global_index']//20;payload=shards/f'{shard:02d}'/'payload'
+            for src,rel in ((imported,parsed['imported_relative_path']),(comp,comp_rel),(side_path,auth['expected_sidecar_path'])):
+                dst=payload/rel;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(src,dst)
+            row.update(imported_evidence_path=str((payload/parsed['imported_relative_path']).resolve()),md5_companion_evidence_path=str((payload/comp_rel).resolve()),sidecar_evidence_path=str((payload/auth['expected_sidecar_path']).resolve()));imported_count+=1
+        except Exception as e:row['import_error']=repr(e);row['imported_file_exists']=False
+        rows.append(row)
+    tail=log_tail(log)
+    for shard in range(40):
+        root=shards/f'{shard:02d}';first,last=shard_bounds(shard);subset=rows[first:last+1];(root/'IMPORT_LOG_TAIL.txt').write_text(tail);inventory=build_inventory(root/'payload');write_json(root/'SHARD_INVENTORY.json',inventory);write_json(root/'SHARD_MANIFEST.json',{'schema_version':1,'side':side,'shard_index':shard,'first_global_index':first,'last_global_index':last,'expected_models':20,'included_models':len(subset),'models':subset,'complete_file_inventory':inventory['files'],'inventory_sha256':inventory['inventory_sha256'],'total_bytes':inventory['total_bytes'],'import_log_sha256':run['log_sha256']})
+    complete=run['exit_code']==0 and not run['timed_out'] and imported_count==TOTAL_MODELS
+    summary={'schema_version':1,'side':side,'engine_version':ENGINE_VERSION,'runner_identity':{'hostname':before['hostname'],'runner_name':before['runner_name'],'runner_os':before['runner_os'],'runner_arch':before['runner_arch'],'github_job':before['github_job'],'github_run_id':before['github_run_id']},'absolute_project_root':str(project.resolve()),'import_duration_seconds':run['duration_seconds'],'import_exit_code':run['exit_code'],'timed_out':run['timed_out'],'watchdog_result':run['watchdog_result'],'import_completed':complete,'expected_model_count':TOTAL_MODELS,'imported_model_count':imported_count,'failed_model_count':TOTAL_MODELS-imported_count,'log_sha256':run['log_sha256'],'models':rows,'source_authority':source_report,'sidecar_authority':sidecars,'engine_authority':engine,'no_generated_reuse':True,'no_stage5':True}
+    write_json(out/f'FULL_IMPORT_{side}_MODEL_MANIFEST.json',summary);(out/f'FULL_IMPORT_{side}_GENERATED_PATHS.txt').write_text(''.join(x+'\n' for x in generated));write_json(out/f'FULL_IMPORT_{side}_ENVIRONMENT.json',{'before':before,'after':after});write_json(out/f'FULL_IMPORT_{side}_SOURCE_AUTHORITY.json',source_report);return summary
+
+def find_one(root:Path,name:str)->Path:
+    matches=list(root.rglob(name))
+    if len(matches)!=1:raise AuthorityError(f'{name} missing/ambiguous:{len(matches)}')
+    return matches[0]
+def load_shard(root:Path)->tuple[dict[str,Any],Path]:
+    mp=find_one(root,'SHARD_MANIFEST.json');base=mp.parent;m=load_json(mp);inv=load_json(base/'SHARD_INVENTORY.json');verify_inventory(base/'payload',inv)
+    if m.get('inventory_sha256')!=inv.get('inventory_sha256') or m.get('expected_models')!=20 or len(m.get('models',[]))!=20:raise AuthorityError('invalid shard manifest')
+    return m,base
+def compare_shard(d1_root:Path,d2_root:Path,index:int,out:Path)->dict[str,Any]:
+    out.mkdir(parents=True,exist_ok=True)
+    try:
+        d1,b1=load_shard(d1_root);d2,b2=load_shard(d2_root)
+        if d1.get('shard_index')!=index or d2.get('shard_index')!=index:raise AuthorityError('shard index mismatch')
+        left={x['logical_source_path']:dict(x) for x in d1['models']};right={x['logical_source_path']:dict(x) for x in d2['models']};rows=[]
+        for path in sorted(set(left)|set(right),key=lambda x:x.encode()):
+            l=left.get(path);r=right.get(path)
+            if l:l['imported_evidence_path']=str(b1/'payload'/l['imported_relative_path'])
+            if r:r['imported_evidence_path']=str(b2/'payload'/r['imported_relative_path'])
+            rows.append(compare_model_records(l,r))
+        if len(rows)!=20:raise AuthorityError(f'model count:{len(rows)}')
+        counts={v:sum(x.get('result')==v for x in rows) for v in MODEL_RESULT_VALUES};insufficient=sum(counts[v] for v in MODEL_RESULT_VALUES-{'PASS','NONDETERMINISTIC'})
+        result='PASS' if counts['PASS']==20 else 'NONDETERMINISTIC' if counts['NONDETERMINISTIC'] and not insufficient else 'EVIDENCE_INSUFFICIENT'
+        summary={'schema_version':1,'shard_index':index,'first_global_index':index*20,'last_global_index':index*20+19,'expected_models':20,'completed_models':len(rows),'result':result,'model_result_counts':counts,'models':rows,'d1_inventory_sha256':d1['inventory_sha256'],'d2_inventory_sha256':d2['inventory_sha256']}
+    except Exception as e:summary={'schema_version':1,'shard_index':index,'expected_models':20,'completed_models':0,'result':'EVIDENCE_INSUFFICIENT','models':[],'harness_error':repr(e)}
