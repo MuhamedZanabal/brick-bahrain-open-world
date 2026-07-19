@@ -1,0 +1,54 @@
+    if left is None:return {'result':'MISSING_D1'}
+    if right is None:return {'result':'MISSING_D2'}
+    base={k:left.get(k) for k in ('global_index','logical_source_path','source_type','matrix_member')}
+    if left.get('logical_source_path')!=right.get('logical_source_path') or left.get('source_sha256')!=right.get('source_sha256'):return {**base,'result':'SOURCE_AUTHORITY_FAILURE'}
+    la=left.get('authority_source_md5',left.get('source_md5'));ra=right.get('authority_source_md5',right.get('source_md5'));lp=left.get('parsed_source_md5',left.get('source_md5'));rp=right.get('parsed_source_md5',right.get('source_md5'))
+    if la!=ra or lp!=la or rp!=ra:return {**base,'result':'SOURCE_AUTHORITY_FAILURE'}
+    if left.get('sidecar_authority_equal',True) is not True or right.get('sidecar_authority_equal',True) is not True or left.get('sidecar_sha256')!=right.get('sidecar_sha256'):return {**base,'result':'SIDECAR_AUTHORITY_FAILURE','sidecar_equal':False}
+    if left.get('import_error') or right.get('import_error'):return {**base,'result':'IMPORT_FAILURE'}
+    lpath=Path(left.get('imported_evidence_path',''));rpath=Path(right.get('imported_evidence_path',''))
+    if not left.get('imported_sha256') or not lpath.is_file():return {**base,'result':'MISSING_D1'}
+    if not right.get('imported_sha256') or not rpath.is_file():return {**base,'result':'MISSING_D2'}
+    imported=left.get('imported_sha256')==right.get('imported_sha256') and left.get('imported_byte_size')==right.get('imported_byte_size');dest=left.get('destination_md5')==right.get('destination_md5');src=lp==rp;comp=left.get('md5_companion_sha256')==right.get('md5_companion_sha256')
+    out={**base,'result':'PASS' if imported and dest and src and comp else 'NONDETERMINISTIC','source_bytes_identical':True,'sidecar_equal':True,'imported_binary_equal':imported,'destination_md5_equal':dest,'source_md5_equal':src,'md5_companion_equal':comp,'d1_imported_sha256':left.get('imported_sha256'),'d2_imported_sha256':right.get('imported_sha256'),'d1_imported_byte_size':left.get('imported_byte_size'),'d2_imported_byte_size':right.get('imported_byte_size'),'d1_destination_md5':left.get('destination_md5'),'d2_destination_md5':right.get('destination_md5')}
+    if not imported:out['difference_diagnostic']=bounded_byte_diagnostic(lpath.read_bytes(),rpath.read_bytes())
+    return out
+
+def aggregate_stage4(reports:list[dict[str,Any]],imports:dict[str,dict[str,Any]])->dict[str,Any]:
+    by={r.get('shard_index'):r for r in reports if isinstance(r,dict)};missing=[i for i in range(40) if i not in by];models=[]
+    for i in range(40):
+        if i in by and isinstance(by[i].get('models'),list):models.extend(by[i]['models'])
+    formats={k:sum(r.get('source_type')==k for r in models) for k in MODEL_COUNTS};matrix=sum(bool(r.get('matrix_member')) for r in models);counts={v:sum(r.get('result')==v for r in models) for v in MODEL_RESULT_VALUES}
+    di=sum(r.get('imported_binary_equal') is False for r in models);dd=sum(r.get('destination_md5_equal') is False for r in models);ds=sum(r.get('source_md5_equal') is False for r in models);dc=sum(r.get('sidecar_equal') is False for r in models);dm=sum(r.get('md5_companion_equal') is False for r in models)
+    d1=imports.get('D1',{});d2=imports.get('D2',{});both=bool(d1.get('import_completed')) and bool(d2.get('import_completed'))
+    exact=len(models)==TOTAL_MODELS and formats==MODEL_COUNTS and matrix==MATRIX_MODEL_COUNT and d1.get('imported_model_count')==TOTAL_MODELS and d2.get('imported_model_count')==TOTAL_MODELS;q6=[]
+    if missing:q6.append('missing shard reports')
+    if not both:q6.append('one or both full imports incomplete')
+    if not exact:q6.append('comparison or import count mismatch')
+    if any(counts[x] for x in MODEL_RESULT_VALUES-{'PASS','NONDETERMINISTIC'}):q6.append('evidence-insufficient model result')
+    if q6:classification='Q6';decision='FAIL_INSUFFICIENT_EVIDENCE';eligible=False
+    elif di or dd:classification='Q3';decision='FAIL_NONDETERMINISTIC';eligible=False
+    elif ds or dc or dm or counts['NONDETERMINISTIC']:classification='Q6';decision='FAIL_INSUFFICIENT_EVIDENCE';eligible=False
+    else:classification='STAGE4_PASS_PENDING_STAGE5';decision='PASS';eligible=True
+    return {'schema_version':1,'engine_version':ENGINE_VERSION,'expected_models':TOTAL_MODELS,'completed_model_comparisons':len(models),'format_comparisons':formats,'matrix_glb_comparisons':matrix,'missing_d1_models':counts['MISSING_D1'],'missing_d2_models':counts['MISSING_D2'],'source_authority_failures':counts['SOURCE_AUTHORITY_FAILURE'],'sidecar_authority_failures':counts['SIDECAR_AUTHORITY_FAILURE'],'import_failures':counts['IMPORT_FAILURE'],'harness_failures':counts['HARNESS_FAILURE'],'missing_shard_reports':len(missing),'missing_shard_indices':missing,'differing_imported_binaries':di,'differing_destination_md5_values':dd,'differing_source_md5_values':ds,'differing_model_sidecars':dc,'differing_md5_companions':dm,'model_result_counts':counts,'d1_imported_models':d1.get('imported_model_count',0),'d2_imported_models':d2.get('imported_model_count',0),'d1_import_duration_seconds':d1.get('import_duration_seconds'),'d2_import_duration_seconds':d2.get('import_duration_seconds'),'d1_import_exit_code':d1.get('import_exit_code'),'d2_import_exit_code':d2.get('import_exit_code'),'d1_runner_identity':d1.get('runner_identity'),'d2_runner_identity':d2.get('runner_identity'),'d1_absolute_project_root':d1.get('absolute_project_root'),'d2_absolute_project_root':d2.get('absolute_project_root'),'stage4_decision':decision,'classification':classification,'stage5_eligible':eligible,'godot_4_5_2_stage4_required':classification=='Q3','q6_reasons':q6,'gate4_status':'FAIL','gate5_status':'PASS_FOR_TWO_ORIGINAL_RETAINED_APKS_ONLY','no_stage5':True,'no_project_compatibility':True,'no_migration':True,'no_pack_generation':True,'no_android':True,'no_apk':True}
+def verify_engine(engine_root:Path,work:Path)->dict[str,Any]:
+    archives=list(engine_root.rglob(ENGINE_ARCHIVE))
+    if len(archives)!=1:raise AuthorityError('engine archive missing/ambiguous')
+    archive=archives[0]
+    if sha512_file(archive)!=ENGINE_ARCHIVE_SHA512:raise AuthorityError('archive SHA512 mismatch')
+    identities=list(engine_root.rglob('ENGINE_PACKAGE_IDENTITY.json'));identity=load_json(identities[0]) if len(identities)==1 else {}
+    if identity and (identity.get('engine_version')!=ENGINE_VERSION or identity.get('source_commit')!=ENGINE_SOURCE_COMMIT or identity.get('source_archive_sha256')!=ENGINE_SOURCE_ARCHIVE_SHA256):raise AuthorityError('engine identity mismatch')
+    extract=work/'engine-extract';shutil.rmtree(extract,ignore_errors=True);safe_extract_zip(archive,extract)
+    runtimes=[x for x in extract.rglob('Godot*') if x.is_file() and not x.name.endswith('.zip')]
+    if len(runtimes)!=1:raise AuthorityError('runtime missing/ambiguous')
+    runtime=runtimes[0];runtime.chmod(runtime.stat().st_mode|0o111)
+    if sha256_file(runtime)!=ENGINE_RUNTIME_SHA256:raise AuthorityError('runtime SHA mismatch')
+    version=subprocess.check_output([str(runtime),'--version'],text=True,timeout=60).strip()
+    if version!=ENGINE_RUNTIME_IDENTITY:raise AuthorityError(f'identity mismatch:{version}')
+    result={'schema_version':1,'result':'PASS','engine_version':ENGINE_VERSION,'runtime_identity':version,'source_commit':ENGINE_SOURCE_COMMIT,'runtime_archive':ENGINE_ARCHIVE,'runtime_archive_sha512':ENGINE_ARCHIVE_SHA512,'extracted_runtime_sha256':ENGINE_RUNTIME_SHA256,'source_archive_sha256':ENGINE_SOURCE_ARCHIVE_SHA256,'runtime_path':str(runtime.resolve())}
+    write_json(work/'GODOT_4_4_1_ENGINE_AUTHORITY.json',result);return result
+def environment_snapshot(project:Path)->dict[str,Any]:
+    def cmd(args):
+        try:return subprocess.check_output(args,text=True,stderr=subprocess.STDOUT,timeout=30)
+        except Exception as e:return f'ERROR:{e!r}\n'
+    mask=os.umask(0);os.umask(mask)
