@@ -128,8 +128,10 @@ class Stage3QualificationTests(unittest.TestCase):
         self.assertEqual(result["stage3_decision"], "PASS")
         self.assertEqual(result["classification"], "STAGE3_PASS_PENDING_STAGE4")
         passing[0]["experiments"]["B"] = {"result": "NONDETERMINISTIC"}
+        passing[0]["differing_imported_binary_count"] = 1
         result = stage3.aggregate_engine_results("4.4.1-stable", passing)
         self.assertEqual(result["classification"], "Q2")
+        passing[0]["differing_imported_binary_count"] = 0
         passing[0]["experiments"]["B"] = {"result": "TIMEOUT"}
         result = stage3.aggregate_engine_results("4.4.1-stable", passing)
         self.assertEqual(result["classification"], "Q6")
@@ -195,6 +197,7 @@ class Stage3QualificationTests(unittest.TestCase):
                 "source_byte_size": 6,
                 "source_sha256": authority["resources"][0]["source_sha256"],
                 "source_md5": authority["resources"][0]["source_md5"],
+                "frozen_pr_head": stage3.FROZEN_PR_HEAD,
                 "sidecar_path": sidecar_rel,
                 "sidecar_sha256": stage3.sha256_file(sidecar_path),
                 "sidecar_size": sidecar_path.stat().st_size,
