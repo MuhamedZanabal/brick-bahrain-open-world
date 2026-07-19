@@ -119,6 +119,24 @@ class Stage2QualificationTests(unittest.TestCase):
         self.assertEqual(cause["actual_job_duration_seconds"], 10800)
         self.assertFalse(cause["concurrency_cancellation"])
 
+    def test_cancellation_audit_uses_explicit_timeout_log_when_post_steps_extend_job(self):
+        job = {
+            "id": 2,
+            "started_at": "2026-07-18T22:47:14Z",
+            "completed_at": "2026-07-19T01:48:14Z",
+            "conclusion": "cancelled",
+            "steps": [{
+                "name": "Run Stage 1 source audit and Stage 2 eight-resource qualification",
+                "started_at": "2026-07-18T22:48:00Z",
+                "completed_at": "2026-07-19T01:47:14Z",
+                "conclusion": "cancelled",
+            }],
+        }
+        cause = q.classify_cancellation(
+            job, 180, "The job has exceeded the maximum execution time of 180 minutes."
+        )
+        self.assertEqual(cause["cause"], "JOB_TIMEOUT")
+
     def test_resource_command_completes_with_a_deterministic_fake_engine(self):
         import argparse
         import os
