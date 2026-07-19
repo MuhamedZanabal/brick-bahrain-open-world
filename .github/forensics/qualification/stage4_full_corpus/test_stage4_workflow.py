@@ -45,8 +45,8 @@ class Stage4WorkflowTests(unittest.TestCase):
     def test_independent_roots_and_runner_jobs(self):
         self.assertIn("/tmp/bahrain-stage4-d1/project", self.text)
         self.assertIn("/tmp/bahrain-stage4-d2-different-absolute-root/project", self.text)
-        self.assertRegex(self.text, r"(?s)^  import_d1:.*?runs-on: ubuntu-24.04")
-        self.assertRegex(self.text, r"(?s)^  import_d2:.*?runs-on: ubuntu-24.04")
+        self.assertRegex(self.text, r"(?ms)^  import_d1:.*?runs-on: ubuntu-24.04")
+        self.assertRegex(self.text, r"(?ms)^  import_d2:.*?runs-on: ubuntu-24.04")
 
     def test_every_upload_is_unconditional_and_pinned(self):
         blocks = self.text.split("uses: actions/upload-artifact@")
