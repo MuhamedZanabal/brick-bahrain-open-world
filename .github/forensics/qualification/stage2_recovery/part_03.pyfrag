@@ -103,15 +103,19 @@ def resource_qualification(args: argparse.Namespace) -> int:
         imported_rel = sidecar_meta["imported_path"]
         if not imported_rel or not imported_rel.startswith(".godot/imported/"):
             raise RuntimeError({"invalid_main_sidecar": sidecar_meta})
-        sidecar_evidence = output / "sidecar" / main_sidecar_rel
-        sidecar_evidence.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(main_sidecar, sidecar_evidence)
+        sidecar_authority_root = output / "sidecar_authority"
+        sidecar_authority_rows = retain_sidecar_authority(authority, sidecar_authority_root)
+        sidecar_evidence = sidecar_authority_root / main_sidecar_rel
+        if not sidecar_evidence.is_file():
+            raise RuntimeError(f"main sidecar missing from retained authority: {main_sidecar_rel}")
         report.update(
             {
                 "sidecar_path": main_sidecar_rel,
                 "sidecar_size": sidecar_evidence.stat().st_size,
                 "sidecar_sha256": sha256_file(sidecar_evidence),
                 "sidecar_metadata": sidecar_meta,
+                "sidecar_authority_count": len(sidecar_authority_rows),
+                "sidecar_authority_manifest": sidecar_authority_rows,
             }
         )
         write_json(report_path, report)
@@ -122,10 +126,7 @@ def resource_qualification(args: argparse.Namespace) -> int:
             project = work / label.lower()
             project_roots.append(project)
             materialize_project(corpus_root, project, paths)
-            destination_sidecar = project / main_sidecar_rel
-            destination_sidecar.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(sidecar_evidence, destination_sidecar)
-            os.chmod(destination_sidecar, 0o444)
+            apply_sidecar_authority(sidecar_authority_root, project)
             run = run_with_watchdog(
                 import_command(godot, project),
                 output / "logs" / f"{label.lower()}_import.log",
