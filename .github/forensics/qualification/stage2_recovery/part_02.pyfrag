@@ -1,0 +1,192 @@
+    log_data = log_path.read_bytes() if log_path.is_file() else b""
+    log_text = log_data.decode("utf-8", errors="replace")
+    write_json(
+        monitor_path,
+        {
+            "schema_version": 1,
+            "started_at": started_at,
+            "completed_at": utc_now(),
+            "timeout_seconds": timeout_seconds,
+            "timed_out": timed_out,
+            "termination": termination,
+            "snapshots": snapshots,
+            "last_observed_import_state": log_text.splitlines()[-50:],
+        },
+    )
+    return {
+        "command": command,
+        "started_at": started_at,
+        "completed_at": utc_now(),
+        "duration_seconds": elapsed,
+        "exit_code": exit_code,
+        "timed_out": timed_out,
+        "termination": termination,
+        "log_path": str(log_path),
+        "log_bytes": len(log_data),
+        "log_sha256": sha256_bytes(log_data),
+        "last_observed_import_state": log_text.splitlines()[-50:],
+    }
+
+
+def parse_sidecar(path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    text = data.rstrip(b"\x00").decode("utf-8", errors="replace")
+    path_match = PATH_RE.search(text)
+    source_match = SOURCE_RE.search(text)
+    uid_match = UID_RE.search(text)
+    declared = set(re.findall(r'"res://([^"\r\n]+)"', text))
+    return {
+        "path": path.as_posix(),
+        "size": path.stat().st_size,
+        "sha256": sha256_file(path),
+        "imported_path": path_match.group(1) if path_match else None,
+        "source_file": source_match.group(1) if source_match else None,
+        "uid": uid_match.group(1) if uid_match else None,
+        "declared_paths": sorted(x for x in declared if x.startswith(".godot/imported/")),
+    }
+
+
+def parse_md5(path: Path) -> dict[str, Any]:
+    fields: dict[str, str] = {}
+    malformed = []
+    for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        match = re.fullmatch(r'([A-Za-z0-9_./-]+)="([^"]*)"', stripped)
+        if not match:
+            malformed.append({"line": number, "text": stripped})
+        else:
+            fields[match.group(1)] = match.group(2)
+    return {
+        "path": path.as_posix(),
+        "size": path.stat().st_size,
+        "sha256": sha256_file(path),
+        "fields": fields,
+        "malformed": malformed,
+    }
+
+
+def generated_inventory(root: Path) -> dict[str, Any]:
+    records = []
+    for path in sorted(root.rglob("*"), key=lambda p: p.relative_to(root).as_posix()):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel.startswith(".godot/editor/"):
+            continue
+        if rel.startswith(".godot/") or rel.endswith(".import"):
+            records.append({"path": rel, "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+    uid_path = root / ".godot/uid_cache.bin"
+    return {
+        "records": records,
+        "uid_cache": {
+            "exists": uid_path.is_file(),
+            "bytes": uid_path.stat().st_size if uid_path.is_file() else None,
+            "sha256": sha256_file(uid_path) if uid_path.is_file() else None,
+        },
+    }
+
+
+def compare_inventories(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    lm = {row["path"]: row for row in left["records"]}
+    rm = {row["path"]: row for row in right["records"]}
+    differing = []
+    for path in sorted(set(lm) | set(rm)):
+        if path not in lm or path not in rm:
+            differing.append({"path": path, "missing_d1": path not in lm, "missing_d2": path not in rm})
+        elif lm[path]["sha256"] != rm[path]["sha256"]:
+            differing.append({"path": path, "d1": lm[path], "d2": rm[path]})
+    return {
+        "path_sets_equal": set(lm) == set(rm),
+        "d1_path_count": len(lm),
+        "d2_path_count": len(rm),
+        "content_equal": not differing,
+        "content_difference_count": len(differing),
+        "differing_paths": differing[:200],
+        "differing_paths_truncated": max(0, len(differing) - 200),
+    }
+
+
+def bounded_binary_difference(left: bytes, right: bytes, max_windows: int = 20, radius: int = 16) -> dict[str, Any]:
+    maximum = max(len(left), len(right))
+    first = None
+    last = None
+    count = 0
+    windows = []
+    for index in range(maximum):
+        lv = left[index] if index < len(left) else None
+        rv = right[index] if index < len(right) else None
+        if lv == rv:
+            continue
+        if first is None:
+            first = index
+        last = index
+        count += 1
+        if len(windows) < max_windows:
+            lo = max(0, index - radius)
+            hi = min(maximum, index + radius + 1)
+            windows.append(
+                {
+                    "offset": index,
+                    "range_start": lo,
+                    "range_end": hi,
+                    "d1_hex": left[lo:min(hi, len(left))].hex(),
+                    "d2_hex": right[lo:min(hi, len(right))].hex(),
+                }
+            )
+    return {
+        "first_differing_byte": first,
+        "last_differing_byte": last,
+        "differing_byte_count": count,
+        "difference_windows": windows,
+        "local_resource_identifiers_d1": sorted({x.decode("ascii", errors="replace") for x in LOCAL_ID_RE.findall(left)})[:200],
+        "local_resource_identifiers_d2": sorted({x.decode("ascii", errors="replace") for x in LOCAL_ID_RE.findall(right)})[:200],
+    }
+
+
+def decide_resource_result(
+    *,
+    authority_ok: bool,
+    d1_ok: bool,
+    d2_ok: bool,
+    imported_exists: bool,
+    imported_equal: bool,
+    destination_md5_equal: bool,
+    uid_cache_equal: bool,
+    path_sets_equal: bool,
+    timed_out: bool,
+    harness_error: str | None,
+    generated_content_equal: bool = True,
+) -> str:
+    if harness_error:
+        return "HARNESS_FAILURE"
+    if timed_out:
+        return "TIMEOUT"
+    if not authority_ok or not d1_ok or not d2_ok or not imported_exists:
+        return "IMPORT_FAILURE"
+    if not imported_equal or not destination_md5_equal or not uid_cache_equal or not path_sets_equal or not generated_content_equal:
+        return "NONDETERMINISTIC"
+    return "PASS"
+
+
+def seed_resource_report(version: str, selection_id: str) -> dict[str, Any]:
+    return {
+        "schema_version": 2,
+        "created_at": utc_now(),
+        "engine_version": version,
+        "resource_selection_id": selection_id,
+        "candidate_resource_result": "HARNESS_FAILURE",
+        "harness_error": "resource analyzer did not complete",
+        "frozen_pr_head": PR_HEAD,
+        "no_stage3": True,
+        "no_full_corpus": True,
+        "no_project_migration": True,
+        "no_android_export": True,
+        "no_apk_mutation": True,
+    }
+
+
+def verify_engine_package(engine_root: Path, work: Path) -> tuple[Path, dict[str, Any]]:
+    identity_path = engine_root / "ENGINE_PACKAGE_IDENTITY.json"
+    if not identity_path.is_file():
