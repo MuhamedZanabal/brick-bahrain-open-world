@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""Stage 3 byte-repeatability evidence engine for the Bahrain Brick Godot qualification.
+
+The module intentionally uses only Python's standard library. It never opens the Bahrain
+Brick project, invokes Android tooling, exports packs, or mutates PR #59.
+"""
+from __future__ import annotations
+
+import argparse
+import ast
+import concurrent.futures
+import datetime as dt
+import hashlib
+import json
+import os
+import platform
+import re
+import shutil
+import signal
+import socket
+import subprocess
+import sys
+import time
+import traceback
+import zipfile
+from collections import Counter
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
+
+FROZEN_PR_HEAD = "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f"
+STAGE2_RUN_ID = 29685721858
+STAGE2_WORKFLOW_SHA = "23efeab85489ef1efafca60a0c0791507fc3f5dc"
+QUALIFICATION_BRANCH = "ci/godot-engine-determinism-qualification-20260719"
+
+ENGINES = ("4.4.1-stable", "4.5.2-stable")
+ENGINE_AUTHORITIES: dict[str, dict[str, Any]] = {
+    "4.4.1-stable": {
+        "runtime_identity": "4.4.1.stable.official.49a5bc7b6",
+        "source_commit": "49a5bc7b616bd04689a2c89e89bda41f50241464",
+        "archive": "Godot_v4.4.1-stable_linux.x86_64.zip",
+        "archive_sha512": "ef4e76880a514257175544952c61191106fdef3095b909bafed9fcbeb230c3e5533920a0f3012882dd4bbde83028a67549825794e2d2c3cf76eba7918b71370e",
+        "runtime_sha256": "54215149d52efb1d653a3dec39d0993587bdf5daa2c56e787b5ee88417fb1339",
+        "engine_artifact_id": 8441999232,
+        "engine_artifact_digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+    },
+    "4.5.2-stable": {
+        "runtime_identity": "4.5.2.stable.official.6ce3de25a",
+        "source_commit": "6ce3de25aa58466e14ef354703ba8d9791a417da",
+        "archive": "Godot_v4.5.2-stable_linux.x86_64.zip",
+        "archive_sha512": "e3ce6194b6d4d2dcef5e5b5136752c084d9d8b9071c10bc2d2011b947ec7439a257c8d23c541cb30699f16d9edea6dff36e6e84d2bec14a8fe9b4e9aacbe5a8d",
+        "runtime_sha256": "5803746bbe055bee0f07a3c5b0dd347719bd45599f3d34519a8a0beaf83014ae",
+        "engine_artifact_id": 8441999064,
+        "engine_artifact_digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+    },
+}
+
+RESOURCES: tuple[dict[str, Any], ...] = (
+    {"selection_id": "glb_matrix_small", "source_type": "GLB", "timeout_seconds": 1800},
+    {"selection_id": "glb_matrix_medium", "source_type": "GLB", "timeout_seconds": 1800},
+    {"selection_id": "glb_matrix_large", "source_type": "GLB", "timeout_seconds": 1800},
+    {"selection_id": "glb_non_matrix", "source_type": "GLB", "timeout_seconds": 1800},
+    {"selection_id": "gltf_character", "source_type": "GLTF", "timeout_seconds": 2700},
+    {"selection_id": "gltf_environment", "source_type": "GLTF", "timeout_seconds": 2700},
+    {"selection_id": "fbx_character", "source_type": "FBX", "timeout_seconds": 3600},
+    {"selection_id": "obj_single", "source_type": "OBJ", "timeout_seconds": 3600},
+)
+RESOURCE_BY_ID = {item["selection_id"]: item for item in RESOURCES}
+CELL_VALUES = {
+    "PASS",
+    "NONDETERMINISTIC",
+    "IMPORT_FAILURE",
+    "TIMEOUT",
+    "HARNESS_FAILURE",
+    "MISSING_EVIDENCE",
+}
+_FAILURE_PRECEDENCE = {
+    "NONDETERMINISTIC": 6,
+    "TIMEOUT": 5,
+    "IMPORT_FAILURE": 4,
+    "HARNESS_FAILURE": 3,
+    "MISSING_EVIDENCE": 2,
+    "PASS": 1,
+}
+
+PROJECT_GODOT = """; Stage 3 isolated import qualification project\nconfig_version=5\n\n[application]\nconfig/name=\"Bahrain Brick Godot Stage 3 Qualification\"\n\n[rendering]\nrenderer/rendering_method=\"gl_compatibility\"\nrenderer/rendering_method.mobile=\"gl_compatibility\"\n"""
+
+
+def utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def canonical_json_bytes(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def sha512_file(path: Path) -> str:
+    digest = hashlib.sha512()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def md5_file(path: Path) -> str:
+    digest = hashlib.md5(usedforsecurity=False)
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def safe_relative(value: str) -> Path:
+    candidate = Path(value)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise ValueError(f"unsafe relative path: {value!r}")
+    return candidate
+
+
+def without_res_prefix(value: str) -> str:
+    return value[6:] if value.startswith("res://") else value
+
+
+def authority_matrix() -> list[dict[str, Any]]:
+    return [
+        {
+            "version": engine,
+            "resource": item["selection_id"],
+            "source_type": item["source_type"],
+            "timeout_seconds": item["timeout_seconds"],
+        }
+        for engine in ENGINES
+        for item in RESOURCES
+    ]
+
+
+def c_side_matrix() -> list[dict[str, Any]]:
+    return [dict(item, side=side) for item in authority_matrix() for side in ("C1", "C2")]
+
+
+def _extract_quoted(text: str, key: str) -> str | None:
+    match = re.search(rf"(?m)^\s*{re.escape(key)}\s*=\s*\"([^\"]*)\"\s*$", text)
+    return match.group(1) if match else None
+
+
+def parse_import_sidecar(text: str) -> dict[str, Any]:
+    importer = _extract_quoted(text, "importer")
+    resource_type = _extract_quoted(text, "type")
+    uid = _extract_quoted(text, "uid")
+    path = _extract_quoted(text, "path")
+    source_file = _extract_quoted(text, "source_file")
+    dest_match = re.search(r"(?m)^\s*dest_files\s*=\s*(\[[^\n]*\])\s*$", text)
+    dest_values: list[str] = []
+    if dest_match:
+        parsed = ast.literal_eval(dest_match.group(1))
+        if not isinstance(parsed, list) or not all(isinstance(item, str) for item in parsed):
+            raise ValueError("invalid dest_files sidecar authority")
+        dest_values = [without_res_prefix(item) for item in parsed]
+    required = {"importer": importer, "type": resource_type, "path": path, "source_file": source_file}
+    missing = [key for key, value in required.items() if not value]
+    if missing:
+        raise ValueError(f"sidecar missing required fields: {missing}")
+    section_match = re.search(r"(?ms)^\[params\]\s*\n(.*?)(?=^\[[^\]]+\]\s*$|\Z)", text)
+    parameter_text = section_match.group(1) if section_match else ""
+    return {
+        "importer": importer,
+        "type": resource_type,
+        "uid": uid,
+        "source_file": without_res_prefix(source_file or ""),
+        "imported_relative_path": without_res_prefix(path or ""),
+        "dest_files": dest_values,
+        "parameters_sha256": sha256_bytes(parameter_text.encode("utf-8")),
+    }
+
+
+def _verify_file(path: Path, *, expected_sha256: str, expected_bytes: int, expected_md5: str | None = None) -> dict[str, Any]:
+    if not path.is_file():
+        raise FileNotFoundError(path)
