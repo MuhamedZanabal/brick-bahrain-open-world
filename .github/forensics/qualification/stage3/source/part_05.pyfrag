@@ -1,0 +1,200 @@
+        "schema_version": 3,
+        "engine_version": args.version,
+        "resource_selection_id": args.resource,
+        "side": args.side,
+        "runner": snapshot["runner"],
+        "snapshot_path": "import/IMPORT_RESULT.json",
+        "result": "TIMEOUT" if snapshot["timed_out"] else ("PASS" if snapshot["import_exit_code"] == 0 and snapshot["imported_sha256"] and snapshot["destination_md5"] else "IMPORT_FAILURE"),
+        "frozen_pr_head": FROZEN_PR_HEAD,
+        "no_stage4": True,
+    }
+    write_json(output / "C_SIDE_RESULT.json", side_result)
+    create_inventory(output)
+    return 0
+
+
+def _find_unique(root: Path, name: str) -> Path:
+    matches = [path for path in root.rglob(name) if path.is_file()]
+    if len(matches) != 1:
+        raise ValueError(f"expected one {name} beneath {root}, got {len(matches)}")
+    return matches[0]
+
+
+def _copy_tree_contents(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        target = destination / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(item, target)
+
+
+def finalize_resource_command(args: argparse.Namespace) -> int:
+    output = Path(args.output)
+    if output.exists():
+        shutil.rmtree(output)
+    output.mkdir(parents=True)
+    abd_path = _find_unique(Path(args.abd_root), "ABD_RESOURCE_RESULT.json")
+    c1_side_path = _find_unique(Path(args.c1_root), "C_SIDE_RESULT.json")
+    c2_side_path = _find_unique(Path(args.c2_root), "C_SIDE_RESULT.json")
+    abd = read_json(abd_path)
+    c1_side = read_json(c1_side_path)
+    c2_side = read_json(c2_side_path)
+    expected = (args.version, args.resource)
+    for value in (abd, c1_side, c2_side):
+        if (value.get("engine_version"), value.get("resource_selection_id")) != expected:
+            raise ValueError("resource artifact authority mismatch")
+    if c1_side.get("side") != "C1" or c2_side.get("side") != "C2":
+        raise ValueError("C side labels are not C1/C2")
+    c1_snapshot = load_snapshot(c1_side_path.parent / str(c1_side["snapshot_path"]))
+    c2_snapshot = load_snapshot(c2_side_path.parent / str(c2_side["snapshot_path"]))
+    runner1 = c1_side.get("runner", {})
+    runner2 = c2_side.get("runner", {})
+    runners_independent = bool(runner1.get("runner_fingerprint")) and bool(runner2.get("runner_fingerprint")) and runner1.get("runner_fingerprint") != runner2.get("runner_fingerprint")
+    comparison = _comparison_record("C1", "C2", c1_snapshot, c2_snapshot)
+    if not runners_independent:
+        comparison = {**comparison, "result": "HARNESS_FAILURE", "reason": "independent runner fingerprints were absent or equal"}
+    experiment_c = _experiment_summary(
+        "C",
+        {"C1": c1_snapshot, "C2": c2_snapshot},
+        [comparison],
+        independent_runners_proven=runners_independent,
+        runner_fingerprints={"C1": runner1.get("runner_fingerprint"), "C2": runner2.get("runner_fingerprint")},
+        runner_names={"C1": runner1.get("runner_name"), "C2": runner2.get("runner_name")},
+    )
+    experiments = {"A": abd["experiments"]["A"], "B": abd["experiments"]["B"], "C": experiment_c, "D": abd["experiments"]["D"]}
+    comparisons = [comparison for experiment in experiments.values() for comparison in experiment.get("comparisons", [])]
+    differing_binary_count = sum(1 for item in comparisons if item.get("imported_byte_equality") is False)
+    differing_md5_count = sum(1 for item in comparisons if item.get("destination_md5_equality") is False)
+    path_difference_count = sum(1 for item in comparisons if item.get("path_sets_equal") is False)
+    result = {
+        "schema_version": 3,
+        "engine_version": args.version,
+        "resource_selection_id": args.resource,
+        "frozen_pr_head": FROZEN_PR_HEAD,
+        "stage2_run_id": STAGE2_RUN_ID,
+        "authority_manifest_sha256": abd.get("authority_manifest_sha256"),
+        "experiments": experiments,
+        "differing_imported_binary_count": differing_binary_count,
+        "differing_destination_md5_count": differing_md5_count,
+        "path_set_difference_count": path_difference_count,
+        "timeout_count": sum(1 for value in experiments.values() if value.get("result") == "TIMEOUT"),
+        "import_failure_count": sum(1 for value in experiments.values() if value.get("result") == "IMPORT_FAILURE"),
+        "harness_failure_count": sum(1 for value in experiments.values() if value.get("result") == "HARNESS_FAILURE"),
+        "missing_evidence_count": sum(1 for value in experiments.values() if value.get("result") == "MISSING_EVIDENCE"),
+        "nondeterministic_cell_count": sum(1 for value in experiments.values() if value.get("result") == "NONDETERMINISTIC"),
+        "no_stage4": True,
+        "no_full_project_execution": True,
+        "no_project_migration": True,
+        "no_pack_generation": True,
+        "no_android_export": True,
+        "no_apk_mutation": True,
+        "no_installation": True,
+        "no_execution": True,
+        "no_merge": True,
+        "no_publication": True,
+    }
+    write_json(output / "STAGE3_RESOURCE_RESULT.json", result)
+    write_json(output / "EXPERIMENT_C_RESULT.json", experiment_c)
+    _copy_tree_contents(abd_path.parent, output / "raw" / "abd")
+    _copy_tree_contents(c1_side_path.parent, output / "raw" / "c1")
+    _copy_tree_contents(c2_side_path.parent, output / "raw" / "c2")
+    create_inventory(output)
+    return 0
+
+
+def aggregate_engine_results(engine_version: str, resource_results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    if engine_version not in ENGINES:
+        raise ValueError("unauthorized engine aggregate")
+    expected_ids = [item["selection_id"] for item in RESOURCES]
+    reports_by_id = {str(item.get("resource_selection_id")): item for item in resource_results if item.get("engine_version") == engine_version}
+    missing = [item for item in expected_ids if item not in reports_by_id]
+    duplicate_count = len([item for item in resource_results if item.get("engine_version") == engine_version]) - len(reports_by_id)
+    matrix: list[dict[str, Any]] = []
+    cell_counts: Counter[str] = Counter()
+    differing_binaries = 0
+    differing_md5 = 0
+    path_differences = 0
+    for selection_id in expected_ids:
+        report = reports_by_id.get(selection_id)
+        if not report:
+            matrix.append({"resource_selection_id": selection_id, "experiments": {key: "MISSING_EVIDENCE" for key in "ABCD"}})
+            cell_counts.update(["MISSING_EVIDENCE"] * 4)
+            continue
+        experiment_results = {key: report.get("experiments", {}).get(key, {}).get("result", "MISSING_EVIDENCE") for key in "ABCD"}
+        cell_counts.update(experiment_results.values())
+        differing_binaries += int(report.get("differing_imported_binary_count", 0))
+        differing_md5 += int(report.get("differing_destination_md5_count", 0))
+        path_differences += int(report.get("path_set_difference_count", 0))
+        durations = {
+            key: {
+                repetition: snapshot.get("import_duration_seconds")
+                for repetition, snapshot in report.get("experiments", {}).get(key, {}).get("imports", {}).items()
+            }
+            for key in "ABCD"
+        }
+        matrix.append(
+            {
+                "resource_selection_id": selection_id,
+                "experiments": experiment_results,
+                "import_durations_seconds": durations,
+                "differing_imported_binary_count": int(report.get("differing_imported_binary_count", 0)),
+                "differing_destination_md5_count": int(report.get("differing_destination_md5_count", 0)),
+                "path_set_difference_count": int(report.get("path_set_difference_count", 0)),
+                "experiment_d_overlap_proven": report.get("experiments", {}).get("D", {}).get("execution_intervals_overlap"),
+                "experiment_d_overlap_seconds": report.get("experiments", {}).get("D", {}).get("overlap_seconds"),
+            }
+        )
+    complete = not missing and duplicate_count == 0 and sum(cell_counts.values()) == 32
+    all_pass = complete and cell_counts.get("PASS", 0) == 32 and differing_binaries == 0 and differing_md5 == 0 and path_differences == 0
+    if differing_binaries > 0 or differing_md5 > 0:
+        decision = "FAIL"
+        classification = "Q2"
+    elif all_pass:
+        decision = "PASS"
+        classification = "STAGE3_PASS_PENDING_STAGE4"
+    else:
+        decision = "FAIL_INSUFFICIENT_EVIDENCE"
+        classification = "Q6"
+    return {
+        "schema_version": 3,
+        "engine_version": engine_version,
+        "expected_resources": 8,
+        "completed_resources": 8 - len(missing),
+        "missing_resources": missing,
+        "duplicate_report_count": duplicate_count,
+        "completed_experiment_classes": int(cell_counts.get("PASS", 0) + cell_counts.get("NONDETERMINISTIC", 0) + cell_counts.get("IMPORT_FAILURE", 0) + cell_counts.get("TIMEOUT", 0) + cell_counts.get("HARNESS_FAILURE", 0) + cell_counts.get("MISSING_EVIDENCE", 0)),
+        "experiment_cell_counts": {value: int(cell_counts.get(value, 0)) for value in sorted(CELL_VALUES)},
+        "nondeterministic_cells": int(cell_counts.get("NONDETERMINISTIC", 0)),
+        "import_failures": int(cell_counts.get("IMPORT_FAILURE", 0)),
+        "timeouts": int(cell_counts.get("TIMEOUT", 0)),
+        "harness_failures": int(cell_counts.get("HARNESS_FAILURE", 0)),
+        "missing_evidence": int(cell_counts.get("MISSING_EVIDENCE", 0)),
+        "differing_imported_binary_count": differing_binaries,
+        "differing_destination_md5_count": differing_md5,
+        "path_set_difference_count": path_differences,
+        "resource_matrix": matrix,
+        "stage3_decision": decision,
+        "classification": classification,
+        "stage4_eligible": classification == "STAGE3_PASS_PENDING_STAGE4",
+    }
+
+
+def aggregate_engine_command(args: argparse.Namespace) -> int:
+    input_root = Path(args.input_root)
+    paths = [path for path in input_root.rglob("STAGE3_RESOURCE_RESULT.json") if path.is_file()]
+    reports = [read_json(path) for path in paths]
+    result = aggregate_engine_results(args.version, reports)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(output / "ENGINE_STAGE3_RESULT.json", result)
+    write_json(output / "ENGINE_STAGE3_EXPERIMENT_MATRIX.json", {"engine_version": args.version, "resources": result["resource_matrix"]})
+    differing_paths = []
+    for report in reports:
+        if report.get("engine_version") != args.version:
+            continue
+        for experiment_name, experiment in report.get("experiments", {}).items():
+            for comparison in experiment.get("comparisons", []):
+                if comparison.get("path_sets_equal") is False:
+                    differing_paths.append(f"{report.get('resource_selection_id')}\t{experiment_name}\t{comparison.get('left')}\t{comparison.get('right')}")
