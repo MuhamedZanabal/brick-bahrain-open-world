@@ -1,0 +1,137 @@
+    result_counts = {name: sum(row.get("candidate_resource_result") == name for row in ordered) for name in sorted(ALLOWED_RESOURCE_RESULTS)}
+    differing_binary = sum(row.get("imported_byte_equality") is False for row in ordered)
+    differing_md5 = sum(row.get("destination_md5_equality") is False for row in ordered)
+    differing_uid = sum(row.get("uid_cache_equality") is False for row in ordered)
+    path_set_diff = sum(row.get("path_set_comparison", {}).get("path_sets_equal") is False for row in ordered)
+    generated_diff = sum(row.get("generated_content_equality") is False for row in ordered)
+    insufficiency = bool(
+        missing
+        or duplicates
+        or result_counts["TIMEOUT"]
+        or result_counts["IMPORT_FAILURE"]
+        or result_counts["HARNESS_FAILURE"]
+        or len(ordered) != len(expected_ids)
+    )
+    if insufficiency:
+        decision = "FAIL_INSUFFICIENT_EVIDENCE"
+        classification = "Q6"
+        eligible = False
+    elif result_counts["NONDETERMINISTIC"] or differing_binary or differing_md5 or differing_uid or path_set_diff or generated_diff:
+        decision = "FAIL_NONDETERMINISTIC"
+        classification = "Q1"
+        eligible = False
+    elif result_counts["PASS"] == len(expected_ids):
+        decision = "PASS"
+        classification = "STAGE2_PASS_PENDING_STAGE3"
+        eligible = True
+    else:
+        decision = "FAIL_INSUFFICIENT_EVIDENCE"
+        classification = "Q6"
+        eligible = False
+    return {
+        "schema_version": 2,
+        "engine_version": version,
+        "expected_resources": len(expected_ids),
+        "complete_reports": len(ordered),
+        "completed_resources": [row.get("resource_selection_id") for row in ordered],
+        "missing_reports": missing,
+        "duplicate_reports": sorted(set(duplicates)),
+        "passed_resources": result_counts["PASS"],
+        "nondeterministic_resources": result_counts["NONDETERMINISTIC"],
+        "import_failures": result_counts["IMPORT_FAILURE"],
+        "timeouts": result_counts["TIMEOUT"],
+        "harness_failures": result_counts["HARNESS_FAILURE"],
+        "differing_imported_binary_count": differing_binary,
+        "differing_destination_md5_count": differing_md5,
+        "differing_uid_cache_count": differing_uid,
+        "path_set_difference_count": path_set_diff,
+        "generated_content_difference_resource_count": generated_diff,
+        "stage2_decision": decision,
+        "classification": classification,
+        "stage3_eligible": eligible,
+        "resource_matrix": [
+            {
+                "resource_selection_id": row.get("resource_selection_id"),
+                "logical_source_path": row.get("logical_source_path"),
+                "result": row.get("candidate_resource_result"),
+                "imported_byte_equality": row.get("imported_byte_equality"),
+                "destination_md5_equality": row.get("destination_md5_equality"),
+                "uid_cache_equality": row.get("uid_cache_equality"),
+                "path_sets_equal": row.get("path_set_comparison", {}).get("path_sets_equal"),
+                "import_durations_seconds": row.get("import_durations_seconds"),
+                "timeout_status": row.get("timeout_status"),
+            }
+            for row in ordered
+        ],
+    }
+
+
+def aggregate_results(args: argparse.Namespace) -> int:
+    input_root = Path(args.input_root)
+    output_root = Path(args.output)
+    output_root.mkdir(parents=True, exist_ok=True)
+    versions = ["4.4.1-stable", "4.5.2-stable", "4.6.3-stable"]
+    cross_rows = []
+    for version in versions:
+        reports = []
+        for path in sorted(input_root.rglob("RESOURCE_QUALIFICATION.json")):
+            try:
+                report = read_json(path)
+            except Exception:
+                continue
+            if report.get("engine_version") == version:
+                reports.append(report)
+        engine = aggregate_engine_reports(version, reports)
+        identity = next((r.get("engine_archive_verification") for r in reports if r.get("engine_archive_verification")), None)
+        engine["exact_identity"] = identity
+        version_dir = output_root / version
+        version_dir.mkdir(parents=True, exist_ok=True)
+        write_json(version_dir / "ENGINE_STAGE2_RESULT.json", engine)
+        write_json(version_dir / "ENGINE_STAGE2_RESOURCE_MATRIX.json", {"engine_version": version, "resources": engine["resource_matrix"]})
+        differing_paths = []
+        for report in reports:
+            for row in report.get("path_set_comparison", {}).get("differing_paths", []):
+                differing_paths.append(f"{report.get('resource_selection_id')}\t{row.get('path')}")
+        (version_dir / "ENGINE_STAGE2_DIFFERING_PATHS.txt").write_text("\n".join(differing_paths) + ("\n" if differing_paths else ""), encoding="utf-8")
+        cross_rows.append(
+            {
+                "engine_version": version,
+                "exact_identity": identity,
+                "eight_resource_status": engine["resource_matrix"],
+                "differing_binary_count": engine["differing_imported_binary_count"],
+                "differing_destination_md5_count": engine["differing_destination_md5_count"],
+                "timeout_count": engine["timeouts"],
+                "harness_failure_count": engine["harness_failures"],
+                "stage2_decision": engine["stage2_decision"],
+                "classification": engine["classification"],
+                "stage3_eligibility": engine["stage3_eligible"],
+            }
+        )
+    cross = {
+        "schema_version": 2,
+        "created_at": utc_now(),
+        "initial_run_id": INITIAL_RUN_ID,
+        "corrective_run_id": int(args.run_id),
+        "frozen_pr_head": PR_HEAD,
+        "candidates": cross_rows,
+        "stage3_eligible_versions": [row["engine_version"] for row in cross_rows if row["stage3_eligibility"]],
+        "gate4_status": "FAIL",
+        "gate5_status": "PASS_FOR_TWO_ORIGINAL_RETAINED_APKS_ONLY",
+        "no_stage3": True,
+        "no_full_corpus": True,
+        "no_project_migration": True,
+        "no_android_export": True,
+        "no_apk_mutation": True,
+    }
+    write_json(output_root / "cross-version" / "STAGE2_CROSS_VERSION_QUALIFICATION.json", cross)
+    return 0
+
+
+def classify_cancellation(job: dict[str, Any], configured_timeout_minutes: int, log_text: str) -> dict[str, Any]:
+    started = parse_time(job.get("started_at"))
+    completed = parse_time(job.get("completed_at"))
+    duration = int((completed - started).total_seconds()) if started and completed else None
+    timeout_seconds = configured_timeout_minutes * 60
+    lower_log = log_text.lower()
+    concurrency = "canceling since a higher priority waiting request" in lower_log or "cancel-in-progress" in lower_log
+    runner_loss = any(token in lower_log for token in ("lost communication with the server", "runner has received a shutdown signal", "runner disconnected"))
