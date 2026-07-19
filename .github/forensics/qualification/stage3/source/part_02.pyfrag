@@ -1,0 +1,200 @@
+
+
+def materialize_project(project_root: Path, corpus_root: Path, stage2_resource_root: Path, authority: Mapping[str, Any]) -> None:
+    if project_root.exists():
+        shutil.rmtree(project_root)
+    project_root.mkdir(parents=True)
+    (project_root / "project.godot").write_text(PROJECT_GODOT, encoding="utf-8")
+    logical_paths = [authority["logical_source_path"]] + [item["path"] for item in authority.get("dependencies", [])]
+    for relative in logical_paths:
+        source = corpus_root / "files" / safe_relative(str(relative))
+        destination = project_root / safe_relative(str(relative))
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    for sidecar in authority["sidecar_authority_manifest"]:
+        relative = str(sidecar["path"])
+        source = stage2_resource_root / "sidecar_authority" / safe_relative(relative)
+        destination = project_root / safe_relative(relative)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+    godot_dir = project_root / ".godot"
+    if godot_dir.exists():
+        raise RuntimeError("materialization reused generated .godot content")
+
+
+def _runner_metadata() -> dict[str, Any]:
+    machine_id = ""
+    machine_id_path = Path("/etc/machine-id")
+    if machine_id_path.is_file():
+        machine_id = sha256_bytes(machine_id_path.read_bytes())
+    hostname = socket.gethostname()
+    fingerprint_source = "|".join(
+        [
+            hostname,
+            machine_id,
+            os.environ.get("RUNNER_NAME", ""),
+            os.environ.get("RUNNER_TEMP", ""),
+            os.environ.get("GITHUB_JOB", ""),
+        ]
+    )
+    return {
+        "github_run_id": os.environ.get("GITHUB_RUN_ID"),
+        "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "github_job": os.environ.get("GITHUB_JOB"),
+        "runner_name": os.environ.get("RUNNER_NAME"),
+        "runner_os": os.environ.get("RUNNER_OS"),
+        "runner_arch": os.environ.get("RUNNER_ARCH"),
+        "runner_temp": os.environ.get("RUNNER_TEMP"),
+        "hostname": hostname,
+        "machine_id_sha256": machine_id or None,
+        "runner_fingerprint": sha256_bytes(fingerprint_source.encode("utf-8")),
+    }
+
+
+def _cpu_manifest() -> dict[str, Any]:
+    cpuinfo = Path("/proc/cpuinfo")
+    cpu_sha = sha256_file(cpuinfo) if cpuinfo.is_file() else None
+    return {
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "python": sys.version,
+        "cpu_count": os.cpu_count(),
+        "proc_cpuinfo_sha256": cpu_sha,
+        "taskset_available": shutil.which("taskset") is not None,
+    }
+
+
+def _normalized_environment(state_root: Path) -> tuple[dict[str, str], dict[str, str]]:
+    directories = {
+        "HOME": state_root / "home",
+        "XDG_CONFIG_HOME": state_root / "config",
+        "XDG_CACHE_HOME": state_root / "cache",
+        "XDG_DATA_HOME": state_root / "data",
+    }
+    for directory in directories.values():
+        directory.mkdir(parents=True, exist_ok=True)
+    normalized = {
+        "HOME": str(directories["HOME"]),
+        "XDG_CONFIG_HOME": str(directories["XDG_CONFIG_HOME"]),
+        "XDG_CACHE_HOME": str(directories["XDG_CACHE_HOME"]),
+        "XDG_DATA_HOME": str(directories["XDG_DATA_HOME"]),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "TZ": "UTC",
+        "GODOT_SILENCE_ROOT_WARNING": "1",
+        "OMP_NUM_THREADS": "1",
+        "OPENBLAS_NUM_THREADS": "1",
+        "MKL_NUM_THREADS": "1",
+        "VECLIB_MAXIMUM_THREADS": "1",
+        "NUMEXPR_NUM_THREADS": "1",
+        "MALLOC_ARENA_MAX": "1",
+    }
+    environment = dict(os.environ)
+    environment.update(normalized)
+    return environment, normalized
+
+
+def _parse_destination_md5(path: Path) -> tuple[str | None, str | None]:
+    if not path.is_file():
+        return None, None
+    text = path.read_text(encoding="utf-8", errors="replace")
+    source = _extract_quoted(text, "source_md5")
+    destination = _extract_quoted(text, "dest_md5")
+    return source, destination
+
+
+def _generated_inventory(project_root: Path) -> list[dict[str, Any]]:
+    godot_root = project_root / ".godot"
+    if not godot_root.is_dir():
+        return []
+    values: list[dict[str, Any]] = []
+    for path in sorted(item for item in godot_root.rglob("*") if item.is_file()):
+        values.append(
+            {
+                "path": path.relative_to(project_root).as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": sha256_file(path),
+            }
+        )
+    return values
+
+
+def _copy_if_exists(source: Path, destination: Path) -> str | None:
+    if not source.is_file():
+        return None
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return destination.name
+
+
+def run_import(
+    *,
+    engine_path: Path,
+    engine_identity: Mapping[str, Any],
+    project_root: Path,
+    evidence_root: Path,
+    state_root: Path,
+    timeout_seconds: int,
+    experiment: str,
+    repetition: str,
+    authority: Mapping[str, Any],
+) -> dict[str, Any]:
+    evidence_root.mkdir(parents=True, exist_ok=True)
+    if state_root.exists():
+        shutil.rmtree(state_root)
+    environment, normalized = _normalized_environment(state_root)
+    base_command = [str(engine_path), "--headless", "--path", str(project_root), "--editor", "--import", "--quit", "--verbose"]
+    command = base_command
+    cpu_control = {"taskset": False, "cpu_list": None}
+    if shutil.which("taskset"):
+        try:
+            allowed_cpus = sorted(os.sched_getaffinity(0))
+        except (AttributeError, OSError):
+            allowed_cpus = []
+        if allowed_cpus:
+            cpu = str(allowed_cpus[0])
+            command = ["taskset", "-c", cpu] + base_command
+            cpu_control = {"taskset": True, "cpu_list": cpu}
+    environment_manifest = {
+        "schema_version": 1,
+        "created_at": utc_now(),
+        "experiment": experiment,
+        "repetition": repetition,
+        "absolute_project_root": str(project_root.resolve()),
+        "normalized_environment": normalized,
+        "umask": "0022",
+        "cpu_control": cpu_control,
+        "host": _cpu_manifest(),
+        "runner": _runner_metadata(),
+        "command": command,
+        "engine_identity": dict(engine_identity),
+        "authority_manifest_sha256": authority["authority_manifest_sha256"],
+    }
+    environment_path = evidence_root / "ENVIRONMENT_MANIFEST.json"
+    write_json(environment_path, environment_manifest)
+    log_path = evidence_root / "GODOT_IMPORT.log"
+    started_wall = utc_now()
+    started_monotonic = time.monotonic()
+    timed_out = False
+    termination: str | None = None
+    exit_code: int | None = None
+    previous_umask = os.umask(0o022)
+    try:
+        with log_path.open("wb") as log_handle:
+            process = subprocess.Popen(
+                command,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                env=environment,
+                start_new_session=True,
+            )
+            try:
+                exit_code = process.wait(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                termination = "SIGTERM_PROCESS_GROUP"
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
