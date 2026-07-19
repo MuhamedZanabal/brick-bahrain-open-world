@@ -1,0 +1,179 @@
+    (output / "ENGINE_STAGE3_DIFFERING_PATHS.txt").write_text("\n".join(sorted(differing_paths)) + ("\n" if differing_paths else ""), encoding="utf-8")
+    create_inventory(output)
+    return 0
+
+
+def aggregate_cross_version(engine_results: Sequence[Mapping[str, Any]], run_id: int, workflow_sha: str) -> dict[str, Any]:
+    by_version = {str(item.get("engine_version")): dict(item) for item in engine_results if item.get("engine_version") in ENGINES}
+    eligible = [version for version in ENGINES if by_version.get(version, {}).get("classification") == "STAGE3_PASS_PENDING_STAGE4"]
+    preferred = "4.4.1-stable" if "4.4.1-stable" in eligible else (eligible[0] if eligible else None)
+    fallback = "4.5.2-stable" if "4.5.2-stable" in eligible and preferred != "4.5.2-stable" else None
+    if eligible:
+        blocker = "Separate authorization for the full 800-model Stage 4 corpus remains required."
+    else:
+        blocker = "Stage 3 Q2/Q6 failure boundary must be resolved before Stage 4 eligibility."
+    return {
+        "schema_version": 3,
+        "stage3_run_id": int(run_id),
+        "stage3_workflow_commit": workflow_sha,
+        "frozen_pr_head": FROZEN_PR_HEAD,
+        "qualification_branch": QUALIFICATION_BRANCH,
+        "engines_tested": list(ENGINES),
+        "excluded_engine": "4.6.3-stable",
+        "candidate_comparison": [by_version.get(version, {"engine_version": version, "classification": "Q6", "missing": True}) for version in ENGINES],
+        "stage4_eligible_versions": eligible,
+        "preferred_first_stage4_candidate": preferred,
+        "qualified_fallback_candidate": fallback,
+        "gate4_status": "FAIL",
+        "gate5_status": "PASS_FOR_TWO_ORIGINAL_RETAINED_APKS_ONLY",
+        "first_remaining_downstream_blocker": blocker,
+        "no_stage4": True,
+        "no_full_project_execution": True,
+        "no_project_migration": True,
+        "no_pack_generation": True,
+        "no_android_export": True,
+        "no_apk_mutation": True,
+        "no_installation": True,
+        "no_execution": True,
+        "no_merge": True,
+        "no_publication": True,
+    }
+
+
+def aggregate_cross_command(args: argparse.Namespace) -> int:
+    paths = [path for path in Path(args.input_root).rglob("ENGINE_STAGE3_RESULT.json") if path.is_file()]
+    results = [read_json(path) for path in paths]
+    value = aggregate_cross_version(results, int(args.run_id), args.workflow_sha)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(output / "STAGE3_CROSS_VERSION_QUALIFICATION.json", value)
+    create_inventory(output)
+    return 0
+
+
+def create_inventory(root: Path) -> dict[str, Any]:
+    files = []
+    for path in sorted(item for item in root.rglob("*") if item.is_file() and item.name != "ARTIFACT_INVENTORY.json"):
+        files.append({"path": path.relative_to(root).as_posix(), "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+    value = {"schema_version": 1, "created_at": utc_now(), "files": files}
+    write_json(root / "ARTIFACT_INVENTORY.json", value)
+    return value
+
+
+def matrix_command(args: argparse.Namespace) -> int:
+    value = authority_matrix() if args.kind == "authority" else c_side_matrix()
+    print(json.dumps({"include": value}, separators=(",", ":")))
+    return 0
+
+
+def verify_authority_command(args: argparse.Namespace) -> int:
+    value = verify_authority(args.version, args.resource, Path(args.corpus_root), Path(args.stage2_resource_root))
+    if args.artifact_metadata:
+        expected_name = f"stage2-resource-{args.version}-{args.resource}-{STAGE2_RUN_ID}"
+        value["stage2_resource_artifact"] = verify_artifact_metadata(Path(args.artifact_metadata), expected_name=expected_name, expected_run_id=STAGE2_RUN_ID, expected_head_sha=STAGE2_WORKFLOW_SHA)
+    write_json(Path(args.output), value)
+    return 0
+
+
+def _seed_failure(output: Path, payload: Mapping[str, Any]) -> None:
+    output.mkdir(parents=True, exist_ok=True)
+    write_json(output / "HARNESS_FAILURE.json", payload)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    matrix = subparsers.add_parser("matrix")
+    matrix.add_argument("--kind", choices=("authority", "c-side"), required=True)
+    matrix.set_defaults(function=matrix_command)
+
+    verify = subparsers.add_parser("verify-authority")
+    verify.add_argument("--version", required=True, choices=ENGINES)
+    verify.add_argument("--resource", required=True, choices=tuple(RESOURCE_BY_ID))
+    verify.add_argument("--corpus-root", required=True)
+    verify.add_argument("--stage2-resource-root", required=True)
+    verify.add_argument("--artifact-metadata")
+    verify.add_argument("--output", required=True)
+    verify.set_defaults(function=verify_authority_command)
+
+    for name, function in (("run-abd", run_abd_command), ("run-c-side", run_c_side_command)):
+        command = subparsers.add_parser(name)
+        command.add_argument("--version", required=True, choices=ENGINES)
+        command.add_argument("--resource", required=True, choices=tuple(RESOURCE_BY_ID))
+        command.add_argument("--corpus-root", required=True)
+        command.add_argument("--engine-root", required=True)
+        command.add_argument("--stage2-resource-root", required=True)
+        command.add_argument("--artifact-metadata")
+        command.add_argument("--timeout-seconds", required=True, type=int)
+        command.add_argument("--work-root", required=True)
+        command.add_argument("--output", required=True)
+        if name == "run-c-side":
+            command.add_argument("--side", required=True, choices=("C1", "C2"))
+        command.set_defaults(function=function)
+
+    finalize = subparsers.add_parser("finalize-resource")
+    finalize.add_argument("--version", required=True, choices=ENGINES)
+    finalize.add_argument("--resource", required=True, choices=tuple(RESOURCE_BY_ID))
+    finalize.add_argument("--abd-root", required=True)
+    finalize.add_argument("--c1-root", required=True)
+    finalize.add_argument("--c2-root", required=True)
+    finalize.add_argument("--output", required=True)
+    finalize.set_defaults(function=finalize_resource_command)
+
+    engine = subparsers.add_parser("aggregate-engine")
+    engine.add_argument("--version", required=True, choices=ENGINES)
+    engine.add_argument("--input-root", required=True)
+    engine.add_argument("--output", required=True)
+    engine.set_defaults(function=aggregate_engine_command)
+
+    cross = subparsers.add_parser("aggregate-cross")
+    cross.add_argument("--input-root", required=True)
+    cross.add_argument("--run-id", required=True, type=int)
+    cross.add_argument("--workflow-sha", required=True)
+    cross.add_argument("--output", required=True)
+    cross.set_defaults(function=aggregate_cross_command)
+
+    inventory = subparsers.add_parser("inventory")
+    inventory.add_argument("--root", required=True)
+    inventory.set_defaults(function=lambda args: (create_inventory(Path(args.root)), 0)[1])
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        return int(args.function(args))
+    except Exception as error:
+        output_value = getattr(args, "output", None)
+        if output_value:
+            output = Path(output_value)
+            if output.suffix:
+                output = output.parent
+            _seed_failure(
+                output,
+                {
+                    "schema_version": 3,
+                    "created_at": utc_now(),
+                    "command": args.command,
+                    "error_type": type(error).__name__,
+                    "error": str(error),
+                    "traceback": traceback.format_exc(),
+                    "classification": "HARNESS_FAILURE",
+                    "frozen_pr_head": FROZEN_PR_HEAD,
+                    "no_stage4": True,
+                    "no_project_migration": True,
+                    "no_android_export": True,
+                },
+            )
+            try:
+                create_inventory(output)
+            except Exception:
+                pass
+        print(f"ERROR: {type(error).__name__}: {error}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
