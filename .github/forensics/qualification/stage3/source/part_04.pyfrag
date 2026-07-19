@@ -1,0 +1,200 @@
+    return {"left": left_id, "right": right_id, **compare_snapshots(left, right, require_uid=require_uid)}
+
+
+def _experiment_summary(experiment: str, imports: Mapping[str, Mapping[str, Any]], comparisons: Sequence[Mapping[str, Any]], **extra: Any) -> dict[str, Any]:
+    result = collapse_results(str(item.get("result", "MISSING_EVIDENCE")) for item in comparisons)
+    if any(snapshot.get("timed_out") for snapshot in imports.values()):
+        result = collapse_results([result, "TIMEOUT"])
+    elif any(snapshot.get("import_exit_code") != 0 for snapshot in imports.values()):
+        result = collapse_results([result, "IMPORT_FAILURE"])
+    value = {
+        "experiment": experiment,
+        "result": result,
+        "imports": {key: dict(snapshot) for key, snapshot in imports.items()},
+        "comparisons": [dict(item) for item in comparisons],
+    }
+    value.update(extra)
+    return value
+
+
+def _write_authority_bundle(output_root: Path, authority: Mapping[str, Any], artifact_metadata: Mapping[str, Any] | None) -> None:
+    write_json(output_root / "SIDECAR_AUTHORITY_VERIFICATION.json", dict(authority))
+    if artifact_metadata is not None:
+        write_json(output_root / "STAGE2_RESOURCE_ARTIFACT_AUTHORITY.json", dict(artifact_metadata))
+
+
+def run_abd_command(args: argparse.Namespace) -> int:
+    output = Path(args.output)
+    work = Path(args.work_root)
+    output.mkdir(parents=True, exist_ok=True)
+    authority = verify_authority(args.version, args.resource, Path(args.corpus_root), Path(args.stage2_resource_root))
+    artifact_metadata = None
+    if args.artifact_metadata:
+        expected_name = f"stage2-resource-{args.version}-{args.resource}-{STAGE2_RUN_ID}"
+        artifact_metadata = verify_artifact_metadata(Path(args.artifact_metadata), expected_name=expected_name, expected_run_id=STAGE2_RUN_ID, expected_head_sha=STAGE2_WORKFLOW_SHA)
+    _write_authority_bundle(output, authority, artifact_metadata)
+    engine, identity = verify_engine(args.version, Path(args.engine_root), work / "engine")
+    write_json(output / "ENGINE_AUTHORITY_VERIFICATION.json", identity)
+    timeout_seconds = int(args.timeout_seconds)
+    corpus_root = Path(args.corpus_root)
+    resource_root = Path(args.stage2_resource_root)
+
+    a_imports: dict[str, dict[str, Any]] = {}
+    canonical_root = work / "same_absolute_path" / "project"
+    for repetition in ("A1", "A2", "A3"):
+        materialize_project(canonical_root, corpus_root, resource_root, authority)
+        a_imports[repetition] = run_import(
+            engine_path=engine,
+            engine_identity=identity,
+            project_root=canonical_root,
+            evidence_root=output / "experiment_A" / repetition,
+            state_root=work / "state" / repetition,
+            timeout_seconds=timeout_seconds,
+            experiment="A",
+            repetition=repetition,
+            authority=authority,
+        )
+    a_comparisons = [
+        _comparison_record("A1", "A2", a_imports["A1"], a_imports["A2"]),
+        _comparison_record("A1", "A3", a_imports["A1"], a_imports["A3"]),
+        _comparison_record("A2", "A3", a_imports["A2"], a_imports["A3"]),
+    ]
+    experiment_a = _experiment_summary("A", a_imports, a_comparisons, canonical_absolute_path=str(canonical_root.resolve()), rematerialized_between_repetitions=True)
+    write_json(output / "EXPERIMENT_A_RESULT.json", experiment_a)
+
+    b_roots = {
+        "B1": work / "absolute_path_alpha" / "project",
+        "B2": work / "deliberately_different_absolute_workspace_path_beta" / "nested" / "project",
+    }
+    b_imports: dict[str, dict[str, Any]] = {}
+    for repetition, project_root in b_roots.items():
+        materialize_project(project_root, corpus_root, resource_root, authority)
+        b_imports[repetition] = run_import(
+            engine_path=engine,
+            engine_identity=identity,
+            project_root=project_root,
+            evidence_root=output / "experiment_B" / repetition,
+            state_root=work / "state" / repetition,
+            timeout_seconds=timeout_seconds,
+            experiment="B",
+            repetition=repetition,
+            authority=authority,
+        )
+    paths_differ = b_roots["B1"].resolve() != b_roots["B2"].resolve()
+    b_comparison = _comparison_record("B1", "B2", b_imports["B1"], b_imports["B2"], require_uid=True)
+    if not paths_differ:
+        b_comparison = {**b_comparison, "result": "HARNESS_FAILURE", "reason": "absolute project roots did not differ"}
+    experiment_b = _experiment_summary(
+        "B",
+        b_imports,
+        [b_comparison],
+        absolute_paths_differ=paths_differ,
+        absolute_project_roots={key: str(path.resolve()) for key, path in b_roots.items()},
+        logical_project_relative_path_identical=True,
+    )
+    write_json(output / "EXPERIMENT_B_RESULT.json", experiment_b)
+
+    d_roots = {"D1": work / "concurrent" / "d1" / "project", "D2": work / "concurrent" / "d2" / "project"}
+    for project_root in d_roots.values():
+        materialize_project(project_root, corpus_root, resource_root, authority)
+    d_imports: dict[str, dict[str, Any]] = {}
+
+    def run_d(repetition: str) -> tuple[str, dict[str, Any]]:
+        snapshot = run_import(
+            engine_path=engine,
+            engine_identity=identity,
+            project_root=d_roots[repetition],
+            evidence_root=output / "experiment_D" / repetition,
+            state_root=work / "state" / repetition,
+            timeout_seconds=timeout_seconds,
+            experiment="D",
+            repetition=repetition,
+            authority=authority,
+        )
+        return repetition, snapshot
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(run_d, repetition) for repetition in ("D1", "D2")]
+        for future in concurrent.futures.as_completed(futures):
+            repetition, snapshot = future.result()
+            d_imports[repetition] = snapshot
+    overlap = intervals_overlap(
+        float(d_imports["D1"]["process_started_monotonic"]),
+        float(d_imports["D1"]["process_completed_monotonic"]),
+        float(d_imports["D2"]["process_started_monotonic"]),
+        float(d_imports["D2"]["process_completed_monotonic"]),
+    )
+    overlap_seconds = max(
+        0.0,
+        min(float(d_imports["D1"]["process_completed_monotonic"]), float(d_imports["D2"]["process_completed_monotonic"]))
+        - max(float(d_imports["D1"]["process_started_monotonic"]), float(d_imports["D2"]["process_started_monotonic"])),
+    )
+    d_comparison = _comparison_record("D1", "D2", d_imports["D1"], d_imports["D2"])
+    if not overlap:
+        d_comparison = {**d_comparison, "result": "HARNESS_FAILURE", "reason": "concurrent process intervals did not overlap"}
+    experiment_d = _experiment_summary(
+        "D",
+        d_imports,
+        [d_comparison],
+        execution_intervals_overlap=overlap,
+        overlap_seconds=round(overlap_seconds, 6),
+        intervals={
+            key: {
+                "started_at": snapshot["process_started_at"],
+                "completed_at": snapshot["process_completed_at"],
+                "started_monotonic": snapshot["process_started_monotonic"],
+                "completed_monotonic": snapshot["process_completed_monotonic"],
+            }
+            for key, snapshot in d_imports.items()
+        },
+        mutable_roots_shared=False,
+    )
+    write_json(output / "EXPERIMENT_D_RESULT.json", experiment_d)
+    abd = {
+        "schema_version": 3,
+        "engine_version": args.version,
+        "resource_selection_id": args.resource,
+        "frozen_pr_head": FROZEN_PR_HEAD,
+        "stage2_run_id": STAGE2_RUN_ID,
+        "authority_manifest_sha256": authority["authority_manifest_sha256"],
+        "experiments": {"A": experiment_a, "B": experiment_b, "D": experiment_d},
+        "no_stage4": True,
+        "no_full_project_execution": True,
+        "no_project_migration": True,
+        "no_pack_generation": True,
+        "no_android_export": True,
+        "no_apk_mutation": True,
+    }
+    write_json(output / "ABD_RESOURCE_RESULT.json", abd)
+    create_inventory(output)
+    return 0
+
+
+def run_c_side_command(args: argparse.Namespace) -> int:
+    if args.side not in {"C1", "C2"}:
+        raise ValueError("C side must be C1 or C2")
+    output = Path(args.output)
+    work = Path(args.work_root)
+    output.mkdir(parents=True, exist_ok=True)
+    authority = verify_authority(args.version, args.resource, Path(args.corpus_root), Path(args.stage2_resource_root))
+    artifact_metadata = None
+    if args.artifact_metadata:
+        expected_name = f"stage2-resource-{args.version}-{args.resource}-{STAGE2_RUN_ID}"
+        artifact_metadata = verify_artifact_metadata(Path(args.artifact_metadata), expected_name=expected_name, expected_run_id=STAGE2_RUN_ID, expected_head_sha=STAGE2_WORKFLOW_SHA)
+    _write_authority_bundle(output, authority, artifact_metadata)
+    engine, identity = verify_engine(args.version, Path(args.engine_root), work / "engine")
+    write_json(output / "ENGINE_AUTHORITY_VERIFICATION.json", identity)
+    project_root = work / "project"
+    materialize_project(project_root, Path(args.corpus_root), Path(args.stage2_resource_root), authority)
+    snapshot = run_import(
+        engine_path=engine,
+        engine_identity=identity,
+        project_root=project_root,
+        evidence_root=output / "import",
+        state_root=work / "state",
+        timeout_seconds=int(args.timeout_seconds),
+        experiment="C",
+        repetition=args.side,
+        authority=authority,
+    )
+    side_result = {
