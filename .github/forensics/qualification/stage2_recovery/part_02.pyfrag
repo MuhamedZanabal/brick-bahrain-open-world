@@ -46,6 +46,28 @@ def parse_sidecar(path: Path) -> dict[str, Any]:
     }
 
 
+def retain_sidecar_authority(authority_project: Path, evidence_root: Path) -> list[dict[str, Any]]:
+    if evidence_root.exists():
+        shutil.rmtree(evidence_root)
+    evidence_root.mkdir(parents=True)
+    rows = []
+    for sidecar in sorted(authority_project.rglob("*.import"), key=lambda p: p.relative_to(authority_project).as_posix()):
+        rel = sidecar.relative_to(authority_project).as_posix()
+        destination = evidence_root / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(sidecar, destination)
+        rows.append({"path": rel, "size": destination.stat().st_size, "sha256": sha256_file(destination)})
+    return rows
+
+
+def apply_sidecar_authority(evidence_root: Path, project: Path) -> None:
+    for sidecar in sorted(evidence_root.rglob("*.import"), key=lambda p: p.relative_to(evidence_root).as_posix()):
+        rel = sidecar.relative_to(evidence_root)
+        destination = project / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(sidecar, destination)
+
+
 def parse_md5(path: Path) -> dict[str, Any]:
     fields: dict[str, str] = {}
     malformed = []
