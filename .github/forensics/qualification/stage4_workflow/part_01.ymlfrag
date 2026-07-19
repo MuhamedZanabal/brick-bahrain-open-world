@@ -1,0 +1,160 @@
+          python3 - <<'PY'
+          import json,os,subprocess
+          checks=[
+            ('/tmp/source-artifact.json',os.environ['SOURCE_ARTIFACT_ID'],os.environ['SOURCE_ARTIFACT_NAME'],os.environ['SOURCE_ARTIFACT_DIGEST'],os.environ['SOURCE_RUN_ID'],os.environ['COMPOSITE_SOURCE_HEAD']),
+            ('/tmp/engine-artifact.json',os.environ['ENGINE_ARTIFACT_ID'],os.environ['ENGINE_ARTIFACT_NAME'],os.environ['ENGINE_ARTIFACT_DIGEST'],os.environ['ENGINE_RUN_ID'],'23efeab85489ef1efafca60a0c0791507fc3f5dc'),
+          ]
+          for path,aid,name,digest,run,head in checks:
+            a=json.load(open(path));assert str(a['id'])==aid and a['name']==name
+            assert a['digest']=='sha256:'+digest and not a['expired']
+            assert str(a['workflow_run']['id'])==run and a['workflow_run']['head_sha']==head
+          release=json.load(open('/tmp/engine-release.json'))
+          assert any(x['name']=='Godot_v4.4.1-stable_linux.x86_64.zip' for x in release['assets'])
+          ref=json.load(open('/tmp/engine-ref.json'))['object']
+          resolved=ref['sha']
+          if ref['type']=='tag':
+            resolved=json.loads(subprocess.check_output(['gh','api',f"repos/godotengine/godot/git/tags/{resolved}"]))['object']['sha']
+          assert resolved==os.environ['ENGINE_SOURCE_COMMIT']
+          PY
+      - name: Build exact immutable full-corpus authority
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          python3 "$analyzer" build-authority --authority-root build/source-authority --work-root /tmp/bahrain-stage4-authority --output build/full-corpus-authority/evidence
+          code=$?
+          python3 "$analyzer" inventory --root build/full-corpus-authority/evidence --output build/full-corpus-authority/ARTIFACT_INVENTORY.json || true
+          printf '%s\n' "$code" > build/full-corpus-authority/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Upload full-corpus authority evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  prepare_sidecars:
+    needs: prepare_authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Seed unconditional sidecar evidence
+        shell: bash
+        run: |
+          mkdir -p build/sidecar-authority/evidence
+          printf '%s\n' '{"schema_version":1,"result":"HARNESS_FAILURE","classification":"Q6"}' > build/sidecar-authority/evidence/GODOT_4_4_1_FULL_SIDECAR_AUTHORITY.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download full-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+      - name: Generate exact 800-model sidecar authority
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          corpus="$(find build/full-corpus-authority -name FULL_MODEL_CORPUS_AUTHORITY.json -print -quit)"
+          python3 "$analyzer" build-sidecars --authority-root build/source-authority --corpus-authority "$corpus" --engine-root build/engine --work-root /tmp/bahrain-stage4-sidecar-authority --output build/sidecar-authority/evidence --timeout-seconds 10800
+          code=$?
+          python3 "$analyzer" inventory --root build/sidecar-authority/evidence --output build/sidecar-authority/ARTIFACT_INVENTORY.json || true
+          printf '%s\n' "$code" > build/sidecar-authority/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Upload full sidecar authority evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-sidecar-authority-${{ github.run_id }}
+          path: build/sidecar-authority
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+
+  import_d1:
+    needs: prepare_sidecars
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Seed unconditional D1 evidence
+        shell: bash
+        run: |
+          mkdir -p build/d1/evidence/shards build/d1-manifest/evidence
+          printf '%s\n' '{"schema_version":1,"side":"D1","import_completed":false,"imported_model_count":0,"classification":"Q6"}' > build/d1/evidence/FULL_IMPORT_D1_MODEL_MANIFEST.json
+          for n in $(seq -w 0 39); do
+            mkdir -p "build/d1/evidence/shards/$n/payload"
+            printf '%s\n' '{"schema_version":1,"side":"D1","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "build/d1/evidence/shards/$n/SHARD_MANIFEST.json"
+            printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "build/d1/evidence/shards/$n/SHARD_INVENTORY.json"
+          done
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download full-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+      - name: Download exact sidecar authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-sidecar-authority-${{ github.run_id }}
+          path: build/sidecar-authority
+      - name: Run independent clean full-source import D1
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          corpus="$(find build/full-corpus-authority -name FULL_MODEL_CORPUS_AUTHORITY.json -print -quit)"
+          python3 "$analyzer" run-import --side D1 --authority-root build/source-authority --corpus-authority "$corpus" --sidecar-root build/sidecar-authority --engine-root build/engine --project-root /tmp/bahrain-stage4-d1/project --output build/d1/evidence --timeout-seconds 14400
+          printf '%s\n' "$?" > build/d1/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Finalize manifest and shard inventories
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          mkdir -p build/d1-manifest/evidence
