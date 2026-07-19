@@ -1,0 +1,519 @@
+name: Bahrain Brick Godot Engine Qualification Stage 2 Recovery
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths:
+      - .github/workflows/godot-engine-qualification-stage2-recovery.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: bahrain-brick-godot-stage2-recovery
+  cancel-in-progress: false
+
+env:
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  INITIAL_RUN_ID: '29664068659'
+  INITIAL_WORKFLOW_SHA: a7b189090be8ab884855b6c799edcaa8b3c2ea00
+  INPUT_RUN_ID: '29627302405'
+  INPUT_ARTIFACT_NAME: pr59-godot-import-experiment-input-29627302405
+  INPUT_ARTIFACT_ID: '8424275568'
+  INPUT_ARTIFACT_DIGEST: 0292e1686ac49aaad7523f4c1011d506149b98c2227f099a2348b2e3afac185b
+  SELECTION_RUN_ID: '29636586197'
+  SELECTION_ARTIFACT_NAME: pr59-model-retained-29636586197
+  SELECTION_ARTIFACT_ID: '8427294301'
+  SELECTION_ARTIFACT_DIGEST: 9b235e822c234441881b5ba2f84dcb1609effeec244e857443772f2440b27e1f
+  ANALYZER_SHA256: aabe64f37a264ca5c39c33f9397873c32ea31571f621bab0da089fb95911c21b
+  TEST_SHA256: 978df7054968c07d42e04d0a17e24581af4b7809f58a0b9db5b3e497d4b6c4a2
+  SIDECAR_TEST_SHA256: 3f4791eca141e207337a719703f11cacd0f2887abc1592077690ee315e72856c
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out corrective workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 20
+      - name: Record corrective run locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics/qualification
+          cat > .github/forensics/qualification/LATEST_STAGE2_RECOVERY_RUN.json <<JSON
+          {"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"$PR_HEAD","branch":"ci/godot-engine-determinism-qualification-20260719"}
+          JSON
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/qualification/LATEST_STAGE2_RECOVERY_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(stage2): record recovery run ${{ github.run_id }}"
+            git fetch origin ci/godot-engine-determinism-qualification-20260719
+            git rebase origin/ci/godot-engine-determinism-qualification-20260719
+            git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+          fi
+
+  prepare_matrix:
+    needs: record_locator
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Check out recovery implementation
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Materialize, verify and test recovery analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tooling/.github/forensics/qualification/stage2_recovery/part_*.pyfrag > /tmp/stage2_resource_qualification.py
+          cp tooling/.github/forensics/qualification/stage2_recovery/test_stage2_resource_qualification.py /tmp/
+          cp tooling/.github/forensics/qualification/stage2_recovery/test_stage2_sidecar_authority.py /tmp/
+          printf '%s  %s\n' "$ANALYZER_SHA256" /tmp/stage2_resource_qualification.py | sha256sum -c -
+          printf '%s  %s\n' "$TEST_SHA256" /tmp/test_stage2_resource_qualification.py | sha256sum -c -
+          printf '%s  %s\n' "$SIDECAR_TEST_SHA256" /tmp/test_stage2_sidecar_authority.py | sha256sum -c -
+          python3 -m py_compile /tmp/stage2_resource_qualification.py
+          cd /tmp
+          python3 -m unittest -v test_stage2_resource_qualification.py test_stage2_sidecar_authority.py
+      - name: Build exact 24-shard matrix
+        id: matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          versions = ['4.4.1-stable', '4.5.2-stable', '4.6.3-stable']
+          resources = [
+              ('glb_matrix_small', 'GLB', 1800),
+              ('glb_matrix_medium', 'GLB', 1800),
+              ('glb_matrix_large', 'GLB', 1800),
+              ('glb_non_matrix', 'GLB', 1800),
+              ('gltf_character', 'GLTF', 2700),
+              ('gltf_environment', 'GLTF', 2700),
+              ('fbx_character', 'FBX', 3600),
+              ('obj_single', 'OBJ', 3600),
+          ]
+          include = []
+          for version in versions:
+              for resource, source_type, timeout_seconds in resources:
+                  include.append({'version': version, 'resource': resource, 'source_type': source_type, 'timeout_seconds': timeout_seconds})
+          assert len(include) == 24
+          print('matrix=' + json.dumps({'include': include}, separators=(',', ':')))
+          PY
+
+  prepare_engines:
+    needs: prepare_matrix
+    name: prepare-engine-${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - version: 4.4.1-stable
+            runtime_identity: 4.4.1.stable.official.49a5bc7b6
+            source_commit: 49a5bc7b616bd04689a2c89e89bda41f50241464
+            archive: Godot_v4.4.1-stable_linux.x86_64.zip
+            archive_sha512: ef4e76880a514257175544952c61191106fdef3095b909bafed9fcbeb230c3e5533920a0f3012882dd4bbde83028a67549825794e2d2c3cf76eba7918b71370e
+            archive_sha256: ''
+            runtime_sha256: 54215149d52efb1d653a3dec39d0993587bdf5daa2c56e787b5ee88417fb1339
+            source_archive_sha256: ddbd6527cdb3ddb02910b383301a5c9117b1c33c777ef1c86d1b1eea43dcb651
+          - version: 4.5.2-stable
+            runtime_identity: 4.5.2.stable.official.6ce3de25a
+            source_commit: 6ce3de25aa58466e14ef354703ba8d9791a417da
+            archive: Godot_v4.5.2-stable_linux.x86_64.zip
+            archive_sha512: e3ce6194b6d4d2dcef5e5b5136752c084d9d8b9071c10bc2d2011b947ec7439a257c8d23c541cb30699f16d9edea6dff36e6e84d2bec14a8fe9b4e9aacbe5a8d
+            archive_sha256: 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03
+            runtime_sha256: 5803746bbe055bee0f07a3c5b0dd347719bd45599f3d34519a8a0beaf83014ae
+            source_archive_sha256: d24d5efec9ad7ca48bb2d80dfcf15f065c02ffd6d98f0e6d00d07ba93d407ec0
+          - version: 4.6.3-stable
+            runtime_identity: 4.6.3.stable.official.7d41c59c4
+            source_commit: 35e80b3a8822a9df9be390814b62f44c0a9c69e8
+            archive: Godot_v4.6.3-stable_linux.x86_64.zip
+            archive_sha512: a035258da32b77f966a5376f9fa29c30a6adde826a85ba918e1605bd1fc9823eba7d85f1dd5e748956bd2ba72827c0025ffa11bb82aec91128c407a2e723c99c
+            archive_sha256: d0bc2113065e481c9c2c2b2c37daa4e8be3fe9e27f0ab9ab0b6096e9a37907f3
+            runtime_sha256: f64d4ed19fc9df9440321653fcc80df8c6e365ba7b6de0a29e2cfa9fa71bfeb3
+            source_archive_sha256: 2261028c0dfc10e0cf4800a5b2e5a57ea241f72965162327f5764d536a69a46a
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Create engine evidence root
+        shell: bash
+        run: mkdir -p "build/engine_package/${{ matrix.version }}"
+      - name: Download and verify official engine package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ matrix.version }}
+          ARCHIVE: ${{ matrix.archive }}
+          ARCHIVE_SHA512: ${{ matrix.archive_sha512 }}
+          ARCHIVE_SHA256: ${{ matrix.archive_sha256 }}
+          RUNTIME_SHA256: ${{ matrix.runtime_sha256 }}
+          RUNTIME_IDENTITY: ${{ matrix.runtime_identity }}
+          SOURCE_COMMIT: ${{ matrix.source_commit }}
+          SOURCE_ARCHIVE_SHA256: ${{ matrix.source_archive_sha256 }}
+        run: |
+          set -euo pipefail
+          root="build/engine_package/${VERSION}"
+          gh api "repos/godotengine/godot-builds/releases/tags/${VERSION}" > "$root/release.json"
+          gh api "repos/godotengine/godot/git/ref/tags/${VERSION}" > "$root/source-ref.json"
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          root = Path('build/engine_package') / os.environ['VERSION']
+          release = json.load(open(root / 'release.json'))
+          assets = {a['name']: a for a in release['assets']}
+          for required in [os.environ['ARCHIVE'], 'SHA512-SUMS.txt']:
+              if required not in assets:
+                  raise SystemExit(f'missing official release asset: {required}')
+          for name in [os.environ['ARCHIVE'], 'SHA512-SUMS.txt']:
+              with open(root / name, 'wb') as handle:
+                  subprocess.run(['gh', 'api', '-H', 'Accept: application/octet-stream', assets[name]['url']], stdout=handle, check=True)
+          ref = json.load(open(root / 'source-ref.json'))['object']
+          if ref['type'] == 'tag':
+              tag = json.loads(subprocess.check_output(['gh', 'api', f"repos/godotengine/godot/git/tags/{ref['sha']}"]))
+              resolved = tag['object']['sha']
+          else:
+              resolved = ref['sha']
+          if resolved != os.environ['SOURCE_COMMIT']:
+              raise SystemExit({'source_commit_expected': os.environ['SOURCE_COMMIT'], 'source_commit_actual': resolved})
+          (root / 'resolved-source-commit.txt').write_text(resolved + '\n')
+          PY
+          printf '%s  %s\n' "$ARCHIVE_SHA512" "$root/$ARCHIVE" | sha512sum -c -
+          if [[ -n "$ARCHIVE_SHA256" ]]; then printf '%s  %s\n' "$ARCHIVE_SHA256" "$root/$ARCHIVE" | sha256sum -c -; fi
+          mkdir -p "$root/extract"
+          unzip -q "$root/$ARCHIVE" -d "$root/extract"
+          runtime="$(find "$root/extract" -maxdepth 1 -type f -name 'Godot*' -print -quit)"
+          test -n "$runtime"
+          chmod +x "$runtime"
+          printf '%s  %s\n' "$RUNTIME_SHA256" "$runtime" | sha256sum -c -
+          test "$("$runtime" --version)" = "$RUNTIME_IDENTITY"
+          rm -rf "$root/extract"
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path('build/engine_package') / os.environ['VERSION']
+          release = json.load(open(root / 'release.json'))
+          value = {'engine_version':os.environ['VERSION'],'runtime_identity':os.environ['RUNTIME_IDENTITY'],'source_commit':os.environ['SOURCE_COMMIT'],'binary_archive_filename':os.environ['ARCHIVE'],'binary_archive_sha512':os.environ['ARCHIVE_SHA512'],'binary_archive_sha256':os.environ['ARCHIVE_SHA256'] or None,'extracted_runtime_sha256':os.environ['RUNTIME_SHA256'],'source_archive_sha256':os.environ['SOURCE_ARCHIVE_SHA256'],'official_release_id':release['id'],'official_release_url':release['html_url'],'download_provenance':'Official godotengine/godot-builds release; source tag commit resolved through godotengine/godot Git ref; no source archive redownload.'}
+          (root / 'ENGINE_PACKAGE_IDENTITY.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Upload verified engine package
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-engine-package-${{ matrix.version }}-${{ github.run_id }}
+          path: build/engine_package/${{ matrix.version }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  prepare_corpus:
+    needs: prepare_matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out recovery implementation
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Materialize analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tooling/.github/forensics/qualification/stage2_recovery/part_*.pyfrag > /tmp/stage2_resource_qualification.py
+          printf '%s  %s\n' "$ANALYZER_SHA256" /tmp/stage2_resource_qualification.py | sha256sum -c -
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.INPUT_ARTIFACT_NAME }}
+          path: build/input
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.INPUT_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted representative selection
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SELECTION_ARTIFACT_NAME }}
+          path: build/selection
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SELECTION_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Verify retained artifact authority and prepare compact corpus
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${INPUT_ARTIFACT_ID}" > build/input-artifact.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SELECTION_ARTIFACT_ID}" > build/selection-artifact.json
+          python3 - <<'PY'
+          import json, os
+          checks=[('build/input-artifact.json',int(os.environ['INPUT_ARTIFACT_ID']),os.environ['INPUT_ARTIFACT_NAME'],'sha256:'+os.environ['INPUT_ARTIFACT_DIGEST'],int(os.environ['INPUT_RUN_ID'])),('build/selection-artifact.json',int(os.environ['SELECTION_ARTIFACT_ID']),os.environ['SELECTION_ARTIFACT_NAME'],'sha256:'+os.environ['SELECTION_ARTIFACT_DIGEST'],int(os.environ['SELECTION_RUN_ID']))]
+          for path,artifact_id,name,digest,run_id in checks:
+              value=json.load(open(path)); assert value['id']==artifact_id; assert value['name']==name; assert value['digest']==digest; assert value['workflow_run']['id']==run_id; assert value['expired'] is False
+          PY
+          python3 /tmp/stage2_resource_qualification.py prepare-corpus --source-zip build/input/input/MANAMA_SOUQ_COMPOSITE_SOURCE.zip --selection build/selection/REPRESENTATIVE_SELECTION.json --output build/stage2_corpus
+      - name: Upload compact exact corpus
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-exact-corpus-${{ github.run_id }}
+          path: build/stage2_corpus
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 7
+
+  cancellation_audit:
+    needs: prepare_matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out recovery implementation
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Materialize analyzer and evidence roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat tooling/.github/forensics/qualification/stage2_recovery/part_*.pyfrag > /tmp/stage2_resource_qualification.py
+          printf '%s  %s\n' "$ANALYZER_SHA256" /tmp/stage2_resource_qualification.py | sha256sum -c -
+          mkdir -p build/jobs build/partial/4.4.1-stable build/partial/4.5.2-stable build/partial/4.6.3-stable build/cancellation
+          printf '%s\n' '{"schema_version":2,"aggregate_cancellation_cause":"EVIDENCE_INSUFFICIENT","harness_error":"cancellation audit did not complete"}' > build/cancellation/STAGE2_CANCELLATION_CAUSE.json
+      - name: Fetch exact initial job metadata and logs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for job in 88131462251 88131462261 88131462268; do gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job}" > "build/jobs/job-${job}.json"; gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job}/logs" > "build/jobs/job-${job}.log"; done
+      - name: Download 4.4.1 partial evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: godot-engine-qualification-4.4.1-stable-29664068659
+          path: build/partial/4.4.1-stable
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29664068659'
+          github-token: ${{ github.token }}
+      - name: Download 4.5.2 partial evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: godot-engine-qualification-4.5.2-stable-29664068659
+          path: build/partial/4.5.2-stable
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29664068659'
+          github-token: ${{ github.token }}
+      - name: Download 4.6.3 partial evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: godot-engine-qualification-4.6.3-stable-29664068659
+          path: build/partial/4.6.3-stable
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29664068659'
+          github-token: ${{ github.token }}
+      - name: Generate cancellation cause report
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          python3 /tmp/stage2_resource_qualification.py cancellation --jobs-root build/jobs --partial-root build/partial --output build/cancellation
+          exit 0
+      - name: Upload cancellation evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-cancellation-cause-${{ github.run_id }}
+          path: build/cancellation
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  resource_qualify:
+    needs: [prepare_matrix, prepare_engines, prepare_corpus]
+    if: ${{ always() && needs.prepare_matrix.result == 'success' }}
+    name: stage2-${{ matrix.version }}-${{ matrix.resource }}
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.prepare_matrix.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 210
+    steps:
+      - name: Seed unconditional evidence root
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+          RESOURCE: ${{ matrix.resource }}
+        run: |
+          set -euo pipefail
+          root="build/resource_evidence/${VERSION}/${RESOURCE}"; mkdir -p "$root"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path('build/resource_evidence')/os.environ['VERSION']/os.environ['RESOURCE']
+          value={'schema_version':2,'engine_version':os.environ['VERSION'],'resource_selection_id':os.environ['RESOURCE'],'candidate_resource_result':'HARNESS_FAILURE','harness_error':'resource job did not reach analyzer completion','frozen_pr_head':os.environ['PR_HEAD'],'no_stage3':True,'no_full_corpus':True,'no_project_migration':True,'no_android_export':True,'no_apk_mutation':True}
+          (root/'RESOURCE_QUALIFICATION.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Check out recovery implementation
+        continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download verified engine package
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage2-engine-package-${{ matrix.version }}-${{ github.run_id }}
+          path: build/engine/${{ matrix.version }}
+      - name: Download exact compact corpus
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage2-exact-corpus-${{ github.run_id }}
+          path: build/corpus
+      - name: Run one engine-resource byte qualification
+        if: always()
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+          RESOURCE: ${{ matrix.resource }}
+          TIMEOUT_SECONDS: ${{ matrix.timeout_seconds }}
+        run: |
+          set +e
+          root="build/resource_evidence/${VERSION}/${RESOURCE}"
+          if [[ -d tooling/.github/forensics/qualification/stage2_recovery ]]; then cat tooling/.github/forensics/qualification/stage2_recovery/part_*.pyfrag > /tmp/stage2_resource_qualification.py; fi
+          if [[ -s /tmp/stage2_resource_qualification.py ]] && [[ "$(sha256sum /tmp/stage2_resource_qualification.py | awk '{print $1}')" == "$ANALYZER_SHA256" ]]; then
+            python3 /tmp/stage2_resource_qualification.py resource --version "$VERSION" --selection-id "$RESOURCE" --engine-root "build/engine/${VERSION}" --corpus-root build/corpus --timeout-seconds "$TIMEOUT_SECONDS" --work-root "/tmp/stage2/${VERSION}/${RESOURCE}" --output "$root"; analyzer_code=$?
+          else analyzer_code=98; fi
+          printf '%s\n' "$analyzer_code" > "$root/ANALYZER_EXIT_CODE.txt"
+          exit 0
+      - name: Ensure a valid report exists
+        if: always()
+        shell: bash
+        env:
+          VERSION: ${{ matrix.version }}
+          RESOURCE: ${{ matrix.resource }}
+        run: |
+          set +e
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          root=Path('build/resource_evidence')/os.environ['VERSION']/os.environ['RESOURCE']; path=root/'RESOURCE_QUALIFICATION.json'
+          try:
+              value=json.loads(path.read_text()); assert value.get('candidate_resource_result') in {'PASS','NONDETERMINISTIC','IMPORT_FAILURE','TIMEOUT','HARNESS_FAILURE'}
+          except Exception as error:
+              value={'schema_version':2,'engine_version':os.environ['VERSION'],'resource_selection_id':os.environ['RESOURCE'],'candidate_resource_result':'HARNESS_FAILURE','harness_error':f'final report validation failed: {error!r}','frozen_pr_head':os.environ['PR_HEAD'],'no_stage3':True,'no_full_corpus':True,'no_project_migration':True,'no_android_export':True,'no_apk_mutation':True}; path.write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          files=[]
+          for item in sorted(root.rglob('*')):
+              if item.is_file() and item.name!='ARTIFACT_INVENTORY.json': files.append({'path':item.relative_to(root).as_posix(),'bytes':item.stat().st_size,'sha256':hashlib.sha256(item.read_bytes()).hexdigest()})
+          (root/'ARTIFACT_INVENTORY.json').write_text(json.dumps({'schema_version':1,'files':files,'resource_result':value.get('candidate_resource_result')},indent=2,sort_keys=True)+'\n')
+          PY
+          exit 0
+      - name: Upload per-resource evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-resource-${{ matrix.version }}-${{ matrix.resource }}-${{ github.run_id }}
+          path: build/resource_evidence/${{ matrix.version }}/${{ matrix.resource }}
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  aggregate_stage2:
+    needs: [prepare_matrix, resource_qualify, cancellation_audit]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out recovery implementation
+        continue-on-error: true
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download every per-resource artifact
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage2-resource-*-${{ github.run_id }}
+          path: build/resource_artifacts
+      - name: Aggregate Stage 2 regardless of resource outcomes
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          mkdir -p build/aggregate
+          if [[ -d tooling/.github/forensics/qualification/stage2_recovery ]]; then cat tooling/.github/forensics/qualification/stage2_recovery/part_*.pyfrag > /tmp/stage2_resource_qualification.py; fi
+          if [[ -s /tmp/stage2_resource_qualification.py ]] && [[ "$(sha256sum /tmp/stage2_resource_qualification.py | awk '{print $1}')" == "$ANALYZER_SHA256" ]]; then python3 /tmp/stage2_resource_qualification.py aggregate --input-root build/resource_artifacts --output build/aggregate --run-id "${{ github.run_id }}"; fi
+          for version in 4.4.1-stable 4.5.2-stable 4.6.3-stable; do
+            mkdir -p "build/aggregate/${version}"
+            if [[ ! -s "build/aggregate/${version}/ENGINE_STAGE2_RESULT.json" ]]; then VERSION="$version" python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          root=Path('build/aggregate')/os.environ['VERSION']; root.mkdir(parents=True,exist_ok=True)
+          value={'schema_version':2,'engine_version':os.environ['VERSION'],'expected_resources':8,'complete_reports':0,'missing_reports':['all'],'stage2_decision':'FAIL_INSUFFICIENT_EVIDENCE','classification':'Q6','stage3_eligible':False}
+          (root/'ENGINE_STAGE2_RESULT.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n'); (root/'ENGINE_STAGE2_RESOURCE_MATRIX.json').write_text(json.dumps({'engine_version':os.environ['VERSION'],'resources':[]},indent=2,sort_keys=True)+'\n'); (root/'ENGINE_STAGE2_DIFFERING_PATHS.txt').write_text('')
+          PY
+            fi
+          done
+          mkdir -p build/aggregate/cross-version
+          if [[ ! -s build/aggregate/cross-version/STAGE2_CROSS_VERSION_QUALIFICATION.json ]]; then python3 - <<'PY'
+          import json
+          from pathlib import Path
+          value={'schema_version':2,'corrective_run_id':${{ github.run_id }},'frozen_pr_head':'5b4e2466ef84f3984f3bf336b31925d4d2e97a7f','candidates':[],'stage3_eligible_versions':[],'gate4_status':'FAIL','gate5_status':'PASS_FOR_TWO_ORIGINAL_RETAINED_APKS_ONLY','no_stage3':True,'no_full_corpus':True,'no_project_migration':True,'no_android_export':True,'no_apk_mutation':True}
+          Path('build/aggregate/cross-version/STAGE2_CROSS_VERSION_QUALIFICATION.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+          fi
+          exit 0
+      - name: Upload 4.4.1 aggregate
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-engine-result-4.4.1-stable-${{ github.run_id }}
+          path: build/aggregate/4.4.1-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - name: Upload 4.5.2 aggregate
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-engine-result-4.5.2-stable-${{ github.run_id }}
+          path: build/aggregate/4.5.2-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - name: Upload 4.6.3 aggregate
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-engine-result-4.6.3-stable-${{ github.run_id }}
+          path: build/aggregate/4.6.3-stable
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+      - name: Upload cross-version aggregate
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage2-cross-version-result-${{ github.run_id }}
+          path: build/aggregate/cross-version
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
