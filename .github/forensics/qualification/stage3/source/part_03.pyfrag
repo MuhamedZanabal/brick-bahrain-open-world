@@ -1,0 +1,200 @@
+                try:
+                    exit_code = process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    termination = "SIGKILL_PROCESS_GROUP"
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    exit_code = process.wait(timeout=10)
+    finally:
+        os.umask(previous_umask)
+    completed_monotonic = time.monotonic()
+    completed_wall = utc_now()
+    imported_relative = Path(str(authority["sidecar"]["imported_relative_path"]))
+    imported_path = project_root / imported_relative
+    md5_path = imported_path.with_suffix(".md5")
+    uid_path = project_root / ".godot" / "uid_cache.bin"
+    inventory = _generated_inventory(project_root)
+    generated_path_set = [item["path"] for item in inventory]
+    imported_evidence = evidence_root / "generated" / "imported.bin"
+    md5_evidence = evidence_root / "generated" / "destination.md5"
+    uid_evidence = evidence_root / "generated" / "uid_cache.bin"
+    imported_copy = _copy_if_exists(imported_path, imported_evidence)
+    md5_copy = _copy_if_exists(md5_path, md5_evidence)
+    uid_copy = _copy_if_exists(uid_path, uid_evidence)
+    md5_source, destination_md5 = _parse_destination_md5(md5_path)
+    snapshot = {
+        "schema_version": 3,
+        "engine_identity": engine_identity.get("runtime_identity"),
+        "engine_version": authority["engine_version"],
+        "source_tag_commit": engine_identity.get("source_commit"),
+        "engine_binary_sha256": engine_identity.get("runtime_sha256") or engine_identity.get("extracted_runtime_sha256"),
+        "experiment_class": experiment,
+        "repetition_or_side": repetition,
+        "resource_selection_id": authority["resource_selection_id"],
+        "logical_source_path": authority["logical_source_path"],
+        "absolute_project_root": str(project_root.resolve()),
+        "source_sha256": authority["source_sha256"],
+        "source_md5": authority["source_md5"],
+        "dependency_hashes": authority.get("dependencies", []),
+        "sidecar_sha256": authority["sidecar_sha256"],
+        "sidecar_importer": authority["sidecar"]["importer"],
+        "sidecar_type": authority["sidecar"]["type"],
+        "sidecar_parameters_sha256": authority["sidecar"]["parameters_sha256"],
+        "imported_relative_path": imported_relative.as_posix(),
+        "imported_byte_size": imported_path.stat().st_size if imported_path.is_file() else None,
+        "imported_sha256": sha256_file(imported_path) if imported_path.is_file() else None,
+        "imported_evidence_path": str(imported_evidence) if imported_copy else None,
+        "imported_evidence_relpath": "generated/imported.bin" if imported_copy else None,
+        "destination_md5": destination_md5,
+        "destination_source_md5": md5_source,
+        "destination_md5_evidence_relpath": "generated/destination.md5" if md5_copy else None,
+        "uid_cache_sha256": sha256_file(uid_path) if uid_path.is_file() else None,
+        "uid_cache_evidence_relpath": "generated/uid_cache.bin" if uid_copy else None,
+        "generated_path_set": generated_path_set,
+        "generated_inventory": inventory,
+        "import_exit_code": exit_code,
+        "import_duration_seconds": round(completed_monotonic - started_monotonic, 6),
+        "watchdog_result": "TIMEOUT" if timed_out else "COMPLETED",
+        "timed_out": timed_out,
+        "process_started_at": started_wall,
+        "process_completed_at": completed_wall,
+        "process_started_monotonic": started_monotonic,
+        "process_completed_monotonic": completed_monotonic,
+        "termination": termination,
+        "godot_log_sha256": sha256_file(log_path),
+        "godot_log_bytes": log_path.stat().st_size,
+        "environment_manifest_sha256": sha256_file(environment_path),
+        "runner": environment_manifest["runner"],
+    }
+    write_json(evidence_root / "IMPORT_RESULT.json", snapshot)
+    write_json(evidence_root / "GENERATED_PATH_INVENTORY.json", inventory)
+    return snapshot
+
+
+def intervals_overlap(first_start: float, first_end: float, second_start: float, second_end: float) -> bool:
+    if first_end <= first_start or second_end <= second_start:
+        return False
+    return max(first_start, second_start) < min(first_end, second_end)
+
+
+def _extract_ascii_strings(data: bytes, prefix: bytes) -> list[str]:
+    pattern = re.compile(re.escape(prefix) + rb"[A-Za-z0-9_./:\-]{1,160}")
+    return sorted({match.group(0).decode("ascii", errors="replace") for match in pattern.finditer(data)})[:100]
+
+
+def bounded_byte_diagnostic(left: bytes, right: bytes) -> dict[str, Any]:
+    maximum = max(len(left), len(right))
+    differing_positions = [index for index in range(maximum) if (left[index] if index < len(left) else None) != (right[index] if index < len(right) else None)]
+    ranges: list[tuple[int, int]] = []
+    for position in differing_positions:
+        if not ranges or position != ranges[-1][1] + 1:
+            ranges.append((position, position))
+        else:
+            ranges[-1] = (ranges[-1][0], position)
+    windows = []
+    for start, end in ranges[:20]:
+        center = start
+        window_start = max(0, center - 16)
+        window_end = min(maximum, center + 17)
+        windows.append(
+            {
+                "range_start": start,
+                "range_end": end,
+                "window_start": window_start,
+                "left_hex": left[window_start:min(window_end, len(left))].hex(),
+                "right_hex": right[window_start:min(window_end, len(right))].hex(),
+            }
+        )
+    local_strings = sorted(set(_extract_ascii_strings(left, b"local://") + _extract_ascii_strings(right, b"local://")))
+    uid_strings = sorted(set(_extract_ascii_strings(left, b"uid://") + _extract_ascii_strings(right, b"uid://")))
+    resource_indications = sorted(
+        set(
+            value.decode("ascii", errors="replace")
+            for data in (left, right)
+            for value in re.findall(rb"(?:res://|local://|uid://)[A-Za-z0-9_./:\-]{1,160}", data)
+        )
+    )[:100]
+    return {
+        "first_differing_byte_offset": differing_positions[0] if differing_positions else None,
+        "final_differing_byte_offset": differing_positions[-1] if differing_positions else None,
+        "differing_byte_position_count": len(differing_positions),
+        "contiguous_range_count": len(ranges),
+        "first_20_byte_windows": windows,
+        "output_size_difference": len(right) - len(left),
+        "left_size": len(left),
+        "right_size": len(right),
+        "local_strings": local_strings,
+        "uid_strings": uid_strings,
+        "resource_order_indications": resource_indications,
+    }
+
+
+def _resolved_imported_path(snapshot: Mapping[str, Any]) -> Path | None:
+    value = snapshot.get("imported_evidence_path")
+    return Path(value) if value else None
+
+
+def load_snapshot(path: Path) -> dict[str, Any]:
+    value = read_json(path)
+    relative = value.get("imported_evidence_relpath")
+    if relative:
+        value["imported_evidence_path"] = str(path.parent / safe_relative(str(relative)))
+    return value
+
+
+def compare_snapshots(left: Mapping[str, Any], right: Mapping[str, Any], *, require_uid: bool = False) -> dict[str, Any]:
+    if not left or not right:
+        return {"result": "MISSING_EVIDENCE", "reason": "one or both import snapshots are missing"}
+    for snapshot in (left, right):
+        if snapshot.get("timed_out") or snapshot.get("watchdog_result") == "TIMEOUT":
+            return {"result": "TIMEOUT", "reason": "one or both imports timed out"}
+        if snapshot.get("import_exit_code") != 0:
+            return {"result": "IMPORT_FAILURE", "reason": "one or both import processes returned non-zero"}
+        if not snapshot.get("imported_sha256") or not snapshot.get("destination_md5"):
+            return {"result": "IMPORT_FAILURE", "reason": "required imported binary or destination MD5 is absent"}
+    byte_equality = left.get("imported_sha256") == right.get("imported_sha256") and left.get("imported_byte_size") == right.get("imported_byte_size")
+    md5_equality = left.get("destination_md5") == right.get("destination_md5")
+    path_sets_equal = left.get("generated_path_set") == right.get("generated_path_set")
+    uid_equality = left.get("uid_cache_sha256") == right.get("uid_cache_sha256")
+    diagnostics = None
+    if not byte_equality:
+        left_path = _resolved_imported_path(left)
+        right_path = _resolved_imported_path(right)
+        if not left_path or not right_path or not left_path.is_file() or not right_path.is_file():
+            return {
+                "result": "MISSING_EVIDENCE",
+                "reason": "byte hashes differ but bounded diagnostic bytes are missing",
+                "imported_byte_equality": False,
+                "destination_md5_equality": md5_equality,
+                "path_sets_equal": path_sets_equal,
+                "uid_cache_equality": uid_equality,
+            }
+        diagnostics = bounded_byte_diagnostic(left_path.read_bytes(), right_path.read_bytes())
+        diagnostics["destination_md5_difference"] = not md5_equality
+    result = "PASS"
+    if not byte_equality or not md5_equality or not path_sets_equal or (require_uid and not uid_equality):
+        result = "NONDETERMINISTIC"
+    return {
+        "result": result,
+        "imported_byte_equality": byte_equality,
+        "destination_md5_equality": md5_equality,
+        "path_sets_equal": path_sets_equal,
+        "uid_cache_equality": uid_equality,
+        "left_imported_sha256": left.get("imported_sha256"),
+        "right_imported_sha256": right.get("imported_sha256"),
+        "left_destination_md5": left.get("destination_md5"),
+        "right_destination_md5": right.get("destination_md5"),
+        "bounded_difference_diagnostic": diagnostics,
+    }
+
+
+def collapse_results(results: Iterable[str]) -> str:
+    values = list(results)
+    if not values:
+        return "MISSING_EVIDENCE"
+    return max(values, key=lambda item: _FAILURE_PRECEDENCE.get(item, 0))
+
+
+def _comparison_record(left_id: str, right_id: str, left: Mapping[str, Any], right: Mapping[str, Any], require_uid: bool = False) -> dict[str, Any]:
