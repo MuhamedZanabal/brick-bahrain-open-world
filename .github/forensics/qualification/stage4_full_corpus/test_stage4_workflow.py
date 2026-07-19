@@ -2,13 +2,16 @@ import re
 import unittest
 from pathlib import Path
 
-WORKFLOW = Path(__file__).parents[3] / "workflows" / "godot-engine-qualification-stage4-full-corpus.yml"
+GITHUB_ROOT = Path(__file__).parents[3]
+WORKFLOW = GITHUB_ROOT / "workflows" / "godot-engine-qualification-stage4-full-corpus.yml"
+SHARD_ACTION = GITHUB_ROOT / "actions" / "stage4-upload-shards" / "action.yml"
 
 
 class Stage4WorkflowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.text = WORKFLOW.read_text(encoding="utf-8")
+        cls.shards = SHARD_ACTION.read_text(encoding="utf-8")
 
     def test_exact_jobs_exist(self):
         for job in (
@@ -48,19 +51,26 @@ class Stage4WorkflowTests(unittest.TestCase):
         self.assertRegex(self.text, r"(?ms)^  import_d1:.*?runs-on: ubuntu-24.04")
         self.assertRegex(self.text, r"(?ms)^  import_d2:.*?runs-on: ubuntu-24.04")
 
-    def test_every_upload_is_unconditional_and_pinned(self):
+    def test_exact_forty_shard_uploads_called_for_both_imports(self):
+        self.assertEqual(self.text.count("uses: ./tooling/.github/actions/stage4-upload-shards"), 2)
+        names = re.findall(r"(?m)^    - name: Upload shard (\d\d)$", self.shards)
+        self.assertEqual(names, [f"{i:02d}" for i in range(40)])
+        self.assertEqual(self.shards.count("uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808"), 40)
+        self.assertEqual(self.shards.count("if: always()"), 40)
+        self.assertEqual(self.shards.count("include-hidden-files: true"), 40)
+
+    def test_every_main_upload_is_unconditional_and_pinned(self):
         blocks = self.text.split("uses: actions/upload-artifact@")
-        self.assertGreater(len(blocks), 85)
+        self.assertEqual(len(blocks) - 1, 7)
         for block in blocks[1:]:
-            prefix = block[:160]
-            self.assertIn("65462800fd760344b1a7b4382951275a0abb4808", prefix)
-        upload_lines = [i for i, line in enumerate(self.text.splitlines()) if "uses: actions/upload-artifact@" in line]
+            self.assertIn("65462800fd760344b1a7b4382951275a0abb4808", block[:160])
         lines = self.text.splitlines()
-        for index in upload_lines:
-            self.assertTrue(any("if: always()" in lines[j] for j in range(max(0, index - 3), index + 1)))
+        for index, line in enumerate(lines):
+            if "uses: actions/upload-artifact@" in line:
+                self.assertTrue(any("if: always()" in lines[j] for j in range(max(0, index - 3), index + 1)))
 
     def test_prohibitions(self):
-        lowered = self.text.lower()
+        lowered = (self.text + self.shards).lower()
         for forbidden in (
             "4.5.2-stable",
             "4.6.3-stable",
