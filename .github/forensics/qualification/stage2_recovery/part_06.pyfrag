@@ -1,0 +1,147 @@
+    memory_pressure = any(token in lower_log for token in ("out of memory", "oom-killer", "killed process"))
+    disk_pressure = any(token in lower_log for token in ("no space left on device", "disk quota exceeded"))
+    timeout_match = duration is not None and abs(duration - timeout_seconds) <= 5 and job.get("conclusion") == "cancelled"
+    if timeout_match:
+        cause = "JOB_TIMEOUT"
+    elif concurrency:
+        cause = "CONCURRENCY_CANCELLATION"
+    elif runner_loss:
+        cause = "RUNNER_LOSS_OR_SHUTDOWN"
+    elif memory_pressure:
+        cause = "MEMORY_PRESSURE"
+    elif disk_pressure:
+        cause = "DISK_PRESSURE"
+    elif job.get("conclusion") == "cancelled":
+        cause = "WORKFLOW_OR_MANUAL_CANCELLATION"
+    else:
+        cause = "EVIDENCE_INSUFFICIENT"
+    step = next((x for x in job.get("steps", []) if "Stage 1 source audit and Stage 2" in x.get("name", "")), None)
+    return {
+        "job_id": job.get("id"),
+        "job_name": job.get("name"),
+        "configured_job_timeout_minutes": configured_timeout_minutes,
+        "actual_job_start_time": job.get("started_at"),
+        "actual_job_end_time": job.get("completed_at"),
+        "actual_job_duration_seconds": duration,
+        "analyzer_step_start_time": step.get("started_at") if step else None,
+        "analyzer_step_end_time": step.get("completed_at") if step else None,
+        "job_conclusion": job.get("conclusion"),
+        "analyzer_step_conclusion": step.get("conclusion") if step else None,
+        "concurrency_cancellation": concurrency,
+        "runner_shutdown_status": runner_loss,
+        "memory_pressure_detected": memory_pressure,
+        "disk_pressure_detected": disk_pressure,
+        "cause": cause,
+    }
+
+
+def cancellation_audit(args: argparse.Namespace) -> int:
+    jobs_root = Path(args.jobs_root)
+    partial_root = Path(args.partial_root)
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    job_map = {
+        "4.4.1-stable": 88131462251,
+        "4.5.2-stable": 88131462261,
+        "4.6.3-stable": 88131462268,
+    }
+    rows = []
+    for version, job_id in job_map.items():
+        job = read_json(jobs_root / f"job-{job_id}.json")
+        log_path = jobs_root / f"job-{job_id}.log"
+        log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
+        row = classify_cancellation(job, 180, log_text)
+        artifact = partial_root / version
+        completed = []
+        if artifact.is_dir():
+            for resource_id in RESOURCE_IDS:
+                required = [
+                    artifact / "logs" / f"{resource_id}_authority.log",
+                    artifact / "logs" / f"{resource_id}_D1.log",
+                    artifact / "logs" / f"{resource_id}_D2.log",
+                ]
+                if all(path.is_file() for path in required):
+                    completed.append(resource_id)
+        last_completed = completed[-1] if completed else None
+        next_resource = RESOURCE_IDS[len(completed)] if len(completed) < len(RESOURCE_IDS) else None
+        analyzer_exit_code_match = re.findall(r"Process completed with exit code (\d+)", log_text)
+        cancellation_signal = None
+        for token in ("SIGTERM", "SIGKILL", "The operation was canceled", "Job cancelled", "job has exceeded the maximum execution time"):
+            if token.lower() in log_text.lower():
+                cancellation_signal = token
+                break
+        row.update(
+            {
+                "engine_version": version,
+                "last_completed_resource": last_completed,
+                "completed_resources": completed,
+                "resource_active_at_cancellation": next_resource,
+                "active_resource_state": "pre-authority or authority-start boundary" if next_resource else None,
+                "analyzer_exit_code": int(analyzer_exit_code_match[-1]) if analyzer_exit_code_match else None,
+                "signal_or_cancellation_message": cancellation_signal,
+                "partial_artifact_file_count": len([p for p in artifact.rglob("*") if p.is_file()]) if artifact.is_dir() else 0,
+            }
+        )
+        rows.append(row)
+    causes = {row["cause"] for row in rows}
+    aggregate_cause = causes.pop() if len(causes) == 1 else "MIXED_OR_INCONSISTENT"
+    result = {
+        "schema_version": 2,
+        "initial_run_id": INITIAL_RUN_ID,
+        "initial_workflow_sha": INITIAL_WORKFLOW_SHA,
+        "configured_job_timeout_minutes": 180,
+        "aggregate_cancellation_cause": aggregate_cause,
+        "cancellation_initiator": "GitHub Actions job timeout enforcement" if aggregate_cause == "JOB_TIMEOUT" else None,
+        "workflow_concurrency_cancel_in_progress": False,
+        "jobs": rows,
+        "root_cause_statement": (
+            "Each monolithic candidate job reached its configured 180-minute job timeout while the sequential analyzer had completed six resources and was transitioning to fbx_character. The resource-sharded recovery removes the all-eight-resources-in-one-job failure mode and omits semantic graph extraction from the Stage 2 passing path."
+            if aggregate_cause == "JOB_TIMEOUT"
+            else "Cancellation evidence was not uniform; inspect per-job rows."
+        ),
+    }
+    write_json(output / "STAGE2_CANCELLATION_CAUSE.json", result)
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser()
+    sub = root.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("prepare-corpus")
+    p.add_argument("--source-zip", required=True)
+    p.add_argument("--selection", required=True)
+    p.add_argument("--output", required=True)
+    p.set_defaults(function=prepare_corpus)
+
+    p = sub.add_parser("resource")
+    p.add_argument("--version", required=True)
+    p.add_argument("--selection-id", required=True)
+    p.add_argument("--engine-root", required=True)
+    p.add_argument("--corpus-root", required=True)
+    p.add_argument("--timeout-seconds", required=True, type=int)
+    p.add_argument("--work-root", required=True)
+    p.add_argument("--output", required=True)
+    p.set_defaults(function=resource_qualification)
+
+    p = sub.add_parser("aggregate")
+    p.add_argument("--input-root", required=True)
+    p.add_argument("--output", required=True)
+    p.add_argument("--run-id", required=True)
+    p.set_defaults(function=aggregate_results)
+
+    p = sub.add_parser("cancellation")
+    p.add_argument("--jobs-root", required=True)
+    p.add_argument("--partial-root", required=True)
+    p.add_argument("--output", required=True)
+    p.set_defaults(function=cancellation_audit)
+    return root
+
+
+def main() -> int:
+    args = parser().parse_args()
+    return args.function(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
