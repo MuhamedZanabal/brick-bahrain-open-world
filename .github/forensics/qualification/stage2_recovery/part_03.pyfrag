@@ -1,0 +1,144 @@
+        raise FileNotFoundError(identity_path)
+    identity = read_json(identity_path)
+    archive = engine_root / identity["binary_archive_filename"]
+    sums = engine_root / "SHA512-SUMS.txt"
+    if not archive.is_file() or not sums.is_file():
+        raise FileNotFoundError("engine archive or official SHA512-SUMS.txt missing")
+    expected_sha512 = identity["binary_archive_sha512"]
+    if sha512_file(archive) != expected_sha512:
+        raise RuntimeError("official engine archive SHA-512 mismatch")
+    if identity.get("binary_archive_sha256") and sha256_file(archive) != identity["binary_archive_sha256"]:
+        raise RuntimeError("engine archive SHA-256 mismatch")
+    extract = work / "engine"
+    if extract.exists():
+        shutil.rmtree(extract)
+    extract.mkdir(parents=True)
+    with zipfile.ZipFile(archive) as zf:
+        zf.extractall(extract)
+    candidates = [p for p in extract.iterdir() if p.is_file() and p.name.startswith("Godot")]
+    if len(candidates) != 1:
+        raise RuntimeError(f"unexpected extracted Godot binaries: {[p.name for p in candidates]}")
+    godot = candidates[0]
+    os.chmod(godot, 0o755)
+    if sha256_file(godot) != identity["extracted_runtime_sha256"]:
+        raise RuntimeError("extracted runtime SHA-256 mismatch")
+    runtime_identity = subprocess.check_output([str(godot), "--version"], text=True).strip()
+    if runtime_identity != identity["runtime_identity"]:
+        raise RuntimeError({"expected_runtime_identity": identity["runtime_identity"], "actual": runtime_identity})
+    return godot, identity
+
+
+def import_command(godot: Path, project: Path) -> list[str]:
+    return [str(godot), "--headless", "--path", str(project), "--editor", "--import", "--quit", "--verbose"]
+
+
+def resource_qualification(args: argparse.Namespace) -> int:
+    output = Path(args.output)
+    output.mkdir(parents=True, exist_ok=True)
+    report_path = output / "RESOURCE_QUALIFICATION.json"
+    report = seed_resource_report(args.version, args.selection_id)
+    write_json(report_path, report)
+    try:
+        corpus_root = Path(args.corpus_root)
+        corpus = read_json(corpus_root / "CORPUS_AUTHORITY.json")
+        matches = [row for row in corpus["resources"] if row["selection_id"] == args.selection_id]
+        if len(matches) != 1:
+            raise RuntimeError(f"selection not found or duplicate: {args.selection_id}")
+        resource = matches[0]
+        paths = verify_resource_inputs(corpus_root, resource)
+        work = Path(args.work_root)
+        if work.exists():
+            shutil.rmtree(work)
+        work.mkdir(parents=True)
+        godot, engine_identity = verify_engine_package(Path(args.engine_root), work)
+        timeout_seconds = int(args.timeout_seconds)
+
+        report.update(
+            {
+                "engine_version": args.version,
+                "official_runtime_identity": engine_identity["runtime_identity"],
+                "source_tag_commit": engine_identity["source_commit"],
+                "resource_selection_id": resource["selection_id"],
+                "logical_source_path": resource["logical_source"],
+                "source_type": resource["source_type"],
+                "matrix_membership": resource["matrix_member"],
+                "source_byte_size": resource["source_bytes"],
+                "source_sha256": resource["source_sha256"],
+                "source_md5": resource["source_md5"],
+                "dependency_paths_and_hashes": resource["dependencies"],
+                "per_import_timeout_seconds": timeout_seconds,
+                "engine_archive_verification": engine_identity,
+            }
+        )
+        write_json(report_path, report)
+
+        authority = work / "authority"
+        materialize_project(corpus_root, authority, paths)
+        authority_run = run_with_watchdog(
+            import_command(godot, authority),
+            output / "logs" / "authority_import.log",
+            deterministic_env(work / "xdg_authority"),
+            timeout_seconds,
+            output / "monitor" / "authority.json",
+            work,
+        )
+        main_sidecar_rel = resource["logical_source"] + ".import"
+        main_sidecar = authority / main_sidecar_rel
+        authority_ok = authority_run["exit_code"] == 0 and not authority_run["timed_out"] and main_sidecar.is_file()
+        report["authority_import"] = authority_run
+        if authority_run["timed_out"]:
+            report["candidate_resource_result"] = "TIMEOUT"
+            report["timeout_status"] = {"authority": True, "d1": False, "d2": False}
+            report["harness_error"] = None
+            write_json(report_path, report)
+            return 0
+        if not authority_ok:
+            report["candidate_resource_result"] = "IMPORT_FAILURE"
+            report["harness_error"] = None
+            report["timeout_status"] = {"authority": False, "d1": False, "d2": False}
+            write_json(report_path, report)
+            return 0
+
+        sidecar_meta = parse_sidecar(main_sidecar)
+        imported_rel = sidecar_meta["imported_path"]
+        if not imported_rel or not imported_rel.startswith(".godot/imported/"):
+            raise RuntimeError({"invalid_main_sidecar": sidecar_meta})
+        sidecar_evidence = output / "sidecar" / main_sidecar_rel
+        sidecar_evidence.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(main_sidecar, sidecar_evidence)
+        report.update(
+            {
+                "sidecar_path": main_sidecar_rel,
+                "sidecar_size": sidecar_evidence.stat().st_size,
+                "sidecar_sha256": sha256_file(sidecar_evidence),
+                "sidecar_metadata": sidecar_meta,
+            }
+        )
+        write_json(report_path, report)
+
+        run_rows = []
+        project_roots = []
+        for label in ("D1", "D2"):
+            project = work / label.lower()
+            project_roots.append(project)
+            materialize_project(corpus_root, project, paths)
+            destination_sidecar = project / main_sidecar_rel
+            destination_sidecar.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(sidecar_evidence, destination_sidecar)
+            os.chmod(destination_sidecar, 0o444)
+            run = run_with_watchdog(
+                import_command(godot, project),
+                output / "logs" / f"{label.lower()}_import.log",
+                deterministic_env(work / f"xdg_{label.lower()}"),
+                timeout_seconds,
+                output / "monitor" / f"{label.lower()}.json",
+                work,
+            )
+            imported = project / imported_rel
+            md5_path = project / str(PurePosixPath(imported_rel).with_suffix(".md5"))
+            inventory = generated_inventory(project)
+            row = {
+                "label": label,
+                "import": run,
+                "imported_path": imported_rel,
+                "imported_exists": imported.is_file(),
