@@ -1,0 +1,184 @@
+                data = archive.read(dep)
+                dependency_rows.append(
+                    {
+                        "path": dep,
+                        "bytes": len(data),
+                        "sha256": sha256_bytes(data),
+                        "md5": hashlib.md5(data).hexdigest(),
+                    }
+                )
+            resources.append(
+                {
+                    "selection_id": entry["selection_id"],
+                    "source_type": entry["source_type"],
+                    "logical_source": logical,
+                    "matrix_member": bool(entry.get("matrix_member", False)),
+                    "selection_rule": entry.get("selection_rule"),
+                    "source_bytes": len(source_data),
+                    "source_sha256": sha256_bytes(source_data),
+                    "source_md5": hashlib.md5(source_data).hexdigest(),
+                    "dependencies": dependency_rows,
+                }
+            )
+    ids = [row["selection_id"] for row in resources]
+    if ids != RESOURCE_IDS:
+        raise RuntimeError({"expected_resource_ids": RESOURCE_IDS, "actual_resource_ids": ids})
+    return {
+        "schema_version": 2,
+        "source_zip": {"bytes": SOURCE_ZIP_BYTES, "sha256": SOURCE_ZIP_SHA256},
+        "resource_count": len(resources),
+        "resources": resources,
+    }
+
+
+def prepare_corpus(args: argparse.Namespace) -> int:
+    source_zip = Path(args.source_zip)
+    selection_path = Path(args.selection)
+    output = Path(args.output)
+    if output.exists():
+        shutil.rmtree(output)
+    (output / "files").mkdir(parents=True)
+    authority = build_corpus_authority(source_zip, selection_path)
+    paths = set()
+    for row in authority["resources"]:
+        paths.add(row["logical_source"])
+        paths.update(dep["path"] for dep in row["dependencies"])
+    with zipfile.ZipFile(source_zip) as archive:
+        for rel in sorted(paths):
+            destination = output / "files" / rel
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(archive.read(rel))
+            os.chmod(destination, 0o444)
+    write_json(output / "CORPUS_AUTHORITY.json", authority)
+    write_json(
+        output / "CORPUS_PACKAGE_INVENTORY.json",
+        {
+            "schema_version": 1,
+            "files": [
+                {
+                    "path": path.relative_to(output).as_posix(),
+                    "bytes": path.stat().st_size,
+                    "sha256": sha256_file(path),
+                }
+                for path in sorted(output.rglob("*"))
+                if path.is_file() and path.name != "CORPUS_PACKAGE_INVENTORY.json"
+            ],
+        },
+    )
+    return 0
+
+
+def verify_resource_inputs(corpus_root: Path, resource: dict[str, Any]) -> list[str]:
+    paths = [resource["logical_source"], *[dep["path"] for dep in resource["dependencies"]]]
+    expected = {
+        resource["logical_source"]: (resource["source_bytes"], resource["source_sha256"], resource["source_md5"]),
+        **{
+            dep["path"]: (dep["bytes"], dep["sha256"], dep["md5"])
+            for dep in resource["dependencies"]
+        },
+    }
+    for rel in paths:
+        path = corpus_root / "files" / rel
+        if not path.is_file():
+            raise FileNotFoundError(path)
+        size, sha, md5 = expected[rel]
+        if path.stat().st_size != size or sha256_file(path) != sha or md5_file(path) != md5:
+            raise RuntimeError(f"corpus file verification failed: {rel}")
+    return paths
+
+
+def materialize_project(corpus_root: Path, target: Path, paths: list[str]) -> None:
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True)
+    for rel in paths:
+        source = corpus_root / "files" / rel
+        destination = target / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, destination)
+        os.chmod(destination, 0o644)
+    (target / "project.godot").write_text(project_text(), encoding="utf-8")
+
+
+def process_snapshot(process: subprocess.Popen[bytes], work_root: Path) -> dict[str, Any]:
+    snapshot: dict[str, Any] = {
+        "timestamp": utc_now(),
+        "root_pid": process.pid,
+        "disk": {},
+        "memory": {},
+        "processes": [],
+    }
+    usage = shutil.disk_usage(work_root)
+    snapshot["disk"] = {"total": usage.total, "used": usage.used, "free": usage.free}
+    meminfo = {}
+    try:
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            key, value = line.split(":", 1)
+            meminfo[key] = value.strip()
+    except Exception:
+        pass
+    snapshot["memory"] = meminfo
+    try:
+        completed = subprocess.run(
+            ["ps", "-eo", "pid,ppid,pcpu,pmem,rss,vsz,stat,etime,cmd", "--forest"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+        )
+        snapshot["processes"] = completed.stdout.splitlines()[:500]
+    except Exception as error:
+        snapshot["process_snapshot_error"] = repr(error)
+    return snapshot
+
+
+def run_with_watchdog(
+    command: list[str],
+    log_path: Path,
+    env: dict[str, str],
+    timeout_seconds: int,
+    monitor_path: Path,
+    work_root: Path,
+) -> dict[str, Any]:
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    monitor_path.parent.mkdir(parents=True, exist_ok=True)
+    started = time.monotonic()
+    started_at = utc_now()
+    snapshots: list[dict[str, Any]] = []
+    timed_out = False
+    termination = None
+    with log_path.open("wb") as stream:
+        process = subprocess.Popen(
+            command,
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            env=env,
+            start_new_session=True,
+        )
+        next_snapshot = time.monotonic()
+        while process.poll() is None:
+            now = time.monotonic()
+            if now >= next_snapshot:
+                snapshots.append(process_snapshot(process, work_root))
+                next_snapshot = now + 30
+            if now - started >= timeout_seconds:
+                timed_out = True
+                snapshots.append(process_snapshot(process, work_root))
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                    termination = "SIGTERM_PROCESS_GROUP"
+                except ProcessLookupError:
+                    termination = "PROCESS_ALREADY_EXITED"
+                try:
+                    process.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        termination = "SIGKILL_PROCESS_GROUP"
+                    except ProcessLookupError:
+                        pass
+                    process.wait(timeout=15)
+                break
+            time.sleep(1)
+        exit_code = process.poll()
+    elapsed = round(time.monotonic() - started, 3)
