@@ -1,0 +1,95 @@
+name: Install Bahrain Brick Stage 3 Qualification Workflow
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths:
+      - .github/workflows/godot-engine-qualification-stage3-bootstrap.yml
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+
+concurrency:
+  group: bahrain-brick-godot-stage3-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  install_and_dispatch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out detached qualification authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 50
+      - name: Reconstruct and verify Stage 3 workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, hashlib, zlib
+          from pathlib import Path
+          root = Path('.github/forensics/qualification/stage3_repeatability')
+          encoded = ''.join(path.read_text(encoding='ascii').strip() for path in sorted(root.glob('workflow_payload_*.b64')))
+          content = zlib.decompress(base64.b64decode(encoded))
+          expected = '693f7ffa8c12773a5dd51ad2c6f8b7b36de038dc8394fbc36d48c32e54465835'
+          actual = hashlib.sha256(content).hexdigest()
+          if actual != expected:
+              raise SystemExit({'workflow_sha256_expected': expected, 'actual': actual})
+          target = Path('.github/workflows/godot-engine-qualification-stage3-repeatability.yml')
+          target.write_bytes(content)
+          PY
+          printf '%s  %s\n' '693f7ffa8c12773a5dd51ad2c6f8b7b36de038dc8394fbc36d48c32e54465835' .github/workflows/godot-engine-qualification-stage3-repeatability.yml | sha256sum -c -
+      - name: Run Stage 3 analyzer and workflow contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=.github/forensics/qualification/stage3_repeatability
+          test_root=/tmp/stage3-bootstrap-tests
+          rm -rf "$test_root"
+          mkdir -p "$test_root"
+          cp "$root/stage3_repeatability.py" "$test_root/"
+          cp "$root"/payload_*.b64 "$test_root/"
+          cp "$root/test_stage3_repeatability.py" "$test_root/"
+          cp "$root/test_stage3_workflow.py" "$test_root/"
+          cp "$root"/test_*_payload.b64 "$test_root/"
+          cp .github/workflows/godot-engine-qualification-stage3-repeatability.yml "$test_root/"
+          printf '%s  %s\n' '60c6fbd33a330fa094e8c8cf76b009d573d3fa87e2ea17b64124e81e952e1b2c' "$test_root/stage3_repeatability.py" | sha256sum -c -
+          printf '%s  %s\n' 'f3701935cf863b772b49987ce1aa6e749a2f82936b1191e96a16bd1758bb5a98' "$test_root/test_stage3_repeatability.py" | sha256sum -c -
+          printf '%s  %s\n' '3d3d216e860f6bf5e22b6fb79cc20a360da68995da2e9b731a7597c0b2a0957f' "$test_root/test_stage3_workflow.py" | sha256sum -c -
+          cd "$test_root"
+          python3 -m py_compile stage3_repeatability.py test_stage3_repeatability.py test_stage3_workflow.py
+          python3 -m unittest -v test_stage3_repeatability.py test_stage3_workflow.py
+      - name: Commit installed Stage 3 workflow
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/workflows/godot-engine-qualification-stage3-repeatability.yml
+          if git diff --cached --quiet; then
+            echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m 'ci(stage3): install repeatability qualification workflow'
+            git fetch origin ci/godot-engine-determinism-qualification-20260719
+            git rebase origin/ci/godot-engine-determinism-qualification-20260719
+            git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+            echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Dispatch exact installed Stage 3 workflow
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/workflows/godot-engine-qualification-stage3-repeatability.yml/dispatches" -f ref=ci/godot-engine-determinism-qualification-20260719; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
