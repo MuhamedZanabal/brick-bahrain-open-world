@@ -1,0 +1,160 @@
+          find build/d1/evidence -maxdepth 1 -type f -exec cp {} build/d1-manifest/evidence/ \;
+          python3 "$analyzer" inventory --root build/d1-manifest/evidence --output build/d1-manifest/ARTIFACT_INVENTORY.json || true
+          for n in $(seq -w 0 39); do
+            root="build/d1/evidence/shards/$n"
+            mkdir -p "$root/payload"
+            test -f "$root/SHARD_MANIFEST.json" || printf '%s\n' '{"schema_version":1,"side":"D1","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "$root/SHARD_MANIFEST.json"
+            test -f "$root/SHARD_INVENTORY.json" || printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "$root/SHARD_INVENTORY.json"
+            python3 "$analyzer" inventory --root "$root" --output "$root/ARTIFACT_INVENTORY.json" || true
+          done
+          exit 0
+      - name: Upload D1 compact manifest evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-d1-manifest-${{ github.run_id }}
+          path: build/d1-manifest
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+      - name: Upload all D1 deterministic shard artifacts
+        if: always()
+        uses: ./tooling/.github/actions/stage4-upload-shards
+        with:
+          side: d1
+          root: build/d1/evidence/shards
+          run-id: ${{ github.run_id }}
+
+  import_d2:
+    needs: prepare_sidecars
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Seed unconditional D2 evidence
+        shell: bash
+        run: |
+          mkdir -p build/d2/evidence/shards build/d2-manifest/evidence
+          printf '%s\n' '{"schema_version":1,"side":"D2","import_completed":false,"imported_model_count":0,"classification":"Q6"}' > build/d2/evidence/FULL_IMPORT_D2_MODEL_MANIFEST.json
+          for n in $(seq -w 0 39); do
+            mkdir -p "build/d2/evidence/shards/$n/payload"
+            printf '%s\n' '{"schema_version":1,"side":"D2","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "build/d2/evidence/shards/$n/SHARD_MANIFEST.json"
+            printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "build/d2/evidence/shards/$n/SHARD_INVENTORY.json"
+          done
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download full-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+      - name: Download exact sidecar authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-sidecar-authority-${{ github.run_id }}
+          path: build/sidecar-authority
+      - name: Run independent clean full-source import D2
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          corpus="$(find build/full-corpus-authority -name FULL_MODEL_CORPUS_AUTHORITY.json -print -quit)"
+          python3 "$analyzer" run-import --side D2 --authority-root build/source-authority --corpus-authority "$corpus" --sidecar-root build/sidecar-authority --engine-root build/engine --project-root /tmp/bahrain-stage4-d2-different-absolute-root/project --output build/d2/evidence --timeout-seconds 14400
+          printf '%s\n' "$?" > build/d2/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Finalize manifest and shard inventories
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          mkdir -p build/d2-manifest/evidence
+          find build/d2/evidence -maxdepth 1 -type f -exec cp {} build/d2-manifest/evidence/ \;
+          python3 "$analyzer" inventory --root build/d2-manifest/evidence --output build/d2-manifest/ARTIFACT_INVENTORY.json || true
+          for n in $(seq -w 0 39); do
+            root="build/d2/evidence/shards/$n"
+            mkdir -p "$root/payload"
+            test -f "$root/SHARD_MANIFEST.json" || printf '%s\n' '{"schema_version":1,"side":"D2","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "$root/SHARD_MANIFEST.json"
+            test -f "$root/SHARD_INVENTORY.json" || printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "$root/SHARD_INVENTORY.json"
+            python3 "$analyzer" inventory --root "$root" --output "$root/ARTIFACT_INVENTORY.json" || true
+          done
+          exit 0
+      - name: Upload D2 compact manifest evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-d2-manifest-${{ github.run_id }}
+          path: build/d2-manifest
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+      - name: Upload all D2 deterministic shard artifacts
+        if: always()
+        uses: ./tooling/.github/actions/stage4-upload-shards
+        with:
+          side: d2
+          root: build/d2/evidence/shards
+          run-id: ${{ github.run_id }}
+
+  compare_shards:
+    needs: [import_d1, import_d2]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard:
+          - '00'
+          - '01'
+          - '02'
+          - '03'
+          - '04'
+          - '05'
+          - '06'
+          - '07'
+          - '08'
+          - '09'
+          - '10'
+          - '11'
+          - '12'
+          - '13'
+          - '14'
+          - '15'
+          - '16'
+          - '17'
+          - '18'
+          - '19'
+          - '20'
+          - '21'
+          - '22'
+          - '23'
+          - '24'
+          - '25'
+          - '26'
+          - '27'
+          - '28'
+          - '29'
+          - '30'
