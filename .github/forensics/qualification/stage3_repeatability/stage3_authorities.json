@@ -1,0 +1,273 @@
+{
+  "authorities": [
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "glb_matrix_small",
+      "resource_artifact": {
+        "digest": "2905549cccddf3bd6771d43883063ee9c335d1b2833ef7f25a8a8baff73d7a7d",
+        "id": 8442006392,
+        "name": "stage2-resource-4.4.1-stable-glb_matrix_small-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "glb_matrix_medium",
+      "resource_artifact": {
+        "digest": "6d94ad22f1626be89cbdabbe8854800a0da08e46c915feef47a9c6949ae99ac7",
+        "id": 8442006538,
+        "name": "stage2-resource-4.4.1-stable-glb_matrix_medium-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "glb_matrix_large",
+      "resource_artifact": {
+        "digest": "472cd4191c74fb43ee10b6d9ac09edb258b50b5c864e2971ec0fa9d06c462459",
+        "id": 8442006166,
+        "name": "stage2-resource-4.4.1-stable-glb_matrix_large-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "glb_non_matrix",
+      "resource_artifact": {
+        "digest": "4279adb2de3933da5ee017819df9352dfdc35553c1fb0c9e25fcd9cb1e2750b3",
+        "id": 8442006331,
+        "name": "stage2-resource-4.4.1-stable-glb_non_matrix-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "gltf_character",
+      "resource_artifact": {
+        "digest": "cecaba3732048cb3981b1c54cceb89dab3ad08b04f8b8845bb271ca3027cec4b",
+        "id": 8442006702,
+        "name": "stage2-resource-4.4.1-stable-gltf_character-29685721858"
+      },
+      "source_type": "GLTF",
+      "timeout_seconds": 2700,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "gltf_environment",
+      "resource_artifact": {
+        "digest": "dca154491e2d1142b636dded180e21e0ebac1bc10548ff994b4bcec586eabfc2",
+        "id": 8442008410,
+        "name": "stage2-resource-4.4.1-stable-gltf_environment-29685721858"
+      },
+      "source_type": "GLTF",
+      "timeout_seconds": 2700,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "fbx_character",
+      "resource_artifact": {
+        "digest": "2effd6a484de6912ea8a1e99bf9284f7757e72546e1b112d94ebc50dae047c07",
+        "id": 8442012430,
+        "name": "stage2-resource-4.4.1-stable-fbx_character-29685721858"
+      },
+      "source_type": "FBX",
+      "timeout_seconds": 3600,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809",
+        "id": 8441999232,
+        "name": "stage2-engine-package-4.4.1-stable-29685721858"
+      },
+      "resource": "obj_single",
+      "resource_artifact": {
+        "digest": "16054d598c90e9c8bfb22bdf5ad863ec2888513a5c2b2e17fdb2b9973d9a69e0",
+        "id": 8442011229,
+        "name": "stage2-resource-4.4.1-stable-obj_single-29685721858"
+      },
+      "source_type": "OBJ",
+      "timeout_seconds": 3600,
+      "version": "4.4.1-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "glb_matrix_small",
+      "resource_artifact": {
+        "digest": "63013b53d000459d2183dd0c1ed92a4587171502bf0cfb0f2dc5ebe95a6c7642",
+        "id": 8442011240,
+        "name": "stage2-resource-4.5.2-stable-glb_matrix_small-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "glb_matrix_medium",
+      "resource_artifact": {
+        "digest": "2fb372319b52442ffd5f92bb819da353d7812f58f27135eb7ded93b5990b41db",
+        "id": 8442010494,
+        "name": "stage2-resource-4.5.2-stable-glb_matrix_medium-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "glb_matrix_large",
+      "resource_artifact": {
+        "digest": "830654d4b65d7cbe38538aa3f95fa5fcd238a278fdca2dd4540c9e0546d89e2d",
+        "id": 8442012098,
+        "name": "stage2-resource-4.5.2-stable-glb_matrix_large-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "glb_non_matrix",
+      "resource_artifact": {
+        "digest": "09ccf187ee4b399e0220e6b6370691c375084356037a349e9d3616fb904a47e2",
+        "id": 8442012527,
+        "name": "stage2-resource-4.5.2-stable-glb_non_matrix-29685721858"
+      },
+      "source_type": "GLB",
+      "timeout_seconds": 1800,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "gltf_character",
+      "resource_artifact": {
+        "digest": "85b90ef81f2ff285ec31b9eba22b01aa33825d4f27c32af58d713f8524bba477",
+        "id": 8442014504,
+        "name": "stage2-resource-4.5.2-stable-gltf_character-29685721858"
+      },
+      "source_type": "GLTF",
+      "timeout_seconds": 2700,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "gltf_environment",
+      "resource_artifact": {
+        "digest": "66e531a15c71de07da307e1b118a6b32fe84f95bc569c962bd3cc65b2103738a",
+        "id": 8442016778,
+        "name": "stage2-resource-4.5.2-stable-gltf_environment-29685721858"
+      },
+      "source_type": "GLTF",
+      "timeout_seconds": 2700,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "fbx_character",
+      "resource_artifact": {
+        "digest": "21d54093568e96117bea0878d1bbd0f98dacdce91417a87b9d1bd134c8c7351c",
+        "id": 8442015106,
+        "name": "stage2-resource-4.5.2-stable-fbx_character-29685721858"
+      },
+      "source_type": "FBX",
+      "timeout_seconds": 3600,
+      "version": "4.5.2-stable"
+    },
+    {
+      "engine_artifact": {
+        "digest": "86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9",
+        "id": 8441999064,
+        "name": "stage2-engine-package-4.5.2-stable-29685721858"
+      },
+      "resource": "obj_single",
+      "resource_artifact": {
+        "digest": "dfde88c251da5e23cad354655c90b49f4c4a3fbc475d2db4749e9c08eda0d31a",
+        "id": 8442016937,
+        "name": "stage2-resource-4.5.2-stable-obj_single-29685721858"
+      },
+      "source_type": "OBJ",
+      "timeout_seconds": 3600,
+      "version": "4.5.2-stable"
+    }
+  ],
+  "corpus_artifact": {
+    "digest": "9b2d4b4746567b98abd20800159aafe47eb6cf9688921f2e51ae81ff4da5e12f",
+    "id": 8442001215,
+    "name": "stage2-exact-corpus-29685721858"
+  },
+  "cross_artifact": {
+    "digest": "54c649d1cf5e55180f5658c3a7c0385c18b3f12b7ca563b198c018e4b2acc328",
+    "id": 8442023755,
+    "name": "stage2-cross-version-result-29685721858"
+  },
+  "schema_version": 1,
+  "stage2_run_id": 29685721858,
+  "stage2_workflow_sha": "23efeab85489ef1efafca60a0c0791507fc3f5dc"
+}
