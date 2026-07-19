@@ -1,0 +1,142 @@
+                "imported_byte_size": imported.stat().st_size if imported.is_file() else None,
+                "imported_sha256": sha256_file(imported) if imported.is_file() else None,
+                "md5": parse_md5(md5_path) if md5_path.is_file() else None,
+                "uid_cache_sha256": inventory["uid_cache"]["sha256"],
+                "uid_cache_exists": inventory["uid_cache"]["exists"],
+                "inventory": inventory,
+            }
+            run_rows.append(row)
+            report[label.lower()] = row
+            write_json(report_path, report)
+
+        d1, d2 = run_rows
+        timed_out = any(row["import"]["timed_out"] for row in run_rows)
+        d1_ok = d1["import"]["exit_code"] == 0 and not d1["import"]["timed_out"] and d1["imported_exists"] and d1["md5"] is not None
+        d2_ok = d2["import"]["exit_code"] == 0 and not d2["import"]["timed_out"] and d2["imported_exists"] and d2["md5"] is not None
+        imported_exists = d1["imported_exists"] and d2["imported_exists"]
+        imported_equal = imported_exists and d1["imported_byte_size"] == d2["imported_byte_size"] and d1["imported_sha256"] == d2["imported_sha256"]
+        d1_dest_md5 = d1["md5"]["fields"].get("dest_md5") if d1["md5"] else None
+        d2_dest_md5 = d2["md5"]["fields"].get("dest_md5") if d2["md5"] else None
+        destination_md5_equal = d1_dest_md5 is not None and d1_dest_md5 == d2_dest_md5
+        uid_cache_equal = d1["uid_cache_exists"] and d2["uid_cache_exists"] and d1["uid_cache_sha256"] == d2["uid_cache_sha256"]
+        inventory_compare = compare_inventories(d1["inventory"], d2["inventory"])
+        path_sets_equal = inventory_compare["path_sets_equal"]
+        generated_content_equal = inventory_compare["content_equal"]
+        harness_error = None
+        if d1_ok and d2_ok and (not d1["uid_cache_exists"] or not d2["uid_cache_exists"]):
+            harness_error = "required UID cache missing"
+
+        result = decide_resource_result(
+            authority_ok=authority_ok,
+            d1_ok=d1_ok,
+            d2_ok=d2_ok,
+            imported_exists=imported_exists,
+            imported_equal=imported_equal,
+            destination_md5_equal=destination_md5_equal,
+            uid_cache_equal=uid_cache_equal,
+            path_sets_equal=path_sets_equal,
+            timed_out=timed_out,
+            harness_error=harness_error,
+            generated_content_equal=generated_content_equal,
+        )
+        report.update(
+            {
+                "D1_imported_path": d1["imported_path"],
+                "D2_imported_path": d2["imported_path"],
+                "D1_imported_byte_size": d1["imported_byte_size"],
+                "D2_imported_byte_size": d2["imported_byte_size"],
+                "D1_imported_sha256": d1["imported_sha256"],
+                "D2_imported_sha256": d2["imported_sha256"],
+                "D1_destination_md5": d1_dest_md5,
+                "D2_destination_md5": d2_dest_md5,
+                "D1_UID_cache_sha256": d1["uid_cache_sha256"],
+                "D2_UID_cache_sha256": d2["uid_cache_sha256"],
+                "import_exit_codes": {
+                    "authority": authority_run["exit_code"],
+                    "D1": d1["import"]["exit_code"],
+                    "D2": d2["import"]["exit_code"],
+                },
+                "import_durations_seconds": {
+                    "authority": authority_run["duration_seconds"],
+                    "D1": d1["import"]["duration_seconds"],
+                    "D2": d2["import"]["duration_seconds"],
+                },
+                "timeout_status": {
+                    "authority": authority_run["timed_out"],
+                    "D1": d1["import"]["timed_out"],
+                    "D2": d2["import"]["timed_out"],
+                },
+                "path_set_comparison": inventory_compare,
+                "imported_byte_equality": imported_equal,
+                "destination_md5_equality": destination_md5_equal,
+                "uid_cache_equality": uid_cache_equal,
+                "generated_content_equality": generated_content_equal,
+                "candidate_resource_result": result,
+                "harness_error": harness_error,
+            }
+        )
+        if imported_exists and not imported_equal:
+            left = (project_roots[0] / imported_rel).read_bytes()
+            right = (project_roots[1] / imported_rel).read_bytes()
+            report["bounded_binary_diagnostic"] = bounded_binary_difference(left, right, max_windows=20, radius=16)
+        write_json(report_path, report)
+        write_json(
+            output / "ARTIFACT_INVENTORY.json",
+            {
+                "schema_version": 1,
+                "files": [
+                    {
+                        "path": path.relative_to(output).as_posix(),
+                        "bytes": path.stat().st_size,
+                        "sha256": sha256_file(path),
+                    }
+                    for path in sorted(output.rglob("*"))
+                    if path.is_file() and path.name != "ARTIFACT_INVENTORY.json"
+                ],
+                "candidate_resource_result": result,
+                "no_stage3": True,
+                "no_android_export": True,
+            },
+        )
+        return 0
+    except BaseException as error:
+        report.update(
+            {
+                "candidate_resource_result": "HARNESS_FAILURE",
+                "harness_error": repr(error),
+                "traceback": traceback.format_exc().splitlines()[-200:],
+                "completed_at": utc_now(),
+            }
+        )
+        write_json(report_path, report)
+        return 0
+
+
+def synthetic_resource_report(result: str, selection_id: str = "synthetic") -> dict[str, Any]:
+    if result not in ALLOWED_RESOURCE_RESULTS:
+        raise ValueError(result)
+    nondeterministic = result == "NONDETERMINISTIC"
+    return {
+        "resource_selection_id": selection_id,
+        "candidate_resource_result": result,
+        "imported_byte_equality": not nondeterministic,
+        "destination_md5_equality": not nondeterministic,
+        "uid_cache_equality": not nondeterministic,
+        "path_set_comparison": {"path_sets_equal": not nondeterministic, "differing_paths": []},
+        "generated_content_equality": not nondeterministic,
+        "D1_imported_path": "x",
+        "D2_imported_path": "x",
+    }
+
+
+def aggregate_engine_reports(version: str, reports: list[dict[str, Any]], expected_ids: list[str] = RESOURCE_IDS) -> dict[str, Any]:
+    by_id: dict[str, dict[str, Any]] = {}
+    duplicates = []
+    for report in reports:
+        selection_id = report.get("resource_selection_id")
+        if selection_id in by_id:
+            duplicates.append(selection_id)
+        elif selection_id:
+            by_id[selection_id] = report
+    missing = [x for x in expected_ids if x not in by_id]
+    ordered = [by_id[x] for x in expected_ids if x in by_id]
