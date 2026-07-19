@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+import argparse, ast, hashlib, json, os, platform, re, shlex, shutil, signal, socket, subprocess, sys, time, urllib.parse, zipfile
+from collections import Counter
+from pathlib import Path, PurePosixPath
+from typing import Any
+
+PR_HEAD='5b4e2466ef84f3984f3bf336b31925d4d2e97a7f'
+COMPOSITE_SOURCE_HEAD='b12e1e012e256036e71066260a4c6392d26c3839'
+SOURCE_MANIFEST_SHA256='ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab'
+SOURCE_AGGREGATE_TREE_SHA256='e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e'
+SOURCE_ARCHIVE_SHA256='5ca9ff72aaaddeb9d86fb02c2fe99de5da280988b3945c4c627e80effeb01aa7'
+SOURCE_FILE_COUNT=1502
+SOURCE_BYTES=369162800
+MATRIX_MANIFEST_SHA256='6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff'
+MATRIX_MODEL_COUNT=436
+ENGINE_VERSION='4.4.1-stable'
+ENGINE_RUNTIME_IDENTITY='4.4.1.stable.official.49a5bc7b6'
+ENGINE_SOURCE_COMMIT='49a5bc7b616bd04689a2c89e89bda41f50241464'
+ENGINE_ARCHIVE='Godot_v4.4.1-stable_linux.x86_64.zip'
+ENGINE_ARCHIVE_SHA512='ef4e76880a514257175544952c61191106fdef3095b909bafed9fcbeb230c3e5533920a0f3012882dd4bbde83028a67549825794e2d2c3cf76eba7918b71370e'
+ENGINE_RUNTIME_SHA256='54215149d52efb1d653a3dec39d0993587bdf5daa2c56e787b5ee88417fb1339'
+ENGINE_SOURCE_ARCHIVE_SHA256='ddbd6527cdb3ddb02910b383301a5c9117b1c33c777ef1c86d1b1eea43dcb651'
+MODEL_COUNTS={'GLB':578,'GLTF':203,'FBX':18,'OBJ':1}
+TOTAL_MODELS=800
+MODEL_RESULT_VALUES={'PASS','NONDETERMINISTIC','MISSING_D1','MISSING_D2','SOURCE_AUTHORITY_FAILURE','SIDECAR_AUTHORITY_FAILURE','IMPORT_FAILURE','HARNESS_FAILURE'}
+
+class AuthorityError(RuntimeError): pass
+def sha256_bytes(data:bytes)->str:return hashlib.sha256(data).hexdigest()
+def sha256_file(path:Path)->str:
+    h=hashlib.sha256()
+    with path.open('rb') as f:
+        for b in iter(lambda:f.read(1024*1024),b''):h.update(b)
+    return h.hexdigest()
+def sha512_file(path:Path)->str:
+    h=hashlib.sha512()
+    with path.open('rb') as f:
+        for b in iter(lambda:f.read(1024*1024),b''):h.update(b)
+    return h.hexdigest()
+def md5_file(path:Path)->str:
+    h=hashlib.md5()
+    with path.open('rb') as f:
+        for b in iter(lambda:f.read(1024*1024),b''):h.update(b)
+    return h.hexdigest()
+def canonical_json_bytes(v:Any)->bytes:return (json.dumps(v,indent=2,sort_keys=True,ensure_ascii=False)+'\n').encode()
+def write_json(path:Path,v:Any)->None:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(canonical_json_bytes(v))
+def load_json(path:Path)->Any:return json.loads(path.read_text())
+def normalize_relative_path(raw:str)->str:
+    if not isinstance(raw,str) or not raw or '\0' in raw or '\\' in raw:raise AuthorityError(f'unsafe path:{raw!r}')
+    p=PurePosixPath(raw)
+    if p.is_absolute() or any(x in ('','.','..') for x in p.parts) or p.as_posix()!=raw:raise AuthorityError(f'unsafe path:{raw!r}')
+    return raw
+def safe_extract_zip(archive:Path,dest:Path)->None:
+    dest.mkdir(parents=True,exist_ok=True);root=dest.resolve()
+    with zipfile.ZipFile(archive) as z:
+        for info in z.infolist():
+            name=info.filename.rstrip('/')
+            if not name:continue
+            rel=normalize_relative_path(name);target=(dest/rel).resolve()
+            if root not in target.parents and target!=root:raise AuthorityError(f'zip escape:{rel}')
+            if ((info.external_attr>>16)&0o170000)==0o120000:raise AuthorityError(f'zip symlink:{rel}')
+        z.extractall(dest)
+def shard_bounds(i:int)->tuple[int,int]:
+    if i not in range(40):raise AuthorityError(f'invalid shard:{i}')
+    return i*20,i*20+19
+def matrix_paths_from_manifest(v:dict[str,Any])->set[str]:
+    out=set()
+    for a in v.get('assets',[]):
+        if not isinstance(a,dict) or not isinstance(a.get('paths'),dict):raise AuthorityError('invalid matrix asset')
+        for rows in a['paths'].values():
+            if not isinstance(rows,list):raise AuthorityError('invalid matrix group')
+            for raw in rows:
+                if not isinstance(raw,str) or not raw.startswith('res://'):raise AuthorityError('invalid matrix path')
+                out.add(normalize_relative_path(raw[6:]))
+    for a in v.get('commercial',[]):
+        raw=a.get('path') if isinstance(a,dict) else None
+        if not isinstance(raw,str) or not raw.startswith('res://'):raise AuthorityError('invalid commercial path')
+        out.add(normalize_relative_path(raw[6:]))
+    return out
+def _resolve_dep(base:PurePosixPath,uri:str)->str|None:
+    if not isinstance(uri,str) or not uri or uri.startswith('data:'):return None
+    p=urllib.parse.urlparse(uri)
+    if p.scheme or p.netloc:return None
+    parts=[]
+    for part in (base.parent/PurePosixPath(urllib.parse.unquote(p.path))).parts:
+        if part in ('','.'):continue
+        if part=='..':
+            if not parts:raise AuthorityError('dependency escape')
+            parts.pop()
+        else:parts.append(part)
+    return normalize_relative_path(PurePosixPath(*parts).as_posix())
+def extract_dependencies(model:Path,logical:str,root:Path)->list[str]:
+    found=set();base=PurePosixPath(logical);ext=model.suffix.lower()
+    if ext=='.gltf':
+        v=json.loads(model.read_text(encoding='utf-8-sig'))
+        for group in ('buffers','images'):
+            for row in v.get(group,[]):
+                dep=_resolve_dep(base,row.get('uri')) if isinstance(row,dict) else None
+                if dep:found.add(dep)
+    elif ext=='.obj':
+        mtls=[]
+        for line in model.read_text(errors='replace').splitlines():
+            if line.strip().lower().startswith('mtllib '):
+                for token in shlex.split(line.strip()[7:]):
+                    dep=_resolve_dep(base,token)
+                    if dep:found.add(dep);mtls.append(dep)
+        keys={'map_ka','map_kd','map_ks','map_ke','map_ns','map_d','bump','map_bump','disp','decal','refl','norm'}
+        for rel in mtls:
+            p=root/rel
+            if not p.is_file():continue
+            mbase=PurePosixPath(rel)
+            for line in p.read_text(errors='replace').splitlines():
+                toks=shlex.split(line,comments=True)
+                if len(toks)>=2 and toks[0].lower() in keys:
+                    dep=_resolve_dep(mbase,toks[-1])
+                    if dep:found.add(dep)
+    return sorted(found,key=lambda x:x.encode())
+def source_type_for(p:Path)->str:
+    try:return {'.glb':'GLB','.gltf':'GLTF','.fbx':'FBX','.obj':'OBJ'}[p.suffix.lower()]
+    except KeyError as e:raise AuthorityError(f'unsupported model:{p}') from e
+def verify_source_authority(authority_root:Path,project:Path,extract:bool=True)->dict[str,Any]:
+    mp=authority_root/'FINAL_TREE_MANIFEST.json';ap=authority_root/'FINAL_TREE_AUTHORITY.json';zp=authority_root/'MANAMA_SOUQ_COMPOSITE_SOURCE.zip'
+    if sha256_file(mp)!=SOURCE_MANIFEST_SHA256:raise AuthorityError('manifest SHA mismatch')
+    m=load_json(mp);a=load_json(ap)
+    for k,v in {'candidate_commit':COMPOSITE_SOURCE_HEAD,'aggregate_tree_sha256':SOURCE_AGGREGATE_TREE_SHA256,'file_count':SOURCE_FILE_COUNT,'total_bytes':SOURCE_BYTES}.items():
+        if m.get(k)!=v or a.get(k)!=v:raise AuthorityError(f'source authority mismatch:{k}')
+    if a.get('manifest_sha256')!=SOURCE_MANIFEST_SHA256 or sha256_file(zp)!=SOURCE_ARCHIVE_SHA256:raise AuthorityError('source archive authority mismatch')
+    if extract:shutil.rmtree(project,ignore_errors=True);safe_extract_zip(zp,project)
+    seen=set();fold={};total=0
+    for row in m.get('files',[]):
+        rel=normalize_relative_path(row['path']);low=rel.casefold()
+        if rel in seen or (low in fold and fold[low]!=rel):raise AuthorityError('duplicate/case collision')
+        seen.add(rel);fold[low]=rel;p=project/rel
+        if not p.is_file() or p.stat().st_size!=row['bytes'] or sha256_file(p)!=row['sha256']:raise AuthorityError(f'source alarm:{rel}')
+        total+=p.stat().st_size
+    actual={p.relative_to(project).as_posix() for p in project.rglob('*') if p.is_file()}
