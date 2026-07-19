@@ -1,0 +1,160 @@
+name: Bahrain Brick Godot 4.4.1 Stage 4 Full Corpus
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths: [.github/workflows/godot-engine-qualification-stage4-full-corpus.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: bahrain-brick-godot-stage4-full-corpus
+  cancel-in-progress: false
+
+env:
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  PR_NUMBER: '59'
+  COMPOSITE_SOURCE_HEAD: b12e1e012e256036e71066260a4c6392d26c3839
+  SOURCE_MANIFEST_SHA256: ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab
+  SOURCE_TREE_SHA256: e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e
+  MATRIX_MANIFEST_SHA256: 6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff
+  SOURCE_RUN_ID: '29538386331'
+  SOURCE_ARTIFACT_ID: '8391457302'
+  SOURCE_ARTIFACT_NAME: bahrain-brick-pr59-authority-run-a-29538386331
+  SOURCE_ARTIFACT_DIGEST: c05d7ff8f46bc6b830f114f47446e92ede06ee55d00436527f500faf50273193
+  ENGINE_RUN_ID: '29685721858'
+  ENGINE_ARTIFACT_ID: '8441999232'
+  ENGINE_ARTIFACT_NAME: stage2-engine-package-4.4.1-stable-29685721858
+  ENGINE_ARTIFACT_DIGEST: 267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809
+  STAGE3_RUN_ID: '29691637620'
+  STAGE3_WORKFLOW_SHA: 0ee943c0cbb21b3e21e3fb5709dc8c24e80d1b9a
+  STAGE3_CROSS_ARTIFACT_ID: '8443812617'
+  STAGE3_CROSS_DIGEST: 08f99b2df25f79a3aa14163ebe485558a7aa3106b9f8f90040d795ba17c76976
+  STAGE3_ENGINE_ARTIFACT_ID: '8443809946'
+  STAGE3_ENGINE_DIGEST: f84e07a09d58172b5038cbc699d7f6414fe75ba3c413f807f22cbfe82c05c8f9
+  ENGINE_RUNTIME_IDENTITY: 4.4.1.stable.official.49a5bc7b6
+  ENGINE_SOURCE_COMMIT: 49a5bc7b616bd04689a2c89e89bda41f50241464
+  ENGINE_RUNTIME_SHA256: 54215149d52efb1d653a3dec39d0993587bdf5daa2c56e787b5ee88417fb1339
+  ANALYZER_SOURCE_SHA256: 76d75db809d35b7ac99d0320827f9e302ab2d6704c90a0e2ac7c99131befe3d8
+  ANALYZER_LOADER_SHA256: 88cb43bb8d3169fdbe0b8108ec9a041f75ac6c55ffd080d5797cf4c9f0cd5e7d
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out immutable Stage 4 workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 30
+      - name: Record Stage 4 run locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics/qualification
+          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","stage3_run_id":29691637620}' > .github/forensics/qualification/LATEST_STAGE4_FULL_CORPUS_RUN.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/qualification/LATEST_STAGE4_FULL_CORPUS_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(stage4): record full-corpus run ${{ github.run_id }}"
+            git fetch origin ci/godot-engine-determinism-qualification-20260719
+            git rebase origin/ci/godot-engine-determinism-qualification-20260719
+            git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+          fi
+
+  contracts:
+    needs: record_locator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Verify analyzer bytes and run contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=tooling/.github/forensics/qualification/stage4_full_corpus
+          test "$(sha256sum "$root/stage4_full_corpus.py" | awk '{print $1}')" = "$ANALYZER_LOADER_SHA256"
+          cat "$root"/source_*.pyfrag > /tmp/stage4_full_corpus_source.py
+          test "$(sha256sum /tmp/stage4_full_corpus_source.py | awk '{print $1}')" = "$ANALYZER_SOURCE_SHA256"
+          python3 -m py_compile "$root/stage4_full_corpus.py" /tmp/stage4_full_corpus_source.py "$root/test_stage4_full_corpus.py" "$root/test_stage4_workflow.py"
+          cd "$root"
+          python3 -m unittest -v test_stage4_full_corpus.py test_stage4_workflow.py
+      - name: Verify frozen PR and accepted Stage 3 artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > /tmp/pr.json
+          for id in "$STAGE3_CROSS_ARTIFACT_ID" "$STAGE3_ENGINE_ARTIFACT_ID"; do
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" > "/tmp/artifact-${id}.json"
+          done
+          python3 - <<'PY'
+          import json,os
+          pr=json.load(open('/tmp/pr.json'))
+          assert pr['head']['sha']==os.environ['PR_HEAD']
+          assert pr['state']=='open' and pr['draft'] is True and pr['merged_at'] is None
+          checks=[
+            (os.environ['STAGE3_CROSS_ARTIFACT_ID'],os.environ['STAGE3_CROSS_DIGEST']),
+            (os.environ['STAGE3_ENGINE_ARTIFACT_ID'],os.environ['STAGE3_ENGINE_DIGEST']),
+          ]
+          for aid,digest in checks:
+            a=json.load(open('/tmp/artifact-'+aid+'.json'))
+            assert str(a['id'])==aid and a['digest']=='sha256:'+digest and not a['expired']
+            assert str(a['workflow_run']['id'])==os.environ['STAGE3_RUN_ID']
+            assert a['workflow_run']['head_sha']==os.environ['STAGE3_WORKFLOW_SHA']
+          PY
+
+  prepare_authority:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Seed unconditional authority evidence
+        shell: bash
+        run: |
+          mkdir -p build/full-corpus-authority/evidence
+          printf '%s\n' '{"schema_version":1,"result":"HARNESS_FAILURE","classification":"Q6"}' > build/full-corpus-authority/evidence/FULL_MODEL_CORPUS_AUTHORITY.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted composite source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Reverify retained artifacts and official release authorities
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}" > /tmp/source-artifact.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ENGINE_ARTIFACT_ID}" > /tmp/engine-artifact.json
+          gh api "repos/godotengine/godot-builds/releases/tags/4.4.1-stable" > /tmp/engine-release.json
+          gh api "repos/godotengine/godot/git/ref/tags/4.4.1-stable" > /tmp/engine-ref.json
