@@ -1,0 +1,636 @@
+name: Bahrain Brick Godot 4.4.1 Stage 4 Full Corpus
+
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths: [.github/workflows/godot-engine-qualification-stage4-full-corpus.yml]
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: bahrain-brick-godot-stage4-full-corpus
+  cancel-in-progress: false
+
+env:
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  PR_NUMBER: '59'
+  COMPOSITE_SOURCE_HEAD: b12e1e012e256036e71066260a4c6392d26c3839
+  SOURCE_MANIFEST_SHA256: ba937afa335170ccaa726297fc23712a44e3295689a86640e1c1dbe6165701ab
+  SOURCE_TREE_SHA256: e0cfa6604569c13e1d75b2439d6936b7e2423ad5ba3715f033200335e864bc4e
+  MATRIX_MANIFEST_SHA256: 6aa202e2298fa514bfdb2ba10fd66237cc2d15005cdb2d6316a57d847ece8eff
+  SOURCE_RUN_ID: '29538386331'
+  SOURCE_ARTIFACT_ID: '8391457302'
+  SOURCE_ARTIFACT_NAME: bahrain-brick-pr59-authority-run-a-29538386331
+  SOURCE_ARTIFACT_DIGEST: c05d7ff8f46bc6b830f114f47446e92ede06ee55d00436527f500faf50273193
+  ENGINE_RUN_ID: '29685721858'
+  ENGINE_ARTIFACT_ID: '8441999232'
+  ENGINE_ARTIFACT_NAME: stage2-engine-package-4.4.1-stable-29685721858
+  ENGINE_ARTIFACT_DIGEST: 267c4d2d5fb9388c92ef537443142fbff6a6d939188c32905d7b0f6a53ba2809
+  STAGE3_RUN_ID: '29691637620'
+  STAGE3_WORKFLOW_SHA: 0ee943c0cbb21b3e21e3fb5709dc8c24e80d1b9a
+  STAGE3_CROSS_ARTIFACT_ID: '8443812617'
+  STAGE3_CROSS_DIGEST: 08f99b2df25f79a3aa14163ebe485558a7aa3106b9f8f90040d795ba17c76976
+  STAGE3_ENGINE_ARTIFACT_ID: '8443809946'
+  STAGE3_ENGINE_DIGEST: f84e07a09d58172b5038cbc699d7f6414fe75ba3c413f807f22cbfe82c05c8f9
+  ENGINE_RUNTIME_IDENTITY: 4.4.1.stable.official.49a5bc7b6
+  ENGINE_SOURCE_COMMIT: 49a5bc7b616bd04689a2c89e89bda41f50241464
+  ENGINE_RUNTIME_SHA256: 54215149d52efb1d653a3dec39d0993587bdf5daa2c56e787b5ee88417fb1339
+  ANALYZER_SOURCE_SHA256: 76d75db809d35b7ac99d0320827f9e302ab2d6704c90a0e2ac7c99131befe3d8
+  ANALYZER_LOADER_SHA256: 88cb43bb8d3169fdbe0b8108ec9a041f75ac6c55ffd080d5797cf4c9f0cd5e7d
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out immutable Stage 4 workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 30
+      - name: Record Stage 4 run locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/forensics/qualification
+          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","stage3_run_id":29691637620}' > .github/forensics/qualification/LATEST_STAGE4_FULL_CORPUS_RUN.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add .github/forensics/qualification/LATEST_STAGE4_FULL_CORPUS_RUN.json
+          if ! git diff --cached --quiet; then
+            git commit -m "ci(stage4): record full-corpus run ${{ github.run_id }}"
+            git fetch origin ci/godot-engine-determinism-qualification-20260719
+            git rebase origin/ci/godot-engine-determinism-qualification-20260719
+            git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+          fi
+
+  contracts:
+    needs: record_locator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Verify analyzer bytes and run contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=tooling/.github/forensics/qualification/stage4_full_corpus
+          test "$(sha256sum "$root/stage4_full_corpus.py" | awk '{print $1}')" = "$ANALYZER_LOADER_SHA256"
+          cat "$root"/source_*.pyfrag > /tmp/stage4_full_corpus_source.py
+          test "$(sha256sum /tmp/stage4_full_corpus_source.py | awk '{print $1}')" = "$ANALYZER_SOURCE_SHA256"
+          python3 -m py_compile "$root/stage4_full_corpus.py" /tmp/stage4_full_corpus_source.py "$root/test_stage4_full_corpus.py" "$root/test_stage4_workflow.py"
+          cd "$root"
+          python3 -m unittest -v test_stage4_full_corpus.py test_stage4_workflow.py
+      - name: Verify frozen PR and accepted Stage 3 artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" > /tmp/pr.json
+          for id in "$STAGE3_CROSS_ARTIFACT_ID" "$STAGE3_ENGINE_ARTIFACT_ID"; do
+            gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" > "/tmp/artifact-${id}.json"
+          done
+          python3 - <<'PY'
+          import json,os
+          pr=json.load(open('/tmp/pr.json'))
+          assert pr['head']['sha']==os.environ['PR_HEAD']
+          assert pr['state']=='open' and pr['draft'] is True and pr['merged_at'] is None
+          checks=[
+            (os.environ['STAGE3_CROSS_ARTIFACT_ID'],os.environ['STAGE3_CROSS_DIGEST']),
+            (os.environ['STAGE3_ENGINE_ARTIFACT_ID'],os.environ['STAGE3_ENGINE_DIGEST']),
+          ]
+          for aid,digest in checks:
+            a=json.load(open('/tmp/artifact-'+aid+'.json'))
+            assert str(a['id'])==aid and a['digest']=='sha256:'+digest and not a['expired']
+            assert str(a['workflow_run']['id'])==os.environ['STAGE3_RUN_ID']
+            assert a['workflow_run']['head_sha']==os.environ['STAGE3_WORKFLOW_SHA']
+          PY
+
+  prepare_authority:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Seed unconditional authority evidence
+        shell: bash
+        run: |
+          mkdir -p build/full-corpus-authority/evidence
+          printf '%s\n' '{"schema_version":1,"result":"HARNESS_FAILURE","classification":"Q6"}' > build/full-corpus-authority/evidence/FULL_MODEL_CORPUS_AUTHORITY.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted composite source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Reverify retained artifacts and official release authorities
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}" > /tmp/source-artifact.json
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${ENGINE_ARTIFACT_ID}" > /tmp/engine-artifact.json
+          gh api "repos/godotengine/godot-builds/releases/tags/4.4.1-stable" > /tmp/engine-release.json
+          gh api "repos/godotengine/godot/git/ref/tags/4.4.1-stable" > /tmp/engine-ref.json
+          python3 - <<'PY'
+          import json,os,subprocess
+          checks=[
+            ('/tmp/source-artifact.json',os.environ['SOURCE_ARTIFACT_ID'],os.environ['SOURCE_ARTIFACT_NAME'],os.environ['SOURCE_ARTIFACT_DIGEST'],os.environ['SOURCE_RUN_ID'],os.environ['COMPOSITE_SOURCE_HEAD']),
+            ('/tmp/engine-artifact.json',os.environ['ENGINE_ARTIFACT_ID'],os.environ['ENGINE_ARTIFACT_NAME'],os.environ['ENGINE_ARTIFACT_DIGEST'],os.environ['ENGINE_RUN_ID'],'23efeab85489ef1efafca60a0c0791507fc3f5dc'),
+          ]
+          for path,aid,name,digest,run,head in checks:
+            a=json.load(open(path));assert str(a['id'])==aid and a['name']==name
+            assert a['digest']=='sha256:'+digest and not a['expired']
+            assert str(a['workflow_run']['id'])==run and a['workflow_run']['head_sha']==head
+          release=json.load(open('/tmp/engine-release.json'))
+          assert any(x['name']=='Godot_v4.4.1-stable_linux.x86_64.zip' for x in release['assets'])
+          ref=json.load(open('/tmp/engine-ref.json'))['object']
+          resolved=ref['sha']
+          if ref['type']=='tag':
+            resolved=json.loads(subprocess.check_output(['gh','api',f"repos/godotengine/godot/git/tags/{resolved}"]))['object']['sha']
+          assert resolved==os.environ['ENGINE_SOURCE_COMMIT']
+          PY
+      - name: Build exact immutable full-corpus authority
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          python3 "$analyzer" build-authority --authority-root build/source-authority --work-root /tmp/bahrain-stage4-authority --output build/full-corpus-authority/evidence
+          code=$?
+          python3 "$analyzer" inventory --root build/full-corpus-authority/evidence --output build/full-corpus-authority/ARTIFACT_INVENTORY.json || true
+          printf '%s\n' "$code" > build/full-corpus-authority/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Upload full-corpus authority evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+
+  prepare_sidecars:
+    needs: prepare_authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Seed unconditional sidecar evidence
+        shell: bash
+        run: |
+          mkdir -p build/sidecar-authority/evidence
+          printf '%s\n' '{"schema_version":1,"result":"HARNESS_FAILURE","classification":"Q6"}' > build/sidecar-authority/evidence/GODOT_4_4_1_FULL_SIDECAR_AUTHORITY.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download full-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+      - name: Generate exact 800-model sidecar authority
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          corpus="$(find build/full-corpus-authority -name FULL_MODEL_CORPUS_AUTHORITY.json -print -quit)"
+          python3 "$analyzer" build-sidecars --authority-root build/source-authority --corpus-authority "$corpus" --engine-root build/engine --work-root /tmp/bahrain-stage4-sidecar-authority --output build/sidecar-authority/evidence --timeout-seconds 10800
+          code=$?
+          python3 "$analyzer" inventory --root build/sidecar-authority/evidence --output build/sidecar-authority/ARTIFACT_INVENTORY.json || true
+          printf '%s\n' "$code" > build/sidecar-authority/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Upload full sidecar authority evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-sidecar-authority-${{ github.run_id }}
+          path: build/sidecar-authority
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+
+  import_d1:
+    needs: prepare_sidecars
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Seed unconditional D1 evidence
+        shell: bash
+        run: |
+          mkdir -p build/d1/evidence/shards build/d1-manifest/evidence
+          printf '%s\n' '{"schema_version":1,"side":"D1","import_completed":false,"imported_model_count":0,"classification":"Q6"}' > build/d1/evidence/FULL_IMPORT_D1_MODEL_MANIFEST.json
+          for n in $(seq -w 0 39); do
+            mkdir -p "build/d1/evidence/shards/$n/payload"
+            printf '%s\n' '{"schema_version":1,"side":"D1","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "build/d1/evidence/shards/$n/SHARD_MANIFEST.json"
+            printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "build/d1/evidence/shards/$n/SHARD_INVENTORY.json"
+          done
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download full-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+      - name: Download exact sidecar authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-sidecar-authority-${{ github.run_id }}
+          path: build/sidecar-authority
+      - name: Run independent clean full-source import D1
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          corpus="$(find build/full-corpus-authority -name FULL_MODEL_CORPUS_AUTHORITY.json -print -quit)"
+          python3 "$analyzer" run-import --side D1 --authority-root build/source-authority --corpus-authority "$corpus" --sidecar-root build/sidecar-authority --engine-root build/engine --project-root /tmp/bahrain-stage4-d1/project --output build/d1/evidence --timeout-seconds 14400
+          printf '%s\n' "$?" > build/d1/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Finalize manifest and shard inventories
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          mkdir -p build/d1-manifest/evidence
+          find build/d1/evidence -maxdepth 1 -type f -exec cp {} build/d1-manifest/evidence/ \;
+          python3 "$analyzer" inventory --root build/d1-manifest/evidence --output build/d1-manifest/ARTIFACT_INVENTORY.json || true
+          for n in $(seq -w 0 39); do
+            root="build/d1/evidence/shards/$n"
+            mkdir -p "$root/payload"
+            test -f "$root/SHARD_MANIFEST.json" || printf '%s\n' '{"schema_version":1,"side":"D1","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "$root/SHARD_MANIFEST.json"
+            test -f "$root/SHARD_INVENTORY.json" || printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "$root/SHARD_INVENTORY.json"
+            python3 "$analyzer" inventory --root "$root" --output "$root/ARTIFACT_INVENTORY.json" || true
+          done
+          exit 0
+      - name: Upload D1 compact manifest evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-d1-manifest-${{ github.run_id }}
+          path: build/d1-manifest
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+      - name: Upload all D1 deterministic shard artifacts
+        if: always()
+        uses: ./tooling/.github/actions/stage4-upload-shards
+        with:
+          side: d1
+          root: build/d1/evidence/shards
+          run-id: ${{ github.run_id }}
+
+  import_d2:
+    needs: prepare_sidecars
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - name: Seed unconditional D2 evidence
+        shell: bash
+        run: |
+          mkdir -p build/d2/evidence/shards build/d2-manifest/evidence
+          printf '%s\n' '{"schema_version":1,"side":"D2","import_completed":false,"imported_model_count":0,"classification":"Q6"}' > build/d2/evidence/FULL_IMPORT_D2_MODEL_MANIFEST.json
+          for n in $(seq -w 0 39); do
+            mkdir -p "build/d2/evidence/shards/$n/payload"
+            printf '%s\n' '{"schema_version":1,"side":"D2","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "build/d2/evidence/shards/$n/SHARD_MANIFEST.json"
+            printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "build/d2/evidence/shards/$n/SHARD_INVENTORY.json"
+          done
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download accepted source authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.SOURCE_ARTIFACT_NAME }}
+          path: build/source-authority
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download accepted engine package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ env.ENGINE_ARTIFACT_NAME }}
+          path: build/engine
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: ${{ env.ENGINE_RUN_ID }}
+          github-token: ${{ github.token }}
+      - name: Download full-corpus authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-full-corpus-authority-${{ github.run_id }}
+          path: build/full-corpus-authority
+      - name: Download exact sidecar authority
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-sidecar-authority-${{ github.run_id }}
+          path: build/sidecar-authority
+      - name: Run independent clean full-source import D2
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          corpus="$(find build/full-corpus-authority -name FULL_MODEL_CORPUS_AUTHORITY.json -print -quit)"
+          python3 "$analyzer" run-import --side D2 --authority-root build/source-authority --corpus-authority "$corpus" --sidecar-root build/sidecar-authority --engine-root build/engine --project-root /tmp/bahrain-stage4-d2-different-absolute-root/project --output build/d2/evidence --timeout-seconds 14400
+          printf '%s\n' "$?" > build/d2/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Finalize manifest and shard inventories
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          mkdir -p build/d2-manifest/evidence
+          find build/d2/evidence -maxdepth 1 -type f -exec cp {} build/d2-manifest/evidence/ \;
+          python3 "$analyzer" inventory --root build/d2-manifest/evidence --output build/d2-manifest/ARTIFACT_INVENTORY.json || true
+          for n in $(seq -w 0 39); do
+            root="build/d2/evidence/shards/$n"
+            mkdir -p "$root/payload"
+            test -f "$root/SHARD_MANIFEST.json" || printf '%s\n' '{"schema_version":1,"side":"D2","expected_models":20,"included_models":0,"models":[],"classification":"Q6"}' > "$root/SHARD_MANIFEST.json"
+            test -f "$root/SHARD_INVENTORY.json" || printf '%s\n' '{"schema_version":1,"files":[],"inventory_sha256":"","total_bytes":0}' > "$root/SHARD_INVENTORY.json"
+            python3 "$analyzer" inventory --root "$root" --output "$root/ARTIFACT_INVENTORY.json" || true
+          done
+          exit 0
+      - name: Upload D2 compact manifest evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-d2-manifest-${{ github.run_id }}
+          path: build/d2-manifest
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+      - name: Upload all D2 deterministic shard artifacts
+        if: always()
+        uses: ./tooling/.github/actions/stage4-upload-shards
+        with:
+          side: d2
+          root: build/d2/evidence/shards
+          run-id: ${{ github.run_id }}
+
+  compare_shards:
+    needs: [import_d1, import_d2]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard:
+          - '00'
+          - '01'
+          - '02'
+          - '03'
+          - '04'
+          - '05'
+          - '06'
+          - '07'
+          - '08'
+          - '09'
+          - '10'
+          - '11'
+          - '12'
+          - '13'
+          - '14'
+          - '15'
+          - '16'
+          - '17'
+          - '18'
+          - '19'
+          - '20'
+          - '21'
+          - '22'
+          - '23'
+          - '24'
+          - '25'
+          - '26'
+          - '27'
+          - '28'
+          - '29'
+          - '30'
+          - '31'
+          - '32'
+          - '33'
+          - '34'
+          - '35'
+          - '36'
+          - '37'
+          - '38'
+          - '39'
+    steps:
+      - name: Seed unconditional shard comparison evidence
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p build/comparison
+          printf '{"schema_version":1,"shard_index":%s,"result":"EVIDENCE_INSUFFICIENT","classification":"Q6","models":[]}\n' "$((10#$SHARD))" > build/comparison/STAGE4_SHARD_COMPARISON.json
+          : > build/comparison/STAGE4_SHARD_DIFFERING_PATHS.txt
+          cp build/comparison/STAGE4_SHARD_COMPARISON.json build/comparison/STAGE4_SHARD_SUMMARY.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Verify matching artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for side in d1 d2; do
+            name="stage4-${side}-shard-${SHARD}-${{ github.run_id }}"
+            gh api "repos/${{ github.repository }}/actions/artifacts?name=${name}&per_page=100" > "build/${side}-metadata.json"
+            SIDE="$side" NAME="$name" python3 - <<'PY'
+          import json,os
+          rows=[x for x in json.load(open('build/'+os.environ['SIDE']+'-metadata.json'))['artifacts'] if str(x['workflow_run']['id'])==os.environ['GITHUB_RUN_ID']]
+          assert len(rows)==1
+          a=rows[0];assert a['name']==os.environ['NAME'] and not a['expired']
+          assert a['digest'].startswith('sha256:') and len(a['digest'])==71
+          open('build/'+os.environ['SIDE']+'-artifact-digest.txt','w').write(a['digest']+'\n')
+          PY
+          done
+      - name: Download D1 shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d1-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: build/d1
+      - name: Download D2 shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d2-shard-${{ matrix.shard }}-${{ github.run_id }}
+          path: build/d2
+      - name: Compare exact shard bytes
+        env:
+          SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          python3 "$analyzer" compare-shard --d1-root build/d1 --d2-root build/d2 --shard-index "$((10#$SHARD))" --output build/comparison
+          cp build/d1-artifact-digest.txt build/comparison/D1_ARTIFACT_DIGEST.txt || true
+          cp build/d2-artifact-digest.txt build/comparison/D2_ARTIFACT_DIGEST.txt || true
+          python3 "$analyzer" inventory --root build/comparison --output build/COMPARISON_ARTIFACT_INVENTORY.json || true
+          exit 0
+      - name: Upload shard comparison evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-shard-comparison-${{ matrix.shard }}-${{ github.run_id }}
+          path: build
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+
+  aggregate_stage4:
+    needs: [import_d1, import_d2, compare_shards]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Seed unconditional aggregate evidence
+        shell: bash
+        run: |
+          mkdir -p build/aggregate/evidence
+          printf '%s\n' '{"schema_version":1,"stage4_decision":"FAIL_INSUFFICIENT_EVIDENCE","classification":"Q6","stage5_eligible":false}' > build/aggregate/evidence/GODOT_4_4_1_STAGE4_RESULT.json
+      - name: Check out exact workflow authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          path: tooling
+          fetch-depth: 1
+      - name: Download all shard comparison reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage4-shard-comparison-*-${{ github.run_id }}
+          path: build/comparisons
+      - name: Download D1 compact manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d1-manifest-${{ github.run_id }}
+          path: build/d1-manifest
+      - name: Download D2 compact manifest
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage4-d2-manifest-${{ github.run_id }}
+          path: build/d2-manifest
+      - name: Download all D1 shards
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage4-d1-shard-*-${{ github.run_id }}
+          path: build/d1-shards
+      - name: Download all D2 shards
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: stage4-d2-shard-*-${{ github.run_id }}
+          path: build/d2-shards
+      - name: Aggregate exact full-corpus result
+        shell: bash
+        run: |
+          set +e
+          analyzer=tooling/.github/forensics/qualification/stage4_full_corpus/stage4_full_corpus.py
+          rm -rf build/aggregate/evidence
+          mkdir -p build/aggregate/evidence
+          python3 "$analyzer" aggregate --comparison-root build/comparisons --d1-manifest-root build/d1-manifest --d2-manifest-root build/d2-manifest --d1-shards-root build/d1-shards --d2-shards-root build/d2-shards --output build/aggregate/evidence
+          code=$?
+          if test -d build/aggregate/evidence/differing_pairs; then
+            mkdir -p build/differing-pairs/evidence
+            cp -a build/aggregate/evidence/differing_pairs/. build/differing-pairs/evidence/
+            python3 "$analyzer" inventory --root build/differing-pairs/evidence --output build/differing-pairs/ARTIFACT_INVENTORY.json || true
+          fi
+          python3 "$analyzer" inventory --root build/aggregate/evidence --output build/aggregate/ARTIFACT_INVENTORY.json || true
+          printf '%s\n' "$code" > build/aggregate/ANALYZER_EXIT_CODE.txt
+          exit 0
+      - name: Upload Stage 4 aggregate evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-aggregate-result-${{ github.run_id }}
+          path: build/aggregate
+          if-no-files-found: error
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
+      - name: Upload bounded differing-pair evidence when present
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: stage4-differing-pairs-${{ github.run_id }}
+          path: build/differing-pairs
+          if-no-files-found: ignore
+          compression-level: 9
+          retention-days: 30
+          include-hidden-files: true
