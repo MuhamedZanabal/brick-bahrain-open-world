@@ -37,8 +37,7 @@ def build_sidecar_authority(authority_root:Path,corpus_path:Path,engine_root:Pat
         try:
             if not side.is_file():raise AuthorityError('sidecar missing')
             data=side.read_bytes();parsed=parse_import_sidecar(data)
-            if parsed['source_file']!=rel:raise AuthorityError('source_file mismatch')
-            if parsed['importer']!=row['expected_importer'] or parsed['type']!=row['expected_imported_resource_type']:raise AuthorityError('importer/type mismatch')
+            verify_import_sidecar_contract(row,parsed)
             companion=project/md5_companion_path(parsed['imported_relative_path'])
             if not companion.is_file():raise AuthorityError('companion missing')
             md5=parse_md5_companion(companion.read_bytes())
@@ -47,7 +46,7 @@ def build_sidecar_authority(authority_root:Path,corpus_path:Path,engine_root:Pat
             mapped.append({'global_index':row['global_index'],'logical_source_path':rel,'source_type':row['source_type'],'matrix_member':row['matrix_member'],'sidecar_path':side_rel,'sidecar_byte_size':len(data),'sidecar_sha256':sha256_bytes(data),'source_md5':row['source_md5'],'destination_md5':md5['dest_md5'],'uid':parsed['uid'],'importer':parsed['importer'],'resource_type':parsed['type'],'imported_relative_path':parsed['imported_relative_path'],'dest_files':parsed['dest_files'],'parameters':parsed['parameters'],'parameters_sha256':parsed['parameters_sha256']})
         except Exception as e:rejected.append({'global_index':row['global_index'],'logical_source_path':rel,'error':repr(e)})
     result='PASS' if run['exit_code']==0 and not run['timed_out'] and len(mapped)==TOTAL_MODELS and not rejected else 'FAIL'
-    summary={'schema_version':1,'result':result,'engine_authority':engine,'source_authority':source_report,'expected_model_sidecars':TOTAL_MODELS,'verified_model_sidecars':len(mapped),'rejected_sidecars':len(rejected),'missing_sidecars':sum('missing' in x['error'] for x in rejected),'source_mismatches':sum('source' in x['error'].lower() for x in rejected),'importer_mismatches':sum('importer' in x['error'].lower() for x in rejected),'unsafe_target_paths':sum('unsafe' in x['error'].lower() for x in rejected),'import_duration_seconds':run['duration_seconds'],'import_exit_code':run['exit_code'],'timed_out':run['timed_out'],'watchdog_result':run['watchdog_result'],'log_sha256':run['log_sha256'],'rejected':rejected,'no_generated_godot_reuse':True,'no_stage5':True}
+    summary={'schema_version':1,'result':result,'engine_authority':engine,'source_authority':source_report,'expected_model_sidecars':TOTAL_MODELS,'verified_model_sidecars':len(mapped),'rejected_sidecars':len(rejected),'missing_sidecars':sum('missing' in x['error'] for x in rejected),'source_mismatches':sum('source' in x['error'].lower() for x in rejected),'importer_mismatches':sum('importer mismatch' in x['error'].lower() for x in rejected),'type_mismatches':sum('type mismatch' in x['error'].lower() for x in rejected),'imported_extension_mismatches':sum('extension mismatch' in x['error'].lower() for x in rejected),'unsafe_target_paths':sum('unsafe' in x['error'].lower() for x in rejected),'import_duration_seconds':run['duration_seconds'],'import_exit_code':run['exit_code'],'timed_out':run['timed_out'],'watchdog_result':run['watchdog_result'],'log_sha256':run['log_sha256'],'rejected':rejected,'no_generated_godot_reuse':True,'no_stage5':True}
     write_json(out/'GODOT_4_4_1_FULL_SIDECAR_AUTHORITY.json',summary);write_json(out/'GODOT_4_4_1_MODEL_SIDECAR_MAP.json',{'schema_version':1,'models':mapped});deterministic_zip(items,out/'GODOT_4_4_1_FULL_SIDECAR_AUTHORITY.zip');write_json(out/'SIDECAR_ARTIFACT_INVENTORY.json',build_inventory(out/'sidecars'));return summary
 def materialize_sidecars(project:Path,root:Path,models:list[dict[str,Any]])->dict[str,Any]:
     maps=list(root.rglob('GODOT_4_4_1_MODEL_SIDECAR_MAP.json'));zips=list(root.rglob('GODOT_4_4_1_FULL_SIDECAR_AUTHORITY.zip'));summaries=list(root.rglob('GODOT_4_4_1_FULL_SIDECAR_AUTHORITY.json'))
@@ -61,6 +60,6 @@ def materialize_sidecars(project:Path,root:Path,models:list[dict[str,Any]])->dic
     for row in models:
         auth=by.get(row['logical_source_path']);path=project/row['expected_sidecar_path']
         if not auth or not path.is_file() or sha256_file(path)!=auth['sidecar_sha256']:raise AuthorityError(f'sidecar mismatch:{row["logical_source_path"]}')
-        parsed=parse_import_sidecar(path.read_bytes())
-        if parsed['source_file']!=row['logical_source_path'] or parsed['imported_relative_path']!=auth['imported_relative_path']:raise AuthorityError('sidecar fields mismatch')
+        parsed=parse_import_sidecar(path.read_bytes());verify_import_sidecar_contract(row,parsed)
+        if parsed['imported_relative_path']!=auth['imported_relative_path']:raise AuthorityError('sidecar fields mismatch')
         verified.append(auth)
