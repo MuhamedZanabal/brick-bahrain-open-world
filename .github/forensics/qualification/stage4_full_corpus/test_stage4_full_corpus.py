@@ -3,10 +3,29 @@ from pathlib import Path
 P=Path(__file__).with_name("stage4_full_corpus.py");s=importlib.util.spec_from_file_location("stage4",P);m=importlib.util.module_from_spec(s)
 try:s.loader.exec_module(m)
 except FileNotFoundError:m=None
+CUP_SIDECAR=b'''[remap]\n\nimporter="wavefront_obj"\nimporter_version=1\ntype="Mesh"\nuid="uid://qyjr4fj0y43v"\npath="res://.godot/imported/cup.obj-573fe637ebf8c9287e6a16426ff7f16a.mesh"\n\n[deps]\n\nfiles=["res://.godot/imported/cup.obj-573fe637ebf8c9287e6a16426ff7f16a.mesh"]\n\nsource_file="res://addons/flexible_toon_shader/example/cup.obj"\ndest_files=["res://.godot/imported/cup.obj-573fe637ebf8c9287e6a16426ff7f16a.mesh", "res://.godot/imported/cup.obj-573fe637ebf8c9287e6a16426ff7f16a.mesh"]\n\n[params]\n\ngenerate_tangents=true\ngenerate_lods=true\ngenerate_shadow_mesh=true\ngenerate_lightmap_uv2=false\ngenerate_lightmap_uv2_texel_size=0.2\nscale_mesh=Vector3(1, 1, 1)\noffset_mesh=Vector3(0, 0, 0)\nforce_disable_mesh_compression=false\n'''
 class T(unittest.TestCase):
  def req(self):self.assertIsNotNone(m)
  def test_authorities(self):
-  self.req();self.assertEqual(m.ENGINE_VERSION,"4.4.1-stable");self.assertEqual(m.MODEL_COUNTS,{"GLB":578,"GLTF":203,"FBX":18,"OBJ":1});self.assertEqual(m.MATRIX_MODEL_COUNT,436);self.assertEqual(len(m.MODEL_RESULT_VALUES),8)
+  self.req();self.assertEqual(m.ENGINE_VERSION,"4.4.1-stable");self.assertEqual(m.MODEL_COUNTS,{"GLB":578,"GLTF":203,"FBX":18,"OBJ":1});self.assertEqual(sum(m.MODEL_COUNTS.values()),m.TOTAL_MODELS);self.assertEqual(m.TOTAL_MODELS,800);self.assertEqual(m.MATRIX_MODEL_COUNT,436);self.assertEqual(len(m.MODEL_RESULT_VALUES),8)
+ def test_source_format_import_contracts(self):
+  self.req();expected={"GLB":("scene","PackedScene",".scn"),"GLTF":("scene","PackedScene",".scn"),"FBX":("scene","PackedScene",".scn"),"OBJ":("wavefront_obj","Mesh",".mesh")}
+  self.assertEqual(set(m.MODEL_IMPORT_CONTRACTS),set(expected))
+  for source_type,values in expected.items():
+   c=m.import_contract_for_source_type(source_type);self.assertEqual((c["importer"],c["resource_type"],c["imported_extension"]),values)
+ def test_cup_obj_exact_accepted_sidecar_contract(self):
+  self.req();self.assertEqual(m.sha256_bytes(CUP_SIDECAR),"39eef61c535761504c701d490fad8c6fddcd6ca363b07e0ad5aca7fe7ddaded9")
+  parsed=m.parse_import_sidecar(CUP_SIDECAR);row={"logical_source_path":"addons/flexible_toon_shader/example/cup.obj","source_type":"OBJ",**m.expected_import_fields("OBJ")};m.verify_import_sidecar_contract(row,parsed)
+  self.assertEqual(parsed["importer"],"wavefront_obj");self.assertEqual(parsed["type"],"Mesh");self.assertEqual(parsed["uid"],"uid://qyjr4fj0y43v");self.assertEqual(parsed["imported_relative_path"],".godot/imported/cup.obj-573fe637ebf8c9287e6a16426ff7f16a.mesh")
+ def test_obj_rejects_scene_or_packed_scene_contract(self):
+  self.req();base=m.parse_import_sidecar(CUP_SIDECAR);row={"logical_source_path":"addons/flexible_toon_shader/example/cup.obj","source_type":"OBJ",**m.expected_import_fields("OBJ")}
+  for patch in ({"importer":"scene"},{"type":"PackedScene"},{"imported_relative_path":".godot/imported/cup.scn","dest_files":[".godot/imported/cup.scn"]}):
+   with self.subTest(patch=patch),self.assertRaises(m.AuthorityError):m.verify_import_sidecar_contract(row,{**base,**patch})
+ def test_scene_formats_reject_obj_contract(self):
+  self.req();parsed=m.parse_import_sidecar(CUP_SIDECAR)
+  for source_type,ext in (("GLB","glb"),("GLTF","gltf"),("FBX","fbx")):
+   row={"logical_source_path":f"asset.{ext}","source_type":source_type,**m.expected_import_fields(source_type)};candidate={**parsed,"source_file":f"asset.{ext}"}
+   with self.subTest(source_type=source_type),self.assertRaises(m.AuthorityError):m.verify_import_sidecar_contract(row,candidate)
  def test_shards(self):
   self.req();self.assertEqual(m.shard_bounds(0),(0,19));self.assertEqual(m.shard_bounds(39),(780,799));self.assertEqual([i for s in range(40) for i in range(*((lambda b:(b[0],b[1]+1))(m.shard_bounds(s))))],list(range(800)))
  def test_paths(self):
