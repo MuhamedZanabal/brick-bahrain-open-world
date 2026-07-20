@@ -1,6 +1,27 @@
     if len(seen)!=SOURCE_FILE_COUNT or actual!=seen or total!=SOURCE_BYTES:raise AuthorityError('source tree mismatch')
     return {'result':'PASS','manifest_sha256':SOURCE_MANIFEST_SHA256,'aggregate_tree_sha256':SOURCE_AGGREGATE_TREE_SHA256,'source_archive_sha256':SOURCE_ARCHIVE_SHA256,'file_count':SOURCE_FILE_COUNT,'total_bytes':SOURCE_BYTES,'candidate_commit':COMPOSITE_SOURCE_HEAD,'duplicate_paths':0,'unsafe_paths':0,'case_collisions':0,'missing_source_files':0,'source_hash_alarms':0}
 
+MODEL_IMPORT_CONTRACTS={
+    'GLB':{'importer':'scene','resource_type':'PackedScene','imported_extension':'.scn'},
+    'GLTF':{'importer':'scene','resource_type':'PackedScene','imported_extension':'.scn'},
+    'FBX':{'importer':'scene','resource_type':'PackedScene','imported_extension':'.scn'},
+    'OBJ':{'importer':'wavefront_obj','resource_type':'Mesh','imported_extension':'.mesh'},
+}
+def import_contract_for_source_type(source_type:str)->dict[str,str]:
+    try:return dict(MODEL_IMPORT_CONTRACTS[source_type])
+    except KeyError as e:raise AuthorityError(f'unsupported source type:{source_type}') from e
+def expected_import_fields(source_type:str)->dict[str,str]:
+    contract=import_contract_for_source_type(source_type)
+    return {'expected_importer':contract['importer'],'expected_imported_resource_type':contract['resource_type'],'expected_imported_extension':contract['imported_extension']}
+def verify_import_sidecar_contract(row:dict[str,Any],parsed:dict[str,Any])->None:
+    if parsed.get('source_file')!=row.get('logical_source_path'):raise AuthorityError('source_file mismatch')
+    if parsed.get('importer')!=row.get('expected_importer'):raise AuthorityError('importer mismatch')
+    if parsed.get('type')!=row.get('expected_imported_resource_type'):raise AuthorityError('type mismatch')
+    expected=row.get('expected_imported_extension')
+    if not isinstance(expected,str) or not expected.startswith('.'):raise AuthorityError('invalid imported extension authority')
+    if PurePosixPath(parsed.get('imported_relative_path','')).suffix!=expected:raise AuthorityError('imported extension mismatch')
+    if any(PurePosixPath(x).suffix!=expected for x in parsed.get('dest_files',[])):raise AuthorityError('destination extension mismatch')
+
 def build_full_corpus_authority(source:Path,out:Path,source_verification:dict[str,Any]|None=None)->dict[str,Any]:
     matrix_file=source/'asset_lab/runtime/full_asset_matrix_manifest.json'
     if sha256_file(matrix_file)!=MATRIX_MANIFEST_SHA256:raise AuthorityError('matrix SHA mismatch')
@@ -17,7 +38,7 @@ def build_full_corpus_authority(source:Path,out:Path,source_verification:dict[st
             dp=source/d
             if not dp.is_file():raise AuthorityError(f'missing dependency:{rel}->{d}')
             deps.append({'path':d,'bytes':dp.stat().st_size,'sha256':sha256_file(dp),'md5':md5_file(dp)})
-        row={'global_index':idx,'logical_source_path':rel,'source_type':typ,'matrix_member':rel in matrix,'source_byte_size':path.stat().st_size,'source_sha256':sha256_file(path),'source_md5':md5_file(path),'dependencies':deps,'expected_sidecar_path':rel+'.import','expected_importer':'scene','expected_imported_resource_type':'PackedScene'}
+        row={'global_index':idx,'logical_source_path':rel,'source_type':typ,'matrix_member':rel in matrix,'source_byte_size':path.stat().st_size,'source_sha256':sha256_file(path),'source_md5':md5_file(path),'dependencies':deps,'expected_sidecar_path':rel+'.import',**expected_import_fields(typ)}
         models.append(row);deps_out.append({'global_index':idx,'logical_source_path':rel,'dependencies':deps})
     if dict(formats)!=MODEL_COUNTS:raise AuthorityError(f'format counts:{dict(formats)}')
     found={x['logical_source_path'] for x in models if x['matrix_member']};missing=sorted(matrix-found,key=lambda x:x.encode())
