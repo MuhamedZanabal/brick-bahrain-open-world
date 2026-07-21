@@ -1,5 +1,5 @@
 name: Materialize Godot 4.5.2 Stage 5 analyzer
-description: Reconstruct and verify the immutable Stage 5 qualification bundle.
+description: Reconstruct, correct and verify the immutable Stage 5 qualification bundle.
 outputs:
   analyzer:
     description: Absolute Stage 5 analyzer entrypoint.
@@ -25,7 +25,16 @@ runs:
         test "$(sha256sum "$d/bundle.zip" | cut -d' ' -f1)" = 2cca51807ea3b6b23d14302c578a11b9814705f7c630c362fed9c00fb7caa901
         unzip -q "$d/bundle.zip" -d "$d"
         test "$(sha256sum "$d/stage5_project_compatibility_4_5_2.py" | cut -d' ' -f1)" = 87c8ac6b3653f678c4383ed39818ccc3c76fba4f55971c5c3a7f8e1d786aed57
-        test "$(sha256sum "$d/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" | cut -d' ' -f1)" = 1fd26565851c4ede348566b40bbc03d667d325ffac040406616d184b131cef5b
+        pc="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2"
+        cat "$pc"/stage5_harness_correction_v2_*.b64part | tr -d '\r\n' > "$d/correction.b64"
+        printf '\n' >> "$d/correction.b64"
+        test "$(sha256sum "$d/correction.b64" | cut -d' ' -f1)" = f4536f30c5de8717fd103fff32016eaca6e3d5d926ffb59a5b01eb9e749bfeb3
+        base64 -d "$d/correction.b64" > "$d/correction.patch"
+        test "$(sha256sum "$d/correction.patch" | cut -d' ' -f1)" = d46b005dac1ee382018e5c825e4891dbba7125fcbe1b2a775d4ecd3a8fc95939
+        patch --batch --forward -s -d "$d" -p0 < "$d/correction.patch"
+        test "$(sha256sum "$d/stage5_project_compatibility_4_5_2.py" | cut -d' ' -f1)" = a88f9cdfa407963528b6689fa4e79b4e5ae089abdb3bfdd2b7293c675db7d0e2
+        test "$(sha256sum "$d/test_stage5.py" | cut -d' ' -f1)" = e6b7278901e63e3663daf50842f494fe155ddb87ab51e00bf54811b7fbb464b3
+        test "$(sha256sum "$d/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" | cut -d' ' -f1)" = bba6c0deacb1a9dc3a767333084aabde3bb166a4672049b4a100bba1ff62e6dd
         chmod +x "$d/stage5_project_compatibility_4_5_2.py"
         echo "analyzer=$d/stage5_project_compatibility_4_5_2.py" >> "$GITHUB_OUTPUT"
         echo "bundle_root=$d" >> "$GITHUB_OUTPUT"
