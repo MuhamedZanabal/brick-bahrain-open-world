@@ -1,0 +1,37 @@
+name: Run Stage 5 revision 4 legacy diagnostic
+description: Diagnose exact legacy source using an absolute compatibility-census destination.
+runs:
+  using: composite
+  steps:
+    - id: bundle
+      uses: ./.github/actions/stage5-r4-materialize
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: bahrain-brick-pr59-authority-run-a-29538386331, path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29538386331', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage2-engine-package-4.5.2-stable-29685721858, path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage4-4-5-2-prep-29818942517, path: build/stage4-prep, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29818942517', github-token: '${{ github.token }}'}
+    - shell: bash
+      run: |
+        set -euo pipefail
+        root=/tmp/bahrain-stage5-4-5-2-r4-legacy-source/project
+        engine=/tmp/bahrain-stage5-4-5-2-r4-legacy-source/engine
+        evidence=/tmp/bahrain-stage5-4-5-2-r4-legacy-evidence
+        rm -rf /tmp/bahrain-stage5-4-5-2-r4-legacy-source "$evidence" build/legacy
+        mkdir -p "$evidence"
+        export STAGE5_R4_REPORT_PATH="$(realpath "$evidence")/PROJECT_COMPATIBILITY_CENSUS.json"
+        python3 '${{ steps.bundle.outputs.analyzer }}' patch-base --bundle-root '${{ steps.bundle.outputs.base_bundle_root }}'
+        set +e
+        PYTHONPATH='${{ steps.bundle.outputs.base_bundle_root }}' python3 '${{ steps.bundle.outputs.base_analyzer }}' legacy \
+          --source-artifact build/source-artifact --engine-artifact build/engine-artifact --stage4-prep build/stage4-prep \
+          --project-root "$root" --engine-output "$engine" \
+          --bundle-root '${{ steps.bundle.outputs.base_bundle_root }}' --output build/legacy
+        base_rc=$?
+        set -e
+        printf '%s\n' "$base_rc" > build/legacy/BASE_ANALYZER_EXIT_CODE.txt
+        PYTHONPATH='${{ steps.bundle.outputs.bundle_root }}' python3 '${{ steps.bundle.outputs.analyzer }}' finalize-legacy \
+          --project-root "$root" --engine-binary "$engine/Godot_v4.5.2-stable_linux.x86_64" \
+          --evidence-dir "$evidence" --output build/legacy --bundle-root '${{ steps.bundle.outputs.bundle_root }}'
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with: {name: 'stage5-4-5-2-r4-legacy-${{ github.run_id }}', path: build/legacy, retention-days: 30, compression-level: 9, include-hidden-files: true}
