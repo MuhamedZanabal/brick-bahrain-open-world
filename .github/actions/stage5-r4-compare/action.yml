@@ -1,0 +1,27 @@
+name: Compare one Stage 5 revision 4 generated shard
+description: Compare matching C1/C2 path unions, bytes and generated metadata with UID-cache byte forensics.
+inputs:
+  index: {required: true, description: Zero-padded shard index}
+runs:
+  using: composite
+  steps:
+    - id: bundle
+      uses: ./.github/actions/stage5-r4-materialize
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {name: 'stage5-4-5-2-c1-generated-shard-${{ inputs.index }}-${{ github.run_id }}', path: build/c1}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {name: 'stage5-4-5-2-c2-generated-shard-${{ inputs.index }}-${{ github.run_id }}', path: build/c2}
+    - shell: bash
+      run: |
+        set +e
+        PYTHONPATH='${{ steps.bundle.outputs.bundle_root }}' python3 '${{ steps.bundle.outputs.analyzer }}' compare-shard \
+          --c1 build/c1 --c2 build/c2 --index $((10#${{ inputs.index }})) --output build/comparison
+        rc=$?
+        set -e
+        test -f "build/comparison/GENERATED_COMPARISON_${{ inputs.index }}.json"
+        exit "$rc"
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with: {name: 'stage5-4-5-2-r4-generated-comparison-${{ inputs.index }}-${{ github.run_id }}', path: build/comparison, retention-days: 30, compression-level: 9, include-hidden-files: true}
