@@ -1,0 +1,30 @@
+name: Aggregate Stage 5 revision 3 evidence
+description: Produce the terminal Stage 5 compatibility and reproducibility classification.
+runs:
+  using: composite
+  steps:
+    - id: bundle
+      uses: ./.github/actions/stage5-4-5-2-materialize
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {name: 'stage5-4-5-2-r3-preparation-${{ github.run_id }}', path: build/prep}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {name: 'stage5-4-5-2-r3-legacy-${{ github.run_id }}', path: build/legacy}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {name: 'stage5-4-5-2-r3-c1-evidence-${{ github.run_id }}', path: build/c1}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {name: 'stage5-4-5-2-r3-c2-evidence-${{ github.run_id }}', path: build/c2}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      continue-on-error: true
+      with: {pattern: 'stage5-4-5-2-generated-comparison-*-${{ github.run_id }}', path: build/comparisons, merge-multiple: true}
+    - shell: bash
+      run: |
+        PYTHONPATH='${{ steps.bundle.outputs.bundle_root }}' python3 '${{ steps.bundle.outputs.analyzer }}' aggregate \
+          --prep build/prep --legacy build/legacy --c1 build/c1 --c2 build/c2 \
+          --comparisons build/comparisons --output build/aggregate
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with: {name: 'stage5-4-5-2-r3-aggregate-${{ github.run_id }}', path: build/aggregate, retention-days: 30, compression-level: 9, include-hidden-files: true}
