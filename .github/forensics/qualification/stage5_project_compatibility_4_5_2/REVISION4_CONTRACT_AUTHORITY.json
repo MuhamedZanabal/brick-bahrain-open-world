@@ -1,0 +1,46 @@
+{
+  "action_sha256": {
+    "stage5-r4-aggregate": "24250a28147a42aff6df532cae003e0c90101815e3a3935550a586790327b935",
+    "stage5-r4-candidate": "3cde912247ce87d09d2710da696f7006807f0e2319d40011cc4b64679b861ed1",
+    "stage5-r4-compare": "c420e4a04237b6687c30bfac9500739533bc00cf2efea15ae52793d557886427",
+    "stage5-r4-legacy": "77572594d3d9fc277a7b789dc2f658ddb5ea286eab103a004528bed3ef8a59b3",
+    "stage5-r4-materialize": "95bd326a233287e66ffe7e91b89fda4ca986f39761746f8adb60b351a99e9187",
+    "stage5-r4-prepare": "b3baca793895fb59b770598deb07882fc95b79de4bbed1252b4c389376dcaccd"
+  },
+  "analyzer_loader_sha256": "68b0b0ab16bd3c79547db1c808cec570b4c55a18d24f75de37f9ace7b5ecc634",
+  "analyzer_source_sha256": "999895744f59d25dc863a5533f1dcb253c8caf1462900c848cf558f4582ba6d5",
+  "bundle_base64_sha256": "bd202e11ae88e6f5d6c40f7973148108b3b87d6d80130f8d8ccf3e8379473f7f",
+  "deterministic_bundle_sha256": "01915eeae84d4ac94cf9b59cff21ac9205a131e503c8c9702b0794541040ab95",
+  "frozen_authorities": {
+    "added_model_sidecars": 533,
+    "authorized_model_sidecars": 800,
+    "changed_existing_model_sidecars": 267,
+    "pr_head": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "source_bytes": 369162800,
+    "source_files": 1502
+  },
+  "godot_probe_parse_and_execution": "PASS",
+  "pre_revision4_branch_head": "0eedbbafdc99e0fcb6638a32c91734c8ae882ba4",
+  "python_compilation": "PASS",
+  "revision3_accepted_classification": "Q6 — EVIDENCE INSUFFICIENT",
+  "revision3_aggregate_artifact": 8508358647,
+  "revision3_aggregate_sha256": "264add4b35814a79449277a56a128def12e08b246067a3f7f2a470734de2f2c0",
+  "revision3_generated_comparison_sha256": "7cd2c9f443c79d2401700a36ec9109e2bdfc9408b4206748baef120111703ef1",
+  "revision3_locator": "0eedbbafdc99e0fcb6638a32c91734c8ae882ba4",
+  "revision3_run_id": 29862957145,
+  "revision3_workflow": "e24b1e37b8834ace125edeba4b7f1aca44f652ba",
+  "schema": "stage5-revision4-contract-authority-v1",
+  "stage5_harness_revision": 4,
+  "test_sha256": "7ab08496e2dc9c8c022c5fbc50ae88fde291892ee136e1ca1046942426e4ea36",
+  "tests_failed": 0,
+  "tests_passed": 16,
+  "workflow_contracts": {
+    "aggregate_if_always": true,
+    "c1_shards": 40,
+    "c2_shards": 40,
+    "comparisons": 40,
+    "exact_self_path_trigger": true,
+    "prohibited_actions_absent": true
+  },
+  "workflow_sha256": "58d7c2b13eb5bfe2d2d1d9fb69e2f2b53bdb87c89b2611653da081e0650379e9"
+}
