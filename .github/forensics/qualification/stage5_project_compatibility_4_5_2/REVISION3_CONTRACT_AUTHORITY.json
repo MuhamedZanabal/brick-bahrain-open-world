@@ -5,13 +5,13 @@
   "deterministic_bundle_sha256": "1607878095e0e5f1b7ac5b03195d79058b79697e0294e2fe05fb526d612f7622",
   "harness_action_sha256": {
     "aggregate": "4bbc1620b3addc5d4c82e0cbd8a2894a463706590d99cd2a3e3533a3b3f1d5e0",
-    "candidate": "a0a23b14de68f76a609858b3ece3df877ab9507436b0227c99dc2380fd764520",
+    "candidate": "ba37fa03a6fac8f29da0806cd1c9b1ba12c040fd0fb543bb31d7ec4a03e19f3b",
     "compare": "86fbab8b9bd22b7418e3006a24c066f42efce71b6346f5118a497d5a4679f7c1",
     "legacy": "d988103006320f8aa5f07a209db300be0bb84103a9d300c644132b3f4006ff75",
     "prepare": "bdc4b893ce7c4c76f5043b6a166a980748a7131ef48db8efb96cee093a0361e1"
   },
   "materializer_sha256": "bee2a2097d2ef11602e28c880aafb957f5ca17d6655b5fa9dcfde71db8c944f2",
-  "pending_workflow_sha256": "99818bd0d70b445bedf96b914fc06c03a86b4180bdcd24ce60f7924186733d56",
+  "pending_workflow_sha256": "92b25bc0a440caec1864257c8c7e67a4f900f04d54fd10d63daca227cabe1223",
   "scanner_regressions": {
     "asset_filename_crash_false_positive": "PASS",
     "fatal_engine_signature": "PASS",
@@ -40,6 +40,7 @@
     "c2_generated_shards": 40,
     "comparisons": 40,
     "exact_self_path_trigger": "PASS",
-    "prohibited_actions_absent": "PASS"
+    "prohibited_actions_absent": "PASS",
+    "terminal_candidate_evidence_preserved": "PASS"
   }
 }
