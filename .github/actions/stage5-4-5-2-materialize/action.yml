@@ -1,0 +1,31 @@
+name: Materialize Godot 4.5.2 Stage 5 analyzer
+description: Reconstruct and verify the immutable Stage 5 qualification bundle.
+outputs:
+  analyzer:
+    description: Absolute Stage 5 analyzer entrypoint.
+    value: ${{ steps.unpack.outputs.analyzer }}
+  bundle_root:
+    description: Absolute materialized bundle root.
+    value: ${{ steps.unpack.outputs.bundle_root }}
+runs:
+  using: composite
+  steps:
+    - id: unpack
+      shell: bash
+      run: |
+        set -euo pipefail
+        d="$RUNNER_TEMP/stage5-4-5-2-bundle"
+        rm -rf "$d"
+        mkdir -p "$d"
+        c="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2/chunks"
+        cat "$c"/stage5_bundle_*.b64part | tr -d '\r\n' > "$d/bundle.b64"
+        printf '\n' >> "$d/bundle.b64"
+        test "$(sha256sum "$d/bundle.b64" | cut -d' ' -f1)" = 0f1bf8c1bc40e83b111270202433a39ec0f351abf1beb2331028312c4e61440d
+        base64 -d "$d/bundle.b64" > "$d/bundle.zip"
+        test "$(sha256sum "$d/bundle.zip" | cut -d' ' -f1)" = 2cca51807ea3b6b23d14302c578a11b9814705f7c630c362fed9c00fb7caa901
+        unzip -q "$d/bundle.zip" -d "$d"
+        test "$(sha256sum "$d/stage5_project_compatibility_4_5_2.py" | cut -d' ' -f1)" = 87c8ac6b3653f678c4383ed39818ccc3c76fba4f55971c5c3a7f8e1d786aed57
+        test "$(sha256sum "$d/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" | cut -d' ' -f1)" = 1fd26565851c4ede348566b40bbc03d667d325ffac040406616d184b131cef5b
+        chmod +x "$d/stage5_project_compatibility_4_5_2.py"
+        echo "analyzer=$d/stage5_project_compatibility_4_5_2.py" >> "$GITHUB_OUTPUT"
+        echo "bundle_root=$d" >> "$GITHUB_OUTPUT"
