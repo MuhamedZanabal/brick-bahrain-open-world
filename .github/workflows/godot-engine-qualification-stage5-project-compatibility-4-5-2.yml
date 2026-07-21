@@ -45,7 +45,9 @@ jobs:
           root='${{ steps.bundle.outputs.bundle_root }}'
           test '${{ steps.bundle.outputs.analyzer_source_sha256 }}' = "$ANALYZER_SOURCE_SHA256"
           test '${{ steps.bundle.outputs.analyzer_loader_sha256 }}' = "$ANALYZER_LOADER_SHA256"
-          STAGE5_WORKFLOW_PATH="$GITHUB_WORKSPACE/.github/workflows/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" PYTHONPATH="$root" python3 -m unittest -v "$root/test_stage5_r3.py"
+          cd "$root"
+          STAGE5_WORKFLOW_PATH="$GITHUB_WORKSPACE/.github/workflows/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" python3 -m unittest -v test_stage5_r3.py
+          cd "$GITHUB_WORKSPACE"
           python3 -m py_compile "$root"/*.py
           pr=$(gh api repos/$GITHUB_REPOSITORY/pulls/59)
           test "$(jq -r .head.sha<<<"$pr")" = "$PR_HEAD"
@@ -115,7 +117,7 @@ jobs:
           engine-output: /tmp/bahrain-stage5-4-5-2-r3-c2-different-absolute-root/engine
   upload_c1_generated_shards:
     needs: candidate_c1
-    if: always()
+    if: always() && needs.candidate_c1.result != 'skipped'
     runs-on: ubuntu-24.04
     strategy: &shard_strategy
       fail-fast: false
@@ -130,7 +132,7 @@ jobs:
         with: {lane: c1, root: build/shards, index: '${{ matrix.shard }}', run-id: '${{ github.run_id }}'}
   upload_c2_generated_shards:
     needs: candidate_c2
-    if: always()
+    if: always() && needs.candidate_c2.result != 'skipped'
     runs-on: ubuntu-24.04
     strategy: *shard_strategy
     steps:
@@ -142,7 +144,7 @@ jobs:
         with: {lane: c2, root: build/shards, index: '${{ matrix.shard }}', run-id: '${{ github.run_id }}'}
   compare_generated:
     needs: [candidate_c1, candidate_c2, upload_c1_generated_shards, upload_c2_generated_shards]
-    if: always()
+    if: always() && needs.candidate_c1.result != 'skipped' && needs.candidate_c2.result != 'skipped'
     runs-on: ubuntu-24.04
     strategy: *shard_strategy
     steps:
