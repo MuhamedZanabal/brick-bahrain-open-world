@@ -1,0 +1,26 @@
+name: Upload one Stage 5 generated closure shard
+description: Upload one deterministic Stage 5 generated-file shard from a matrix job.
+inputs:
+  lane:
+    required: true
+    description: c1 or c2
+  root:
+    required: true
+    description: Directory containing 00..39 shard directories
+  run-id:
+    required: true
+    description: Workflow run ID
+  index:
+    required: true
+    description: Zero-padded shard index
+runs:
+  using: composite
+  steps:
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      with:
+        name: stage5-4-5-2-${{ inputs.lane }}-generated-shard-${{ inputs.index }}-${{ inputs.run-id }}
+        path: ${{ inputs.root }}/${{ inputs.index }}
+        if-no-files-found: error
+        retention-days: 30
+        compression-level: 0
+        include-hidden-files: true
