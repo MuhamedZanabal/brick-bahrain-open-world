@@ -1,0 +1,38 @@
+{
+  "analyzer_loader_sha256": "e837e359aff883814395d8482515fb85750b2c53ce9e7aa43254f0017bd5bed4",
+  "analyzer_source_sha256": "b3be23cc346be02c98a35ae40edf4d60ad0273ac63170102c76a42356a446d50",
+  "bundle_base64_sha256": "2dea7b866867239360d273ce1ce39f4be79c6a7ad3bbc24f54e6eaa7eabdaf17",
+  "deterministic_bundle_sha256": "1607878095e0e5f1b7ac5b03195d79058b79697e0294e2fe05fb526d612f7622",
+  "materializer_sha256": "bee2a2097d2ef11602e28c880aafb957f5ca17d6655b5fa9dcfde71db8c944f2",
+  "pending_workflow_sha256": "d963e776e563514633db1853a90342d6aba3429f963498d29ad69df37a703c0f",
+  "scanner_regressions": {
+    "asset_filename_crash_false_positive": "PASS",
+    "fatal_engine_signature": "PASS",
+    "resource_load_path_false_positive": "PASS",
+    "script_parser_error_separation": "PASS",
+    "segmentation_fault_signal": "PASS"
+  },
+  "source_authority_preflight": {
+    "added_sidecars": 533,
+    "authorized_model_sidecars": 800,
+    "bytes": 369162800,
+    "changed_existing_sidecars": 267,
+    "files": 1502,
+    "frozen_controls": "25/25",
+    "result": "PASS"
+  },
+  "stage5_harness_revision": 3,
+  "stage5_shard_uploader_sha256": "400014e670d1d5aa4ab4773c09105e14cd06a93ec9786062105b8216af167c96",
+  "test_result": "PASS",
+  "test_sha256": "99e7f706669588e2b2f72e656de76dd178905d000d93e70729e52e7b04421d5a",
+  "tests_failed": 0,
+  "tests_passed": 11,
+  "workflow_contracts": {
+    "aggregate_if_always": true,
+    "c1_generated_shards": 40,
+    "c2_generated_shards": 40,
+    "comparisons": 40,
+    "exact_self_path_trigger": "PASS",
+    "prohibited_actions_absent": "PASS"
+  }
+}
