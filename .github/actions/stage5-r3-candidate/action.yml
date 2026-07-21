@@ -1,0 +1,56 @@
+name: Run one Stage 5 revision 3 candidate lane
+description: Reconstruct, import, census and shard one independent candidate project.
+inputs:
+  lane: {required: true, description: C1 or C2}
+  artifact-lane: {required: true, description: c1 or c2}
+  project-root: {required: true, description: Absolute detached project root}
+  engine-output: {required: true, description: Absolute detached engine root}
+  run-full-suite: {required: false, default: 'false', description: Run inherited C1 regression suite}
+runs:
+  using: composite
+  steps:
+    - id: bundle
+      uses: ./.github/actions/stage5-4-5-2-materialize
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: bahrain-brick-pr59-authority-run-a-29538386331, path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29538386331', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage2-engine-package-4.5.2-stable-29685721858, path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage4-4-5-2-prep-29818942517, path: build/stage4-prep, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29818942517', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage4-4-5-2-aggregate-result-29818942517, path: build/stage4-aggregate, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29818942517', github-token: '${{ github.token }}'}
+    - shell: bash
+      run: |
+        extra=()
+        if test '${{ inputs.run-full-suite }}' = true; then extra+=(--run-full-suite); fi
+        PYTHONPATH='${{ steps.bundle.outputs.bundle_root }}' python3 '${{ steps.bundle.outputs.analyzer }}' candidate \
+          --source-artifact build/source-artifact --engine-artifact build/engine-artifact \
+          --stage4-prep build/stage4-prep --stage4-aggregate build/stage4-aggregate \
+          --project-root '${{ inputs.project-root }}' --engine-output '${{ inputs.engine-output }}' \
+          --output 'build/${{ inputs.artifact-lane }}' --bundle-root '${{ steps.bundle.outputs.bundle_root }}' \
+          --lane '${{ inputs.lane }}' "${extra[@]}"
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with:
+        name: stage5-4-5-2-r3-${{ inputs.artifact-lane }}-evidence-${{ github.run_id }}
+        path: |
+          build/${{ inputs.artifact-lane }}
+          !build/${{ inputs.artifact-lane }}/generated_closure/**
+          !build/${{ inputs.artifact-lane }}/FULL_GENERATED_${{ inputs.lane }}_CLOSURE.zip
+          !build/${{ inputs.artifact-lane }}/shards/**
+        retention-days: 30
+        compression-level: 9
+        include-hidden-files: true
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with:
+        name: stage5-4-5-2-r3-${{ inputs.artifact-lane }}-generated-closure-${{ github.run_id }}
+        path: |
+          build/${{ inputs.artifact-lane }}/FULL_GENERATED_${{ inputs.lane }}_CLOSURE.zip
+          build/${{ inputs.artifact-lane }}/FULL_GENERATED_${{ inputs.lane }}_MANIFEST.json
+        retention-days: 30
+        compression-level: 0
+        include-hidden-files: true
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with: {name: 'stage5-4-5-2-r3-${{ inputs.artifact-lane }}-shard-source-${{ github.run_id }}', path: 'build/${{ inputs.artifact-lane }}/shards', retention-days: 1, compression-level: 0, include-hidden-files: true}
