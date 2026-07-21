@@ -1,0 +1,23 @@
+name: Run Stage 5 revision 3 legacy diagnostic
+description: Diagnose exact legacy source under Godot 4.5.2 without sidecar replacement.
+runs:
+  using: composite
+  steps:
+    - id: bundle
+      uses: ./.github/actions/stage5-4-5-2-materialize
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: bahrain-brick-pr59-authority-run-a-29538386331, path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29538386331', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage2-engine-package-4.5.2-stable-29685721858, path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29685721858', github-token: '${{ github.token }}'}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with: {name: stage4-4-5-2-prep-29818942517, path: build/stage4-prep, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29818942517', github-token: '${{ github.token }}'}
+    - shell: bash
+      run: |
+        PYTHONPATH='${{ steps.bundle.outputs.bundle_root }}' python3 '${{ steps.bundle.outputs.analyzer }}' legacy \
+          --source-artifact build/source-artifact --engine-artifact build/engine-artifact --stage4-prep build/stage4-prep \
+          --project-root /tmp/bahrain-stage5-4-5-2-r3-legacy-source/project \
+          --engine-output /tmp/bahrain-stage5-4-5-2-r3-legacy-source/engine \
+          --bundle-root '${{ steps.bundle.outputs.bundle_root }}' --output build/legacy
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with: {name: 'stage5-4-5-2-r3-legacy-${{ github.run_id }}', path: build/legacy, retention-days: 30, compression-level: 9, include-hidden-files: true}
