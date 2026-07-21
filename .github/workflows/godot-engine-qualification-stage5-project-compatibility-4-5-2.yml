@@ -6,10 +6,10 @@ on:
 permissions: {actions: read, contents: read}
 concurrency: {group: bahrain-brick-godot-stage5-project-compatibility-4-5-2, cancel-in-progress: false}
 env:
-  STAGE5_HARNESS_REVISION: '3'
-  ANALYZER_SOURCE_SHA256: b3be23cc346be02c98a35ae40edf4d60ad0273ac63170102c76a42356a446d50
-  ANALYZER_LOADER_SHA256: e837e359aff883814395d8482515fb85750b2c53ce9e7aa43254f0017bd5bed4
-  DETERMINISTIC_BUNDLE_SHA256: 1607878095e0e5f1b7ac5b03195d79058b79697e0294e2fe05fb526d612f7622
+  STAGE5_HARNESS_REVISION: '4'
+  ANALYZER_SOURCE_SHA256: 999895744f59d25dc863a5533f1dcb253c8caf1462900c848cf558f4582ba6d5
+  ANALYZER_LOADER_SHA256: 68b0b0ab16bd3c79547db1c808cec570b4c55a18d24f75de37f9ace7b5ecc634
+  DETERMINISTIC_BUNDLE_SHA256: 01915eeae84d4ac94cf9b59cff21ac9205a131e503c8c9702b0794541040ab95
   PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
 jobs:
   record_locator:
@@ -22,11 +22,11 @@ jobs:
         run: |
           set -euo pipefail
           p=.github/forensics/qualification/LATEST_STAGE5_PROJECT_COMPATIBILITY_4_5_2_RUN.json
-          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","engine":"4.5.2","stage":5,"harness_revision":3}' > "$p"
+          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","engine":"4.5.2","stage":5,"harness_revision":4}' > "$p"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add "$p"
-          git commit -m "ci(stage5): record revision 3 run ${{ github.run_id }}"
+          git commit -m "ci(stage5): record revision 4 run ${{ github.run_id }}"
           git fetch origin ci/godot-engine-determinism-qualification-20260719
           git rebase origin/ci/godot-engine-determinism-qualification-20260719
           git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
       - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
+        uses: ./.github/actions/stage5-r4-materialize
       - env: {GH_TOKEN: '${{ github.token }}'}
         shell: bash
         run: |
@@ -46,19 +46,22 @@ jobs:
           test '${{ steps.bundle.outputs.analyzer_source_sha256 }}' = "$ANALYZER_SOURCE_SHA256"
           test '${{ steps.bundle.outputs.analyzer_loader_sha256 }}' = "$ANALYZER_LOADER_SHA256"
           cd "$root"
-          STAGE5_WORKFLOW_PATH="$GITHUB_WORKSPACE/.github/workflows/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" python3 -m unittest -v test_stage5_r3.py
+          STAGE5_WORKFLOW_PATH="$GITHUB_WORKSPACE/.github/workflows/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" python3 -m unittest -v test_stage5_r4.py
           cd "$GITHUB_WORKSPACE"
           python3 -m py_compile "$root"/*.py
           pr=$(gh api repos/$GITHUB_REPOSITORY/pulls/59)
           test "$(jq -r .head.sha<<<"$pr")" = "$PR_HEAD"
+          test "$(jq -r .base.sha<<<"$pr")" = fc8f00182f97c39015610d6603fa7c9c44364c5d
           test "$(jq -r .state<<<"$pr")" = open
           test "$(jq -r .draft<<<"$pr")" = true
           test "$(jq -r .merged_at<<<"$pr")" = null
+          test "$(jq -r .commits<<<"$pr")" = 99
           for s in \
             '8391457302:c05d7ff8f46bc6b830f114f47446e92ede06ee55d00436527f500faf50273193:29538386331:b12e1e012e256036e71066260a4c6392d26c3839' \
             '8441999064:86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9:29685721858:23efeab85489ef1efafca60a0c0791507fc3f5dc' \
             '8490701959:784b5b137f89b67f16e87487e72b1acf84046472a4017f295c505cf18d6bea1b:29818942517:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662' \
-            '8490964042:320eb5a9d393d084aba65d94ec1f7d7a2f7ea1000dafc97fbe4dee622dd720ee:29818942517:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662'; do
+            '8490964042:320eb5a9d393d084aba65d94ec1f7d7a2f7ea1000dafc97fbe4dee622dd720ee:29818942517:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662' \
+            '8508358647:264add4b35814a79449277a56a128def12e08b246067a3f7f2a470734de2f2c0:29862957145:e24b1e37b8834ace125edeba4b7f1aca44f652ba'; do
             IFS=: read id dg run head<<<"$s"
             j=$(gh api repos/$GITHUB_REPOSITORY/actions/artifacts/$id)
             test "$(jq -r .digest<<<"$j")" = sha256:$dg
@@ -79,7 +82,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - uses: ./.github/actions/stage5-r3-prepare
+      - uses: ./.github/actions/stage5-r4-prepare
   legacy_source:
     needs: prepare_authority
     runs-on: ubuntu-24.04
@@ -87,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - uses: ./.github/actions/stage5-r3-legacy
+      - uses: ./.github/actions/stage5-r4-legacy
   candidate_c1:
     needs: prepare_authority
     runs-on: ubuntu-24.04
@@ -95,12 +98,13 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - uses: ./.github/actions/stage5-r3-candidate
+      - uses: ./.github/actions/stage5-r4-candidate
         with:
           lane: C1
           artifact-lane: c1
-          project-root: /tmp/bahrain-stage5-4-5-2-r3-c1/project
-          engine-output: /tmp/bahrain-stage5-4-5-2-r3-c1/engine
+          project-root: /tmp/bahrain-stage5-4-5-2-r4-c1/project
+          engine-output: /tmp/bahrain-stage5-4-5-2-r4-c1/engine
+          evidence-dir: /tmp/bahrain-stage5-4-5-2-r4-c1-evidence
           run-full-suite: 'true'
   candidate_c2:
     needs: prepare_authority
@@ -109,12 +113,13 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - uses: ./.github/actions/stage5-r3-candidate
+      - uses: ./.github/actions/stage5-r4-candidate
         with:
           lane: C2
           artifact-lane: c2
-          project-root: /tmp/bahrain-stage5-4-5-2-r3-c2-different-absolute-root/project
-          engine-output: /tmp/bahrain-stage5-4-5-2-r3-c2-different-absolute-root/engine
+          project-root: /tmp/bahrain-stage5-4-5-2-r4-c2-different-absolute-root/project
+          engine-output: /tmp/bahrain-stage5-4-5-2-r4-c2-different-absolute-root/engine
+          evidence-dir: /tmp/bahrain-stage5-4-5-2-r4-c2-evidence
   upload_c1_generated_shards:
     needs: candidate_c1
     if: always() && needs.candidate_c1.result != 'skipped'
@@ -127,7 +132,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage5-4-5-2-r3-c1-shard-source-${{ github.run_id }}', path: build/shards}
+        with: {name: 'stage5-4-5-2-r4-c1-shard-source-${{ github.run_id }}', path: build/shards}
       - uses: ./.github/actions/stage5-upload-generated-shards
         with: {lane: c1, root: build/shards, index: '${{ matrix.shard }}', run-id: '${{ github.run_id }}'}
   upload_c2_generated_shards:
@@ -139,7 +144,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage5-4-5-2-r3-c2-shard-source-${{ github.run_id }}', path: build/shards}
+        with: {name: 'stage5-4-5-2-r4-c2-shard-source-${{ github.run_id }}', path: build/shards}
       - uses: ./.github/actions/stage5-upload-generated-shards
         with: {lane: c2, root: build/shards, index: '${{ matrix.shard }}', run-id: '${{ github.run_id }}'}
   compare_generated:
@@ -150,7 +155,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - uses: ./.github/actions/stage5-r3-compare
+      - uses: ./.github/actions/stage5-r4-compare
         with: {index: '${{ matrix.shard }}'}
   aggregate:
     needs: [prepare_authority, legacy_source, candidate_c1, candidate_c2, compare_generated]
@@ -159,4 +164,4 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - uses: ./.github/actions/stage5-r3-aggregate
+      - uses: ./.github/actions/stage5-r4-aggregate
