@@ -21,6 +21,7 @@ runs:
       with: {name: stage4-4-5-2-aggregate-result-29818942517, path: build/stage4-aggregate, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '29818942517', github-token: '${{ github.token }}'}
     - shell: bash
       run: |
+        set +e
         extra=()
         if test '${{ inputs.run-full-suite }}' = true; then extra+=(--run-full-suite); fi
         PYTHONPATH='${{ steps.bundle.outputs.bundle_root }}' python3 '${{ steps.bundle.outputs.analyzer }}' candidate \
@@ -29,6 +30,12 @@ runs:
           --project-root '${{ inputs.project-root }}' --engine-output '${{ inputs.engine-output }}' \
           --output 'build/${{ inputs.artifact-lane }}' --bundle-root '${{ steps.bundle.outputs.bundle_root }}' \
           --lane '${{ inputs.lane }}' "${extra[@]}"
+        rc=$?
+        set -e
+        mkdir -p 'build/${{ inputs.artifact-lane }}'
+        printf '%s\n' "$rc" > 'build/${{ inputs.artifact-lane }}/ANALYZER_EXIT_CODE.txt'
+        test -f 'build/${{ inputs.artifact-lane }}/CANDIDATE_${{ inputs.lane }}_RESULT.json'
+        test "$(find 'build/${{ inputs.artifact-lane }}/shards' -name SHARD_MANIFEST.json -type f | wc -l)" -eq 40
     - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
       if: always()
       with:
