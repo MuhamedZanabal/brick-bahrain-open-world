@@ -11,13 +11,14 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        d="$RUNNER_TEMP/stage4-4-5-2-analyzer"; rm -rf "$d"; mkdir -p "$d"
+        d="$RUNNER_TEMP/stage4-4-5-2-analyzer"; rm -rf "$d"; mkdir -p "$d/.github/forensics/qualification" "$d/.github/workflows" "$d/.github/actions/stage4-upload-shards"
         c="$GITHUB_WORKSPACE/.github/forensics/qualification/stage4_full_corpus_4_5_2/chunks"
         cat "$c"/analyzer_bundle_*.b64part | tr -d '\r\n' > "$d/bundle.b64"; printf '\n' >> "$d/bundle.b64"
         test "$(sha256sum "$d/bundle.b64"|cut -d' ' -f1)" = 13acb4e893593bbd4f4d4de31deb7bf78e4e1f62ef3683f4b64b57834c4f9dcd
-        base64 -d "$d/bundle.b64" > "$d/bundle.zip"
-        test "$(sha256sum "$d/bundle.zip"|cut -d' ' -f1)" = cd1fb5dfe92635d09838e1aedef90499409afd2053339173b3aede651ba1b921
-        unzip -q "$d/bundle.zip" -d "$d"
-        a="$d/stage4_full_corpus_4_5_2/stage4_full_corpus_4_5_2.py"
+        base64 -d "$d/bundle.b64" > "$d/bundle.zip"; test "$(sha256sum "$d/bundle.zip"|cut -d' ' -f1)" = cd1fb5dfe92635d09838e1aedef90499409afd2053339173b3aede651ba1b921
+        unzip -q "$d/bundle.zip" -d "$d/.github/forensics/qualification"
+        cp "$GITHUB_WORKSPACE/.github/workflows/godot-engine-qualification-stage4-full-corpus-4-5-2.yml" "$d/.github/workflows/"
+        cp "$GITHUB_WORKSPACE/.github/actions/stage4-upload-shards/action.yml" "$d/.github/actions/stage4-upload-shards/"
+        a="$d/.github/forensics/qualification/stage4_full_corpus_4_5_2/stage4_full_corpus_4_5_2.py"
         test "$(sha256sum "$a"|cut -d' ' -f1)" = 3071527c7fbca5b442dbde745e0cb108e82df0428b4c47f5fb26299d77f364da
         echo "analyzer=$a" >> "$GITHUB_OUTPUT"
