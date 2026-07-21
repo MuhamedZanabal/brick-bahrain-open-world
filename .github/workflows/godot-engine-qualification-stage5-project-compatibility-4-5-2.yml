@@ -6,39 +6,27 @@ on:
 permissions: {actions: read, contents: read}
 concurrency: {group: bahrain-brick-godot-stage5-project-compatibility-4-5-2, cancel-in-progress: false}
 env:
-  STAGE5_HARNESS_REVISION: '2'
+  STAGE5_HARNESS_REVISION: '3'
+  ANALYZER_SOURCE_SHA256: b3be23cc346be02c98a35ae40edf4d60ad0273ac63170102c76a42356a446d50
+  ANALYZER_LOADER_SHA256: e837e359aff883814395d8482515fb85750b2c53ce9e7aa43254f0017bd5bed4
+  DETERMINISTIC_BUNDLE_SHA256: 1607878095e0e5f1b7ac5b03195d79058b79697e0294e2fe05fb526d612f7622
   PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
-  SOURCE_RUN: '29538386331'
-  SOURCE_NAME: bahrain-brick-pr59-authority-run-a-29538386331
-  SOURCE_ID: '8391457302'
-  SOURCE_DIGEST: c05d7ff8f46bc6b830f114f47446e92ede06ee55d00436527f500faf50273193
-  ENGINE_RUN: '29685721858'
-  ENGINE_NAME: stage2-engine-package-4.5.2-stable-29685721858
-  ENGINE_ID: '8441999064'
-  ENGINE_DIGEST: 86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9
-  STAGE4_RUN: '29818942517'
-  STAGE4_PREP_NAME: stage4-4-5-2-prep-29818942517
-  STAGE4_PREP_ID: '8490701959'
-  STAGE4_PREP_DIGEST: 784b5b137f89b67f16e87487e72b1acf84046472a4017f295c505cf18d6bea1b
-  STAGE4_AGG_NAME: stage4-4-5-2-aggregate-result-29818942517
-  STAGE4_AGG_ID: '8490964042'
-  STAGE4_AGG_DIGEST: 320eb5a9d393d084aba65d94ec1f7d7a2f7ea1000dafc97fbe4dee622dd720ee
 jobs:
   record_locator:
     runs-on: ubuntu-24.04
     permissions: {contents: write}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with: {ref: '${{ github.sha }}', fetch-depth: 30}
+        with: {ref: '${{ github.sha }}', fetch-depth: 50}
       - shell: bash
         run: |
           set -euo pipefail
           p=.github/forensics/qualification/LATEST_STAGE5_PROJECT_COMPATIBILITY_4_5_2_RUN.json
-          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","engine":"4.5.2","stage":5}' > "$p"
+          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","engine":"4.5.2","stage":5,"harness_revision":3}' > "$p"
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add "$p"
-          git commit -m "ci(stage5): record Godot 4.5.2 project compatibility run ${{ github.run_id }}"
+          git commit -m "ci(stage5): record revision 3 run ${{ github.run_id }}"
           git fetch origin ci/godot-engine-determinism-qualification-20260719
           git rebase origin/ci/godot-engine-determinism-qualification-20260719
           git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
@@ -55,16 +43,20 @@ jobs:
         run: |
           set -euo pipefail
           root='${{ steps.bundle.outputs.bundle_root }}'
-          cd "$root"
-          python3 -m unittest -v test_stage5.py
-          python3 -m py_compile stage5_project_compatibility_4_5_2.py
-          cd "$GITHUB_WORKSPACE"
+          test '${{ steps.bundle.outputs.analyzer_source_sha256 }}' = "$ANALYZER_SOURCE_SHA256"
+          test '${{ steps.bundle.outputs.analyzer_loader_sha256 }}' = "$ANALYZER_LOADER_SHA256"
+          STAGE5_WORKFLOW_PATH="$GITHUB_WORKSPACE/.github/workflows/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" PYTHONPATH="$root" python3 -m unittest -v "$root/test_stage5_r3.py"
+          python3 -m py_compile "$root"/*.py
           pr=$(gh api repos/$GITHUB_REPOSITORY/pulls/59)
           test "$(jq -r .head.sha<<<"$pr")" = "$PR_HEAD"
           test "$(jq -r .state<<<"$pr")" = open
           test "$(jq -r .draft<<<"$pr")" = true
           test "$(jq -r .merged_at<<<"$pr")" = null
-          for s in "$SOURCE_ID:$SOURCE_DIGEST:$SOURCE_RUN:b12e1e012e256036e71066260a4c6392d26c3839" "$ENGINE_ID:$ENGINE_DIGEST:$ENGINE_RUN:23efeab85489ef1efafca60a0c0791507fc3f5dc" "$STAGE4_PREP_ID:$STAGE4_PREP_DIGEST:$STAGE4_RUN:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662" "$STAGE4_AGG_ID:$STAGE4_AGG_DIGEST:$STAGE4_RUN:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662"; do
+          for s in \
+            '8391457302:c05d7ff8f46bc6b830f114f47446e92ede06ee55d00436527f500faf50273193:29538386331:b12e1e012e256036e71066260a4c6392d26c3839' \
+            '8441999064:86847c1a5a31a11d7208f8daf4917e2022d613ac31d40918765ac45f25331ad9:29685721858:23efeab85489ef1efafca60a0c0791507fc3f5dc' \
+            '8490701959:784b5b137f89b67f16e87487e72b1acf84046472a4017f295c505cf18d6bea1b:29818942517:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662' \
+            '8490964042:320eb5a9d393d084aba65d94ec1f7d7a2f7ea1000dafc97fbe4dee622dd720ee:29818942517:f7d6ec3f12ae79a7d9eae4683247ee3dcaf49662'; do
             IFS=: read id dg run head<<<"$s"
             j=$(gh api repos/$GITHUB_REPOSITORY/actions/artifacts/$id)
             test "$(jq -r .digest<<<"$j")" = sha256:$dg
@@ -85,25 +77,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.SOURCE_NAME }}', path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SOURCE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.ENGINE_NAME }}', path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.ENGINE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.STAGE4_PREP_NAME }}', path: build/stage4-prep, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STAGE4_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.STAGE4_AGG_NAME }}', path: build/stage4-aggregate, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STAGE4_RUN }}', github-token: '${{ github.token }}'}
-      - shell: bash
-        run: |
-          python3 '${{ steps.bundle.outputs.analyzer }}' prepare-candidate \
-            --source-artifact build/source-artifact --engine-artifact build/engine-artifact \
-            --stage4-prep build/stage4-prep --stage4-aggregate build/stage4-aggregate \
-            --project-root /tmp/bahrain-stage5-4-5-2-authority/project \
-            --engine-output /tmp/bahrain-stage5-4-5-2-authority/engine --output build/prep
-      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with: {name: 'stage5-4-5-2-preparation-${{ github.run_id }}', path: build/prep, retention-days: 30, compression-level: 9, include-hidden-files: true}
+      - uses: ./.github/actions/stage5-r3-prepare
   legacy_source:
     needs: prepare_authority
     runs-on: ubuntu-24.04
@@ -111,22 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.SOURCE_NAME }}', path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SOURCE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.ENGINE_NAME }}', path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.ENGINE_RUN }}', github-token: '${{ github.token }}'}
-      - shell: bash
-        run: |
-          python3 '${{ steps.bundle.outputs.analyzer }}' legacy \
-            --source-artifact build/source-artifact --engine-artifact build/engine-artifact \
-            --project-root /tmp/bahrain-stage5-4-5-2-legacy-source/project \
-            --engine-output /tmp/bahrain-stage5-4-5-2-legacy-source/engine \
-            --bundle-root '${{ steps.bundle.outputs.bundle_root }}' --output build/legacy
-      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        if: always()
-        with: {name: 'stage5-4-5-2-legacy-${{ github.run_id }}', path: build/legacy, retention-days: 30, compression-level: 9, include-hidden-files: true}
+      - uses: ./.github/actions/stage5-r3-legacy
   candidate_c1:
     needs: prepare_authority
     runs-on: ubuntu-24.04
@@ -134,39 +93,13 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.SOURCE_NAME }}', path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SOURCE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.ENGINE_NAME }}', path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.ENGINE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.STAGE4_PREP_NAME }}', path: build/stage4-prep, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STAGE4_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.STAGE4_AGG_NAME }}', path: build/stage4-aggregate, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STAGE4_RUN }}', github-token: '${{ github.token }}'}
-      - id: execute
-        continue-on-error: true
-        shell: bash
-        run: |
-          python3 '${{ steps.bundle.outputs.analyzer }}' candidate \
-            --source-artifact build/source-artifact --engine-artifact build/engine-artifact \
-            --stage4-prep build/stage4-prep --stage4-aggregate build/stage4-aggregate \
-            --project-root /tmp/bahrain-stage5-4-5-2-c1/project \
-            --engine-output /tmp/bahrain-stage5-4-5-2-c1/engine --output build/c1-prep \
-            --bundle-root '${{ steps.bundle.outputs.bundle_root }}' --import-output build/c1 --lane C1 --run-regressions
-      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        if: always()
+      - uses: ./.github/actions/stage5-r3-candidate
         with:
-          name: stage5-4-5-2-c1-evidence-${{ github.run_id }}
-          path: |
-            build/c1
-            build/c1-prep
-          retention-days: 30
-          compression-level: 9
-          include-hidden-files: true
-      - uses: ./.github/actions/stage4-upload-shards
-        if: always()
-        with: {side: stage5-c1, root: build/c1/shards, run-id: '${{ github.run_id }}'}
+          lane: C1
+          artifact-lane: c1
+          project-root: /tmp/bahrain-stage5-4-5-2-r3-c1/project
+          engine-output: /tmp/bahrain-stage5-4-5-2-r3-c1/engine
+          run-full-suite: 'true'
   candidate_c2:
     needs: prepare_authority
     runs-on: ubuntu-24.04
@@ -174,59 +107,49 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.SOURCE_NAME }}', path: build/source-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.SOURCE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.ENGINE_NAME }}', path: build/engine-artifact, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.ENGINE_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.STAGE4_PREP_NAME }}', path: build/stage4-prep, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STAGE4_RUN }}', github-token: '${{ github.token }}'}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: '${{ env.STAGE4_AGG_NAME }}', path: build/stage4-aggregate, repository: MuhamedZanabal/brick-bahrain-open-world, run-id: '${{ env.STAGE4_RUN }}', github-token: '${{ github.token }}'}
-      - id: execute
-        continue-on-error: true
-        shell: bash
-        run: |
-          python3 '${{ steps.bundle.outputs.analyzer }}' candidate \
-            --source-artifact build/source-artifact --engine-artifact build/engine-artifact \
-            --stage4-prep build/stage4-prep --stage4-aggregate build/stage4-aggregate \
-            --project-root /tmp/bahrain-stage5-4-5-2-c2-different-absolute-root/project \
-            --engine-output /tmp/bahrain-stage5-4-5-2-c2-different-absolute-root/engine --output build/c2-prep \
-            --bundle-root '${{ steps.bundle.outputs.bundle_root }}' --import-output build/c2 --lane C2
-      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        if: always()
+      - uses: ./.github/actions/stage5-r3-candidate
         with:
-          name: stage5-4-5-2-c2-evidence-${{ github.run_id }}
-          path: |
-            build/c2
-            build/c2-prep
-          retention-days: 30
-          compression-level: 9
-          include-hidden-files: true
-      - uses: ./.github/actions/stage4-upload-shards
-        if: always()
-        with: {side: stage5-c2, root: build/c2/shards, run-id: '${{ github.run_id }}'}
-  compare_generated:
-    needs: [candidate_c1, candidate_c2]
-    strategy:
+          lane: C2
+          artifact-lane: c2
+          project-root: /tmp/bahrain-stage5-4-5-2-r3-c2-different-absolute-root/project
+          engine-output: /tmp/bahrain-stage5-4-5-2-r3-c2-different-absolute-root/engine
+  upload_c1_generated_shards:
+    needs: candidate_c1
+    if: always()
+    runs-on: ubuntu-24.04
+    strategy: &shard_strategy
       fail-fast: false
       matrix:
-        shard: ['00','01','02','03','04','05','06','07','08','09','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31','32','33','34','35','36','37','38','39']
-    runs-on: ubuntu-24.04
+        shard: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31","32","33","34","35","36","37","38","39"]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage4-stage5-c1-shard-${{ matrix.shard }}-${{ github.run_id }}', path: build/c1}
+        with: {name: 'stage5-4-5-2-r3-c1-shard-source-${{ github.run_id }}', path: build/shards}
+      - uses: ./.github/actions/stage5-upload-generated-shards
+        with: {lane: c1, root: build/shards, index: '${{ matrix.shard }}', run-id: '${{ github.run_id }}'}
+  upload_c2_generated_shards:
+    needs: candidate_c2
+    if: always()
+    runs-on: ubuntu-24.04
+    strategy: *shard_strategy
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage4-stage5-c2-shard-${{ matrix.shard }}-${{ github.run_id }}', path: build/c2}
-      - shell: bash
-        run: python3 '${{ steps.bundle.outputs.analyzer }}' compare-shard --c1-root build/c1 --c2-root build/c2 --shard-index $((10#${{ matrix.shard }})) --output build/comparison
-      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with: {name: 'stage5-4-5-2-generated-comparison-${{ matrix.shard }}-${{ github.run_id }}', path: build/comparison, retention-days: 30, compression-level: 9}
+        with: {name: 'stage5-4-5-2-r3-c2-shard-source-${{ github.run_id }}', path: build/shards}
+      - uses: ./.github/actions/stage5-upload-generated-shards
+        with: {lane: c2, root: build/shards, index: '${{ matrix.shard }}', run-id: '${{ github.run_id }}'}
+  compare_generated:
+    needs: [candidate_c1, candidate_c2, upload_c1_generated_shards, upload_c2_generated_shards]
+    if: always()
+    runs-on: ubuntu-24.04
+    strategy: *shard_strategy
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
+      - uses: ./.github/actions/stage5-r3-compare
+        with: {index: '${{ matrix.shard }}'}
   aggregate:
     needs: [prepare_authority, legacy_source, candidate_c1, candidate_c2, compare_generated]
     if: always()
@@ -234,22 +157,4 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: bundle
-        uses: ./.github/actions/stage5-4-5-2-materialize
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage5-4-5-2-preparation-${{ github.run_id }}', path: build/prep}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage5-4-5-2-legacy-${{ github.run_id }}', path: build/legacy}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage5-4-5-2-c1-evidence-${{ github.run_id }}', path: build/c1-all}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {name: 'stage5-4-5-2-c2-evidence-${{ github.run_id }}', path: build/c2-all}
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with: {pattern: 'stage5-4-5-2-generated-comparison-*-${{ github.run_id }}', path: build/comparisons, merge-multiple: true}
-      - shell: bash
-        run: |
-          python3 '${{ steps.bundle.outputs.analyzer }}' aggregate \
-            --prep build/prep --legacy build/legacy --c1 build/c1-all/c1 --c2 build/c2-all/c2 \
-            --comparisons build/comparisons --output build/aggregate
-      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with: {name: 'stage5-4-5-2-aggregate-result-${{ github.run_id }}', path: build/aggregate, retention-days: 30, compression-level: 9, include-hidden-files: true}
+      - uses: ./.github/actions/stage5-r3-aggregate
