@@ -1,12 +1,18 @@
-name: Materialize Godot 4.5.2 Stage 5 analyzer
-description: Reconstruct, correct and verify the immutable Stage 5 qualification bundle.
+name: Materialize Godot 4.5.2 Stage 5 revision 3 analyzer
+description: Reconstruct and verify the immutable Stage 5 revision 3 qualification bundle.
 outputs:
   analyzer:
-    description: Absolute Stage 5 analyzer entrypoint.
+    description: Absolute revision 3 analyzer entrypoint.
     value: ${{ steps.unpack.outputs.analyzer }}
   bundle_root:
     description: Absolute materialized bundle root.
     value: ${{ steps.unpack.outputs.bundle_root }}
+  analyzer_source_sha256:
+    description: Aggregate analyzer source authority.
+    value: ${{ steps.unpack.outputs.analyzer_source_sha256 }}
+  analyzer_loader_sha256:
+    description: Analyzer loader authority.
+    value: ${{ steps.unpack.outputs.analyzer_loader_sha256 }}
 runs:
   using: composite
   steps:
@@ -14,27 +20,30 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        d="$RUNNER_TEMP/stage5-4-5-2-bundle"
+        d="$RUNNER_TEMP/stage5-4-5-2-r3-bundle"
         rm -rf "$d"
         mkdir -p "$d"
-        c="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2/chunks"
-        cat "$c"/stage5_bundle_*.b64part | tr -d '\r\n' > "$d/bundle.b64"
-        printf '\n' >> "$d/bundle.b64"
-        test "$(sha256sum "$d/bundle.b64" | cut -d' ' -f1)" = 0f1bf8c1bc40e83b111270202433a39ec0f351abf1beb2331028312c4e61440d
+        c="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2/revision3_bundle"
+        cat "$c"/stage5_r3_bundle_*.b64part | tr -d '\r\n' > "$d/bundle.b64"
+        test "$(sha256sum "$d/bundle.b64" | cut -d' ' -f1)" = 2dea7b866867239360d273ce1ce39f4be79c6a7ad3bbc24f54e6eaa7eabdaf17
         base64 -d "$d/bundle.b64" > "$d/bundle.zip"
-        test "$(sha256sum "$d/bundle.zip" | cut -d' ' -f1)" = 2cca51807ea3b6b23d14302c578a11b9814705f7c630c362fed9c00fb7caa901
+        test "$(sha256sum "$d/bundle.zip" | cut -d' ' -f1)" = 1607878095e0e5f1b7ac5b03195d79058b79697e0294e2fe05fb526d612f7622
         unzip -q "$d/bundle.zip" -d "$d"
-        test "$(sha256sum "$d/stage5_project_compatibility_4_5_2.py" | cut -d' ' -f1)" = 87c8ac6b3653f678c4383ed39818ccc3c76fba4f55971c5c3a7f8e1d786aed57
-        pc="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2"
-        cat "$pc"/stage5_harness_correction_v2_*.b64part | tr -d '\r\n' > "$d/correction.b64"
-        printf '\n' >> "$d/correction.b64"
-        test "$(sha256sum "$d/correction.b64" | cut -d' ' -f1)" = f4536f30c5de8717fd103fff32016eaca6e3d5d926ffb59a5b01eb9e749bfeb3
-        base64 -d "$d/correction.b64" > "$d/correction.patch"
-        test "$(sha256sum "$d/correction.patch" | cut -d' ' -f1)" = d46b005dac1ee382018e5c825e4891dbba7125fcbe1b2a775d4ecd3a8fc95939
-        patch --batch --forward -s -d "$d" -p0 < "$d/correction.patch"
-        test "$(sha256sum "$d/stage5_project_compatibility_4_5_2.py" | cut -d' ' -f1)" = a88f9cdfa407963528b6689fa4e79b4e5ae089abdb3bfdd2b7293c675db7d0e2
-        test "$(sha256sum "$d/test_stage5.py" | cut -d' ' -f1)" = e6b7278901e63e3663daf50842f494fe155ddb87ab51e00bf54811b7fbb464b3
-        test "$(sha256sum "$d/godot-engine-qualification-stage5-project-compatibility-4-5-2.yml" | cut -d' ' -f1)" = bba6c0deacb1a9dc3a767333084aabde3bb166a4672049b4a100bba1ff62e6dd
-        chmod +x "$d/stage5_project_compatibility_4_5_2.py"
-        echo "analyzer=$d/stage5_project_compatibility_4_5_2.py" >> "$GITHUB_OUTPUT"
+        python3 - "$d" <<'PY'
+        import hashlib,json,sys
+        from pathlib import Path
+        root=Path(sys.argv[1]); authority=json.loads((root/'BUNDLE_INTEGRITY.json').read_text())
+        def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+        for record in authority['files']:
+            p=root/record['path']; assert p.is_file(), record['path']; assert p.stat().st_size==record['bytes']; assert sha(p)==record['sha256']
+        records=[{'path':r['path'],'sha256':sha(root/r['path'])} for r in authority['analyzer_source_files']]
+        aggregate=hashlib.sha256((json.dumps(records,sort_keys=True,separators=(',',':'))+'\n').encode()).hexdigest()
+        assert aggregate==authority['analyzer_source_sha256']=='b3be23cc346be02c98a35ae40edf4d60ad0273ac63170102c76a42356a446d50'
+        assert sha(root/'stage5_r3.py')==authority['analyzer_loader_sha256']=='e837e359aff883814395d8482515fb85750b2c53ce9e7aa43254f0017bd5bed4'
+        assert sha(root/'test_stage5_r3.py')==authority['test_sha256']=='99e7f706669588e2b2f72e656de76dd178905d000d93e70729e52e7b04421d5a'
+        PY
+        chmod +x "$d/stage5_r3.py"
+        echo "analyzer=$d/stage5_r3.py" >> "$GITHUB_OUTPUT"
         echo "bundle_root=$d" >> "$GITHUB_OUTPUT"
+        echo "analyzer_source_sha256=b3be23cc346be02c98a35ae40edf4d60ad0273ac63170102c76a42356a446d50" >> "$GITHUB_OUTPUT"
+        echo "analyzer_loader_sha256=e837e359aff883814395d8482515fb85750b2c53ce9e7aa43254f0017bd5bed4" >> "$GITHUB_OUTPUT"
