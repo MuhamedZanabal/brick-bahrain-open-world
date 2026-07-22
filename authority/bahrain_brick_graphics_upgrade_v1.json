@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "program": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
   "recorded_date": "2026-07-22",
   "repository": "MuhamedZanabal/brick-bahrain-open-world",
@@ -54,35 +54,21 @@
       "minimum, target and high-end physical-device results"
     ]
   },
+  "protected_file_policy": {
+    "hash_authority": "exact bytes from parent_pull_request.expected_head_sha Git objects",
+    "comparison": "Compare each protected path at HEAD against the same path at the exact frozen PR #59 commit.",
+    "reconstructed_hashes_are_not_git_hashes": true,
+    "missing_path_policy": "fail_closed"
+  },
   "protected_files": [
-    {
-      "path": "scripts/virtual_joystick.gd",
-      "sha256": "917fde4ffac3cf6f224d6761b26443ad3ffe66a913c56b0f11570058584f166e"
-    },
-    {
-      "path": "scripts/touch_input.gd",
-      "sha256": "d9ff063d02140fdcd330a26f967982b929896b742d53d36678ad70608ba5591d"
-    },
-    {
-      "path": "scripts/player_controller.gd",
-      "sha256": "79f18a1950c9d0819e36ff102615eda2ed6796ba74daece9c7c2631c3e348366"
-    },
-    {
-      "path": "tests/mobile_input_pipeline_test.gd",
-      "sha256": "c4d6c5d8fab9197259cd82ea02f76da4d906a1283e242b92e9a2892bf1c790bf"
-    },
-    {
-      "path": "scenes/mobile_input_pipeline_test.tscn",
-      "sha256": "29c3bba4dabf57c3f52f6d31c9de935bfaf45c3b96eae877b390c9dcf633d527"
-    },
-    {
-      "path": "tests/mobile_input_visual_evidence.gd",
-      "sha256": "eb363e0ea7ce3c14b67e3c6d18be5f034c437f9841715582fa84b074301d4b78"
-    },
-    {
-      "path": "scenes/mobile_input_visual_evidence.tscn",
-      "sha256": "c456c26db3f2e6d15a4de300c976613c6717aa6a1006c0b23c3b68dba20fbb1b"
-    }
+    {"path": "scripts/virtual_joystick.gd"},
+    {"path": "scripts/touch_input.gd"},
+    {"path": "scripts/player_controller.gd"},
+    {"path": "tests/mobile_input_pipeline_test.gd"},
+    {"path": "scenes/mobile_input_pipeline_test.tscn"},
+    {"path": "tests/mobile_input_visual_evidence.gd"},
+    {"path": "scenes/mobile_input_visual_evidence.tscn"},
+    {"path": "scripts/world.gd"}
   ],
   "protected_behaviour": [
     "existing player movement semantics",
@@ -96,8 +82,17 @@
     {
       "id": "G0-AUTH-001",
       "severity": "high",
-      "description": "The accepted vertical-slice design names scripts/world.gd::_exit_tree as a frozen function authority, but the symbol was not found in the inspected PR #59 head source ranges. No synthetic hash or replacement authority is permitted.",
-      "resolution_required": "Resolve against reconstructed source evidence before any world.gd graphics edit. Until resolved, scripts/world.gd is treated as protected from modification."
+      "state": "OPEN_PENDING_GENERATED_ADJUDICATION",
+      "description": "The accepted vertical-slice design names scripts/world.gd::_exit_tree as a frozen function authority. The exact frozen Git object must determine whether the file and symbol exist; no symbol may be inferred.",
+      "interim_rule": "If scripts/world.gd exists at the frozen commit, protect its exact bytes. Do not claim _exit_tree exists.",
+      "required_report": "reports/graphics/g0/world_gd_adjudication.json"
+    },
+    {
+      "id": "G0-AUTH-002",
+      "severity": "high",
+      "state": "ROOT_CAUSE_IDENTIFIED",
+      "description": "The initial G0 contract copied SHA-256 values from the reconstructed composite authority and incorrectly treated them as exact PR #59 Git-tree hashes.",
+      "resolution": "Protection now compares exact Git objects at the frozen commit. Generated census evidence will record exact blob SHA and SHA-256 values."
     }
   ],
   "graphics_scope_policy": {
