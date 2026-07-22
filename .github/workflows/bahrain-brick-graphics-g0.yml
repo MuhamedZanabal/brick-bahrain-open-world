@@ -1,0 +1,149 @@
+name: Bahrain Brick Graphics G0 Authority and Baseline
+
+on:
+  push:
+    branches: [work/bahrain-brick-graphics-upgrade-v1]
+    paths:
+      - .github/workflows/bahrain-brick-graphics-g0.yml
+      - .ai/**
+      - authority/bahrain_brick_graphics_upgrade_v1.json
+      - docs/graphics/**
+      - tests/graphics/**
+      - project.godot
+      - export_presets.cfg
+      - scripts/world.gd
+      - scripts/virtual_joystick.gd
+      - scripts/touch_input.gd
+      - scripts/player_controller.gd
+      - tests/mobile_input_pipeline_test.gd
+      - tests/mobile_input_visual_evidence.gd
+      - scenes/mobile_input_pipeline_test.tscn
+      - scenes/mobile_input_visual_evidence.tscn
+  pull_request:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    types: [opened, synchronize, reopened, converted_to_draft, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: bahrain-brick-graphics-g0-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FROZEN_PR_NUMBER: '59'
+  FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  FROZEN_PR_BASE: fc8f00182f97c39015610d6603fa7c9c44364c5d
+
+jobs:
+  authority_contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate with authority history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Run G0 source contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/graphics-g0
+          python3 tests/graphics/test_graphics_upgrade_g0_contract.py 2>&1 | tee build/graphics-g0/g0-contracts.log
+
+      - name: Verify frozen PR 59 through GitHub API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          repo = os.environ["REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          url = f"https://api.github.com/repos/{repo}/pulls/{os.environ['FROZEN_PR_NUMBER']}"
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "bahrain-brick-graphics-g0",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+
+          observed = {
+              "number": payload["number"],
+              "state": payload["state"],
+              "draft": payload["draft"],
+              "merged": payload["merged"],
+              "base_ref": payload["base"]["ref"],
+              "base_sha": payload["base"]["sha"],
+              "head_ref": payload["head"]["ref"],
+              "head_sha": payload["head"]["sha"],
+              "changed_files": payload["changed_files"],
+              "html_url": payload["html_url"],
+          }
+          expected = {
+              "number": 59,
+              "state": "open",
+              "draft": True,
+              "merged": False,
+              "base_ref": "work/bahrain-brick-asset-lab-integration-v1",
+              "base_sha": os.environ["FROZEN_PR_BASE"],
+              "head_ref": "work/bahrain-brick-manama-souq-vertical-slice-v1",
+              "head_sha": os.environ["FROZEN_PR_HEAD"],
+              "changed_files": 54,
+          }
+          failures = {
+              key: {"expected": value, "observed": observed.get(key)}
+              for key, value in expected.items()
+              if observed.get(key) != value
+          }
+          Path("build/graphics-g0/pr59-authority.json").write_text(
+              json.dumps({"expected": expected, "observed": observed, "failures": failures}, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          if failures:
+              raise SystemExit(f"PR #59 authority moved: {json.dumps(failures, sort_keys=True)}")
+          PY
+
+      - name: Record renderer and Android configuration baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          authority = json.loads(Path("authority/bahrain_brick_graphics_upgrade_v1.json").read_text(encoding="utf-8"))
+          report = {
+              "renderer_gate": authority["renderer_gate"],
+              "current_configuration": authority["current_configuration"],
+              "conclusion": "UNRESOLVED: no graphics implementation may pass G0 until renderer and physical-device evidence are attached.",
+          }
+          Path("build/graphics-g0/configuration-baseline.json").write_text(
+              json.dumps(report, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload G0 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-graphics-g0-${{ github.run_id }}
+          path: build/graphics-g0
+          if-no-files-found: error
+          retention-days: 30
