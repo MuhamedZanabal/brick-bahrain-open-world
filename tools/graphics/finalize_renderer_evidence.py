@@ -39,6 +39,34 @@ def read_metrics(path: Path) -> dict[str, Any]:
         return {"row_count": len(rows), "columns": reader.fieldnames or []}
 
 
+def parse_renderer_startup(log_text: str) -> dict[str, str | None]:
+    gl = re.search(r"OpenGL API\s+([^\n]+?)\s+-\s+Compatibility\s+-\s+Using Device:\s*([^\n]+)", log_text)
+    if gl:
+        return {
+            "renderer": "gl_compatibility",
+            "rendering_driver": "opengl3",
+            "rendering_api": gl.group(1).strip(),
+            "rendering_device": gl.group(2).strip(),
+        }
+    mobile = re.search(r"Vulkan\s+([^\n]+?)\s+-\s+Forward Mobile\s+-\s+Using Device[^:]*:\s*([^\n]+)", log_text)
+    if mobile:
+        return {
+            "renderer": "mobile",
+            "rendering_driver": "vulkan",
+            "rendering_api": mobile.group(1).strip(),
+            "rendering_device": mobile.group(2).strip(),
+        }
+    forward_plus = re.search(r"Vulkan\s+([^\n]+?)\s+-\s+Forward\+\s+-\s+Using Device[^:]*:\s*([^\n]+)", log_text)
+    if forward_plus:
+        return {
+            "renderer": "gl_compatibility" if False else "forward_plus",
+            "rendering_driver": "vulkan",
+            "rendering_api": forward_plus.group(1).strip(),
+            "rendering_device": forward_plus.group(2).strip(),
+        }
+    return {"renderer": None, "rendering_driver": None, "rendering_api": None, "rendering_device": None}
+
+
 def finalize_evidence(
     evidence_dir: Path,
     *,
@@ -66,7 +94,8 @@ def finalize_evidence(
     )
 
     actual_exit_code = int(runtime.get("exit_code", 1) if exit_code is None else exit_code)
-    renderer = str(runtime.get("renderer", ""))
+    startup = parse_renderer_startup(log_text)
+    renderer = startup["renderer"]
     screenshot = evidence_dir / "screenshot.png"
     metrics = read_metrics(evidence_dir / "frame_metrics.csv")
     marker_ready = READY_MARKER in log_text
@@ -88,6 +117,7 @@ def finalize_evidence(
 
     finalized = {
         **runtime,
+        **startup,
         "schema_version": 1,
         "expected_renderer": expected_renderer,
         "renderer_matches_expected": renderer_matches,
