@@ -1,0 +1,79 @@
+name: Stage 5A UID analysis
+description: Parse immutable Revision-4 UID caches and trace exact Godot 4.5.2 ownership and ordering source.
+runs:
+  using: composite
+  steps:
+    - id: bundle
+      uses: ./.github/actions/stage5a-uid-materialize
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        repository: godotengine/godot
+        ref: 6ce3de25aa58466e14ef354703ba8d9791a417da
+        path: build/godot-source
+        persist-credentials: false
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: bahrain-brick-pr59-authority-run-a-29538386331
+        path: build/source-artifact
+        repository: MuhamedZanabal/brick-bahrain-open-world
+        run-id: '29538386331'
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: stage4-4-5-2-prep-29818942517
+        path: build/stage4-prep
+        repository: MuhamedZanabal/brick-bahrain-open-world
+        run-id: '29818942517'
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: stage5-4-5-2-r4-c1-generated-closure-29880296708
+        path: build/r4-c1-closure
+        repository: MuhamedZanabal/brick-bahrain-open-world
+        run-id: '29880296708'
+        github-token: ${{ github.token }}
+    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+      with:
+        name: stage5-4-5-2-r4-c2-generated-closure-29880296708
+        path: build/r4-c2-closure
+        repository: MuhamedZanabal/brick-bahrain-open-world
+        run-id: '29880296708'
+        github-token: ${{ github.token }}
+    - shell: bash
+      run: |
+        set -euo pipefail
+        rm -rf build/stage5a-analysis
+        mkdir -p build/stage5a-analysis
+        set +e
+        python3 '${{ steps.bundle.outputs.analyzer }}' analyze-r4 \
+          --c1-closure build/r4-c1-closure \
+          --c2-closure build/r4-c2-closure \
+          --source-artifact build/source-artifact \
+          --stage4-prep build/stage4-prep \
+          --godot-source build/godot-source \
+          --output build/stage5a-analysis \
+          > build/stage5a-analysis/ANALYSIS.log 2>&1
+        rc=$?
+        set -e
+        printf '%s\n' "$rc" > build/stage5a-analysis/ANALYZER_EXIT_CODE.txt
+        if test ! -f build/stage5a-analysis/STAGE5A_R4_ANALYSIS_RESULT.json; then
+          python3 - "$rc" <<'PY'
+        import json, pathlib, sys
+        out = pathlib.Path('build/stage5a-analysis')
+        (out / 'STAGE5A_R4_ANALYSIS_RESULT.json').write_text(json.dumps({
+            'schema': 'stage5a-r4-analysis-result-v1',
+            'analysis_complete': False,
+            'root_cause_class': 'U5',
+            'classification': 'Q6 — EVIDENCE INSUFFICIENT',
+            'analyzer_exit_code': int(sys.argv[1]),
+        }, indent=2, sort_keys=True) + '\n')
+        PY
+        fi
+    - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+      if: always()
+      with:
+        name: stage5a-4-5-2-analysis-${{ github.run_id }}
+        path: build/stage5a-analysis
+        retention-days: 30
+        compression-level: 9
+        include-hidden-files: true
