@@ -9,16 +9,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 AUTHORITY_PATH = ROOT / "authority" / "bahrain_brick_graphics_upgrade_v1.json"
-COMPOSITE_PATH = ROOT / "authority" / "manama_souq_composite_source.json"
 PROJECT_PATH = ROOT / "project.godot"
 EXPORT_PATH = ROOT / "export_presets.cfg"
 
 
-def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
 
 
-def git(*args: str) -> subprocess.CompletedProcess[str]:
+def git_text(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", *args],
         cwd=ROOT,
@@ -28,14 +27,23 @@ def git(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def git_bytes(*args: str) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
 class GraphicsUpgradeG0ContractTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        for path in (AUTHORITY_PATH, COMPOSITE_PATH, PROJECT_PATH, EXPORT_PATH):
+        for path in (AUTHORITY_PATH, PROJECT_PATH, EXPORT_PATH):
             if not path.is_file():
                 raise AssertionError(f"required G0 authority input is missing: {path}")
         cls.authority = json.loads(AUTHORITY_PATH.read_text(encoding="utf-8"))
-        cls.composite = json.loads(COMPOSITE_PATH.read_text(encoding="utf-8"))
         cls.project = PROJECT_PATH.read_text(encoding="utf-8")
         cls.export = EXPORT_PATH.read_text(encoding="utf-8")
 
@@ -57,39 +65,49 @@ class GraphicsUpgradeG0ContractTests(unittest.TestCase):
 
     def test_child_branch_descends_from_frozen_pr59_head(self) -> None:
         frozen_head = self.authority["parent_pull_request"]["expected_head_sha"]
-        result = git("merge-base", "--is-ancestor", frozen_head, "HEAD")
+        result = git_text("merge-base", "--is-ancestor", frozen_head, "HEAD")
         if result.returncode != 0 and "not a valid object name" in result.stderr:
             self.skipTest("full git history is unavailable; CI must use fetch-depth: 0")
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_protected_files_are_byte_identical(self) -> None:
-        expected = {
-            item["path"]: item["sha256"]
-            for item in self.authority["protected_files"]
-        }
-        composite = {
-            item["path"]: item["sha256"]
-            for item in self.composite["protected_files"]
-        }
-        self.assertEqual(expected, composite)
-        for relative_path, expected_hash in expected.items():
-            path = ROOT / relative_path
-            self.assertTrue(path.is_file(), f"protected file missing: {relative_path}")
+    def test_protected_files_match_exact_frozen_git_objects(self) -> None:
+        frozen_head = self.authority["parent_pull_request"]["expected_head_sha"]
+        protected = [item["path"] for item in self.authority["protected_files"]]
+        self.assertIn("scripts/world.gd", protected)
+        self.assertEqual(len(protected), len(set(protected)), "duplicate protected path")
+        policy = self.authority["protected_file_policy"]
+        self.assertEqual(
+            policy["hash_authority"],
+            "exact bytes from parent_pull_request.expected_head_sha Git objects",
+        )
+        self.assertTrue(policy["reconstructed_hashes_are_not_git_hashes"])
+
+        for relative_path in protected:
+            frozen = git_bytes("show", f"{frozen_head}:{relative_path}")
             self.assertEqual(
-                sha256(path),
-                expected_hash,
-                f"protected file changed: {relative_path}",
+                frozen.returncode,
+                0,
+                f"protected file missing from exact frozen tree: {relative_path}: "
+                f"{frozen.stderr.decode('utf-8', errors='replace')}",
+            )
+            current_path = ROOT / relative_path
+            self.assertTrue(current_path.is_file(), f"protected file missing at HEAD: {relative_path}")
+            current = current_path.read_bytes()
+            self.assertEqual(
+                current,
+                frozen.stdout,
+                f"protected bytes changed: {relative_path}; frozen_sha256={sha256_bytes(frozen.stdout)} "
+                f"current_sha256={sha256_bytes(current)}",
             )
 
     def test_no_protected_file_changed_since_pr59_head(self) -> None:
         frozen_head = self.authority["parent_pull_request"]["expected_head_sha"]
-        result = git("diff", "--name-only", f"{frozen_head}...HEAD")
+        result = git_text("diff", "--name-only", f"{frozen_head}...HEAD")
         if result.returncode != 0 and "unknown revision" in result.stderr:
             self.skipTest("full git history is unavailable; CI must use fetch-depth: 0")
         self.assertEqual(result.returncode, 0, result.stderr)
         changed = {line.strip() for line in result.stdout.splitlines() if line.strip()}
         protected = {item["path"] for item in self.authority["protected_files"]}
-        protected.add("scripts/world.gd")
         self.assertFalse(
             changed & protected,
             f"graphics branch changed protected authorities: {sorted(changed & protected)}",
