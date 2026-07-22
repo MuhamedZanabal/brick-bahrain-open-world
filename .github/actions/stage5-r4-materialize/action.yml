@@ -19,11 +19,11 @@ runs:
         d="$RUNNER_TEMP/stage5-4-5-2-r4-bundle"
         rm -rf "$d"
         mkdir -p "$d"
-        c="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2/revision4_bundle"
-        cat "$c"/stage5_r4_bundle_*.b64part | tr -d '\r\n' > "$d/bundle.b64"
-        test "$(sha256sum "$d/bundle.b64" | cut -d' ' -f1)" = bd202e11ae88e6f5d6c40f7973148108b3b87d6d80130f8d8ccf3e8379473f7f
+        c="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5_project_compatibility_4_5_2/revision4_completion_bundle_v2"
+        cat "$c"/stage5_r4_completion_*.b64part | tr -d '\r\n' > "$d/bundle.b64"
+        test "$(sha256sum "$d/bundle.b64" | cut -d' ' -f1)" = e86789245a93831f1ba1ed005285a9e718a9f7b74e5ad10a7c1dcc6e097b7bc5
         base64 -d "$d/bundle.b64" > "$d/bundle.zip"
-        test "$(sha256sum "$d/bundle.zip" | cut -d' ' -f1)" = 01915eeae84d4ac94cf9b59cff21ac9205a131e503c8c9702b0794541040ab95
+        test "$(sha256sum "$d/bundle.zip" | cut -d' ' -f1)" = e33eec81a17bca14f4898506242fbf4e263a59803e106e42c1e3f643a181410d
         unzip -q "$d/bundle.zip" -d "$d"
         python3 - "$d" <<'PY'
         import hashlib,json,sys
@@ -34,12 +34,12 @@ runs:
             p=root/record['path']; assert p.is_file(), record['path']; assert p.stat().st_size==record['bytes']; assert sha(p)==record['sha256']
         records=[{'path':r['path'],'sha256':sha(root/r['path'])} for r in authority['analyzer_source_files']]
         aggregate=hashlib.sha256((json.dumps(records,sort_keys=True,separators=(',',':'))+'\n').encode()).hexdigest()
-        assert aggregate==authority['analyzer_source_sha256']=='999895744f59d25dc863a5533f1dcb253c8caf1462900c848cf558f4582ba6d5'
-        assert sha(root/'stage5_r4.py')==authority['analyzer_loader_sha256']=='68b0b0ab16bd3c79547db1c808cec570b4c55a18d24f75de37f9ace7b5ecc634'
-        assert sha(root/'test_stage5_r4.py')==authority['test_sha256']=='7ab08496e2dc9c8c022c5fbc50ae88fde291892ee136e1ca1046942426e4ea36'
+        assert aggregate==authority['analyzer_source_sha256']=='945a9d3c1f9eb1c4321131f0c8f78907117c35814afd755d9ac80885dd666718'
+        assert sha(root/'stage5_r4.py')==authority['analyzer_loader_sha256']=='cc5b819d470bba22380ecf06a5e93f5c20b190b108d021e04d5433f7a7958416'
+        assert sha(root/'test_stage5_r4.py')==authority['test_sha256']=='0190654c4420966ccc57f9958434888157c4835f0f1ddd4e63bb589faeaf6bd4'
         PY
         chmod +x "$d/stage5_r4.py"
         echo "analyzer=$d/stage5_r4.py" >> "$GITHUB_OUTPUT"
         echo "bundle_root=$d" >> "$GITHUB_OUTPUT"
-        echo "analyzer_source_sha256=999895744f59d25dc863a5533f1dcb253c8caf1462900c848cf558f4582ba6d5" >> "$GITHUB_OUTPUT"
-        echo "analyzer_loader_sha256=68b0b0ab16bd3c79547db1c808cec570b4c55a18d24f75de37f9ace7b5ecc634" >> "$GITHUB_OUTPUT"
+        echo "analyzer_source_sha256=945a9d3c1f9eb1c4321131f0c8f78907117c35814afd755d9ac80885dd666718" >> "$GITHUB_OUTPUT"
+        echo "analyzer_loader_sha256=cc5b819d470bba22380ecf06a5e93f5c20b190b108d021e04d5433f7a7958416" >> "$GITHUB_OUTPUT"
