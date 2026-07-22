@@ -56,12 +56,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/graphics-g0/reports/graphics/g0
           candidate_sha="$(git rev-parse HEAD)"
+          worktree_status="$(git status --porcelain=v1)"
+          test -z "$worktree_status"
+          mkdir -p build/graphics-g0/reports/graphics/g0
           echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           printf '%s\n' "$candidate_sha" > build/graphics-g0/CANDIDATE_SHA.txt
-          git status --porcelain=v1 > build/graphics-g0/WORKTREE_STATUS.txt
-          test ! -s build/graphics-g0/WORKTREE_STATUS.txt
+          printf '%s' "$worktree_status" > build/graphics-g0/WORKTREE_STATUS.txt
 
       - name: Generate frozen and graphics source-tree censuses
         id: census
@@ -223,12 +224,12 @@ jobs:
               "job_name": os.environ["GITHUB_JOB"],
               "event_name": os.environ["GITHUB_EVENT_NAME"],
               "event_sha": os.environ["GITHUB_SHA"],
-              "candidate_sha": os.environ["CANDIDATE_SHA"],
+              "candidate_sha": os.environ.get("CANDIDATE_SHA", ""),
               "outcomes": {
-                  "census": os.environ["CENSUS_OUTCOME"],
-                  "contracts": os.environ["CONTRACT_OUTCOME"],
-                  "pr59_api": os.environ["PR59_OUTCOME"],
-                  "configuration": os.environ["CONFIGURATION_OUTCOME"],
+                  "census": os.environ.get("CENSUS_OUTCOME", "skipped"),
+                  "contracts": os.environ.get("CONTRACT_OUTCOME", "skipped"),
+                  "pr59_api": os.environ.get("PR59_OUTCOME", "skipped"),
+                  "configuration": os.environ.get("CONFIGURATION_OUTCOME", "skipped"),
               },
               "test_counts": counts,
               "source_tree_comparison": json.loads(comparison_path.read_text()) if comparison_path.exists() else None,
