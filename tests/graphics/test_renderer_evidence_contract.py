@@ -51,10 +51,10 @@ class RendererEvidenceContractTests(unittest.TestCase):
             "IMPORTED_STATE_MANIFEST.json",
             "cp -a build/g0-render/shared-import build/g0-render/gl_compatibility",
             "cp -a build/g0-render/shared-import build/g0-render/mobile_vulkan",
-            "--rendering-method gl_compatibility",
-            "--rendering-method mobile",
-            "--rendering-driver opengl3",
-            "--rendering-driver vulkan",
+            'run_renderer gl_compatibility gl_compatibility opengl3 "$root/gl_compatibility"',
+            'run_renderer mobile_vulkan mobile vulkan "$root/mobile_vulkan"',
+            '--rendering-method "$method"',
+            '--rendering-driver "$driver"',
         ):
             self.assertIn(fragment, text)
         self.assertNotIn("sed -i", text)
