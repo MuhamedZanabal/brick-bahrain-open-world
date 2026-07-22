@@ -1,0 +1,28 @@
+name: Materialize Stage 5A UID bundle
+description: Reconstruct and verify the deterministic Stage 5A analyzer, tests and Godot probe.
+outputs:
+  bundle-root: {description: Verified materialized bundle root, value: '${{ steps.materialize.outputs.bundle_root }}'}
+  analyzer: {description: Verified analyzer path, value: '${{ steps.materialize.outputs.analyzer }}'}
+  tests: {description: Verified tests path, value: '${{ steps.materialize.outputs.tests }}'}
+  probe: {description: Verified Godot probe path, value: '${{ steps.materialize.outputs.probe }}'}
+runs:
+  using: composite
+  steps:
+    - id: materialize
+      shell: bash
+      run: |
+        set -euo pipefail
+        source_dir="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5a_uid_cache_4_5_2/bundle"
+        root="$RUNNER_TEMP/stage5a-uid-bundle-$GITHUB_SHA"
+        rm -rf "$root"
+        mkdir -p "$root"
+        cat "$source_dir"/*.b64part | tr -d '\n' | base64 --decode > "$root/stage5a_bundle.tar.gz"
+        test "$(sha256sum "$root/stage5a_bundle.tar.gz" | cut -d' ' -f1)" = 10e7b1288fcb9d613caca53b67126fc9113a423855c7d801dfa5ce5e9c3cc9e6
+        tar -xzf "$root/stage5a_bundle.tar.gz" -C "$root"
+        test "$(sha256sum "$root/stage5a.py" | cut -d' ' -f1)" = 49039a15b1cb8cc068c2e651a9e17f8ea8b0b04330c300c34b5c6de0924ce695
+        test "$(sha256sum "$root/test_stage5a.py" | cut -d' ' -f1)" = 50569a80fe0c196baa71dbc631d819c4a5f2362dc7c3bbab336dad928f69e6ec
+        test "$(sha256sum "$root/stage5a_probe.gd" | cut -d' ' -f1)" = 52da4a8a51e6a8852dd9e2716029944aa961ef5f1abf0e396fdbbd01e3139cd1
+        printf 'bundle_root=%s\n' "$root" >> "$GITHUB_OUTPUT"
+        printf 'analyzer=%s\n' "$root/stage5a.py" >> "$GITHUB_OUTPUT"
+        printf 'tests=%s\n' "$root/test_stage5a.py" >> "$GITHUB_OUTPUT"
+        printf 'probe=%s\n' "$root/stage5a_probe.gd" >> "$GITHUB_OUTPUT"
