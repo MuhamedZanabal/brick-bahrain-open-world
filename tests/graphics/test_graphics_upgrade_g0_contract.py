@@ -70,19 +70,21 @@ class GraphicsUpgradeG0ContractTests(unittest.TestCase):
             self.skipTest("full git history is unavailable; CI must use fetch-depth: 0")
         self.assertEqual(result.returncode, 0, result.stderr)
 
-    def test_protected_files_match_exact_frozen_git_objects(self) -> None:
+    def test_exact_git_protected_files_match_frozen_objects_and_declared_hashes(self) -> None:
         frozen_head = self.authority["parent_pull_request"]["expected_head_sha"]
-        protected = [item["path"] for item in self.authority["protected_files"]]
-        self.assertIn("scripts/world.gd", protected)
-        self.assertEqual(len(protected), len(set(protected)), "duplicate protected path")
+        protected = self.authority["exact_git_protected_files"]
+        paths = [item["path"] for item in protected]
+        self.assertIn("scripts/world.gd", paths)
+        self.assertEqual(len(paths), len(set(paths)), "duplicate exact Git protected path")
+
         policy = self.authority["protected_file_policy"]
         self.assertEqual(
-            policy["hash_authority"],
+            policy["exact_git_hash_authority"],
             "exact bytes from parent_pull_request.expected_head_sha Git objects",
         )
-        self.assertTrue(policy["reconstructed_hashes_are_not_git_hashes"])
 
-        for relative_path in protected:
+        for item in protected:
+            relative_path = item["path"]
             frozen = git_bytes("show", f"{frozen_head}:{relative_path}")
             self.assertEqual(
                 frozen.returncode,
@@ -90,6 +92,10 @@ class GraphicsUpgradeG0ContractTests(unittest.TestCase):
                 f"protected file missing from exact frozen tree: {relative_path}: "
                 f"{frozen.stderr.decode('utf-8', errors='replace')}",
             )
+            declared_blob = git_text("rev-parse", f"{frozen_head}:{relative_path}")
+            self.assertEqual(declared_blob.returncode, 0, declared_blob.stderr)
+            self.assertEqual(declared_blob.stdout.strip(), item["blob_sha"], relative_path)
+            self.assertEqual(sha256_bytes(frozen.stdout), item["sha256"], relative_path)
             current_path = ROOT / relative_path
             self.assertTrue(current_path.is_file(), f"protected file missing at HEAD: {relative_path}")
             current = current_path.read_bytes()
@@ -100,14 +106,48 @@ class GraphicsUpgradeG0ContractTests(unittest.TestCase):
                 f"current_sha256={sha256_bytes(current)}",
             )
 
-    def test_no_protected_file_changed_since_pr59_head(self) -> None:
+    def test_reconstructed_output_protections_are_preserved_without_path_invention(self) -> None:
+        outputs = self.authority["reconstructed_output_protections"]
+        self.assertEqual(len(outputs), 7)
+        self.assertEqual(len({item["path"] for item in outputs}), len(outputs))
+        unresolved = []
+        for item in outputs:
+            self.assertRegex(item["sha256"], r"^[0-9a-f]{64}$")
+            source_path = item.get("source_path")
+            if source_path:
+                source = ROOT / source_path
+                self.assertTrue(source.is_file(), f"reconstruction source missing: {source_path}")
+                self.assertEqual(sha256_bytes(source.read_bytes()), item["sha256"], source_path)
+            else:
+                unresolved.append(item)
+        self.assertEqual(len(unresolved), 1)
+        self.assertEqual(unresolved[0]["path"], "scripts/player_controller.gd")
+        self.assertEqual(
+            unresolved[0]["source_classification"],
+            "historical_or_generated_composite_input",
+        )
+
+    def test_world_adjudication_preserves_both_authority_layers(self) -> None:
+        world = self.authority["world_gd_adjudication"]
+        self.assertTrue(world["exact_frozen_git_path_exists"])
+        self.assertFalse(world["exact_frozen_git_exit_tree_exists"])
+        self.assertEqual(world["exact_frozen_git_blob_sha"], "c72ca10bdde7e421f3df6421240588946bb55e4f")
+        self.assertEqual(world["exact_frozen_git_sha256"], "a9d32157d38bee728eec54887a747ece49d070100c1750c313fa75047ce75432")
+        self.assertIn("reconstructed composite source", world["design_symbol_authority"])
+        functions = {item["target"]: item["sha256"] for item in self.authority["reconstructed_function_protections"]}
+        self.assertEqual(
+            functions["scripts/world.gd::_exit_tree"],
+            "fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc",
+        )
+
+    def test_no_exact_git_protected_file_changed_since_pr59_head(self) -> None:
         frozen_head = self.authority["parent_pull_request"]["expected_head_sha"]
         result = git_text("diff", "--name-only", f"{frozen_head}...HEAD")
         if result.returncode != 0 and "unknown revision" in result.stderr:
             self.skipTest("full git history is unavailable; CI must use fetch-depth: 0")
         self.assertEqual(result.returncode, 0, result.stderr)
         changed = {line.strip() for line in result.stdout.splitlines() if line.strip()}
-        protected = {item["path"] for item in self.authority["protected_files"]}
+        protected = {item["path"] for item in self.authority["exact_git_protected_files"]}
         self.assertFalse(
             changed & protected,
             f"graphics branch changed protected authorities: {sorted(changed & protected)}",
