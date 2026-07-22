@@ -1,0 +1,54 @@
+{
+  "action_sha256": {
+    "stage5-r4-aggregate": "24250a28147a42aff6df532cae003e0c90101815e3a3935550a586790327b935",
+    "stage5-r4-candidate": "28bfc40bdf205fa6f3794e9e26a0fbd818b8645c2a083989ab9371c606872b43",
+    "stage5-r4-compare": "c420e4a04237b6687c30bfac9500739533bc00cf2efea15ae52793d557886427",
+    "stage5-r4-legacy": "77572594d3d9fc277a7b789dc2f658ddb5ea286eab103a004528bed3ef8a59b3",
+    "stage5-r4-materialize": "ed2d6381942d028fb9f86beb42ce1e0638ae5b4d76af8a58f639e94d13aaba17",
+    "stage5-r4-prepare": "b3baca793895fb59b770598deb07882fc95b79de4bbed1252b4c389376dcaccd"
+  },
+  "analyzer_loader_sha256": "cc5b819d470bba22380ecf06a5e93f5c20b190b108d021e04d5433f7a7958416",
+  "analyzer_source_sha256": "945a9d3c1f9eb1c4321131f0c8f78907117c35814afd755d9ac80885dd666718",
+  "bundle_base64_sha256": "e86789245a93831f1ba1ed005285a9e718a9f7b74e5ad10a7c1dcc6e097b7bc5",
+  "corrected_contracts": [
+    "accepted full-commit Godot 4.5.2 runtime identity",
+    "resolved already-prefixed lane log paths",
+    "excluded generated closure bytes from compact evidence artifact"
+  ],
+  "deterministic_bundle_sha256": "e33eec81a17bca14f4898506242fbf4e263a59803e106e42c1e3f643a181410d",
+  "first_revision4_classification": "Q6 \u2014 EVIDENCE INSUFFICIENT",
+  "first_revision4_run_id": 29878324293,
+  "frozen_authorities": {
+    "added_model_sidecars": 533,
+    "authorized_model_sidecars": 800,
+    "changed_existing_model_sidecars": 267,
+    "pr_head": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "source_bytes": 369162800,
+    "source_files": 1502
+  },
+  "pre_completion_branch_head": "42665315997d7f0c68b48bf30af5b026a1b0bc66",
+  "python_compilation": "PASS",
+  "revision3_authority": {
+    "accepted_classification": "Q6 \u2014 EVIDENCE INSUFFICIENT",
+    "aggregate_artifact": 8508358647,
+    "aggregate_sha256": "264add4b35814a79449277a56a128def12e08b246067a3f7f2a470734de2f2c0",
+    "locator": "0eedbbafdc99e0fcb6638a32c91734c8ae882ba4",
+    "run_id": 29862957145,
+    "workflow": "e24b1e37b8834ace125edeba4b7f1aca44f652ba"
+  },
+  "schema": "stage5-revision4-completion-contract-authority-v1",
+  "stage5_harness_revision": 4,
+  "test_sha256": "0190654c4420966ccc57f9958434888157c4835f0f1ddd4e63bb589faeaf6bd4",
+  "tests_failed": 0,
+  "tests_passed": 18,
+  "workflow_contracts": {
+    "aggregate_if_always": true,
+    "c1_shards": 40,
+    "c2_shards": 40,
+    "comparisons": 40,
+    "exact_self_path_trigger": true,
+    "prohibited_actions_absent": true
+  },
+  "workflow_sha256": "af8d7d75b741152c19a130f1c4bc5caa06fccac35b4f94edda4f39410ee3351d",
+  "yaml_parse": "PASS"
+}
