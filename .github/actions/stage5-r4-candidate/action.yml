@@ -59,6 +59,7 @@ runs:
         path: |
           build/${{ inputs.artifact-lane }}
           !build/${{ inputs.artifact-lane }}/FULL_GENERATED_${{ inputs.lane }}_CLOSURE.zip
+          !build/${{ inputs.artifact-lane }}/generated_closure/**
           !build/${{ inputs.artifact-lane }}/shards/**
         retention-days: 30
         compression-level: 9
