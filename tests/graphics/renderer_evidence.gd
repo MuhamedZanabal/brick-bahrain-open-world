@@ -7,6 +7,8 @@ const CAPTURE_FRAME := 300
 const TOTAL_MEASURED_FRAMES := 360
 const CAMERA_POSITION := Vector3(-104.0, 48.0, 104.0)
 const CAMERA_TARGET := Vector3(-4.0, 4.0, -4.0)
+const READY_MARKER := "BAHRAIN_BRICK_SOUQ_SLICE_READY assets=35 pedestrians=12 traffic=6"
+const MISSION_START_MARKER := "BAHRAIN_BRICK_KARAK_MISSION_STARTED"
 
 var _evidence_dir: String
 var _frame_rows: Array[Dictionary] = []
@@ -49,7 +51,6 @@ func _run() -> void:
 	if mission == null or mission.current_state != KarakDeliveryMission.MissionState.WALK_TO_CAFE:
 		_fail("Karak Delivery mission did not start", 5)
 		return
-	print("BAHRAIN_BRICK_KARAK_MISSION_STARTED")
 
 	var camera := Camera3D.new()
 	camera.name = "G0EvidenceCamera"
@@ -152,7 +153,7 @@ func _write_frame_metrics() -> void:
 
 
 func _write_runtime_report(slice: ManamaSouqVerticalSlice, mission: KarakDeliveryMission) -> void:
-	var sorted_times := _frame_times_ms.duplicate()
+	var sorted_times: Array[float] = _frame_times_ms.duplicate()
 	sorted_times.sort()
 	var average_ms := _average(_frame_times_ms)
 	var report := {
@@ -179,7 +180,8 @@ func _write_runtime_report(slice: ManamaSouqVerticalSlice, mission: KarakDeliver
 		"scene_ready": slice.is_slice_ready(),
 		"scene_ready_marker": true,
 		"mission_start_marker": true,
-		"mission_state": mission.get_state_name(),
+		"mission_state": mission.current_state,
+		"mission_objective": mission.get_current_objective(),
 		"warmup_frames": WARMUP_FRAMES,
 		"captured_frame_number": CAPTURE_FRAME,
 		"measured_frame_count": _frame_times_ms.size(),
@@ -198,6 +200,7 @@ func _write_runtime_report(slice: ManamaSouqVerticalSlice, mission: KarakDeliver
 		"visible_objects": int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
 		"visible_primitives": int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
 		"visible_triangles": null,
+		"protocol_markers": {"ready": READY_MARKER, "mission_start": MISSION_START_MARKER},
 		"screenshot": _screenshot_report,
 		"exit_code": 0,
 		"evidence_complete": false,
