@@ -8,7 +8,9 @@ on:
       - .ai/**
       - authority/bahrain_brick_graphics_upgrade_v1.json
       - docs/graphics/**
+      - reports/graphics/g0/**
       - tests/graphics/**
+      - tools/graphics/**
       - project.godot
       - export_presets.cfg
       - scripts/world.gd
@@ -26,6 +28,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pull-requests: read
 
 concurrency:
@@ -40,7 +43,7 @@ env:
 jobs:
   authority_contract:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out exact candidate with authority history
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -48,21 +51,52 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      - name: Run G0 source contracts
+      - name: Record exact checkout identity
+        id: identity
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p build/graphics-g0
-          python3 tests/graphics/test_graphics_upgrade_g0_contract.py 2>&1 | tee build/graphics-g0/g0-contracts.log
+          mkdir -p build/graphics-g0/reports/graphics/g0
+          candidate_sha="$(git rev-parse HEAD)"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$candidate_sha" > build/graphics-g0/CANDIDATE_SHA.txt
+          git status --porcelain=v1 > build/graphics-g0/WORKTREE_STATUS.txt
+          test ! -s build/graphics-g0/WORKTREE_STATUS.txt
+
+      - name: Generate frozen and graphics source-tree censuses
+        id: census
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/graphics/g0_source_tree_census.py \
+            --repo-root "$PWD" \
+            --frozen "$FROZEN_PR_HEAD" \
+            --graphics '${{ steps.identity.outputs.candidate_sha }}' \
+            --composite-authority authority/manama_souq_composite_source.json \
+            --output-root build/graphics-g0/reports/graphics/g0 \
+            2>&1 | tee build/graphics-g0/g0-census.log
+
+      - name: Run all G0 source contracts
+        id: contracts
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s tests/graphics -p 'test_*.py' -v \
+            2>&1 | tee build/graphics-g0/g0-contracts.log
 
       - name: Verify frozen PR 59 through GitHub API
+        id: pr59
+        if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee build/graphics-g0/pr59-api.log
           import json
           import os
           import urllib.request
@@ -94,6 +128,7 @@ jobs:
               "head_sha": payload["head"]["sha"],
               "changed_files": payload["changed_files"],
               "html_url": payload["html_url"],
+              "updated_at": payload["updated_at"],
           }
           expected = {
               "number": 59,
@@ -111,8 +146,15 @@ jobs:
               for key, value in expected.items()
               if observed.get(key) != value
           }
+          report = {
+              "schema_version": 1,
+              "expected": expected,
+              "observed": observed,
+              "failures": failures,
+              "unchanged": not failures,
+          }
           Path("build/graphics-g0/pr59-authority.json").write_text(
-              json.dumps({"expected": expected, "observed": observed, "failures": failures}, indent=2) + "\n",
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           if failures:
@@ -120,23 +162,108 @@ jobs:
           PY
 
       - name: Record renderer and Android configuration baseline
+        id: configuration
+        if: always()
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee build/graphics-g0/configuration-baseline.log
           import json
           from pathlib import Path
 
           authority = json.loads(Path("authority/bahrain_brick_graphics_upgrade_v1.json").read_text(encoding="utf-8"))
           report = {
+              "schema_version": 1,
               "renderer_gate": authority["renderer_gate"],
               "current_configuration": authority["current_configuration"],
               "conclusion": "UNRESOLVED: no graphics implementation may pass G0 until renderer and physical-device evidence are attached.",
           }
           Path("build/graphics-g0/configuration-baseline.json").write_text(
-              json.dumps(report, indent=2) + "\n",
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
+          PY
+
+      - name: Build CI execution report
+        if: always()
+        env:
+          CENSUS_OUTCOME: ${{ steps.census.outcome }}
+          CONTRACT_OUTCOME: ${{ steps.contracts.outcome }}
+          PR59_OUTCOME: ${{ steps.pr59.outcome }}
+          CONFIGURATION_OUTCOME: ${{ steps.configuration.outcome }}
+          CANDIDATE_SHA: ${{ steps.identity.outputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path("build/graphics-g0")
+          log = (root / "g0-contracts.log").read_text(encoding="utf-8", errors="replace") if (root / "g0-contracts.log").exists() else ""
+          counts = {
+              "passed": len(re.findall(r"\.\.\. ok$", log, flags=re.MULTILINE)),
+              "failed": len(re.findall(r"\.\.\. FAIL$", log, flags=re.MULTILINE)),
+              "errors": len(re.findall(r"\.\.\. ERROR$", log, flags=re.MULTILINE)),
+              "skipped": len(re.findall(r"\.\.\. skipped", log, flags=re.MULTILINE)),
+          }
+          comparison_path = root / "reports/graphics/g0/source_tree_comparison.json"
+          world_path = root / "reports/graphics/g0/world_gd_adjudication.json"
+          pr59_path = root / "pr59-authority.json"
+          report = {
+              "schema_version": 1,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "workflow_run_number": int(os.environ["GITHUB_RUN_NUMBER"]),
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "job_name": os.environ["GITHUB_JOB"],
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "event_sha": os.environ["GITHUB_SHA"],
+              "candidate_sha": os.environ["CANDIDATE_SHA"],
+              "outcomes": {
+                  "census": os.environ["CENSUS_OUTCOME"],
+                  "contracts": os.environ["CONTRACT_OUTCOME"],
+                  "pr59_api": os.environ["PR59_OUTCOME"],
+                  "configuration": os.environ["CONFIGURATION_OUTCOME"],
+              },
+              "test_counts": counts,
+              "source_tree_comparison": json.loads(comparison_path.read_text()) if comparison_path.exists() else None,
+              "world_gd_adjudication": json.loads(world_path.read_text()) if world_path.exists() else None,
+              "pr59_authority": json.loads(pr59_path.read_text()) if pr59_path.exists() else None,
+          }
+          (root / "g0-ci-execution.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Generate evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("build/graphics-g0")
+          output = root / "EVIDENCE_INVENTORY.json"
+          files = []
+          for path in sorted(root.rglob("*")):
+              if not path.is_file() or path == output:
+                  continue
+              data = path.read_bytes()
+              files.append({
+                  "path": path.relative_to(root).as_posix(),
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+              })
+          output.write_text(json.dumps({"schema_version": 1, "files": files}, indent=2, sort_keys=True) + "\n")
           PY
 
       - name: Upload G0 evidence
@@ -147,3 +274,12 @@ jobs:
           path: build/graphics-g0
           if-no-files-found: error
           retention-days: 30
+
+      - name: Enforce G0 source gate conclusion
+        if: always()
+        shell: bash
+        run: |
+          test '${{ steps.census.outcome }}' = success
+          test '${{ steps.contracts.outcome }}' = success
+          test '${{ steps.pr59.outcome }}' = success
+          test '${{ steps.configuration.outcome }}' = success
