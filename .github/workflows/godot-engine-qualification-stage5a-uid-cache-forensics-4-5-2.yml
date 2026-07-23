@@ -1,0 +1,305 @@
+name: Bahrain Brick Godot 4.5.2 Stage 5A UID Cache Forensics
+on:
+  push:
+    branches: [ci/godot-engine-determinism-qualification-20260719]
+    paths: [.github/workflows/godot-engine-qualification-stage5a-uid-cache-forensics-4-5-2.yml]
+permissions: {actions: read, contents: read}
+concurrency: {group: bahrain-brick-godot-stage5a-uid-cache-forensics-4-5-2, cancel-in-progress: false}
+env:
+  STAGE5A_REVISION: '1'
+  EXPERIMENT_ANALYZER_SHA256: de2510b474c43683370e18de7cc5273cb5e66fa22e9f82067857efa6ab2b7d1e
+  EXPERIMENT_TEST_SHA256: f48653a8e2c8151ee57bbdb955b796476694be4b8993d2d855fc219df35b8126
+  PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  REV4_WORKFLOW: d96dbf1b4e66e5b600237d105972105cda2095d1
+  REV4_RUN: '29880296708'
+  REV4_LOCATOR: fc5612d7fdf8a7f3e43beb1750f3430d3572b7c2
+  REV4_AGGREGATE_ARTIFACT: '8514683598'
+  REV4_AGGREGATE_SHA256: be5f6656069a90bf4305c863617212b13336d5fd4ba823b5aa9643427650afb9
+  C1_UID_SHA256: 4626c503be7c266e255ee0d4d9e6075cbff8a29482c05510ea788ecd54198ddd
+  GODOT_SOURCE_COMMIT: 6ce3de25aa58466e14ef354703ba8d9791a417da
+
+jobs:
+  record_locator:
+    runs-on: ubuntu-24.04
+    permissions: {contents: write}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}', fetch-depth: 50}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          p=.github/forensics/qualification/LATEST_STAGE5A_UID_CACHE_FORENSICS_4_5_2_RUN.json
+          printf '%s\n' '{"run_id":${{ github.run_id }},"workflow_sha":"${{ github.sha }}","pr_head":"'$PR_HEAD'","branch":"ci/godot-engine-determinism-qualification-20260719","engine":"4.5.2","stage":"5A","revision":1}' > "$p"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add "$p"
+          git commit -m "ci(stage5a): record UID-cache run ${{ github.run_id }}"
+          git fetch origin ci/godot-engine-determinism-qualification-20260719
+          git rebase origin/ci/godot-engine-determinism-qualification-20260719
+          git push origin HEAD:ci/godot-engine-determinism-qualification-20260719
+
+  contracts:
+    needs: record_locator
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
+      - id: core_bundle
+        uses: ./.github/actions/stage5a-uid-materialize
+      - id: experiment_bundle
+        uses: ./.github/actions/stage5a-experiment-materialize
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage5-4-5-2-r4-c1-generated-closure-29880296708
+          path: build/r4-c1
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29880296708'
+          github-token: '${{ github.token }}'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage5-4-5-2-r4-c2-generated-closure-29880296708
+          path: build/r4-c2
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29880296708'
+          github-token: '${{ github.token }}'
+      - env: {GH_TOKEN: '${{ github.token }}'}
+        shell: bash
+        run: |
+          set -euo pipefail
+          analyzer='${{ steps.experiment_bundle.outputs.analyzer }}'
+          tests='${{ steps.experiment_bundle.outputs.tests }}'
+          test "$(sha256sum "$analyzer" | cut -d' ' -f1)" = "$EXPERIMENT_ANALYZER_SHA256"
+          test "$(sha256sum "$tests" | cut -d' ' -f1)" = "$EXPERIMENT_TEST_SHA256"
+          mkdir -p /tmp/r4closurec1/full/.godot /tmp/r4closurec2/full/.godot
+          unzip -p build/r4-c1/FULL_GENERATED_C1_CLOSURE.zip .godot/uid_cache.bin > /tmp/r4closurec1/full/.godot/uid_cache.bin
+          unzip -p build/r4-c2/FULL_GENERATED_C2_CLOSURE.zip .godot/uid_cache.bin > /tmp/r4closurec2/full/.godot/uid_cache.bin
+          test "$(sha256sum /tmp/r4closurec1/full/.godot/uid_cache.bin | cut -d' ' -f1)" = "$C1_UID_SHA256"
+          python3 '${{ steps.core_bundle.outputs.tests }}' -v
+          python3 -m py_compile '${{ steps.core_bundle.outputs.analyzer }}' '${{ steps.core_bundle.outputs.tests }}'
+          python3 "$tests" -v
+          python3 -m py_compile "$analyzer" "$tests"
+          pr=$(gh api repos/$GITHUB_REPOSITORY/pulls/59)
+          test "$(jq -r .head.sha<<<"$pr")" = "$PR_HEAD"
+          test "$(jq -r .base.sha<<<"$pr")" = fc8f00182f97c39015610d6603fa7c9c44364c5d
+          test "$(jq -r .state<<<"$pr")" = open
+          test "$(jq -r .draft<<<"$pr")" = true
+          test "$(jq -r .merged_at<<<"$pr")" = null
+          test "$(jq -r .commits<<<"$pr")" = 99
+          artifact=$(gh api repos/$GITHUB_REPOSITORY/actions/artifacts/$REV4_AGGREGATE_ARTIFACT)
+          test "$(jq -r .digest<<<"$artifact")" = sha256:$REV4_AGGREGATE_SHA256
+          test "$(jq -r .workflow_run.id<<<"$artifact")" = "$REV4_RUN"
+          test "$(jq -r .workflow_run.head_sha<<<"$artifact")" = "$REV4_WORKFLOW"
+          python3 - <<'PY'
+          from pathlib import Path
+          text=Path('.github/workflows/godot-engine-qualification-stage5a-uid-cache-forensics-4-5-2.yml').read_text().lower()
+          prohibited=[
+              'update'+'_'+'ref', 'force'+'-'+'push', 'android'+' tooling',
+              'create an '+'.apk', 'create an '+'.aab', 'godot '+'4.6.3', 'generate a '+'pck',
+          ]
+          assert all(token not in text for token in prohibited), [token for token in prohibited if token in text]
+          PY
+          mkdir -p build/contracts
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          p=pathlib.Path('.github/workflows/godot-engine-qualification-stage5a-uid-cache-forensics-4-5-2.yml')
+          out={"schema":"stage5a-contract-result-v1","tests_passed":7,"tests_failed":0,"python_compilation":"PASS","prohibited_actions_absent":True,"workflow_sha256":hashlib.sha256(p.read_bytes()).hexdigest()}
+          pathlib.Path('build/contracts/CONTRACT_RESULT.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          PY
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage5a-contracts-${{ github.run_id }}', path: build/contracts, retention-days: 30, compression-level: 9}
+
+  source_and_revision4:
+    needs: contracts
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
+      - id: experiment_bundle
+        uses: ./.github/actions/stage5a-experiment-materialize
+      - uses: ./.github/actions/stage5a-uid-analysis
+      - shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/revision4-crosscheck
+          unzip -p build/r4-c1-closure/FULL_GENERATED_C1_CLOSURE.zip .godot/uid_cache.bin > build/revision4-crosscheck/C1_uid_cache.bin
+          unzip -p build/r4-c2-closure/FULL_GENERATED_C2_CLOSURE.zip .godot/uid_cache.bin > build/revision4-crosscheck/C2_uid_cache.bin
+          python3 '${{ steps.experiment_bundle.outputs.analyzer }}' revision4 \
+            --c1-cache build/revision4-crosscheck/C1_uid_cache.bin \
+            --c2-cache build/revision4-crosscheck/C2_uid_cache.bin \
+            --godot-source-root build/godot-source \
+            --output build/revision4-crosscheck
+          jq -e '.root_cause_class=="U2" and .record_order_difference_count==16 and .path_to_uid_mapping_difference_count==0' build/revision4-crosscheck/UID_CACHE_C1_VS_C2_SEMANTIC_COMPARISON.json >/dev/null
+          cp build/stage5a-analysis/*.json build/revision4-crosscheck/ || true
+          cp build/stage5a-analysis/ANALYSIS.log build/revision4-crosscheck/ || true
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with: {name: 'stage5a-revision4-source-crosscheck-${{ github.run_id }}', path: build/revision4-crosscheck, retention-days: 30, compression-level: 9}
+
+  unseeded:
+    needs: contracts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: U1, base_lane: C1, artifact_lane: u1, root: /tmp/bahrain-stage5a-uid-unseeded-1/project, engine: /tmp/bahrain-stage5a-uid-unseeded-1/engine, evidence: /tmp/bahrain-stage5a-uid-unseeded-1-evidence}
+          - {label: U2, base_lane: C2, artifact_lane: u2, root: /tmp/bahrain-stage5a-uid-unseeded-2-different-root/project, engine: /tmp/bahrain-stage5a-uid-unseeded-2-different-root/engine, evidence: /tmp/bahrain-stage5a-uid-unseeded-2-evidence}
+          - {label: U3, base_lane: C1, artifact_lane: u3, root: /tmp/bahrain-stage5a-uid-unseeded-3-different-root/project, engine: /tmp/bahrain-stage5a-uid-unseeded-3-different-root/engine, evidence: /tmp/bahrain-stage5a-uid-unseeded-3-evidence}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
+      - id: experiment_bundle
+        uses: ./.github/actions/stage5a-experiment-materialize
+      - uses: ./.github/actions/stage5-r4-candidate
+        with:
+          lane: '${{ matrix.base_lane }}'
+          artifact-lane: '${{ matrix.artifact_lane }}'
+          project-root: '${{ matrix.root }}'
+          engine-output: '${{ matrix.engine }}'
+          evidence-dir: '${{ matrix.evidence }}'
+      - if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=build/stage5a-${{ matrix.artifact_lane }}
+          rc=0
+          test -f '${{ matrix.root }}/.godot/uid_cache.bin' || rc=1
+          python3 '${{ steps.experiment_bundle.outputs.analyzer }}' lane \
+            --project-root '${{ matrix.root }}' --output "$out" --lane '${{ matrix.label }}' \
+            --census 'build/${{ matrix.artifact_lane }}/PROJECT_COMPATIBILITY_CENSUS.json' \
+            --import-exit-code "$rc" --import-timed-out false
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with: {name: 'stage5a-${{ matrix.artifact_lane }}-summary-${{ github.run_id }}', path: 'build/stage5a-${{ matrix.artifact_lane }}', retention-days: 30, compression-level: 9, include-hidden-files: true}
+
+  seeded:
+    needs: contracts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {label: S1, artifact_lane: s1, root: /tmp/bahrain-stage5a-uid-seeded-1/project, engine: /tmp/bahrain-stage5a-uid-seeded-1/engine, evidence: /tmp/bahrain-stage5a-uid-seeded-1-evidence, xdg: /tmp/bahrain-stage5a-uid-seeded-1/xdg}
+          - {label: S2, artifact_lane: s2, root: /tmp/bahrain-stage5a-uid-seeded-2-different-root/project, engine: /tmp/bahrain-stage5a-uid-seeded-2-different-root/engine, evidence: /tmp/bahrain-stage5a-uid-seeded-2-evidence, xdg: /tmp/bahrain-stage5a-uid-seeded-2-different-root/xdg}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
+      - id: experiment_bundle
+        uses: ./.github/actions/stage5a-experiment-materialize
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage5-4-5-2-r4-c1-generated-closure-29880296708
+          path: build/r4-c1
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29880296708'
+          github-token: '${{ github.token }}'
+      - uses: ./.github/actions/stage5-r4-candidate
+        with:
+          lane: C1
+          artifact-lane: '${{ matrix.artifact_lane }}-bootstrap'
+          project-root: '${{ matrix.root }}'
+          engine-output: '${{ matrix.engine }}'
+          evidence-dir: '${{ matrix.evidence }}-bootstrap'
+      - id: seeded_import
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='${{ matrix.root }}'
+          engine='${{ matrix.engine }}/Godot_v4.5.2-stable_linux.x86_64'
+          evidence='${{ matrix.evidence }}'
+          xdg='${{ matrix.xdg }}'
+          seed=/tmp/stage5a-c1-seed-${{ matrix.artifact_lane }}.bin
+          harness=/tmp/stage5a-r4-harness-${{ matrix.artifact_lane }}
+          rm -rf "$harness"
+          cp -a "$root/build/stage5_harness_r4" "$harness"
+          unzip -p build/r4-c1/FULL_GENERATED_C1_CLOSURE.zip .godot/uid_cache.bin > "$seed"
+          actual=$(sha256sum "$seed" | cut -d' ' -f1)
+          test "$actual" = "$C1_UID_SHA256"
+          rm -rf "$root" "$evidence" "$xdg"
+          mkdir -p "$root" "$evidence" "$xdg/data" "$xdg/config" "$xdg/cache" "$xdg/home"
+          unzip -q build/source-artifact/MANAMA_SOUQ_COMPOSITE_SOURCE.zip -d "$root"
+          unzip -q -o build/stage4-prep/sidecars/GODOT_4_5_2_FULL_SIDECAR_AUTHORITY.zip -d "$root"
+          mkdir -p "$root/build"
+          cp -a "$harness" "$root/build/stage5_harness_r4"
+          rm -rf "$root/.godot"
+          mkdir -p "$root/.godot"
+          cp "$seed" "$root/.godot/uid_cache.bin"
+          test "$(find "$root/.godot" -type f | wc -l)" -eq 1
+          test "$(sha256sum "$root/.godot/uid_cache.bin" | cut -d' ' -f1)" = "$C1_UID_SHA256"
+          set +e
+          timeout 1500 env HOME="$xdg/home" XDG_DATA_HOME="$xdg/data" XDG_CONFIG_HOME="$xdg/config" XDG_CACHE_HOME="$xdg/cache" \
+            "$engine" --headless --path "$root" --editor --import --verbose > "build/${{ matrix.artifact_lane }}-seeded-import.log" 2>&1
+          rc=$?
+          set -e
+          timed=false
+          if test "$rc" -eq 124; then timed=true; fi
+          probe_rc=1
+          report="$evidence/PROJECT_COMPATIBILITY_CENSUS.json"
+          if test "$rc" -eq 0; then
+            set +e
+            timeout 600 env HOME="$xdg/home" XDG_DATA_HOME="$xdg/data" XDG_CONFIG_HOME="$xdg/config" XDG_CACHE_HOME="$xdg/cache" \
+              "$engine" --headless --path "$root" --audio-driver Dummy \
+              res://build/stage5_harness_r4/stage5_compatibility_probe_r4.tscn -- \
+              --stage5-report="$report" --stage5-lane='${{ matrix.label }}' > "build/${{ matrix.artifact_lane }}-seeded-probe.log" 2>&1
+            probe_rc=$?
+            set -e
+          fi
+          printf '%s\n' "$rc" > "build/${{ matrix.artifact_lane }}-seeded-import-exit.txt"
+          printf '%s\n' "$timed" > "build/${{ matrix.artifact_lane }}-seeded-import-timeout.txt"
+          printf '%s\n' "$probe_rc" > "build/${{ matrix.artifact_lane }}-seeded-probe-exit.txt"
+          echo "import_exit=$rc" >> "$GITHUB_OUTPUT"
+          echo "timed_out=$timed" >> "$GITHUB_OUTPUT"
+          echo "seed_verified=true" >> "$GITHUB_OUTPUT"
+      - if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          out=build/stage5a-${{ matrix.artifact_lane }}
+          import_exit='${{ steps.seeded_import.outputs.import_exit }}'; test -n "$import_exit" || import_exit=1
+          timed_out='${{ steps.seeded_import.outputs.timed_out }}'; test -n "$timed_out" || timed_out=true
+          seed_verified='${{ steps.seeded_import.outputs.seed_verified }}'; test -n "$seed_verified" || seed_verified=false
+          python3 '${{ steps.experiment_bundle.outputs.analyzer }}' lane \
+            --project-root '${{ matrix.root }}' --output "$out" --lane '${{ matrix.label }}' \
+            --census '${{ matrix.evidence }}/PROJECT_COMPATIBILITY_CENSUS.json' \
+            --import-exit-code "$import_exit" --import-timed-out "$timed_out" \
+            --seed-expected-sha256 "$C1_UID_SHA256" --seed-verified "$seed_verified"
+          cp "build/${{ matrix.artifact_lane }}-seeded-import.log" "$out/" || true
+          cp "build/${{ matrix.artifact_lane }}-seeded-probe.log" "$out/" || true
+          cp "build/${{ matrix.artifact_lane }}-seeded-"*.txt "$out/" || true
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with: {name: 'stage5a-${{ matrix.artifact_lane }}-summary-${{ github.run_id }}', path: 'build/stage5a-${{ matrix.artifact_lane }}', retention-days: 30, compression-level: 9, include-hidden-files: true}
+
+  aggregate:
+    needs: [contracts, source_and_revision4, unseeded, seeded]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with: {ref: '${{ github.sha }}'}
+      - id: experiment_bundle
+        uses: ./.github/actions/stage5a-experiment-materialize
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage5a-revision4-source-crosscheck-${{ github.run_id }}', path: build/revision4-analysis}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage5a-u1-summary-${{ github.run_id }}', path: build/u1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage5a-u2-summary-${{ github.run_id }}', path: build/u2}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage5a-u3-summary-${{ github.run_id }}', path: build/u3}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage5a-s1-summary-${{ github.run_id }}', path: build/s1}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with: {name: 'stage5a-s2-summary-${{ github.run_id }}', path: build/s2}
+      - shell: bash
+        run: |
+          set -euo pipefail
+          python3 '${{ steps.experiment_bundle.outputs.analyzer }}' aggregate \
+            --revision4 build/revision4-analysis --u1 build/u1 --u2 build/u2 --u3 build/u3 --s1 build/s1 --s2 build/s2 \
+            --output build/aggregate
+          cp build/revision4-analysis/*.json build/aggregate/
+      - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        if: always()
+        with: {name: 'stage5a-uid-cache-aggregate-${{ github.run_id }}', path: build/aggregate, retention-days: 30, compression-level: 9, include-hidden-files: true}
