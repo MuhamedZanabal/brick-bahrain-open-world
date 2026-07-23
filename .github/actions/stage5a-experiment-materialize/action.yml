@@ -1,0 +1,24 @@
+name: Materialize Stage 5A experiment bundle
+description: Reconstruct and verify the deterministic Stage 5A replication and preseed analyzer.
+outputs:
+  analyzer: {description: Verified experiment analyzer path, value: '${{ steps.materialize.outputs.analyzer }}'}
+  tests: {description: Verified experiment tests path, value: '${{ steps.materialize.outputs.tests }}'}
+runs:
+  using: composite
+  steps:
+    - id: materialize
+      shell: bash
+      run: |
+        set -euo pipefail
+        source_dir="$GITHUB_WORKSPACE/.github/forensics/qualification/stage5a_uid_cache_4_5_2/experiment_bundle"
+        root="$RUNNER_TEMP/stage5a-experiment-$GITHUB_SHA"
+        rm -rf "$root"
+        mkdir -p "$root"
+        cat "$source_dir"/*.b64part | tr -d '\r\n' | base64 --decode > "$root/stage5a_experiment_bundle.tar.gz"
+        test "$(sha256sum "$root/stage5a_experiment_bundle.tar.gz" | cut -d' ' -f1)" = ed58504d1a36ee0a1614c61ed3e9955c9864d4fcfb3a3c380b3710a380a7765b
+        tar -xzf "$root/stage5a_experiment_bundle.tar.gz" -C "$root"
+        test "$(sha256sum "$root/stage5a_experiment.py" | cut -d' ' -f1)" = de2510b474c43683370e18de7cc5273cb5e66fa22e9f82067857efa6ab2b7d1e
+        test "$(sha256sum "$root/test_stage5a_experiment.py" | cut -d' ' -f1)" = f48653a8e2c8151ee57bbdb955b796476694be4b8993d2d855fc219df35b8126
+        chmod +x "$root/stage5a_experiment.py"
+        printf 'analyzer=%s\n' "$root/stage5a_experiment.py" >> "$GITHUB_OUTPUT"
+        printf 'tests=%s\n' "$root/test_stage5a_experiment.py" >> "$GITHUB_OUTPUT"
