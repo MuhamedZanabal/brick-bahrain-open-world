@@ -44,8 +44,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with: {ref: '${{ github.sha }}'}
-      - id: core_bundle
-        uses: ./.github/actions/stage5a-uid-materialize
       - id: experiment_bundle
         uses: ./.github/actions/stage5a-experiment-materialize
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -74,8 +72,6 @@ jobs:
           unzip -p build/r4-c1/FULL_GENERATED_C1_CLOSURE.zip .godot/uid_cache.bin > /tmp/r4closurec1/full/.godot/uid_cache.bin
           unzip -p build/r4-c2/FULL_GENERATED_C2_CLOSURE.zip .godot/uid_cache.bin > /tmp/r4closurec2/full/.godot/uid_cache.bin
           test "$(sha256sum /tmp/r4closurec1/full/.godot/uid_cache.bin | cut -d' ' -f1)" = "$C1_UID_SHA256"
-          python3 '${{ steps.core_bundle.outputs.tests }}' -v
-          python3 -m py_compile '${{ steps.core_bundle.outputs.analyzer }}' '${{ steps.core_bundle.outputs.tests }}'
           python3 "$tests" -v
           python3 -m py_compile "$analyzer" "$tests"
           pr=$(gh api repos/$GITHUB_REPOSITORY/pulls/59)
@@ -116,21 +112,40 @@ jobs:
         with: {ref: '${{ github.sha }}'}
       - id: experiment_bundle
         uses: ./.github/actions/stage5a-experiment-materialize
-      - uses: ./.github/actions/stage5a-uid-analysis
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: godotengine/godot
+          ref: 6ce3de25aa58466e14ef354703ba8d9791a417da
+          path: build/godot-source
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage5-4-5-2-r4-c1-generated-closure-29880296708
+          path: build/r4-c1
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29880296708'
+          github-token: '${{ github.token }}'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: stage5-4-5-2-r4-c2-generated-closure-29880296708
+          path: build/r4-c2
+          repository: MuhamedZanabal/brick-bahrain-open-world
+          run-id: '29880296708'
+          github-token: '${{ github.token }}'
       - shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/revision4-crosscheck
-          unzip -p build/r4-c1-closure/FULL_GENERATED_C1_CLOSURE.zip .godot/uid_cache.bin > build/revision4-crosscheck/C1_uid_cache.bin
-          unzip -p build/r4-c2-closure/FULL_GENERATED_C2_CLOSURE.zip .godot/uid_cache.bin > build/revision4-crosscheck/C2_uid_cache.bin
+          unzip -p build/r4-c1/FULL_GENERATED_C1_CLOSURE.zip .godot/uid_cache.bin > build/revision4-crosscheck/C1_uid_cache.bin
+          unzip -p build/r4-c2/FULL_GENERATED_C2_CLOSURE.zip .godot/uid_cache.bin > build/revision4-crosscheck/C2_uid_cache.bin
           python3 '${{ steps.experiment_bundle.outputs.analyzer }}' revision4 \
             --c1-cache build/revision4-crosscheck/C1_uid_cache.bin \
             --c2-cache build/revision4-crosscheck/C2_uid_cache.bin \
             --godot-source-root build/godot-source \
             --output build/revision4-crosscheck
-          jq -e '.root_cause_class=="U2" and .record_order_difference_count==16 and .path_to_uid_mapping_difference_count==0' build/revision4-crosscheck/UID_CACHE_C1_VS_C2_SEMANTIC_COMPARISON.json >/dev/null
-          cp build/stage5a-analysis/*.json build/revision4-crosscheck/ || true
-          cp build/stage5a-analysis/ANALYSIS.log build/revision4-crosscheck/ || true
+          jq -e '.root_cause_class=="U2" and .record_order_difference_count==16 and .path_to_uid_mapping_difference_count==0 and .uid_to_path_mapping_difference_count==0' build/revision4-crosscheck/UID_CACHE_C1_VS_C2_SEMANTIC_COMPARISON.json >/dev/null
+          jq -e '.records_sorted_before_writing==false and .ordering_dependency_conclusion=="mixed ordering dependency"' build/revision4-crosscheck/GODOT_4_5_2_UID_CACHE_SOURCE_TRACE.json >/dev/null
+          jq -e '[.paths[].final_scope_classification]==["EDITOR_ONLY_NON_EXPORT_RELEVANT","EDITOR_ONLY_NON_EXPORT_RELEVANT","EXPORT_RELEVANT_GENERATED_AUTHORITY"]' build/revision4-crosscheck/GODOT_4_5_2_GENERATED_PATH_OWNERSHIP.json >/dev/null
       - uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with: {name: 'stage5a-revision4-source-crosscheck-${{ github.run_id }}', path: build/revision4-crosscheck, retention-days: 30, compression-level: 9}
 
