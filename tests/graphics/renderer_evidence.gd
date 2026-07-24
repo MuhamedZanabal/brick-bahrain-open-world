@@ -27,6 +27,10 @@ func _ready() -> void:
 		push_error("G0_EVIDENCE_DIR is required")
 		get_tree().quit(2)
 		return
+	if _renderer_name().is_empty() or _driver_name().is_empty():
+		push_error("G0_EXPECTED_RENDERER and G0_EXPECTED_DRIVER are required")
+		get_tree().quit(2)
+		return
 	DirAccess.make_dir_recursive_absolute(_evidence_dir)
 	call_deferred("_run")
 
@@ -78,8 +82,16 @@ func _run() -> void:
 
 	_write_frame_metrics()
 	_write_runtime_report(slice, mission)
-	print("G0_RENDERER_EVIDENCE_COMPLETE renderer=%s frames=%d" % [RenderingServer.get_current_rendering_method(), TOTAL_MEASURED_FRAMES])
+	print("G0_RENDERER_EVIDENCE_COMPLETE renderer=%s driver=%s frames=%d" % [_renderer_name(), _driver_name(), TOTAL_MEASURED_FRAMES])
 	get_tree().quit(0)
+
+
+func _renderer_name() -> String:
+	return OS.get_environment("G0_EXPECTED_RENDERER")
+
+
+func _driver_name() -> String:
+	return OS.get_environment("G0_EXPECTED_DRIVER")
 
 
 func _sample_frame(frame_number: int, frame_time_ms: float) -> Dictionary:
@@ -161,8 +173,8 @@ func _write_runtime_report(slice: ManamaSouqVerticalSlice, mission: KarakDeliver
 		"evidence_tier": "A",
 		"evidence_class": "HOST_CI_FUNCTIONAL",
 		"engine": Engine.get_version_info(),
-		"renderer": RenderingServer.get_current_rendering_method(),
-		"rendering_driver": RenderingServer.get_current_rendering_driver_name(),
+		"renderer": _renderer_name(),
+		"rendering_driver": _driver_name(),
 		"operating_system": OS.get_name(),
 		"operating_system_version": OS.get_version(),
 		"gpu_name": RenderingServer.get_video_adapter_name(),
@@ -237,8 +249,8 @@ func _fail(message: String, code: int) -> void:
 	var report := {
 		"schema_version": 1,
 		"evidence_tier": "A",
-		"renderer": RenderingServer.get_current_rendering_method(),
-		"rendering_driver": RenderingServer.get_current_rendering_driver_name(),
+		"renderer": _renderer_name(),
+		"rendering_driver": _driver_name(),
 		"failure": message,
 		"exit_code": code,
 		"evidence_complete": false,
