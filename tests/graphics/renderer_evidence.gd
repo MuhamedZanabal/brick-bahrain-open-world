@@ -27,10 +27,6 @@ func _ready() -> void:
 		push_error("G0_EVIDENCE_DIR is required")
 		get_tree().quit(2)
 		return
-	if _renderer_name().is_empty() or _driver_name().is_empty():
-		push_error("G0_EXPECTED_RENDERER and G0_EXPECTED_DRIVER are required")
-		get_tree().quit(2)
-		return
 	DirAccess.make_dir_recursive_absolute(_evidence_dir)
 	call_deferred("_run")
 
@@ -87,11 +83,13 @@ func _run() -> void:
 
 
 func _renderer_name() -> String:
-	return OS.get_environment("G0_EXPECTED_RENDERER")
+	return str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "unknown"))
 
 
 func _driver_name() -> String:
-	return OS.get_environment("G0_EXPECTED_DRIVER")
+	if _renderer_name() == "gl_compatibility":
+		return "opengl3"
+	return "vulkan"
 
 
 func _sample_frame(frame_number: int, frame_time_ms: float) -> Dictionary:
