@@ -14,7 +14,7 @@ SCENE = ROOT / "tests" / "graphics" / "android_renderer_evidence.tscn"
 PREPARER = ROOT / "tools" / "graphics" / "prepare_android_renderer_variant.py"
 FINALIZER = ROOT / "tools" / "graphics" / "finalize_android_emulator_evidence.py"
 RUNNER = ROOT / "tools" / "graphics" / "run_android_tier_b.sh"
-WORKFLOW = ROOT / ".github" / "workflows" / "bahrain-brick-graphics-g0.yml"
+WORKFLOW = ROOT / ".github" / "workflows" / "bahrain-brick-graphics-g0.yml-tier-b.yml"
 
 
 def load_module(path: Path, name: str):
