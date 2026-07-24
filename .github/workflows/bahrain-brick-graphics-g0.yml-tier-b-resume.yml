@@ -1,0 +1,391 @@
+name: Bahrain Brick G0 Tier B Targeted Resume
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    types: [synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-graphics-g0.yml-tier-b-resume.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: bahrain-brick-g0-tier-b-targeted-resume
+  cancel-in-progress: false
+
+env:
+  RENDERER_EVIDENCE_COMMIT: 6ade72ed02084791128dcf4a91223e695d802c15
+  SOURCE_RUN_ID: '30064876896'
+  SOURCE_ARTIFACT_ID: '8586122615'
+  SOURCE_ARTIFACT_NAME: bahrain-brick-graphics-g0-tier-b-30064876896
+  SOURCE_ARTIFACT_SHA256: 4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee
+  GL_APK_SHA256: 8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb
+  MOBILE_APK_SHA256: 0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02
+
+jobs:
+  resume_tier_b_from_existing_apks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Check out exact renderer evidence authority
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 6ade72ed02084791128dcf4a91223e695d802c15
+          path: authority-source
+          fetch-depth: 1
+
+      - name: Set up Java 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+          check-latest: false
+
+      - name: Set up API 34 AOSP x86_64 Android emulator toolchain
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            emulator
+            platforms;android-34
+            build-tools;34.0.0
+            system-images;android-34;default;x86_64
+
+      - name: Enable KVM and record acceleration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/tier-b-resume
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+          "$ANDROID_SDK_ROOT/emulator/emulator" -accel-check \
+            > build/tier-b-resume/EMULATOR_ACCELERATION.txt 2>&1 || true
+
+      - name: Extract exact existing APKs without rebuilding
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$PWD/build/tier-b-resume"
+          mkdir -p "$root/source" "$root/apks" "$root/source-evidence"
+          curl --fail --location --retry 3 --retry-all-errors \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip" \
+            --output "$root/source/tier-b-artifact.zip"
+          actual="$(sha256sum "$root/source/tier-b-artifact.zip" | awk '{print $1}')"
+          test "$actual" = "$SOURCE_ARTIFACT_SHA256"
+          python3 - "$root" <<'PY'
+          from __future__ import annotations
+          import hashlib,json,os,sys,zipfile
+          from pathlib import Path
+          root=Path(sys.argv[1]); archive=root/'source/tier-b-artifact.zip'
+          expected={
+            'tier-b/apks/bahrain-brick-g0-gl-compatibility-x86_64.apk':os.environ['GL_APK_SHA256'],
+            'tier-b/apks/bahrain-brick-g0-mobile-vulkan-x86_64.apk':os.environ['MOBILE_APK_SHA256'],
+          }
+          optional=(
+            'tier-b/CLONE_IDENTITY.json','tier-b/GL_VARIANT_OVERRIDE.json',
+            'tier-b/MOBILE_VARIANT_OVERRIDE.json','tier-b/HARNESS_INJECTION.json',
+            'tier-b/IMPORTED_STATE_MANIFEST.json',
+          )
+          records=[]
+          with zipfile.ZipFile(archive) as zf:
+            names=set(zf.namelist())
+            for member, expected_sha in expected.items():
+              if member not in names: raise SystemExit(f'missing APK in source artifact: {member}')
+              data=zf.read(member); actual_sha=hashlib.sha256(data).hexdigest()
+              if actual_sha != expected_sha: raise SystemExit(f'APK SHA mismatch: {member}')
+              target=root/'apks'/Path(member).name; target.write_bytes(data)
+              records.append({'source_path':member,'extracted_path':target.name,'bytes':len(data),'sha256':actual_sha})
+            for member in optional:
+              if member in names:
+                target=root/'source-evidence'/Path(member).name; target.write_bytes(zf.read(member))
+          report={
+            'schema_version':1,'repository':os.environ.get('GITHUB_REPOSITORY'),
+            'renderer_evidence_commit':os.environ['RENDERER_EVIDENCE_COMMIT'],
+            'source_run_id':int(os.environ['SOURCE_RUN_ID']),
+            'source_artifact_id':int(os.environ['SOURCE_ARTIFACT_ID']),
+            'source_artifact_name':os.environ['SOURCE_ARTIFACT_NAME'],
+            'source_artifact_digest':'sha256:'+os.environ['SOURCE_ARTIFACT_SHA256'],
+            'rebuild_performed':False,'apks':records,
+          }
+          (root/'SOURCE_ARTIFACT_EXTRACTION.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+          PY
+          rm -f "$root/source/tier-b-artifact.zip"
+
+      - name: Correct APK verification with AAPT2
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$PWD/build/tier-b-resume"
+          apksigner="$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner"
+          aapt2="$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt2"
+          test -x "$apksigner"
+          test -x "$aapt2"
+          python3 - "$root" "$apksigner" "$aapt2" <<'PY'
+          from __future__ import annotations
+          import hashlib,json,subprocess,sys,zipfile
+          from pathlib import Path
+          root=Path(sys.argv[1]); apksigner=sys.argv[2]; aapt2=sys.argv[3]
+          variants=(
+            ('gl_compatibility','com.brickbahrain.g0gl',root/'apks/bahrain-brick-g0-gl-compatibility-x86_64.apk'),
+            ('mobile','com.brickbahrain.g0mobile',root/'apks/bahrain-brick-g0-mobile-vulkan-x86_64.apk'),
+          )
+          reports=[]
+          for renderer, package, apk in variants:
+            signing=subprocess.run([apksigner,'verify','--verbose','--print-certs',str(apk)],text=True,capture_output=True)
+            package_dump=subprocess.run([aapt2,'dump','packagename',str(apk)],text=True,capture_output=True)
+            with zipfile.ZipFile(apk) as zf:
+              names=zf.namelist()
+            has_x86_64='lib/x86_64/libgodot_android.so' in names
+            actual_package=package_dump.stdout.strip()
+            report={
+              'schema_version':1,'renderer':renderer,'apk':apk.name,'bytes':apk.stat().st_size,
+              'sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+              'apksigner_exit_code':signing.returncode,'apksigner_stdout':signing.stdout,
+              'apksigner_stderr':signing.stderr,'aapt2_packagename_exit_code':package_dump.returncode,
+              'aapt2_packagename_stdout':package_dump.stdout,'aapt2_packagename_stderr':package_dump.stderr,
+              'expected_package':package,'actual_package':actual_package,
+              'package_matches':package in actual_package,'x86_64_godot_library_present':has_x86_64,
+              'legacy_aapt_badging_used':False,
+            }
+            report['verification_passed']=bool(signing.returncode==0 and package_dump.returncode==0 and report['package_matches'] and has_x86_64)
+            (root/f'{renderer}_APK_VERIFICATION.json').write_text(json.dumps(report,indent=2,sort_keys=True)+'\n')
+            (root/f'{renderer}_apksigner.txt').write_text(signing.stdout+signing.stderr)
+            (root/f'{renderer}_aapt2-packagename.txt').write_text(package_dump.stdout+package_dump.stderr)
+            reports.append(report)
+          summary={
+            'schema_version':1,'classification_retried':'TIER_B_APK_VERIFICATION_FAILURE',
+            'correction':'Replace failing legacy aapt dump badging with apksigner plus AAPT2 packagename and ABI verification.',
+            'all_verified':all(item['verification_passed'] for item in reports),'variants':reports,
+          }
+          (root/'APK_VERIFICATION_SUMMARY.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
+          if not summary['all_verified']: raise SystemExit(1)
+          PY
+
+      - name: Resume API 34 emulator evidence from verified APKs
+        id: resume
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$PWD/build/tier-b-resume"
+          authority="$PWD/authority-source"
+          reports="$root/reports/graphics/g0"
+          adb="$ANDROID_SDK_ROOT/platform-tools/adb"
+          emulator="$ANDROID_SDK_ROOT/emulator/emulator"
+          avdmanager="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | sort | tail -1)"
+          avd_home="$root/avd-home"
+          emulator_home="$root/emulator-home"
+          avd_name="bahrain_brick_g0_api34_targeted"
+          mkdir -p "$reports/gl_compatibility" "$reports/mobile_vulkan" "$avd_home" "$emulator_home"
+          export ANDROID_AVD_HOME="$avd_home"
+          export ANDROID_EMULATOR_HOME="$emulator_home"
+
+          cleanup() {
+            "$adb" emu kill >/dev/null 2>&1 || true
+            if test -n "${EMULATOR_PID:-}"; then kill "$EMULATOR_PID" >/dev/null 2>&1 || true; fi
+          }
+          trap cleanup EXIT
+
+          rm -rf "$ANDROID_AVD_HOME/$avd_name.avd" "$ANDROID_AVD_HOME/$avd_name.ini"
+          echo no | "$avdmanager" create avd --force --name "$avd_name" \
+            --package 'system-images;android-34;default;x86_64' --device 'pixel_6'
+          nohup "$emulator" "@$avd_name" \
+            -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
+            -gpu swiftshader -accel auto -memory 4096 -cores 4 \
+            -camera-back none -camera-front none \
+            > "$root/emulator.log" 2>&1 &
+          EMULATOR_PID=$!
+          printf '%s\n' "$EMULATOR_PID" > "$root/EMULATOR_PID.txt"
+          "$adb" wait-for-device
+          booted=false
+          for _attempt in $(seq 1 240); do
+            if [[ "$("$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then booted=true; break; fi
+            sleep 2
+          done
+          test "$booted" = true
+          "$adb" shell settings put system accelerometer_rotation 0
+          "$adb" shell settings put system user_rotation 1
+          "$adb" shell wm size 2400x1080
+          "$adb" shell wm density 420
+          "$adb" shell input keyevent 82 || true
+
+          python3 - "$adb" "$root/DEVICE_BASELINE.json" <<'PY'
+          import json,os,platform,subprocess,sys
+          adb=sys.argv[1]
+          def shell(*args):
+              return subprocess.run([adb,'shell',*args],text=True,capture_output=True,check=False).stdout.strip()
+          value={
+            'schema_version':1,'evidence_tier':'B','performance_acceptance':False,
+            'manufacturer':shell('getprop','ro.product.manufacturer'),'model':shell('getprop','ro.product.model'),
+            'device':shell('getprop','ro.product.device'),'android_version':shell('getprop','ro.build.version.release'),
+            'api_level':int(shell('getprop','ro.build.version.sdk') or 0),'abi':shell('getprop','ro.product.cpu.abi'),
+            'build_fingerprint':shell('getprop','ro.build.fingerprint'),
+            'resolution':shell('wm','size').split('Override size:')[-1].strip(),
+            'density':shell('wm','density'),'gpu':shell('dumpsys','SurfaceFlinger'),
+            'runner_image':os.environ.get('ImageVersion'),'host_platform':platform.platform(),
+          }
+          open(sys.argv[2],'w').write(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+
+          capture_pid_log() {
+            local pid="$1" output="$2"
+            "$adb" logcat -d --pid="$pid" -v threadtime > "$output" 2>&1 || true
+          }
+
+          run_variant() {
+            local key="$1" expected="$2" package="$3" apk="$4"
+            local out="$reports/$key"
+            mkdir -p "$out"
+            cp "$root/DEVICE_BASELINE.json" "$out/device.json"
+            cp "$root/${expected}_APK_VERIFICATION.json" "$out/apk-verification.json"
+            "$adb" uninstall "$package" > "$out/uninstall-before.txt" 2>&1 || true
+            "$adb" logcat -c
+            set +e
+            "$adb" install -r -t "$apk" > "$out/install.txt" 2>&1
+            install_code=$?
+            set -e
+            printf '%s\n' "$install_code" > "$out/install-exit-code.txt"
+            test "$install_code" -eq 0
+            "$adb" shell am force-stop "$package" || true
+            "$adb" shell dumpsys gfxinfo "$package" reset > "$out/gfxinfo-reset.txt" 2>&1 || true
+            start_epoch="$(date +%s)"
+            set +e
+            "$adb" shell monkey -p "$package" -c android.intent.category.LAUNCHER 1 > "$out/launch.txt" 2>&1
+            launch_code=$?
+            set -e
+            printf '%s\n' "$launch_code" > "$out/launch-exit-code.txt"
+            test "$launch_code" -eq 0
+
+            pid_value=""
+            for _attempt in $(seq 1 60); do
+              pid_value="$("$adb" shell pidof "$package" 2>/dev/null | tr -d '\r')"
+              if test -n "$pid_value"; then break; fi
+              sleep 1
+            done
+            test -n "$pid_value"
+
+            capture=false
+            failure=false
+            for _attempt in $(seq 1 300); do
+              capture_pid_log "$pid_value" "$out/runtime.log"
+              if grep -q 'G0_ANDROID_EVIDENCE_FAILURE' "$out/runtime.log"; then failure=true; break; fi
+              if grep -q 'G0_ANDROID_CAPTURE_FRAME frame=300' "$out/runtime.log" && \
+                 grep -q 'BAHRAIN_BRICK_SOUQ_SLICE_READY assets=35 pedestrians=12 traffic=6' "$out/runtime.log" && \
+                 grep -q 'BAHRAIN_BRICK_KARAK_MISSION_STARTED' "$out/runtime.log"; then capture=true; break; fi
+              sleep 2
+            done
+            test "$failure" = false
+            test "$capture" = true
+            cp "$out/runtime.log" "$out/runtime-before-pause.log"
+            "$adb" logcat -d -v threadtime > "$out/runtime-full.log" 2>&1 || true
+            "$adb" exec-out screencap -p > "$out/screenshot.png"
+            "$adb" shell dumpsys gfxinfo "$package" framestats > "$out/gfxinfo.txt" 2>&1 || true
+            "$adb" shell dumpsys meminfo "$package" > "$out/meminfo.txt" 2>&1 || true
+            "$adb" shell dumpsys thermalservice > "$out/thermal.txt" 2>&1 || true
+            "$adb" shell dumpsys activity activities > "$out/activity-before-pause.txt" 2>&1 || true
+
+            "$adb" shell input keyevent 3
+            sleep 4
+            capture_pid_log "$pid_value" "$out/runtime-after-pause.log"
+            pause_observed=false
+            grep -q 'G0_ANDROID_LIFECYCLE_PAUSED' "$out/runtime-after-pause.log" && pause_observed=true || true
+            "$adb" shell monkey -p "$package" -c android.intent.category.LAUNCHER 1 > "$out/resume.txt" 2>&1
+            resume_observed=false
+            for _attempt in $(seq 1 60); do
+              new_pid="$("$adb" shell pidof "$package" 2>/dev/null | tr -d '\r')"
+              if test -n "$new_pid"; then pid_value="$new_pid"; fi
+              capture_pid_log "$pid_value" "$out/runtime-after-resume.log"
+              if grep -q 'G0_ANDROID_LIFECYCLE_RESUMED' "$out/runtime-after-resume.log"; then resume_observed=true; break; fi
+              sleep 2
+            done
+            cat "$out/runtime-before-pause.log" "$out/runtime-after-pause.log" "$out/runtime-after-resume.log" > "$out/runtime.log"
+            process_alive=false
+            pid_value="$("$adb" shell pidof "$package" 2>/dev/null | tr -d '\r')"
+            [[ -n "$pid_value" ]] && process_alive=true
+            completed_epoch="$(date +%s)"
+            python3 - "$out/lifecycle.json" "$pause_observed" "$resume_observed" "$process_alive" "$start_epoch" "$completed_epoch" "$pid_value" <<'PY'
+          import json,sys
+          value={'pause_observed':sys.argv[2]=='true','resume_observed':sys.argv[3]=='true','process_alive':sys.argv[4]=='true','cold_start_result':'PASS','started_epoch':int(sys.argv[5]),'completed_epoch':int(sys.argv[6]),'duration_seconds':int(sys.argv[6])-int(sys.argv[5]),'pid':sys.argv[7] or None}
+          open(sys.argv[1],'w').write(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+            python3 "$authority/tools/graphics/finalize_android_emulator_evidence.py" \
+              --evidence-dir "$out" --expected-renderer "$expected" --apk "$apk" --package-name "$package"
+            "$adb" uninstall "$package" > "$out/uninstall-after.txt" 2>&1 || true
+          }
+
+          run_variant gl_compatibility gl_compatibility com.brickbahrain.g0gl \
+            "$root/apks/bahrain-brick-g0-gl-compatibility-x86_64.apk"
+          run_variant mobile_vulkan mobile com.brickbahrain.g0mobile \
+            "$root/apks/bahrain-brick-g0-mobile-vulkan-x86_64.apk"
+
+          python3 - "$root" "$reports" <<'PY'
+          from pathlib import Path
+          import hashlib,json,sys
+          root=Path(sys.argv[1]); reports=Path(sys.argv[2])
+          gl=json.loads((reports/'gl_compatibility/runtime.json').read_text())
+          mobile=json.loads((reports/'mobile_vulkan/runtime.json').read_text())
+          source=json.loads((root/'SOURCE_ARTIFACT_EXTRACTION.json').read_text())
+          comparison={
+            'schema_version':1,'evidence_tier':'B','performance_acceptance':False,
+            'renderer_evidence_commit':'6ade72ed02084791128dcf4a91223e695d802c15',
+            'source_artifact':source,'same_existing_apk_authority':True,
+            'gl_compatibility':gl,'mobile_vulkan':mobile,
+            'both_functionally_complete':bool(gl.get('evidence_complete') and mobile.get('evidence_complete')),
+            'conclusion':'API 34 Android emulator functional evidence only; emulator frame-rate results are diagnostic and cannot satisfy physical-device performance acceptance.',
+          }
+          (reports/'TIER_B_COMPARISON.json').write_text(json.dumps(comparison,indent=2,sort_keys=True)+'\n')
+          retry={
+            'schema_version':1,'retry_count':1,'targeted_retry':True,
+            'initial_classification':'TIER_B_APK_VERIFICATION_FAILURE',
+            'initial_last_successful_stage':'TIER_B_APK_SIGNING',
+            'initial_first_failed_stage':'TIER_B_APK_VERIFICATION_LEGACY_AAPT_BADGING',
+            'initial_decisive_log_line':"AndroidManifest.xml:0: error: failed to read attribute 'android:required': attribute is not an integer value",
+            'correction':'Reused existing APKs; replaced legacy aapt dump badging with AAPT2 package verification; resumed only downstream emulator stages.',
+            'result':'PASS' if comparison['both_functionally_complete'] else 'FAIL',
+          }
+          (reports/'TIER_B_TARGETED_RETRY.json').write_text(json.dumps(retry,indent=2,sort_keys=True)+'\n')
+          inventory=[]; output=root/'TARGETED_RETRY_EVIDENCE_INVENTORY.json'
+          excluded_roots={root/'apks',root/'avd-home',root/'emulator-home'}
+          for path in sorted(root.rglob('*')):
+            if not path.is_file() or path==output or any(path.is_relative_to(item) for item in excluded_roots): continue
+            data=path.read_bytes(); inventory.append({'path':path.relative_to(root).as_posix(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          output.write_text(json.dumps({'schema_version':1,'files':inventory},indent=2,sort_keys=True)+'\n')
+          if not comparison['both_functionally_complete']: raise SystemExit(1)
+          PY
+
+      - name: Upload compact targeted Tier B evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-graphics-g0-tier-b-targeted-${{ github.run_id }}
+          path: |
+            build/tier-b-resume/reports
+            build/tier-b-resume/SOURCE_ARTIFACT_EXTRACTION.json
+            build/tier-b-resume/APK_VERIFICATION_SUMMARY.json
+            build/tier-b-resume/gl_compatibility_APK_VERIFICATION.json
+            build/tier-b-resume/mobile_APK_VERIFICATION.json
+            build/tier-b-resume/gl_compatibility_apksigner.txt
+            build/tier-b-resume/mobile_apksigner.txt
+            build/tier-b-resume/gl_compatibility_aapt2-packagename.txt
+            build/tier-b-resume/mobile_aapt2-packagename.txt
+            build/tier-b-resume/DEVICE_BASELINE.json
+            build/tier-b-resume/EMULATOR_ACCELERATION.txt
+            build/tier-b-resume/emulator.log
+            build/tier-b-resume/TARGETED_RETRY_EVIDENCE_INVENTORY.json
+            build/tier-b-resume/source-evidence
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Enforce targeted Tier B conclusion
+        if: always()
+        shell: bash
+        run: test '${{ steps.resume.outcome }}' = success
