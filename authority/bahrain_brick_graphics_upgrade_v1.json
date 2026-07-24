@@ -1,0 +1,127 @@
+{
+  "schema_version": 3,
+  "program": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
+  "recorded_date": "2026-07-22",
+  "repository": "MuhamedZanabal/brick-bahrain-open-world",
+  "implementation_branch": "work/bahrain-brick-graphics-upgrade-v1",
+  "parent_pull_request": {
+    "number": 59,
+    "expected_state": "open",
+    "expected_draft": true,
+    "expected_merged": false,
+    "expected_base_branch": "work/bahrain-brick-asset-lab-integration-v1",
+    "expected_base_sha": "fc8f00182f97c39015610d6603fa7c9c44364c5d",
+    "expected_head_branch": "work/bahrain-brick-manama-souq-vertical-slice-v1",
+    "expected_head_sha": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "expected_changed_file_count": 54,
+    "mutation_policy": "PR #59 must remain unchanged, draft, open, and unmerged. Graphics work composes on a child branch only."
+  },
+  "authorities": {
+    "asset_lab_base": "fc8f00182f97c39015610d6603fa7c9c44364c5d",
+    "frozen_premium_authority": "e26ec912db5c10d071a8e120010bdb5a9a136f17",
+    "frozen_controls_authority": "c5548465627942a2889a0bd09f8979c3a29fbcdd",
+    "validated_glb_count": 436,
+    "validated_asset_archive_sha256": "76964c58c283cacaee137152189727d678aa83230d7211dc6a15aa9af9d4a67a",
+    "historical_source_archive_sha256": "5c4d8ac4497eda7752058424062a74a97c1f6f5e0c9a1ff393abac2a2c7c828a"
+  },
+  "current_configuration": {
+    "godot_version_authority": "4.3.stable.official.77dcf97d8",
+    "visible_title": "Brick Bahrain: Open World",
+    "main_scene": "res://scenes/splash_screen.tscn",
+    "design_resolution": "1920x1080 landscape",
+    "feature_set": ["4.3", "Forward Plus"],
+    "desktop_rendering_method": "gl_compatibility",
+    "mobile_rendering_method": "gl_compatibility",
+    "android_architectures": ["armeabi-v7a", "arm64-v8a", "x86_64"],
+    "android_immersive": true,
+    "android_permissions": ["access_network_state", "internet"]
+  },
+  "renderer_gate": {
+    "state": "UNRESOLVED",
+    "conflict": "project.godot forces GL Compatibility for desktop and mobile while the accepted PR #59 design requires Mobile Vulkan Android evidence.",
+    "candidates": ["gl_compatibility", "mobile"],
+    "required_decisions": [
+      "authoritative production renderer",
+      "minimum supported Android device and driver set",
+      "single-path versus dual-path implementation",
+      "effect fallback policy"
+    ],
+    "required_evidence": [
+      "same deterministic scene on both renderer candidates",
+      "visual comparison screenshots",
+      "frame time, draw calls, triangles, memory and load time",
+      "shader, missing-resource, crash and ANR diagnostics",
+      "minimum, target and high-end physical-device results"
+    ]
+  },
+  "protected_file_policy": {
+    "exact_git_hash_authority": "exact bytes from parent_pull_request.expected_head_sha Git objects",
+    "reconstructed_output_authority": "tools/verify_frozen_controls.py applied to the deterministically reconstructed composite source",
+    "comparison": "Exact Git paths are byte-compared to PR #59. Reconstructed logical outputs remain independently enforced by the existing reconstruction verifier.",
+    "missing_path_policy": "classify authority layer; never invent or silently drop a protected output"
+  },
+  "exact_git_protected_files": [
+    {"path": "scripts/virtual_joystick.gd", "blob_sha": "20ba728bced39ffa908ac0b6354e56bfe00ab3d7", "sha256": "ade3acc4a189d325d6925cd708bdbe9215b20abd5fbfc54b3287cf7722fa5243"},
+    {"path": "scripts/touch_input.gd", "blob_sha": "b19e59c2ce6d88e1154b8a9fa4cddcc3242898dd", "sha256": "4a0c151286fd83ece4a4adb1c1ade41e63d5936182cd493d32a82e161a373e25"},
+    {"path": "scripts/player_controller.gd", "blob_sha": "badf5f651c33450c140e4a7bebb37a1fe25ac586", "sha256": "5fb1ffb38c0c4ce74bcf38dd4bf34e3df9357ba9872cecd457fd6e40221be4c0"},
+    {"path": "scripts/world.gd", "blob_sha": "c72ca10bdde7e421f3df6421240588946bb55e4f", "sha256": "a9d32157d38bee728eec54887a747ece49d070100c1750c313fa75047ce75432"},
+    {"path": "tools/bahrain_brick_overlay/scripts/virtual_joystick.gd", "blob_sha": "f81110173e69eedd63fc629d6347c6673591a5a1", "sha256": "917fde4ffac3cf6f224d6761b26443ad3ffe66a913c56b0f11570058584f166e"},
+    {"path": "tools/bahrain_brick_overlay/scripts/touch_input.gd", "blob_sha": "05543517a75b762ff834d9438cba88ae3e4a2333", "sha256": "d9ff063d02140fdcd330a26f967982b929896b742d53d36678ad70608ba5591d"},
+    {"path": "tools/bahrain_brick_overlay/tests/mobile_input_pipeline_test.gd", "blob_sha": "a3ef7af231ab6c613263447e764afbeb3de198a6", "sha256": "c4d6c5d8fab9197259cd82ea02f76da4d906a1283e242b92e9a2892bf1c790bf"},
+    {"path": "tools/bahrain_brick_overlay/scenes/mobile_input_pipeline_test.tscn", "blob_sha": "758a61a083dc7ad804fcb24abbfb397403c63e41", "sha256": "29c3bba4dabf57c3f52f6d31c9de935bfaf45c3b96eae877b390c9dcf633d527"},
+    {"path": "tools/bahrain_brick_overlay/tests/mobile_input_visual_evidence.gd", "blob_sha": "6c1d3632d9345583b82bbbfbd6796464f2b1291d", "sha256": "eb363e0ea7ce3c14b67e3c6d18be5f034c437f9841715582fa84b074301d4b78"},
+    {"path": "tools/bahrain_brick_overlay/scenes/mobile_input_visual_evidence.tscn", "blob_sha": "0cb843cdb01bb8092cd823c55cf9e09dfdf3d911", "sha256": "c456c26db3f2e6d15a4de300c976613c6717aa6a1006c0b23c3b68dba20fbb1b"},
+    {"path": "tools/verify_frozen_controls.py", "blob_sha": "b57a151904401e7c27512531f665fba75557fe83", "sha256": "d04cfd03394e58250aca24250b8017f4454422c60287563d78742257c95bbb46"}
+  ],
+  "reconstructed_output_protections": [
+    {"path": "scripts/virtual_joystick.gd", "sha256": "917fde4ffac3cf6f224d6761b26443ad3ffe66a913c56b0f11570058584f166e", "source_path": "tools/bahrain_brick_overlay/scripts/virtual_joystick.gd"},
+    {"path": "scripts/touch_input.gd", "sha256": "d9ff063d02140fdcd330a26f967982b929896b742d53d36678ad70608ba5591d", "source_path": "tools/bahrain_brick_overlay/scripts/touch_input.gd"},
+    {"path": "scripts/player_controller.gd", "sha256": "79f18a1950c9d0819e36ff102615eda2ed6796ba74daece9c7c2631c3e348366", "source_path": null, "source_classification": "historical_or_generated_composite_input"},
+    {"path": "tests/mobile_input_pipeline_test.gd", "sha256": "c4d6c5d8fab9197259cd82ea02f76da4d906a1283e242b92e9a2892bf1c790bf", "source_path": "tools/bahrain_brick_overlay/tests/mobile_input_pipeline_test.gd"},
+    {"path": "scenes/mobile_input_pipeline_test.tscn", "sha256": "29c3bba4dabf57c3f52f6d31c9de935bfaf45c3b96eae877b390c9dcf633d527", "source_path": "tools/bahrain_brick_overlay/scenes/mobile_input_pipeline_test.tscn"},
+    {"path": "tests/mobile_input_visual_evidence.gd", "sha256": "eb363e0ea7ce3c14b67e3c6d18be5f034c437f9841715582fa84b074301d4b78", "source_path": "tools/bahrain_brick_overlay/tests/mobile_input_visual_evidence.gd"},
+    {"path": "scenes/mobile_input_visual_evidence.tscn", "sha256": "c456c26db3f2e6d15a4de300c976613c6717aa6a1006c0b23c3b68dba20fbb1b", "source_path": "tools/bahrain_brick_overlay/scenes/mobile_input_visual_evidence.tscn"}
+  ],
+  "reconstructed_function_protections": [
+    {"target": "scripts/world.gd::_exit_tree", "sha256": "fa19607a0388e58ff970bacc77139b736e33b827d8682d5859ee2fd62c90a5bc"},
+    {"target": "scripts/world.gd::_spawn_player", "sha256": "5d97ef3556dafa21f8e934fc4b6802e4957c2c4e3790a3c28289dfcfd05e0e05"}
+  ],
+  "protected_behaviour": [
+    "existing player movement semantics",
+    "existing virtual joystick and touch input semantics",
+    "vehicle behaviour and entry/exit relationships",
+    "Karak Delivery mission transitions and replay integration",
+    "existing regression thresholds and allowlists",
+    "validated 436-GLB asset authority"
+  ],
+  "world_gd_adjudication": {
+    "exact_frozen_git_path_exists": true,
+    "exact_frozen_git_blob_sha": "c72ca10bdde7e421f3df6421240588946bb55e4f",
+    "exact_frozen_git_sha256": "a9d32157d38bee728eec54887a747ece49d070100c1750c313fa75047ce75432",
+    "exact_frozen_git_exit_tree_exists": false,
+    "design_symbol_authority": "deterministically reconstructed composite source enforced by tools/verify_frozen_controls.py",
+    "resulting_rule": "Byte-protect exact Git scripts/world.gd and independently preserve reconstructed scripts/world.gd::_exit_tree function hash. Do not claim the function exists in the exact Git file."
+  },
+  "authority_inconsistencies": [
+    {
+      "id": "G0-AUTH-001",
+      "severity": "high",
+      "state": "ADJUDICATED_PENDING_RECONSTRUCTION_EXECUTION",
+      "description": "The exact PR #59 Git file scripts/world.gd exists but contains no _exit_tree token or function. The accepted design's function hash is a reconstructed-composite authority, not a symbol in that Git blob.",
+      "resolution": "Protect both layers: exact Git file bytes and reconstructed function hash. Reconstruction execution remains required to prove the output layer."
+    },
+    {
+      "id": "G0-AUTH-002",
+      "severity": "high",
+      "state": "RESOLVED",
+      "description": "The initial G0 contract copied reconstructed-output SHA-256 values and incorrectly treated them as exact PR #59 Git-path hashes.",
+      "resolution": "Exact Git paths and reconstructed logical outputs are now represented as separate authorities."
+    }
+  ],
+  "graphics_scope_policy": {
+    "large_asset_ingestion_allowed": false,
+    "gameplay_changes_allowed": false,
+    "pr59_changes_allowed": false,
+    "cosmetic_work_allowed_before_g0_gate": false
+  }
+}

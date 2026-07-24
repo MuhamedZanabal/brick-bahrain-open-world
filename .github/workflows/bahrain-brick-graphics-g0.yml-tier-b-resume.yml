@@ -1,0 +1,14 @@
+name: Bahrain Brick G0 Tier B Targeted Resume — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'The single authorized targeted Tier B retry was completed in run 30086966524. Further retries are disabled by the terminal G0 checkpoint.'

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tests/graphics/renderer_evidence.gd" id="1_renderer_evidence"]
+
+[node name="G0RendererEvidence" type="Node"]
+script = ExtResource("1_renderer_evidence")

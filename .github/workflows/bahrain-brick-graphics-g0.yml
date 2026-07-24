@@ -1,0 +1,502 @@
+name: Bahrain Brick Graphics G0 Authority and Baseline
+
+on:
+  push:
+    branches: [work/bahrain-brick-graphics-upgrade-v1]
+    paths:
+      - .github/workflows/bahrain-brick-graphics-g0.yml
+      - .ai/**
+      - authority/bahrain_brick_graphics_upgrade_v1.json
+      - docs/graphics/**
+      - reports/graphics/g0/**
+      - tests/graphics/**
+      - tools/graphics/**
+      - project.godot
+      - export_presets.cfg
+      - scripts/world.gd
+      - scripts/virtual_joystick.gd
+      - scripts/touch_input.gd
+      - scripts/player_controller.gd
+      - tests/mobile_input_pipeline_test.gd
+      - tests/mobile_input_visual_evidence.gd
+      - scenes/mobile_input_pipeline_test.tscn
+      - scenes/mobile_input_visual_evidence.tscn
+  pull_request:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    types: [opened, synchronize, reopened, converted_to_draft, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: bahrain-brick-graphics-g0-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FROZEN_PR_NUMBER: '59'
+  FROZEN_PR_HEAD: 5b4e2466ef84f3984f3bf336b31925d4d2e97a7f
+  FROZEN_PR_BASE: fc8f00182f97c39015610d6603fa7c9c44364c5d
+
+jobs:
+  authority_contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate with authority history
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Record exact checkout identity
+        id: identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_sha="$(git rev-parse HEAD)"
+          worktree_status="$(git status --porcelain=v1)"
+          test -z "$worktree_status"
+          mkdir -p build/graphics-g0/reports/graphics/g0
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$candidate_sha" > build/graphics-g0/CANDIDATE_SHA.txt
+          printf '%s' "$worktree_status" > build/graphics-g0/WORKTREE_STATUS.txt
+
+      - name: Generate frozen and graphics source-tree censuses
+        id: census
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/graphics/g0_source_tree_census.py \
+            --repo-root "$PWD" \
+            --frozen "$FROZEN_PR_HEAD" \
+            --graphics '${{ steps.identity.outputs.candidate_sha }}' \
+            --composite-authority authority/manama_souq_composite_source.json \
+            --output-root build/graphics-g0/reports/graphics/g0 \
+            2>&1 | tee build/graphics-g0/g0-census.log
+
+      - name: Run all G0 source contracts
+        id: contracts
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 -m unittest discover -s tests/graphics -p 'test_*.py' -v \
+            2>&1 | tee build/graphics-g0/g0-contracts.log
+
+      - name: Verify frozen PR 59 through GitHub API
+        id: pr59
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee build/graphics-g0/pr59-api.log
+          import json
+          import os
+          import urllib.request
+          from pathlib import Path
+
+          repo = os.environ["REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          url = f"https://api.github.com/repos/{repo}/pulls/{os.environ['FROZEN_PR_NUMBER']}"
+          request = urllib.request.Request(
+              url,
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {token}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "bahrain-brick-graphics-g0",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=30) as response:
+              payload = json.load(response)
+
+          observed = {
+              "number": payload["number"],
+              "state": payload["state"],
+              "draft": payload["draft"],
+              "merged": payload["merged"],
+              "base_ref": payload["base"]["ref"],
+              "base_sha": payload["base"]["sha"],
+              "head_ref": payload["head"]["ref"],
+              "head_sha": payload["head"]["sha"],
+              "changed_files": payload["changed_files"],
+              "html_url": payload["html_url"],
+              "updated_at": payload["updated_at"],
+          }
+          expected = {
+              "number": 59,
+              "state": "open",
+              "draft": True,
+              "merged": False,
+              "base_ref": "work/bahrain-brick-asset-lab-integration-v1",
+              "base_sha": os.environ["FROZEN_PR_BASE"],
+              "head_ref": "work/bahrain-brick-manama-souq-vertical-slice-v1",
+              "head_sha": os.environ["FROZEN_PR_HEAD"],
+              "changed_files": 54,
+          }
+          failures = {
+              key: {"expected": value, "observed": observed.get(key)}
+              for key, value in expected.items()
+              if observed.get(key) != value
+          }
+          report = {
+              "schema_version": 1,
+              "expected": expected,
+              "observed": observed,
+              "failures": failures,
+              "unchanged": not failures,
+          }
+          Path("build/graphics-g0/pr59-authority.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          if failures:
+              raise SystemExit(f"PR #59 authority moved: {json.dumps(failures, sort_keys=True)}")
+          PY
+
+      - name: Record renderer and Android configuration baseline
+        id: configuration
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 - <<'PY' 2>&1 | tee build/graphics-g0/configuration-baseline.log
+          import json
+          from pathlib import Path
+
+          authority = json.loads(Path("authority/bahrain_brick_graphics_upgrade_v1.json").read_text(encoding="utf-8"))
+          report = {
+              "schema_version": 1,
+              "renderer_gate": authority["renderer_gate"],
+              "current_configuration": authority["current_configuration"],
+              "conclusion": "UNRESOLVED: no graphics implementation may pass G0 until renderer and physical-device evidence are attached.",
+          }
+          Path("build/graphics-g0/configuration-baseline.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Build CI execution report
+        if: always()
+        env:
+          CENSUS_OUTCOME: ${{ steps.census.outcome }}
+          CONTRACT_OUTCOME: ${{ steps.contracts.outcome }}
+          PR59_OUTCOME: ${{ steps.pr59.outcome }}
+          CONFIGURATION_OUTCOME: ${{ steps.configuration.outcome }}
+          CANDIDATE_SHA: ${{ steps.identity.outputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          root = Path("build/graphics-g0")
+          log = (root / "g0-contracts.log").read_text(encoding="utf-8", errors="replace") if (root / "g0-contracts.log").exists() else ""
+          counts = {
+              "passed": len(re.findall(r"\.\.\. ok$", log, flags=re.MULTILINE)),
+              "failed": len(re.findall(r"\.\.\. FAIL$", log, flags=re.MULTILINE)),
+              "errors": len(re.findall(r"\.\.\. ERROR$", log, flags=re.MULTILINE)),
+              "skipped": len(re.findall(r"\.\.\. skipped", log, flags=re.MULTILINE)),
+          }
+          comparison_path = root / "reports/graphics/g0/source_tree_comparison.json"
+          world_path = root / "reports/graphics/g0/world_gd_adjudication.json"
+          pr59_path = root / "pr59-authority.json"
+          report = {
+              "schema_version": 1,
+              "repository": os.environ["GITHUB_REPOSITORY"],
+              "workflow": os.environ["GITHUB_WORKFLOW"],
+              "workflow_run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "workflow_run_number": int(os.environ["GITHUB_RUN_NUMBER"]),
+              "workflow_run_attempt": int(os.environ["GITHUB_RUN_ATTEMPT"]),
+              "job_name": os.environ["GITHUB_JOB"],
+              "event_name": os.environ["GITHUB_EVENT_NAME"],
+              "event_sha": os.environ["GITHUB_SHA"],
+              "candidate_sha": os.environ.get("CANDIDATE_SHA", ""),
+              "outcomes": {
+                  "census": os.environ.get("CENSUS_OUTCOME", "skipped"),
+                  "contracts": os.environ.get("CONTRACT_OUTCOME", "skipped"),
+                  "pr59_api": os.environ.get("PR59_OUTCOME", "skipped"),
+                  "configuration": os.environ.get("CONFIGURATION_OUTCOME", "skipped"),
+              },
+              "test_counts": counts,
+              "source_tree_comparison": json.loads(comparison_path.read_text()) if comparison_path.exists() else None,
+              "world_gd_adjudication": json.loads(world_path.read_text()) if world_path.exists() else None,
+              "pr59_authority": json.loads(pr59_path.read_text()) if pr59_path.exists() else None,
+          }
+          (root / "g0-ci-execution.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Generate evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+
+          root = Path("build/graphics-g0")
+          output = root / "EVIDENCE_INVENTORY.json"
+          files = []
+          for path in sorted(root.rglob("*")):
+              if not path.is_file() or path == output:
+                  continue
+              data = path.read_bytes()
+              files.append({
+                  "path": path.relative_to(root).as_posix(),
+                  "bytes": len(data),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+              })
+          output.write_text(json.dumps({"schema_version": 1, "files": files}, indent=2, sort_keys=True) + "\n")
+          PY
+
+      - name: Upload G0 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-graphics-g0-${{ github.run_id }}
+          path: build/graphics-g0
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce G0 source gate conclusion
+        if: always()
+        shell: bash
+        run: |
+          test '${{ steps.census.outcome }}' = success
+          test '${{ steps.contracts.outcome }}' = success
+          test '${{ steps.pr59.outcome }}' = success
+          test '${{ steps.configuration.outcome }}' = success
+
+  renderer_tier_a:
+    needs: authority_contract
+    if: github.event_name == 'pull_request' && github.event.action == 'reopened'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Check out exact renderer candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Install host rendering diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth mesa-utils mesa-vulkan-drivers vulkan-tools
+
+      - name: Reconstruct exact composite once
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/g0-render
+          bash tools/vertical_slice/reconstruct_manama_souq_composite.sh \
+            A \
+            "$PWD/build/g0-render/reconstruction" \
+            "$PWD/authority/manama_souq_composite_source.json" \
+            '${{ github.event.pull_request.head.sha }}'
+
+      - name: Inject test-only evidence harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          game="$PWD/build/g0-render/reconstruction/game"
+          mkdir -p "$game/tests/graphics"
+          cp tests/graphics/renderer_evidence.gd "$game/tests/graphics/renderer_evidence.gd"
+          cp tests/graphics/renderer_evidence.tscn "$game/tests/graphics/renderer_evidence.tscn"
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          game=Path('build/g0-render/reconstruction/game')
+          source=Path('tests/graphics')
+          items=[]
+          for name in ('renderer_evidence.gd','renderer_evidence.tscn'):
+              a=(source/name).read_bytes(); b=(game/'tests/graphics'/name).read_bytes()
+              items.append({'path':f'tests/graphics/{name}','source_sha256':hashlib.sha256(a).hexdigest(),'injected_sha256':hashlib.sha256(b).hexdigest(),'equal':a==b,'test_only':True})
+          Path('build/g0-render/HARNESS_INJECTION.json').write_text(json.dumps({'schema_version':1,'items':items,'all_equal':all(x['equal'] for x in items)},indent=2,sort_keys=True)+'\n')
+          if not all(x['equal'] for x in items): raise SystemExit(1)
+          PY
+
+      - name: Materialize one imported project state
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$PWD/build/g0-render"
+          game="$root/reconstruction/game"
+          mkdir -p "$root/godot"
+          unzip -q "$root/reconstruction/downloads/Godot_v4.3-stable_linux.x86_64.zip" -d "$root/godot"
+          godot="$(find "$root/godot" -maxdepth 1 -type f -name 'Godot*' | head -1)"
+          chmod +x "$godot"
+          printf '%s\n' "$godot" > "$root/GODOT_PATH.txt"
+          "$godot" --version > "$root/GODOT_VERSION.txt"
+          rm -rf "$game/.godot"
+          LIBGL_ALWAYS_SOFTWARE=1 timeout --signal=TERM --kill-after=30s 1200s \
+            xvfb-run -a -s '-screen 0 1920x1080x24' \
+            "$godot" --path "$game" --editor --import --quit --verbose \
+            --rendering-method gl_compatibility --rendering-driver opengl3 \
+            2>&1 | tee "$root/shared-import.log"
+          test -d "$game/.godot/imported"
+          cp -a "$game" build/g0-render/shared-import
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/g0-render/shared-import')
+          files=[]; aggregate=hashlib.sha256()
+          for path in sorted(p for p in root.rglob('*') if p.is_file()):
+              data=path.read_bytes(); rel=path.relative_to(root).as_posix(); sha=hashlib.sha256(data).hexdigest()
+              files.append({'path':rel,'bytes':len(data),'sha256':sha})
+              aggregate.update(rel.encode()); aggregate.update(b'\0'); aggregate.update(sha.encode()); aggregate.update(b'\n')
+          out={'schema_version':1,'root':'shared-import','file_count':len(files),'aggregate_bytes':sum(x['bytes'] for x in files),'aggregate_sha256':aggregate.hexdigest(),'files':files}
+          Path('build/g0-render/IMPORTED_STATE_MANIFEST.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Clone imported state byte-for-byte
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a build/g0-render/shared-import build/g0-render/gl_compatibility
+          cp -a build/g0-render/shared-import build/g0-render/mobile_vulkan
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          def manifest(root):
+              values=[]; agg=hashlib.sha256()
+              for path in sorted(p for p in root.rglob('*') if p.is_file()):
+                  data=path.read_bytes(); rel=path.relative_to(root).as_posix(); sha=hashlib.sha256(data).hexdigest()
+                  values.append((rel,len(data),sha)); agg.update(rel.encode()); agg.update(b'\0'); agg.update(sha.encode()); agg.update(b'\n')
+              return {'file_count':len(values),'aggregate_bytes':sum(x[1] for x in values),'aggregate_sha256':agg.hexdigest()}
+          roots={name:manifest(Path('build/g0-render')/name) for name in ('shared-import','gl_compatibility','mobile_vulkan')}
+          passed=len({x['aggregate_sha256'] for x in roots.values()})==1
+          Path('build/g0-render/CLONE_IDENTITY.json').write_text(json.dumps({'schema_version':1,'passed':passed,'roots':roots},indent=2,sort_keys=True)+'\n')
+          if not passed: raise SystemExit(1)
+          PY
+
+      - name: Record host graphics metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/g0-render/reports/graphics/g0
+          xvfb-run -a -s '-screen 0 1920x1080x24' glxinfo -B > build/g0-render/glxinfo.txt 2>&1 || true
+          vulkaninfo --summary > build/g0-render/vulkaninfo.txt 2>&1 || true
+          python3 - <<'PY'
+          import json,os,platform,subprocess
+          from pathlib import Path
+          def read(path):
+              p=Path(path); return p.read_text(errors='replace') if p.exists() else ''
+          lvp=sorted(Path('/usr/share/vulkan/icd.d').glob('lvp_icd*.json'))
+          value={'schema_version':1,'tier':'A','performance_acceptance':False,'platform':platform.platform(),'python':platform.python_version(),'cpu':subprocess.check_output(['lscpu'],text=True,errors='replace'),'glxinfo':read('build/g0-render/glxinfo.txt'),'vulkaninfo':read('build/g0-render/vulkaninfo.txt'),'lavapipe_icd':str(lvp[0]) if lvp else None,'runner_image':os.environ.get('ImageVersion')}
+          Path('build/g0-render/HOST_METADATA.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Run identical scene under both renderer candidates
+        id: renderers
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          root="$PWD/build/g0-render"
+          godot="$(cat "$root/GODOT_PATH.txt")"
+          evidence_root="$root/reports/graphics/g0"
+          lvp="$(find /usr/share/vulkan/icd.d -name 'lvp_icd*.json' | head -1)"
+          mkdir -p "$evidence_root/gl_compatibility" "$evidence_root/mobile_vulkan"
+
+          run_renderer() {
+            key="$1"; method="$2"; driver="$3"; project="$4"; shift 4
+            out="$evidence_root/$key"
+            command_file="$out/command.txt"
+            printf '%q ' "$godot" --path "$project" --resolution 1920x1080 --rendering-method "$method" --rendering-driver "$driver" res://tests/graphics/renderer_evidence.tscn > "$command_file"
+            printf '\n' >> "$command_file"
+            set +e
+            env G0_EVIDENCE_DIR="$out" LIBGL_ALWAYS_SOFTWARE=1 "$@" \
+              timeout --signal=TERM --kill-after=30s 900s \
+              xvfb-run -a -s '-screen 0 1920x1080x24' \
+              "$godot" --path "$project" --resolution 1920x1080 \
+              --rendering-method "$method" --rendering-driver "$driver" \
+              res://tests/graphics/renderer_evidence.tscn \
+              2>&1 | tee "$out/runtime.log"
+            code=${PIPESTATUS[0]}
+            set -e
+            printf '%s\n' "$code" > "$out/exit-code.txt"
+            python3 tools/graphics/finalize_renderer_evidence.py \
+              --evidence-dir "$out" \
+              --expected-renderer "$method" \
+              --exit-code "$code" \
+              --command "$(cat "$command_file")" \
+              --host-metadata "$root/HOST_METADATA.json" || true
+          }
+
+          run_renderer gl_compatibility gl_compatibility opengl3 "$root/gl_compatibility"
+          run_renderer mobile_vulkan mobile vulkan "$root/mobile_vulkan" VK_ICD_FILENAMES="$lvp"
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('build/g0-render')
+          reports=root/'reports/graphics/g0'
+          gl=json.loads((reports/'gl_compatibility/runtime.json').read_text())
+          mobile=json.loads((reports/'mobile_vulkan/runtime.json').read_text())
+          clone=json.loads((root/'CLONE_IDENTITY.json').read_text())
+          value={'schema_version':1,'evidence_tier':'A','performance_acceptance':False,'same_imported_state':clone['passed'],'imported_state_aggregate_sha256':clone['roots']['shared-import']['aggregate_sha256'],'gl_compatibility':gl,'mobile_vulkan':mobile,'both_functionally_complete':bool(gl.get('evidence_complete') and mobile.get('evidence_complete')),'conclusion':'Tier A proves host functional rendering only; it cannot establish Android or physical-device performance.'}
+          (reports/'TIER_A_COMPARISON.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          if not value['both_functionally_complete']: raise SystemExit(1)
+          PY
+
+      - name: Build Tier A evidence inventory
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          root=Path('build/g0-render')
+          output=root/'TIER_A_EVIDENCE_INVENTORY.json'
+          files=[]
+          for path in sorted(root.rglob('*')):
+              if not path.is_file() or path==output or '/reconstruction/downloads/' in path.as_posix() or '/shared-import/' in path.as_posix() or '/gl_compatibility/' in path.as_posix() or '/mobile_vulkan/' in path.as_posix():
+                  continue
+              data=path.read_bytes(); files.append({'path':path.relative_to(root).as_posix(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          output.write_text(json.dumps({'schema_version':1,'files':files},indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload Tier A renderer evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-graphics-g0-tier-a-${{ github.run_id }}
+          path: |
+            build/g0-render/reports/graphics/g0
+            build/g0-render/HOST_METADATA.json
+            build/g0-render/HARNESS_INJECTION.json
+            build/g0-render/IMPORTED_STATE_MANIFEST.json
+            build/g0-render/CLONE_IDENTITY.json
+            build/g0-render/TIER_A_EVIDENCE_INVENTORY.json
+            build/g0-render/reconstruction/evidence/FROZEN_CONTROLS_PRE.json
+            build/g0-render/reconstruction/evidence/FROZEN_CONTROLS_POST.json
+            build/g0-render/reconstruction/evidence/FINAL_TREE_AUTHORITY.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce Tier A functional conclusion
+        if: always()
+        shell: bash
+        run: test '${{ steps.renderers.outcome }}' = success

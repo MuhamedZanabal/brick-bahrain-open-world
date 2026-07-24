@@ -1,0 +1,14 @@
+name: Bahrain Brick G0 Evidence Reducer — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'The existing Tier B artifact was reduced successfully in run 30086594777. Automatic reductions are disabled by the terminal G0 checkpoint.'
