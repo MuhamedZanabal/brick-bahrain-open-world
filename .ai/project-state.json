@@ -1,79 +1,53 @@
 {
+  "schema_version": 1,
+  "project": {
+    "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
+    "repository": "MuhamedZanabal/brick-bahrain-open-world",
+    "branch": "work/bahrain-brick-graphics-upgrade-v1",
+    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+    "last_verified_material_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+    "current_commit": null,
+    "head_tracking_note": "Resolve packaging head from the branch ref; this ledger cannot contain its own SHA.",
+    "parent_pr": 59,
+    "implementation_pr": 60,
+    "phase": "G0"
+  },
+  "milestones": [
+    {"id": "G0", "state": "BLOCKED", "gate_state": "G0_EVIDENCE_INSUFFICIENT"},
+    {"id": "G1", "state": "BLOCKED", "blocked_by": ["G0"]},
+    {"id": "G2-G10", "state": "BLOCKED", "blocked_by": ["G0"]}
+  ],
+  "decisions": [
+    "PR #59 remains immutable.",
+    "Renderer decision remains null and defaults remain unchanged.",
+    "scripts/world.gd uses BYTE_PROTECT_EXACT_FROZEN_WORLD_GD; _exit_tree is absent.",
+    "PR #60 remains draft; G1-G10 remain blocked.",
+    "The single authorized Tier B retry is run 30086966524; no further retries are permitted.",
+    "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived."
+  ],
+  "verification": {
+    "source_authority": "PASS",
+    "protected_files": "PASS",
+    "tier_a": "PASS",
+    "tier_b": "FAIL: TIER_B_APP_LAUNCH_FAILURE",
+    "physical_devices": "NOT_AVAILABLE",
+    "renderer_qualification": "G0_EVIDENCE_INSUFFICIENT",
+    "retry_limit_compliance": "FAIL: one authorized retry plus one unintended duplicate replay"
+  },
+  "defects": [
+    {"id": "G0-AUTH-001", "state": "RESOLVED", "resolution": "Exact frozen world.gd byte protection."},
+    {"id": "G0-TIER-B-001", "state": "OPEN", "classification": "TIER_B_APP_LAUNCH_FAILURE"},
+    {"id": "G0-AUTOMATION-001", "state": "CLOSED_WITH_EXCEPTION", "evidence": "duplicate run 30087878937; cancellation run 30088001461 succeeded too late"}
+  ],
   "artifacts": [
     "reports/graphics/g0/G0_TERMINAL_REPORT.json",
     "reports/graphics/g0/G0_TERMINAL_REPORT.md",
-    "reports/graphics/g0/tier_b_reduction/archive_inventory.json",
-    "reports/graphics/g0/tier_b_reduction/retained_inventory.json",
-    "reports/graphics/g0/tier_b_reduction/excluded_inventory.json",
-    "reports/graphics/g0/tier_b_reduction/missing_expected_paths.json",
-    "reports/graphics/g0/tier_b_reduction/reduction_summary.md",
-    "reports/graphics/g0/device_handoff/README.md",
-    "reports/graphics/g0/device_handoff/device_result.schema.json",
-    "reports/graphics/g0/device_handoff/run_device_test.sh",
-    "reports/graphics/g0/device_handoff/run_device_test.ps1",
-    "reports/graphics/g0/device_handoff/adb_capture_commands.txt",
-    "reports/graphics/g0/device_handoff/expected_markers.txt",
-    "reports/graphics/g0/device_handoff/apk_sha256.txt"
-  ],
-  "decisions": [
-    {"decision": "Never modify or merge PR #59 from this graphics branch.", "id": "G0-DEC-001"},
-    {"decision": "Keep renderer decision null and defaults unchanged.", "id": "G0-DEC-002"},
-    {"decision": "Use BYTE_PROTECT_EXACT_FROZEN_WORLD_GD; _exit_tree is absent.", "id": "G0-DEC-003"},
-    {"decision": "Keep PR #60 draft and block G1-G10.", "id": "G0-DEC-004"},
-    {"decision": "No further Tier B retry is permitted in this checkpoint; the single targeted retry is exhausted.", "id": "G0-DEC-005"}
-  ],
-  "defects": [
-    {"id": "G0-AUTH-001", "resolution": "Exact frozen world.gd is byte-protected; _exit_tree is absent.", "state": "RESOLVED"},
-    {"classification": "TIER_B_APP_LAUNCH_FAILURE", "description": "GL APK installs and receives launcher event but no process becomes alive; root cause not proven.", "id": "G0-TIER-B-001", "state": "OPEN"}
-  ],
-  "micro_tasks": [
-    {"evidence": "PR #59 frozen authority recorded and revalidated.", "id": "GFX-000", "state": "COMPLETED"},
-    {"evidence": "PR #59 unchanged before child branch creation.", "id": "GFX-001", "state": "COMPLETED"},
-    {"evidence": "Child branch created from exact frozen head.", "id": "GFX-002", "state": "COMPLETED"},
-    {"evidence": "Protected-file SHA-256 and ancestry contracts passed.", "id": "GFX-003", "state": "COMPLETED"},
-    {"evidence": "Exact source census: 1,256 frozen files, 1,279 graphics files, 23 additions, zero modifications/removals.", "id": "GFX-004", "state": "COMPLETED"},
-    {"evidence": "All 35 deterministic Souq placements inventoried.", "id": "GFX-005", "state": "COMPLETED"},
-    {"evidence": "Tier A 1920x1080 screenshots exist for both renderers; named physical-device baseline remains absent.", "id": "GFX-006", "state": "IN_PROGRESS"},
-    {"blocked_reason": "Tier B app launch failed before runtime metrics and named physical-device evidence is unavailable.", "id": "GFX-007", "state": "BLOCKED"},
-    {"evidence": "Renderer conflict confirmed and paired Tier A host evidence recorded.", "id": "GFX-008", "state": "COMPLETED"},
-    {"evidence": "Tier A passed; Tier B original APK verification failure was corrected, then one targeted retry ended at TIER_B_APP_LAUNCH_FAILURE.", "id": "GFX-009", "state": "FAILED"},
-    {"evidence": "Tier A visual differences and exact Tier B failure stages recorded in G0 terminal report.", "id": "GFX-010", "state": "COMPLETED"},
-    {"blocked_reason": "No renderer decision is admissible without named physical-device evidence.", "id": "GFX-011", "state": "BLOCKED"},
-    {"evidence": "Device matrix and compact physical-device handoff emitted.", "id": "GFX-012", "state": "COMPLETED"},
-    {"evidence": "Provenance ledger exists.", "id": "GFX-013", "state": "COMPLETED"},
-    {"evidence": "Originality and trade-dress prohibitions recorded.", "id": "GFX-014", "state": "COMPLETED"},
-    {"evidence": "Source, Tier A, Tier B, reducer, and targeted-resume CI infrastructure exists.", "id": "GFX-015", "state": "COMPLETED"}
-  ],
-  "milestones": [
-    {"gate_state": "G0_EVIDENCE_INSUFFICIENT", "id": "G0", "state": "BLOCKED", "title": "Authority, Baseline, and Risk Control"},
-    {"blocked_by": ["G0"], "id": "G1", "state": "BLOCKED", "title": "Art Bible and Design System"},
-    {"blocked_by": ["G0", "phase dependencies"], "id": "G2-G10", "state": "BLOCKED", "title": "Visual implementation, optimisation, verification, and release evidence"}
+    "reports/graphics/g0/tier_b_reduction/",
+    "reports/graphics/g0/device_handoff/"
   ],
   "next_action": {
-    "action": "Execute the device handoff on named minimum, target, and high-end devices. Investigate the API 34 GL launch failure only under a separately authorized checkpoint; no retries remain here.",
     "micro_task_id": "GFX-011",
-    "reason": "Physical-device evidence is the remaining decision boundary."
-  },
-  "project": {
-    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
-    "branch": "work/bahrain-brick-graphics-upgrade-v1",
-    "current_commit": null,
-    "head_tracking_note": "Resolve the current packaging commit from the branch ref; this ledger cannot contain its own SHA.",
-    "implementation_pr": 60,
-    "last_verified_material_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
-    "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
-    "objective": "Evidence-gated graphics upgrade preserving frozen gameplay, controls, missions, asset authority, and PR #59.",
-    "parent_pr": 59,
-    "phase": "G0",
-    "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
-    "repository": "MuhamedZanabal/brick-bahrain-open-world"
-  },
-  "schema_version": 1,
-  "verification": [
-    {"claim": "Source authority and protected files", "result": "PASS"},
-    {"claim": "Tier A paired host functional evidence", "result": "PASS"},
-    {"claim": "Tier B API 34 functional evidence", "result": "FAIL: TIER_B_APP_LAUNCH_FAILURE after one targeted retry"},
-    {"claim": "Named physical-device qualification", "result": "NOT AVAILABLE"},
-    {"claim": "Renderer qualification", "result": "G0_EVIDENCE_INSUFFICIENT"}
-  ]
+    "action": "Execute the physical-device handoff on named minimum, target and high-end devices. Any API 34 launch investigation requires a separately authorized checkpoint."
+  }
 }

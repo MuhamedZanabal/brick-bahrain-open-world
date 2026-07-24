@@ -8,34 +8,31 @@ Recorded: 2026-07-24
 
 G0 is terminal for this checkpoint but not passed. PR #60 remains draft. G1-G10 remain blocked.
 
-## Frozen authority
+## Authority
 
-- PR #59: open, draft, unmerged, unchanged.
-- Frozen head: `5b4e2466ef84f3984f3bf336b31925d4d2e97a7f`.
-- Renderer-evidence commit: `6ade72ed02084791128dcf4a91223e695d802c15`.
-- Source census: 1,256 frozen files; 1,279 graphics files; 23 authorized additions; zero frozen modifications or removals.
-- Contracts: 21 passed, 0 failed.
-- `scripts/world.gd` rule: `BYTE_PROTECT_EXACT_FROZEN_WORLD_GD`; `_exit_tree` is absent.
+PR #59 remains open, draft, unmerged and unchanged at `5b4e2466ef84f3984f3bf336b31925d4d2e97a7f`. Renderer evidence is anchored to `6ade72ed02084791128dcf4a91223e695d802c15`. Source authority and protected-file checks passed. `scripts/world.gd` uses `BYTE_PROTECT_EXACT_FROZEN_WORLD_GD`; `_exit_tree` is absent.
 
 ## Tier A
 
-Run `30064876927`, job `89393944500`: **success**. Both GL Compatibility and Mobile Vulkan completed the same scene under one byte-identical imported state. Both produced valid 1920×1080 non-black screenshots, readiness and mission markers, 360 metric rows, and zero critical errors. Host performance is diagnostic only.
+Run `30064876927`, job `89393944500` passed. GL Compatibility and Mobile Vulkan both completed the identical host-CI scene, generated valid 1920×1080 screenshots, reached readiness and mission markers, and reported zero critical errors. Host performance is diagnostic only.
 
 ## Tier B
 
-Existing artifact classification: `TIER_B_APK_VERIFICATION_FAILURE` at legacy `aapt dump badging`, after both APKs were exported, signed and signature-verified.
+The existing artifact is classified `TIER_B_APK_VERIFICATION_FAILURE` at legacy `aapt dump badging`. Reducer run `30086594777` succeeded without rerunning Android.
 
-Reducer run `30086594777`: success. It inspected the existing artifact without rerunning Android.
+The single authorized targeted retry was run `30086966524`. Exact APK verification and emulator boot passed; GL installation and launcher injection passed, but no application process became alive. Final classification is `TIER_B_APP_LAUNCH_FAILURE`. Mobile emulator execution was not attempted. No renderer failure is proven.
 
-One targeted retry, run `30086966524`, reused exact APK bytes and corrected verification with AAPT2. Both APKs verified and the API 34 emulator booted. GL installed and launcher injection returned 0, but no application process became alive. Final classification: `TIER_B_APP_LAUNCH_FAILURE`. Mobile emulator execution was not attempted. No renderer failure is proven. No further Tier B retry is permitted in this checkpoint.
+## Automation exception
+
+Packaging unintentionally retriggered the targeted workflow as run `30087878937`. It completed before cancellation run `30088001461` took effect. The duplicate is excluded from adjudication, but retry-limit compliance is false. Automatic reducer, targeted-resume and cancellation PR triggers are archived.
 
 ## Remaining blockers
 
-1. Named minimum, target and high-end physical-device evidence.
-2. Five-minute traversal, frame metrics, memory, thermal and lifecycle evidence.
-3. Fatal/ANR/native-crash scans on physical devices.
-4. API 34 GL launch root cause is unknown because no pre-PID process log was retained.
-5. Renderer selection and fallback policy remain null.
+- Named minimum, target and high-end physical devices.
+- Five-minute traversal, frame, memory, thermal and lifecycle evidence.
+- Fatal, ANR and native-crash scans.
+- API 34 GL launch root cause.
+- Renderer selection and fallback policy.
 
 ## Outputs
 
@@ -44,6 +41,4 @@ One targeted retry, run `30086966524`, reused exact APK bytes and corrected veri
 - `reports/graphics/g0/tier_b_reduction/`
 - `reports/graphics/g0/device_handoff/`
 
-## Stop condition
-
-Tier A is terminal; Tier B is reduced and diagnosed; exactly one targeted Tier B retry is complete; terminal reports and the physical-device handoff are emitted. No renderer defaults, production scenes, gameplay, controls, missions, materials, or production assets were changed. G1 has not begun.
+No renderer defaults, production scenes, gameplay, controls, missions, materials or production assets were changed. G1 has not begun.

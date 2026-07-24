@@ -10,105 +10,48 @@ No renderer is selected, renderer defaults remain unchanged, and G1 remains bloc
 
 ## Source authority
 
-- Renderer-evidence authority: `6ade72ed02084791128dcf4a91223e695d802c15`
-- Frozen PR #59 head: `5b4e2466ef84f3984f3bf336b31925d4d2e97a7f`
-- Frozen tree: **1,256 files**
-- Graphics tree: **1,279 files**
-- Authorized additions: **23**
-- Modified frozen paths: **0**
-- Removed frozen paths: **0**
-- Contracts: **21 passed, 0 failed**
-- Source workflow run: `30064835410`
-- Source artifact: `8585856751`
-- Source artifact digest: `sha256:d95db81d7aacc2f2de57d60ce898d2df7512474e9b1fca2c1fed8428841e6842`
+Renderer-evidence authority is `6ade72ed02084791128dcf4a91223e695d802c15`. PR #59 remains frozen at `5b4e2466ef84f3984f3bf336b31925d4d2e97a7f`. The execution-proven census is 1,256 frozen files and 1,279 graphics files, with 23 authorized additions, zero modified frozen paths, zero removed frozen paths, and 21 passing contracts.
 
-### `world.gd` rule
+`scripts/world.gd` remains governed by `BYTE_PROTECT_EXACT_FROZEN_WORLD_GD`; `_exit_tree` is absent and no claim is made that it exists.
 
-```text
-BYTE_PROTECT_EXACT_FROZEN_WORLD_GD
-```
+## Tier A
 
-`scripts/world.gd` is byte-protected at SHA-256 `a9d32157d38bee728eec54887a747ece49d070100c1750c313fa75047ce75432`. `_exit_tree` is absent; no claim is made that the symbol exists.
+Run `30064876927`, job `89393944500`, artifact `8586133620` completed successfully and passed enforcement. GL Compatibility and Mobile Vulkan used one byte-identical imported state. Both exited 0, matched startup renderer identity, reached readiness and mission markers, produced valid non-black 1920×1080 screenshots, recorded 360 metric rows, and reported zero critical errors.
 
-## Tier A — terminal host-CI result
+Host metrics are diagnostic only. GL averaged 163.190 ms per frame with 2,138 draw calls; Mobile averaged 151.381 ms with 1,773 draw calls. Screenshot mean absolute channel delta was 21.241 and RMSE was 31.144. This does not select a renderer.
 
-Run `30064876927`, job `89393944500`, conclusion **success**. Artifact `8586133620`, digest `sha256:ac51acb8d82f773b6b545d67bf23c51cbb0bf8a8607f1aecea1af18a1877bf34`.
+## Tier B existing artifact
 
-Both candidates used the same imported-state SHA-256 `0c896a4411c3352850b15a0c54972b2f33db41c7ca7a54a2efe861b912838d56` and passed final enforcement.
+Original run `30064876896`, artifact `8586122615`, is classified `TIER_B_APK_VERIFICATION_FAILURE`. Export, signing and `apksigner verify` succeeded. Legacy `aapt dump badging` then failed with:
 
-| Evidence | GL Compatibility | Mobile Vulkan |
-|---|---:|---:|
-| Runtime exit code | 0 | 0 |
-| Startup identity | OpenGL Compatibility / `opengl3` | Forward Mobile / Vulkan |
-| Scene readiness | PASS | PASS |
-| Mission marker | PASS | PASS |
-| Screenshot | 1920×1080, non-black | 1920×1080, non-black |
-| Critical errors | 0 | 0 |
-| Frame rows | 360 | 360 |
-| Average frame time | 163.190 ms | 151.381 ms |
-| Draw calls | 2,138 | 1,773 |
-| Graphics memory | 262,434,231 B | 495,843,120 B |
+`AndroidManifest.xml:0: error: failed to read attribute 'android:required': attribute is not an integer value`
 
-Host metrics are diagnostic only. The screenshots differ materially: mean absolute channel delta **21.241**, RMSE **31.144**, and **59.853%** of pixels differ. This does not establish an art-quality winner.
+This is an APK-verification harness failure, not a renderer failure.
 
-Renderer identity is taken from Godot startup logs. The Mobile completion marker echoed the project default and is not used as renderer identity evidence.
+Reducer run `30086594777` succeeded without rerunning Android and emitted the required inventories under `reports/graphics/g0/tier_b_reduction/`.
 
-## Tier B — existing artifact diagnosis
+## Authorized targeted retry
 
-Original run `30064876896`, artifact `8586122615`, digest `sha256:4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee`.
+The single authorized retry was run `30086966524`, job `89461293320`, artifact `8594128472`. It reused exact APK bytes, repeated neither reconstruction nor export, and passed signature, AAPT2 package-name and x86_64 ABI verification. The API 34 x86_64 emulator booted. The GL APK installed and launcher injection returned 0, but `pidof com.brickbahrain.g0gl` remained empty. No renderer identity, scene marker, screenshot or lifecycle evidence was reached; Mobile was not attempted.
 
-Primary diagnosis of the existing artifact:
-
-```text
-TIER_B_APK_VERIFICATION_FAILURE
-```
-
-- Last confirmed successful stage: Mobile APK export, signing, and `apksigner verify`.
-- First failed stage: legacy `aapt dump badging` verification.
-- First missing expected artifact: `APK_SHA256SUMS.txt`.
-- Decisive line: `AndroidManifest.xml:0: error: failed to read attribute 'android:required': attribute is not an integer value`.
-- Cause: verification harness / legacy Android build-tool parser.
-- Renderer failure: **not proven**.
-
-The reducer run `30086594777` succeeded and emitted a 6.66 MB diagnostic artifact (`8593954623`, digest `sha256:860c9a2c2b2130359f11643eb821cd3c8f0ce039302460bc739fae8e64860588`) without rerunning Android.
-
-## Single targeted Tier B retry
-
-One targeted retry was executed—no further retry is permitted in this checkpoint.
-
-Run `30086966524`, job `89461293320`, artifact `8594128472`, digest `sha256:87397e8d3a3e2eac267864589140632577600176d6bac88e9bebdf40e4d27e20`.
-
-The retry reused the exact APK bytes and repeated neither reconstruction nor export. Both APKs passed signature, AAPT2 package-name, and x86_64 ABI verification. The API 34 x86_64 emulator booted.
-
-Terminal retry classification:
+Terminal classification is:
 
 ```text
 TIER_B_APP_LAUNCH_FAILURE
 ```
 
-- GL APK install: PASS.
-- Launcher event injection: exit code 0.
-- First failure: `pidof com.brickbahrain.g0gl` remained empty throughout the process-acquisition window.
-- First missing runtime artifact: `reports/graphics/g0/gl_compatibility/runtime.log`.
-- Renderer identity, scene readiness, screenshot, and lifecycle evidence were never reached.
-- Mobile emulator execution was not attempted because the workflow failed fast on GL.
-- Root cause is not proven because process-scoped logcat was not persisted before the PID gate.
-- Renderer failure is **not proven**.
+Root cause is not proven and no renderer failure is proven.
 
-## Device boundary
+## Terminalization exception
 
-Named physical-device evidence is unavailable. The maximum admissible result is therefore `G0_EVIDENCE_INSUFFICIENT`, even though both host renderer paths functioned.
+A terminal-packaging push unintentionally retriggered the same path-filtered workflow as run `30087878937`. It completed before cancellation workflow run `30088001461` took effect. Duplicate artifact `8594493723` has digest `sha256:ffa6bbaeaa7ba4e99847f24b957a8484f38c7758b9a8181e125f2eca7c58814a`.
 
-Required device work is packaged in `reports/graphics/g0/device_handoff/` and has **not** been executed.
+The duplicate replay is excluded from renderer adjudication and does not change `TIER_B_APP_LAUNCH_FAILURE`. However, the requested no-more-than-one-execution constraint was not fully satisfied; `retry_limit_compliance` is false. Automatic reducer, targeted-resume and one-shot cancellation PR triggers are archived.
 
-## Unresolved blockers
+## Physical-device boundary
 
-1. Prove why the GL API 34 emulator process exits or never starts.
-2. Execute the Mobile Vulkan APK on the API 34 emulator.
-3. Run the handoff on named minimum, target, and high-end physical devices.
-4. Record five-minute traversal, memory, thermal, pause/resume, and crash evidence.
-5. Select renderer and fallback policy only after physical-device evidence.
+Named physical-device evidence is unavailable. The maximum admissible gate result remains `G0_EVIDENCE_INSUFFICIENT`. The unexecuted handoff package is in `reports/graphics/g0/device_handoff/`.
 
-## Stop condition
+## Stop
 
-Tier A is terminal; the existing Tier B artifact is reduced and diagnosed; exactly one targeted Tier B retry is complete; terminal reports and the device handoff are emitted. G1 has not begun.
+Tier A is terminal; Tier B is reduced and diagnosed; the authorized retry and unintended duplicate replay are fully disclosed; terminal reports and device handoff are emitted. G1 has not begun.
