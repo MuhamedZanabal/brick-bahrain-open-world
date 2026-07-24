@@ -22,6 +22,20 @@
   "initial_investigation_rebuild_permitted": false,
   "renderer_defaults_may_change": false,
   "g1_authorized": false,
+  "adjudicative_evidence": {
+    "android_run_id": 30126561161,
+    "android_job_id": 89591337940,
+    "raw_artifact_id": 8609540209,
+    "reducer_run_id": 30126886903,
+    "reduced_artifact_id": 8609597152,
+    "primary_classification": "G0_1_CAUSE_NOT_PROVEN",
+    "corrective_implementation_performed": false
+  },
+  "report_finalizer": {
+    "workflow": ".github/workflows/bahrain-brick-g0-1-finalize-reports.yml",
+    "implementation_commit": "7c19e3b57d4a605a81f6edf47500ac04500ae907",
+    "source_artifact_reused_without_android_rerun": true
+  },
   "required_primary_classifications": [
     "G0_1_PACKAGE_NOT_INSTALLED",
     "G0_1_LAUNCHER_COMPONENT_INVALID",
