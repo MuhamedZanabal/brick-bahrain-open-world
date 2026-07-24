@@ -44,6 +44,9 @@ class AndroidTierBContractTests(unittest.TestCase):
         ):
             self.assertIn(fragment, harness)
         self.assertNotIn("ProjectSettings.save", harness)
+        self.assertNotIn("RenderingServer.get_current_rendering_method()", harness)
+        self.assertNotIn("RenderingServer.get_current_rendering_driver_name()", harness)
+        self.assertIn('ProjectSettings.get_setting("rendering/renderer/rendering_method"', harness)
 
     def test_preparer_changes_only_isolated_qa_configuration(self) -> None:
         module = load_module(PREPARER, "prepare_android_renderer_variant")
