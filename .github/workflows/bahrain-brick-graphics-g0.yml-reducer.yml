@@ -22,64 +22,226 @@ jobs:
       SOURCE_ARTIFACT_NAME: bahrain-brick-graphics-g0-tier-b-30064876896
       SOURCE_ARTIFACT_SHA256: 4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee
     steps:
-      - name: Download exact Tier B artifact
+      - name: Download exact Tier B artifact archive
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p build/source build/reduced
-          gh run download "$SOURCE_RUN_ID" \
-            --repo "$GITHUB_REPOSITORY" \
-            --name "$SOURCE_ARTIFACT_NAME" \
-            --dir build/source
+          curl --fail --location --retry 3 --retry-all-errors \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip" \
+            --output build/source/tier-b-artifact.zip
+          actual="$(sha256sum build/source/tier-b-artifact.zip | awk '{print $1}')"
+          test "$actual" = "$SOURCE_ARTIFACT_SHA256"
+          printf '%s  %s\n' "$actual" tier-b-artifact.zip > build/source/tier-b-artifact.zip.sha256
 
-      - name: Reduce to reports and diagnostics
+      - name: Reduce to bounded admissible diagnostics
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          from pathlib import Path
-          import hashlib,json,shutil,os
-          source=Path('build/source'); reduced=Path('build/reduced')
-          keep_names={
-            'TIER_B_EVIDENCE_INVENTORY.json','CLONE_IDENTITY.json','DEVICE_BASELINE.json',
-            'GL_VARIANT_OVERRIDE.json','MOBILE_VARIANT_OVERRIDE.json','HARNESS_INJECTION.json',
-            'EMULATOR_ACCELERATION.txt','EMULATOR_ACCELERATION_PRECHECK.txt',
-            'FROZEN_CONTROLS_PRE.json','FROZEN_CONTROLS_POST.json','FINAL_TREE_AUTHORITY.json',
-            'APK_SHA256SUMS.txt','GODOT_VERSION.txt'
+          from __future__ import annotations
+
+          import hashlib
+          import json
+          import os
+          import shutil
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          archive = Path("build/source/tier-b-artifact.zip")
+          output_root = Path("build/reduced")
+          report_dir = output_root / "reports/graphics/g0/tier_b_reduction"
+          report_dir.mkdir(parents=True, exist_ok=True)
+
+          retain_extensions = {
+              ".json", ".log", ".txt", ".csv", ".png", ".xml", ".md",
+              ".properties", ".yml", ".yaml", ".sha256", ".idsig",
           }
-          copied=[]
-          for path in sorted(p for p in source.rglob('*') if p.is_file()):
-              rel=path.relative_to(source)
-              posix=rel.as_posix()
-              keep='/reports/graphics/g0/' in f'/{posix}' or path.name in keep_names
-              if keep and path.suffix.lower() != '.apk':
-                  target=reduced/rel
-                  target.parent.mkdir(parents=True,exist_ok=True)
-                  shutil.copy2(path,target)
-                  copied.append(target)
-          for path in source.rglob('tier-b-runner.log'):
-              target=reduced/'tier-b-runner.tail.log'
-              lines=path.read_text(encoding='utf-8',errors='replace').splitlines()
-              target.write_text('\n'.join(lines[-12000:])+'\n',encoding='utf-8')
-              copied.append(target)
-              break
-          metadata={
-            'schema_version':1,'source_run_id':int(os.environ['SOURCE_RUN_ID']),
-            'source_artifact_id':int(os.environ['SOURCE_ARTIFACT_ID']),
-            'source_artifact_name':os.environ['SOURCE_ARTIFACT_NAME'],
-            'source_artifact_digest':'sha256:'+os.environ['SOURCE_ARTIFACT_SHA256'],
-            'reduction_policy':'reports, JSON, text diagnostics, screenshots and log tail; APK binaries excluded',
+          excluded_binary_extensions = {
+              ".apk", ".aab", ".pck", ".zip", ".7z", ".rar", ".tar",
+              ".gz", ".xz", ".bz2", ".jar", ".aar", ".so", ".dex",
+              ".bin", ".img", ".qcow2", ".keystore", ".jks",
           }
-          (reduced/'REDUCER_SOURCE.json').write_text(json.dumps(metadata,indent=2,sort_keys=True)+'\n')
-          output=reduced/'REDUCED_EVIDENCE_INVENTORY.json'; files=[]
-          for path in sorted(p for p in reduced.rglob('*') if p.is_file() and p!=output):
-              data=path.read_bytes(); files.append({'path':path.relative_to(reduced).as_posix(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
-          output.write_text(json.dumps({'schema_version':1,'files':files,'aggregate_bytes':sum(x['bytes'] for x in files)},indent=2,sort_keys=True)+'\n')
-          if any(path.suffix.lower()=='.apk' for path in reduced.rglob('*')): raise SystemExit('APK leaked into reduced artifact')
-          if sum(x['bytes'] for x in files) > 100_000_000: raise SystemExit('reduced artifact unexpectedly exceeds 100 MB')
-          if not any(path.name=='runtime.json' for path in reduced.rglob('*')): raise SystemExit('runtime.json evidence missing')
+          retain_keywords = (
+              "adb", "emulator", "avd", "sdkmanager", "gradle", "godot",
+              "export", "install", "launch", "logcat", "package", "manifest",
+              "sign", "verify", "screenshot", "lifecycle", "marker", "runtime",
+              "failure", "error", "diagnostic",
+          )
+          expected_paths = [
+              "reports/graphics/g0/TIER_B_COMPARISON.json",
+              "reports/graphics/g0/gl_compatibility/runtime.json",
+              "reports/graphics/g0/mobile_vulkan/runtime.json",
+              "reports/graphics/g0/gl_compatibility/runtime.log",
+              "reports/graphics/g0/mobile_vulkan/runtime.log",
+              "reports/graphics/g0/gl_compatibility/screenshot.png",
+              "reports/graphics/g0/mobile_vulkan/screenshot.png",
+              "reports/graphics/g0/gl_compatibility/device.json",
+              "reports/graphics/g0/mobile_vulkan/device.json",
+              "reports/graphics/g0/gl_compatibility/lifecycle.json",
+              "reports/graphics/g0/mobile_vulkan/lifecycle.json",
+              "APK_SHA256SUMS.txt",
+              "CLONE_IDENTITY.json",
+              "DEVICE_BASELINE.json",
+              "TIER_B_EVIDENCE_INVENTORY.json",
+              "tier-b-runner.log",
+          ]
+          per_file_ceiling = 64 * 1024 * 1024
+          aggregate_ceiling = 256 * 1024 * 1024
+          total_retained = 0
+          archive_inventory: list[dict[str, object]] = []
+          retained_inventory: list[dict[str, object]] = []
+          excluded_inventory: list[dict[str, object]] = []
+          archive_paths: list[str] = []
+
+          def normalized_path(raw: str) -> tuple[str, bool]:
+              value = raw.replace("\\", "/")
+              pure = PurePosixPath(value)
+              safe = not pure.is_absolute() and ".." not in pure.parts
+              return pure.as_posix(), safe
+
+          def sha256_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> str:
+              digest = hashlib.sha256()
+              with zf.open(info, "r") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              return digest.hexdigest()
+
+          with zipfile.ZipFile(archive) as zf:
+              for info in sorted((item for item in zf.infolist() if not item.is_dir()), key=lambda item: item.filename):
+                  relative, safe = normalized_path(info.filename)
+                  archive_paths.append(relative)
+                  lower = relative.lower()
+                  suffix = PurePosixPath(relative).suffix.lower()
+                  keyword_match = any(keyword in lower for keyword in retain_keywords)
+                  reason: str | None = None
+                  retained = False
+
+                  if not safe:
+                      reason = "unsafe_archive_path"
+                  elif suffix in excluded_binary_extensions:
+                      reason = f"excluded_binary_extension:{suffix or '<none>'}"
+                  elif info.file_size > per_file_ceiling:
+                      reason = f"uncompressed_size_exceeds_{per_file_ceiling}_bytes"
+                  elif suffix in retain_extensions or keyword_match:
+                      if total_retained + info.file_size > aggregate_ceiling:
+                          reason = f"aggregate_retention_ceiling_{aggregate_ceiling}_bytes"
+                      else:
+                          retained = True
+                  else:
+                      reason = "not_a_requested_diagnostic_type_or_name"
+
+                  member_sha256 = sha256_member(zf, info)
+                  record = {
+                      "path": relative,
+                      "uncompressed_size": info.file_size,
+                      "compressed_size": info.compress_size,
+                      "sha256": member_sha256,
+                      "status": "retained" if retained else "excluded",
+                      "exclusion_reason": None if retained else reason,
+                  }
+                  archive_inventory.append(record)
+
+                  if retained:
+                      target = output_root / relative
+                      target.parent.mkdir(parents=True, exist_ok=True)
+                      with zf.open(info, "r") as source, target.open("wb") as destination:
+                          shutil.copyfileobj(source, destination, length=1024 * 1024)
+                      if target.stat().st_size != info.file_size:
+                          raise SystemExit(f"retained size mismatch: {relative}")
+                      total_retained += info.file_size
+                      retained_inventory.append(record)
+                  else:
+                      excluded_inventory.append(record)
+
+          def present_matches(expected: str) -> list[str]:
+              expected_lower = expected.lower()
+              return [
+                  path for path in archive_paths
+                  if path.lower() == expected_lower or path.lower().endswith("/" + expected_lower)
+              ]
+
+          expected_status = [
+              {
+                  "expected_path": expected,
+                  "present": bool(matches := present_matches(expected)),
+                  "matches": matches,
+              }
+              for expected in expected_paths
+          ]
+          missing_expected = [item for item in expected_status if not item["present"]]
+
+          source_metadata = {
+              "schema_version": 1,
+              "repository": os.environ.get("GITHUB_REPOSITORY"),
+              "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+              "source_run_id": int(os.environ["SOURCE_RUN_ID"]),
+              "source_artifact_id": int(os.environ["SOURCE_ARTIFACT_ID"]),
+              "source_artifact_name": os.environ["SOURCE_ARTIFACT_NAME"],
+              "source_artifact_digest": "sha256:" + os.environ["SOURCE_ARTIFACT_SHA256"],
+              "per_file_ceiling_bytes": per_file_ceiling,
+              "aggregate_retention_ceiling_bytes": aggregate_ceiling,
+              "runtime_json_required": False,
+          }
+
+          (report_dir / "archive_inventory.json").write_text(
+              json.dumps({"schema_version": 1, "source": source_metadata, "files": archive_inventory}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (report_dir / "retained_inventory.json").write_text(
+              json.dumps({"schema_version": 1, "files": retained_inventory, "aggregate_bytes": total_retained}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (report_dir / "excluded_inventory.json").write_text(
+              json.dumps({"schema_version": 1, "files": excluded_inventory}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          (report_dir / "missing_expected_paths.json").write_text(
+              json.dumps({"schema_version": 1, "expected": expected_status, "missing": missing_expected}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+
+          summary_lines = [
+              "# Tier B Evidence Reduction Summary",
+              "",
+              f"- Source run: `{source_metadata['source_run_id']}`",
+              f"- Source artifact: `{source_metadata['source_artifact_id']}` / `{source_metadata['source_artifact_name']}`",
+              f"- Source digest: `{source_metadata['source_artifact_digest']}`",
+              f"- Renderer evidence commit: `{source_metadata['renderer_evidence_commit']}`",
+              f"- Archive files inspected: **{len(archive_inventory)}**",
+              f"- Retained files: **{len(retained_inventory)}**",
+              f"- Excluded files: **{len(excluded_inventory)}**",
+              f"- Retained bytes: **{total_retained}**",
+              f"- Missing expected paths: **{len(missing_expected)}**",
+              "- Finalized `runtime.json` is optional and its absence does not fail reduction.",
+              "- APK, AAB, PCK, nested archives, and other large binary payloads are excluded.",
+              "",
+              "## Missing expected paths",
+              "",
+          ]
+          if missing_expected:
+              summary_lines.extend(f"- `{item['expected_path']}`" for item in missing_expected)
+          else:
+              summary_lines.append("None.")
+          (report_dir / "reduction_summary.md").write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
+
+          required_outputs = [
+              "archive_inventory.json",
+              "retained_inventory.json",
+              "excluded_inventory.json",
+              "missing_expected_paths.json",
+              "reduction_summary.md",
+          ]
+          for name in required_outputs:
+              if not (report_dir / name).is_file():
+                  raise SystemExit(f"required reducer output missing: {name}")
+          if any(path.suffix.lower() in {".apk", ".aab", ".pck", ".zip"} for path in output_root.rglob("*")):
+              raise SystemExit("excluded binary leaked into reduced artifact")
           PY
 
       - name: Upload reduced Tier B evidence
