@@ -1,0 +1,14 @@
+name: Bahrain Brick G0.1 Finalize Root-Cause Reports — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'G0.1 root-cause reports are terminal. Do not rerun.'

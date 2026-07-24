@@ -1,0 +1,646 @@
+===== AFTER MONKEY ACTIVITIES =====
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+  * Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+    topResumedActivity=ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+    * Hist  #0: ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+      packageName=com.brickbahrain.g0gl processName=com.brickbahrain.g0gl
+      app=ProcessRecord{15d58ad 2673:com.brickbahrain.g0gl/u0a141}
+      Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp }
+      rootOfTask=true task=Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}
+      taskAffinity=10141:com.brickbahrain.g0gl
+      mActivityComponent=com.brickbahrain.g0gl/com.godot.game.GodotApp
+      baseDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk
+      dataDir=/data/user/0/com.brickbahrain.g0gl
+      state=RESUMED delayedResume=false finishing=false
+      windows=[Window{d2a4b48 u0 Splash Screen com.brickbahrain.g0gl}]
+      mVisibleRequested=true mVisible=true mClientVisible=true reportedDrawn=false reportedVisible=false
+      startingWindow=Window{d2a4b48 u0 Splash Screen com.brickbahrain.g0gl} startingSurface=com.android.server.wm.StartingSurfaceController$StartingSurface@4132ab7 startingDisplayed=true startingMoved=false mVisibleSetFromTransferredStartingWindow=false
+        packageName=com.android.launcher3 processName=com.android.launcher3
+        app=ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+        Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.android.launcher3/.uioverrides.QuickstepLauncher (has extras) }
+        mActivityComponent=com.android.launcher3/.uioverrides.QuickstepLauncher
+        baseDir=/system_ext/priv-app/Launcher3QuickStep/Launcher3QuickStep.apk
+        dataDir=/data/user/0/com.android.launcher3
+        state=PAUSED delayedResume=false finishing=false
+        windows=[Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}]
+        mVisibleRequested=false mVisible=true mClientVisible=true reportedDrawn=true reportedVisible=true
+    Resumed: ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+  ResumedActivity: ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+  topDisplayFocusedRootTask=Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}
+  deepestLastOrientationSource=ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+  mCurrentFocus=null
+  mFocusedApp=ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+  mObscuringWindow=Window{364552c u0 com.android.systemui.wallpapers.ImageWallpaper}
+  mWallpaperTarget=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+      mPreferredTopFocusableRootTask=Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}
+      mLastFocusedRootTask=Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}
+      * Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+        * ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8}
+    mStatusBar=Window{fcf6ffd u0 StatusBar}
+    mExpandedPanel=Window{62cb189 u0 NotificationShade}
+    mNavigationBar=Window{8f038a4 u0 NavigationBar0}
+    mTopGestureHost=Window{fcf6ffd u0 StatusBar}
+    mBottomGestureHost=Window{8f038a4 u0 NavigationBar0}
+    mTopFullscreenOpaqueWindowState=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+    mNavBarColorWindowCandidate=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+    mNavBarBackgroundWindow=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+      Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+        InsetsSource id=7e60000 type=statusBars frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=7e60005 type=mandatorySystemGestures frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=7e60006 type=tappableElement frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620001 type=navigationBars frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620004 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620005 type=mandatorySystemGestures frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620006 type=tappableElement frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620024 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+      Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}:
+        mSource=InsetsSource id=47620024 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620006 type=tappableElement frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620005 type=mandatorySystemGestures frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620004 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620001 type=navigationBars frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mControl=InsetsSourceControl mId=47620001 mType=navigationBars mLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x4563c90 mInitiallyVisible=true mSurfacePosition=Point(0, 954) mInsetsHint=Insets{left=0, top=0, right=0, bottom=126} mSkipAnimationOnce=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x4563c90
+        mControlTarget=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+        mSource=InsetsSource id=7e60006 type=tappableElement frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mSource=InsetsSource id=7e60005 type=mandatorySystemGestures frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mSource=InsetsSource id=7e60000 type=statusBars frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mControl=InsetsSourceControl mId=7e60000 mType=statusBars mLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x68bd989 mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=63, right=0, bottom=0} mSkipAnimationOnce=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x68bd989
+        mControlTarget=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+        mControl=InsetsSourceControl mId=3 mType=ime mLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0xec98d8e mInitiallyVisible=false mSurfacePosition=Point(120, 2274) mInsetsHint=Insets{left=0, top=0, right=0, bottom=0} mSkipAnimationOnce=false
+        mWindowContainer=Window{1028464 u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0xec98d8e
+        mControlTarget=Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+        (fullscreen) Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}
+  VisibleActivityProcess:[ ProcessRecord{15d58ad 2673:com.brickbahrain.g0gl/u0a141} ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}]
+
+===== AFTER EXPLICIT START ACTIVITIES =====
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+  * Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+    topResumedActivity=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    * Hist  #0: ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+      packageName=com.brickbahrain.g0gl processName=com.brickbahrain.g0gl
+      app=ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+      Intent { flg=0x10000000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp }
+      rootOfTask=true task=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+      taskAffinity=10141:com.brickbahrain.g0gl
+      mActivityComponent=com.brickbahrain.g0gl/com.godot.game.GodotApp
+      baseDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk
+      dataDir=/data/user/0/com.brickbahrain.g0gl
+      state=RESUMED delayedResume=false finishing=false
+      windows=[Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}, Window{968284 u0 Splash Screen com.brickbahrain.g0gl}]
+      mVisibleRequested=true mVisible=true mClientVisible=true reportedDrawn=true reportedVisible=false
+        packageName=com.android.launcher3 processName=com.android.launcher3
+        app=ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+        Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.android.launcher3/.uioverrides.QuickstepLauncher (has extras) }
+        mActivityComponent=com.android.launcher3/.uioverrides.QuickstepLauncher
+        baseDir=/system_ext/priv-app/Launcher3QuickStep/Launcher3QuickStep.apk
+        dataDir=/data/user/0/com.android.launcher3
+        state=STOPPED delayedResume=false finishing=false
+        windows=[Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}]
+        mVisibleRequested=false mVisible=false mClientVisible=false reportedDrawn=false reportedVisible=false
+    Resumed: ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  ResumedActivity: ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  topDisplayFocusedRootTask=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+  deepestLastOrientationSource=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  mCurrentFocus=Window{e912562 u0 ImmersiveModeConfirmation}
+  mFocusedApp=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  mHoldScreenWindow=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+  mLastWakeLockHoldingWindow=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+      mPreferredTopFocusableRootTask=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+      mLastFocusedRootTask=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+      * Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+        * ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    mStatusBar=Window{fcf6ffd u0 StatusBar}
+    mExpandedPanel=Window{62cb189 u0 NotificationShade}
+    mNavigationBar=Window{8f038a4 u0 NavigationBar0}
+    mTopGestureHost=Window{fcf6ffd u0 StatusBar}
+    mBottomGestureHost=Window{8f038a4 u0 NavigationBar0}
+    mFocusedWindow=Window{e912562 u0 ImmersiveModeConfirmation}
+    mTopFullscreenOpaqueWindowState=Window{968284 u0 Splash Screen com.brickbahrain.g0gl}
+    mSystemBarColorApps={ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}}
+      Window{968284 u0 Splash Screen com.brickbahrain.g0gl}
+        InsetsSource id=7e60005 type=mandatorySystemGestures frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=7e60006 type=tappableElement frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620004 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620005 type=mandatorySystemGestures frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620006 type=tappableElement frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620024 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+      Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}:
+        mSource=InsetsSource id=47620024 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620006 type=tappableElement frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620005 type=mandatorySystemGestures frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620004 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mControl=InsetsSourceControl mId=47620001 mType=navigationBars mLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a mInitiallyVisible=true mSurfacePosition=Point(0, 954) mInsetsHint=Insets{left=0, top=0, right=0, bottom=126} mSkipAnimationOnce=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a
+        mControlTarget=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+        mSource=InsetsSource id=7e60006 type=tappableElement frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mSource=InsetsSource id=7e60005 type=mandatorySystemGestures frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mControl=InsetsSourceControl mId=7e60000 mType=statusBars mLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=63, right=0, bottom=0} mSkipAnimationOnce=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b
+        mControlTarget=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+        mControl=InsetsSourceControl mId=3 mType=ime mLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x579ff8 mInitiallyVisible=false mSurfacePosition=Point(120, 2274) mInsetsHint=Insets{left=0, top=0, right=0, bottom=0} mSkipAnimationOnce=false
+        mWindowContainer=Window{1028464 u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x579ff8
+        mControlTarget=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+        (fullscreen) Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+  VisibleActivityProcess:[ ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}]
+
+===== AFTER EXPLICIT START PROCESSES =====
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  *APP* UID 1000 ProcessRecord{6cbc40d 2358:com.android.dynsystem/1000}
+  *APP* UID 10061 ProcessRecord{f1f8fd5 1976:com.android.providers.calendar/u0a61}
+  *APP* UID 10071 ProcessRecord{53e3518 1773:com.android.documentsui/u0a71}
+  *APP* UID 10070 ProcessRecord{fad2177 1987:com.android.externalstorage/u0a70}
+  *APP* UID 10107 ProcessRecord{7ec160a 1998:com.android.quicksearchbox/u0a107}
+  *APP* UID 10108 ProcessRecord{57ad303 1910:com.android.messaging/u0a108}
+  *APP* UID 10111 ProcessRecord{7143aee 1533:com.android.carrierconfig/u0a111}
+  *PERS* UID 1000 ProcessRecord{3f287df 527:system/1000}
+  *APP* UID 10095 ProcessRecord{d9009a0 2315:com.android.contacts/u0a95}
+  *APP* UID 10103 ProcessRecord{2fb666f 2157:com.android.camera2/u0a103}
+  *APP* UID 10112 ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+    procStateMemTracker: best=1 (1=1 1.5x) / pending state=2 highest=1 1.0x
+  *APP* UID 10141 ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+    dir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk publicDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk data=/data/user/0/com.brickbahrain.g0gl
+    packageList={com.brickbahrain.g0gl}
+    pid=2704
+    procStateMemTracker: best=4 () / pending state=1 highest=1 1.0x
+        -> ContentProviderRecord{c893496 u0 com.brickbahrain.g0gl/androidx.core.content.FileProvider}
+      - 65d5509/com.android.providers.settings/.SettingsProvider->2704:com.brickbahrain.g0gl/u0a141 s1/1 u0/0 +1s281ms
+      - ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+      - Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+  *APP* UID 10059 ProcessRecord{cbbc7a1 2501:com.android.statementservice/u0a59}
+  *APP* UID 10101 ProcessRecord{cbf6c42 2125:com.android.calendar/u0a101}
+  *APP* UID 10078 ProcessRecord{8679e0e 1599:com.android.printspooler/u0a78}
+  *PERS* UID 1073 ProcessRecord{4c727c1 1042:com.android.networkstack.process/1073}
+  *PERS* UID 1068 ProcessRecord{2a54a9a 1082:com.android.se/1068}
+  *APP* UID 10134 ProcessRecord{f372 2461:com.android.rkpdapp/u0a134}
+  *APP* UID 10110 ProcessRecord{5fda6be 1600:com.android.sdksetup/u0a110}
+  *APP* UID 10064 ProcessRecord{4655b2f 1373:com.android.cellbroadcastreceiver/u0a64}
+  *APP* UID 1000 ProcessRecord{9ea438c 1602:com.android.keychain/1000}
+  *APP* UID 1000 ProcessRecord{b972df8 2407:com.android.dynsystem:dynsystem/1000}
+  *APP* UID 10133 ProcessRecord{922ea09 1499:android.ext.services/u0a133}
+  *APP* UID 1000 ProcessRecord{a67b50 2058:com.android.localtransport/1000}
+  *APP* UID 10067 ProcessRecord{b4ce801 2441:com.android.packageinstaller/u0a67}
+  *APP* UID 10084 ProcessRecord{53fc27a 2187:com.android.carrierdefaultapp/u0a84}
+  *APP* UID 10109 ProcessRecord{535f51f 1494:com.android.inputmethod.latin/u0a109}
+  *APP* UID 10069 ProcessRecord{1994df 1867:com.android.managedprovisioning/u0a69}
+  *PERS* UID 1000 ProcessRecord{2cc3e49 1570:com.android.emulator.multidisplay/1000}
+  *APP* UID 10125 ProcessRecord{1b33e0 1329:com.android.cellbroadcastreceiver.module/u0a125}
+  *APP* UID 10094 ProcessRecord{c0beb74 1695:com.android.imsserviceentitlement/u0a94}
+  *APP* UID 1000 ProcessRecord{9f606dd 1087:com.android.settings/1000}
+  *APP* UID 10102 ProcessRecord{9073eb1 1601:com.android.music/u0a102}
+  *PERS* UID 1001 ProcessRecord{4b58e4a 1084:com.android.phone/1001}
+  *APP* UID 2000 ProcessRecord{3c9c1a8 2484:com.android.shell/2000}
+  *APP* UID 10122 ProcessRecord{ccd2a53 1567:com.android.providers.media.module/u0a122}
+  *PERS* UID 10117 ProcessRecord{c50e7a1 873:com.android.systemui/u0a117}
+  *APP* UID 10057 ProcessRecord{75a9503 1655:android.process.acore/u0a57}
+  *APP* UID 10124 ProcessRecord{6aa5057 885:com.android.permissioncontroller/u0a124}
+    procStateMemTracker: best=2 (2=2 1.5x) / pending state=4 highest=2 1.0x
+  *APP* UID 10065 ProcessRecord{885bd86 1836:android.process.media/u0a65}
+  *APP* UID 10092 ProcessRecord{231926e 2090:com.android.traceur/u0a92}
+  *APP* UID 1002 ProcessRecord{37a1583 1068:com.android.bluetooth/1002}
+  *APP* UID 10138 ProcessRecord{7a4a27b 1598:com.android.devicelockcontroller/u0a138}
+    Proc # 0: fg     T/A/TOP  LCMNFU  t: 0 2704:com.brickbahrain.g0gl/u0a141 (top-activity)
+  mHomeProcess: ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+      proc=ProcessRecord{b972df8 2407:com.android.dynsystem:dynsystem/1000}
+      proc=ProcessRecord{9f606dd 1087:com.android.settings/1000}
+      proc=ProcessRecord{9ea438c 1602:com.android.keychain/1000}
+      proc=ProcessRecord{6cbc40d 2358:com.android.dynsystem/1000}
+      proc=ProcessRecord{3f287df 527:system/1000}
+      proc=ProcessRecord{2cc3e49 1570:com.android.emulator.multidisplay/1000}
+      proc=ProcessRecord{a67b50 2058:com.android.localtransport/1000}
+      proc=ProcessRecord{4b58e4a 1084:com.android.phone/1001}
+      proc=ProcessRecord{37a1583 1068:com.android.bluetooth/1002}
+      proc=ProcessRecord{2a54a9a 1082:com.android.se/1068}
+      proc=ProcessRecord{4c727c1 1042:com.android.networkstack.process/1073}
+      proc=ProcessRecord{3c9c1a8 2484:com.android.shell/2000}
+      proc=ProcessRecord{75a9503 1655:android.process.acore/u0a57}
+      proc=ProcessRecord{cbbc7a1 2501:com.android.statementservice/u0a59}
+      proc=ProcessRecord{f1f8fd5 1976:com.android.providers.calendar/u0a61}
+      proc=ProcessRecord{4655b2f 1373:com.android.cellbroadcastreceiver/u0a64}
+      proc=ProcessRecord{885bd86 1836:android.process.media/u0a65}
+      proc=ProcessRecord{b4ce801 2441:com.android.packageinstaller/u0a67}
+      proc=ProcessRecord{1994df 1867:com.android.managedprovisioning/u0a69}
+      proc=ProcessRecord{fad2177 1987:com.android.externalstorage/u0a70}
+      proc=ProcessRecord{53e3518 1773:com.android.documentsui/u0a71}
+      proc=ProcessRecord{8679e0e 1599:com.android.printspooler/u0a78}
+      proc=ProcessRecord{53fc27a 2187:com.android.carrierdefaultapp/u0a84}
+      proc=ProcessRecord{231926e 2090:com.android.traceur/u0a92}
+      proc=ProcessRecord{c0beb74 1695:com.android.imsserviceentitlement/u0a94}
+      proc=ProcessRecord{d9009a0 2315:com.android.contacts/u0a95}
+      proc=ProcessRecord{cbf6c42 2125:com.android.calendar/u0a101}
+      proc=ProcessRecord{9073eb1 1601:com.android.music/u0a102}
+      proc=ProcessRecord{2fb666f 2157:com.android.camera2/u0a103}
+      proc=ProcessRecord{7ec160a 1998:com.android.quicksearchbox/u0a107}
+      proc=ProcessRecord{57ad303 1910:com.android.messaging/u0a108}
+      proc=ProcessRecord{535f51f 1494:com.android.inputmethod.latin/u0a109}
+      proc=ProcessRecord{5fda6be 1600:com.android.sdksetup/u0a110}
+      proc=ProcessRecord{7143aee 1533:com.android.carrierconfig/u0a111}
+      proc=ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+      proc=ProcessRecord{c50e7a1 873:com.android.systemui/u0a117}
+      proc=ProcessRecord{ccd2a53 1567:com.android.providers.media.module/u0a122}
+      proc=ProcessRecord{6aa5057 885:com.android.permissioncontroller/u0a124}
+      proc=ProcessRecord{1b33e0 1329:com.android.cellbroadcastreceiver.module/u0a125}
+      proc=ProcessRecord{922ea09 1499:android.ext.services/u0a133}
+      proc=ProcessRecord{f372 2461:com.android.rkpdapp/u0a134}
+      proc=ProcessRecord{7a4a27b 1598:com.android.devicelockcontroller/u0a138}
+      proc=ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+    #42: fg     TOP  LCMNFU 2704:com.brickbahrain.g0gl/u0a141 act:activities|recents
+    Proc # 0: fg     T/A/TOP  LCMNFU  t: 0 2704:com.brickbahrain.g0gl/u0a141 (top-activity)
+    PID #527: ProcessRecord{3f287df 527:system/1000}
+    PID #873: ProcessRecord{c50e7a1 873:com.android.systemui/u0a117}
+    PID #885: ProcessRecord{6aa5057 885:com.android.permissioncontroller/u0a124}
+    PID #1042: ProcessRecord{4c727c1 1042:com.android.networkstack.process/1073}
+    PID #1068: ProcessRecord{37a1583 1068:com.android.bluetooth/1002}
+    PID #1082: ProcessRecord{2a54a9a 1082:com.android.se/1068}
+    PID #1084: ProcessRecord{4b58e4a 1084:com.android.phone/1001}
+    PID #1087: ProcessRecord{9f606dd 1087:com.android.settings/1000}
+    PID #1138: ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+    PID #1329: ProcessRecord{1b33e0 1329:com.android.cellbroadcastreceiver.module/u0a125}
+    PID #1373: ProcessRecord{4655b2f 1373:com.android.cellbroadcastreceiver/u0a64}
+    PID #1494: ProcessRecord{535f51f 1494:com.android.inputmethod.latin/u0a109}
+    PID #1499: ProcessRecord{922ea09 1499:android.ext.services/u0a133}
+    PID #1533: ProcessRecord{7143aee 1533:com.android.carrierconfig/u0a111}
+    PID #1567: ProcessRecord{ccd2a53 1567:com.android.providers.media.module/u0a122}
+    PID #1570: ProcessRecord{2cc3e49 1570:com.android.emulator.multidisplay/1000}
+    PID #1598: ProcessRecord{7a4a27b 1598:com.android.devicelockcontroller/u0a138}
+    PID #1599: ProcessRecord{8679e0e 1599:com.android.printspooler/u0a78}
+    PID #1600: ProcessRecord{5fda6be 1600:com.android.sdksetup/u0a110}
+    PID #1601: ProcessRecord{9073eb1 1601:com.android.music/u0a102}
+    PID #1602: ProcessRecord{9ea438c 1602:com.android.keychain/1000}
+    PID #1655: ProcessRecord{75a9503 1655:android.process.acore/u0a57}
+    PID #1695: ProcessRecord{c0beb74 1695:com.android.imsserviceentitlement/u0a94}
+    PID #1773: ProcessRecord{53e3518 1773:com.android.documentsui/u0a71}
+    PID #1836: ProcessRecord{885bd86 1836:android.process.media/u0a65}
+    PID #1867: ProcessRecord{1994df 1867:com.android.managedprovisioning/u0a69}
+    PID #1910: ProcessRecord{57ad303 1910:com.android.messaging/u0a108}
+    PID #1976: ProcessRecord{f1f8fd5 1976:com.android.providers.calendar/u0a61}
+    PID #1987: ProcessRecord{fad2177 1987:com.android.externalstorage/u0a70}
+    PID #1998: ProcessRecord{7ec160a 1998:com.android.quicksearchbox/u0a107}
+    PID #2058: ProcessRecord{a67b50 2058:com.android.localtransport/1000}
+    PID #2090: ProcessRecord{231926e 2090:com.android.traceur/u0a92}
+    PID #2125: ProcessRecord{cbf6c42 2125:com.android.calendar/u0a101}
+    PID #2157: ProcessRecord{2fb666f 2157:com.android.camera2/u0a103}
+    PID #2187: ProcessRecord{53fc27a 2187:com.android.carrierdefaultapp/u0a84}
+    PID #2315: ProcessRecord{d9009a0 2315:com.android.contacts/u0a95}
+    PID #2358: ProcessRecord{6cbc40d 2358:com.android.dynsystem/1000}
+    PID #2407: ProcessRecord{b972df8 2407:com.android.dynsystem:dynsystem/1000}
+    PID #2441: ProcessRecord{b4ce801 2441:com.android.packageinstaller/u0a67}
+    PID #2461: ProcessRecord{f372 2461:com.android.rkpdapp/u0a134}
+    PID #2484: ProcessRecord{3c9c1a8 2484:com.android.shell/2000}
+    PID #2501: ProcessRecord{cbbc7a1 2501:com.android.statementservice/u0a59}
+    PID #2704: ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+  mHomeProcess: ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+
+===== AFTER EXPLICIT START WINDOWS =====
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #0 Window{1a39091 u0 ScreenDecorOverlayBottom}:
+      mSurface=Surface(name=ScreenDecorOverlayBottom)/@0x794bdac
+    isVisible=true
+  Window #1 Window{59b895b u0 ScreenDecorOverlay}:
+      mSurface=Surface(name=ScreenDecorOverlay)/@0x8cf5a0a
+    isVisible=true
+  Window #2 Window{8f038a4 u0 NavigationBar0}:
+      mLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a mAnimationType=insets_animation
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a
+      mSurface=Surface(name=NavigationBar0)/@0xea028f1
+    isVisible=false
+  Window #3 Window{1028464 u0 InputMethod}:
+      mLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x579ff8 mAnimationType=insets_animation
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x579ff8
+    isVisible=false
+  Window #4 Window{e912562 u0 ImmersiveModeConfirmation}:
+      mSurface=Surface(name=ImmersiveModeConfirmation)/@0x6fd632d
+    isVisible=true
+  Window #5 Window{62cb189 u0 NotificationShade}:
+    isVisible=false
+  Window #6 Window{fcf6ffd u0 StatusBar}:
+      mLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b mAnimationType=insets_animation
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b
+      mSurface=Surface(name=StatusBar)/@0xa7a0529
+    isVisible=false
+  Window #7 Window{b099895 u0 ShellDropTarget}:
+    isVisible=false
+  Window #8 Window{968284 u0 Splash Screen com.brickbahrain.g0gl}:
+    mOwnerUid=10117 showForAllUsers=true package=com.brickbahrain.g0gl appop=NONE
+    mBaseLayer=21000 mSubLayer=0    mToken=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    mActivityRecord=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    WindowStateAnimator{cf4de4f Splash Screen com.brickbahrain.g0gl}:
+      mSurface=Surface(name=Splash Screen com.brickbahrain.g0gl)/@0x18e9dc
+    isVisible=true
+  Window #9 Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}:
+    mOwnerUid=10141 showForAllUsers=false package=com.brickbahrain.g0gl appop=NONE
+    mBaseLayer=21000 mSubLayer=0    mToken=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    mActivityRecord=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+      mLeash=Surface(name=Surface(name=1ed92e4 com.brickbahrain.g0gl/com.godot.game.GodotApp)/@0x89289bd - animation-leash of starting_reveal)/@0xe04cae5 mAnimationType=starting_reveal
+        StartingWindowAnimationAdaptor mCapturedLeash=Surface(name=Surface(name=1ed92e4 com.brickbahrain.g0gl/com.godot.game.GodotApp)/@0x89289bd - animation-leash of starting_reveal)/@0xe04cae5
+    WindowStateAnimator{4cb106b com.brickbahrain.g0gl/com.godot.game.GodotApp}:
+      mSurface=Surface(name=com.brickbahrain.g0gl/com.godot.game.GodotApp)/@0x738c7c8
+    isVisible=true
+  Window #10 Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}:
+    isVisible=false
+  Window #11 Window{364552c u0 com.android.systemui.wallpapers.ImageWallpaper}:
+      mSurface=Surface(name=com.android.systemui.wallpapers.ImageWallpaper)/@0x1884847
+    isVisible=false
+  imeLayeringTarget in display# 0 Window{e912562 u0 ImmersiveModeConfirmation}
+  imeInputTarget in display# 0 Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+  imeControlTarget in display# 0 Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+  mInputMethodWindow=Window{1028464 u0 InputMethod}
+
+===== FINAL ACTIVITIES =====
+ACTIVITY MANAGER ACTIVITIES (dumpsys activity activities)
+  * Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+    topResumedActivity=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    * Hist  #0: ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+      packageName=com.brickbahrain.g0gl processName=com.brickbahrain.g0gl
+      app=ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+      Intent { flg=0x10000000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp }
+      rootOfTask=true task=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+      taskAffinity=10141:com.brickbahrain.g0gl
+      mActivityComponent=com.brickbahrain.g0gl/com.godot.game.GodotApp
+      baseDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk
+      dataDir=/data/user/0/com.brickbahrain.g0gl
+      state=RESUMED delayedResume=false finishing=false
+      windows=[Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}]
+      mVisibleRequested=true mVisible=true mClientVisible=true reportedDrawn=true reportedVisible=true
+        packageName=com.android.launcher3 processName=com.android.launcher3
+        app=ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+        Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] flg=0x10000100 cmp=com.android.launcher3/.uioverrides.QuickstepLauncher (has extras) }
+        mActivityComponent=com.android.launcher3/.uioverrides.QuickstepLauncher
+        baseDir=/system_ext/priv-app/Launcher3QuickStep/Launcher3QuickStep.apk
+        dataDir=/data/user/0/com.android.launcher3
+        state=STOPPED delayedResume=false finishing=false
+        windows=[Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}]
+        mVisibleRequested=false mVisible=false mClientVisible=false reportedDrawn=false reportedVisible=false
+    Resumed: ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  ResumedActivity: ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  topDisplayFocusedRootTask=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+  deepestLastOrientationSource=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  mCurrentFocus=Window{e912562 u0 ImmersiveModeConfirmation}
+  mFocusedApp=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+  mHoldScreenWindow=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+  mLastWakeLockHoldingWindow=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+      mPreferredTopFocusableRootTask=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+      mLastFocusedRootTask=Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+      * Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl U=0 visible=true visibleRequested=true mode=fullscreen translucent=false sz=1}
+        * ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    mStatusBar=Window{fcf6ffd u0 StatusBar}
+    mExpandedPanel=Window{62cb189 u0 NotificationShade}
+    mNavigationBar=Window{8f038a4 u0 NavigationBar0}
+    mTopGestureHost=Window{fcf6ffd u0 StatusBar}
+    mBottomGestureHost=Window{8f038a4 u0 NavigationBar0}
+    mFocusedWindow=Window{e912562 u0 ImmersiveModeConfirmation}
+    mTopFullscreenOpaqueWindowState=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+    mSystemBarColorApps={ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}}
+      Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+        InsetsSource id=7e60005 type=mandatorySystemGestures frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=7e60006 type=tappableElement frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620004 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620005 type=mandatorySystemGestures frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620006 type=tappableElement frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        InsetsSource id=47620024 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+      Window{e912562 u0 ImmersiveModeConfirmation}:
+      Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}:
+        mSource=InsetsSource id=47620024 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620006 type=tappableElement frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620005 type=mandatorySystemGestures frame=[0,954][2400,1080] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mSource=InsetsSource id=47620004 type=systemGestures frame=[0,0][0,0] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mControl=InsetsSourceControl mId=47620001 mType=navigationBars mLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a mInitiallyVisible=true mSurfacePosition=Point(0, 954) mInsetsHint=Insets{left=0, top=0, right=0, bottom=126} mSkipAnimationOnce=false
+        mWindowContainer=Window{8f038a4 u0 NavigationBar0}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a
+        mControlTarget=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+        mSource=InsetsSource id=7e60006 type=tappableElement frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mSource=InsetsSource id=7e60005 type=mandatorySystemGestures frame=[0,0][2400,63] visible=true flags= insetsRoundedCornerFrame=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mControl=InsetsSourceControl mId=7e60000 mType=statusBars mLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b mInitiallyVisible=true mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=63, right=0, bottom=0} mSkipAnimationOnce=false
+        mWindowContainer=Window{fcf6ffd u0 StatusBar}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b
+        mControlTarget=Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}
+        mControl=InsetsSourceControl mId=3 mType=ime mLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x5f7c5f8 mInitiallyVisible=false mSurfacePosition=Point(120, 2274) mInsetsHint=Insets{left=0, top=0, right=0, bottom=0} mSkipAnimationOnce=false
+        mWindowContainer=Window{1028464 u0 InputMethod}
+        mAdapter=ControlAdapter mCapturedLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x5f7c5f8
+        mControlTarget=Window{e912562 u0 ImmersiveModeConfirmation}
+        (fullscreen) Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+  VisibleActivityProcess:[ ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}]
+
+===== FINAL PROCESSES =====
+ACTIVITY MANAGER RUNNING PROCESSES (dumpsys activity processes)
+  *APP* UID 1000 ProcessRecord{6cbc40d 2358:com.android.dynsystem/1000}
+  *APP* UID 10061 ProcessRecord{f1f8fd5 1976:com.android.providers.calendar/u0a61}
+  *APP* UID 10071 ProcessRecord{53e3518 1773:com.android.documentsui/u0a71}
+  *APP* UID 10070 ProcessRecord{fad2177 1987:com.android.externalstorage/u0a70}
+  *APP* UID 10107 ProcessRecord{7ec160a 1998:com.android.quicksearchbox/u0a107}
+  *APP* UID 10108 ProcessRecord{57ad303 1910:com.android.messaging/u0a108}
+  *APP* UID 10111 ProcessRecord{7143aee 1533:com.android.carrierconfig/u0a111}
+  *PERS* UID 1000 ProcessRecord{3f287df 527:system/1000}
+  *APP* UID 10095 ProcessRecord{d9009a0 2315:com.android.contacts/u0a95}
+  *APP* UID 10103 ProcessRecord{2fb666f 2157:com.android.camera2/u0a103}
+  *APP* UID 10112 ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+    procStateMemTracker: best=1 (1=1 1.5x) / pending state=2 highest=1 1.0x
+  *APP* UID 10141 ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+    dir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk publicDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk data=/data/user/0/com.brickbahrain.g0gl
+    packageList={com.brickbahrain.g0gl}
+    pid=2704
+    procStateMemTracker: best=4 () / pending state=1 highest=1 1.0x
+        -> ContentProviderRecord{c893496 u0 com.brickbahrain.g0gl/androidx.core.content.FileProvider}
+      - 65d5509/com.android.providers.settings/.SettingsProvider->2704:com.brickbahrain.g0gl/u0a141 s1/1 u0/0 +1m1s740ms
+      - ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+      - Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+  *APP* UID 10059 ProcessRecord{cbbc7a1 2501:com.android.statementservice/u0a59}
+  *APP* UID 10101 ProcessRecord{cbf6c42 2125:com.android.calendar/u0a101}
+  *APP* UID 10078 ProcessRecord{8679e0e 1599:com.android.printspooler/u0a78}
+  *PERS* UID 1073 ProcessRecord{4c727c1 1042:com.android.networkstack.process/1073}
+  *PERS* UID 1068 ProcessRecord{2a54a9a 1082:com.android.se/1068}
+  *APP* UID 10134 ProcessRecord{f372 2461:com.android.rkpdapp/u0a134}
+  *APP* UID 10110 ProcessRecord{5fda6be 1600:com.android.sdksetup/u0a110}
+  *APP* UID 10064 ProcessRecord{4655b2f 1373:com.android.cellbroadcastreceiver/u0a64}
+  *APP* UID 1000 ProcessRecord{9ea438c 1602:com.android.keychain/1000}
+  *APP* UID 1000 ProcessRecord{b972df8 2407:com.android.dynsystem:dynsystem/1000}
+  *APP* UID 10133 ProcessRecord{922ea09 1499:android.ext.services/u0a133}
+  *APP* UID 1000 ProcessRecord{a67b50 2058:com.android.localtransport/1000}
+  *APP* UID 10067 ProcessRecord{b4ce801 2441:com.android.packageinstaller/u0a67}
+  *APP* UID 10084 ProcessRecord{53fc27a 2187:com.android.carrierdefaultapp/u0a84}
+  *APP* UID 10109 ProcessRecord{535f51f 1494:com.android.inputmethod.latin/u0a109}
+  *APP* UID 10069 ProcessRecord{1994df 1867:com.android.managedprovisioning/u0a69}
+  *PERS* UID 1000 ProcessRecord{2cc3e49 1570:com.android.emulator.multidisplay/1000}
+  *APP* UID 10125 ProcessRecord{1b33e0 1329:com.android.cellbroadcastreceiver.module/u0a125}
+  *APP* UID 10094 ProcessRecord{c0beb74 1695:com.android.imsserviceentitlement/u0a94}
+  *APP* UID 1000 ProcessRecord{9f606dd 1087:com.android.settings/1000}
+  *APP* UID 10102 ProcessRecord{9073eb1 1601:com.android.music/u0a102}
+  *PERS* UID 1001 ProcessRecord{4b58e4a 1084:com.android.phone/1001}
+  *APP* UID 2000 ProcessRecord{3c9c1a8 2484:com.android.shell/2000}
+  *APP* UID 10122 ProcessRecord{ccd2a53 1567:com.android.providers.media.module/u0a122}
+  *PERS* UID 10117 ProcessRecord{c50e7a1 873:com.android.systemui/u0a117}
+  *APP* UID 10057 ProcessRecord{75a9503 1655:android.process.acore/u0a57}
+  *APP* UID 10124 ProcessRecord{6aa5057 885:com.android.permissioncontroller/u0a124}
+    procStateMemTracker: best=2 (2=2 1.5x) / pending state=4 highest=2 1.0x
+  *APP* UID 10065 ProcessRecord{885bd86 1836:android.process.media/u0a65}
+  *APP* UID 10092 ProcessRecord{231926e 2090:com.android.traceur/u0a92}
+  *APP* UID 1002 ProcessRecord{37a1583 1068:com.android.bluetooth/1002}
+  *APP* UID 10138 ProcessRecord{7a4a27b 1598:com.android.devicelockcontroller/u0a138}
+    Proc # 0: fg     T/A/TOP  LCMNFU  t: 0 2704:com.brickbahrain.g0gl/u0a141 (top-activity)
+  mHomeProcess: ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+      proc=ProcessRecord{b972df8 2407:com.android.dynsystem:dynsystem/1000}
+      proc=ProcessRecord{9f606dd 1087:com.android.settings/1000}
+      proc=ProcessRecord{9ea438c 1602:com.android.keychain/1000}
+      proc=ProcessRecord{6cbc40d 2358:com.android.dynsystem/1000}
+      proc=ProcessRecord{3f287df 527:system/1000}
+      proc=ProcessRecord{2cc3e49 1570:com.android.emulator.multidisplay/1000}
+      proc=ProcessRecord{a67b50 2058:com.android.localtransport/1000}
+      proc=ProcessRecord{4b58e4a 1084:com.android.phone/1001}
+      proc=ProcessRecord{37a1583 1068:com.android.bluetooth/1002}
+      proc=ProcessRecord{2a54a9a 1082:com.android.se/1068}
+      proc=ProcessRecord{4c727c1 1042:com.android.networkstack.process/1073}
+      proc=ProcessRecord{3c9c1a8 2484:com.android.shell/2000}
+      proc=ProcessRecord{75a9503 1655:android.process.acore/u0a57}
+      proc=ProcessRecord{cbbc7a1 2501:com.android.statementservice/u0a59}
+      proc=ProcessRecord{f1f8fd5 1976:com.android.providers.calendar/u0a61}
+      proc=ProcessRecord{4655b2f 1373:com.android.cellbroadcastreceiver/u0a64}
+      proc=ProcessRecord{885bd86 1836:android.process.media/u0a65}
+      proc=ProcessRecord{b4ce801 2441:com.android.packageinstaller/u0a67}
+      proc=ProcessRecord{1994df 1867:com.android.managedprovisioning/u0a69}
+      proc=ProcessRecord{fad2177 1987:com.android.externalstorage/u0a70}
+      proc=ProcessRecord{53e3518 1773:com.android.documentsui/u0a71}
+      proc=ProcessRecord{8679e0e 1599:com.android.printspooler/u0a78}
+      proc=ProcessRecord{53fc27a 2187:com.android.carrierdefaultapp/u0a84}
+      proc=ProcessRecord{231926e 2090:com.android.traceur/u0a92}
+      proc=ProcessRecord{c0beb74 1695:com.android.imsserviceentitlement/u0a94}
+      proc=ProcessRecord{d9009a0 2315:com.android.contacts/u0a95}
+      proc=ProcessRecord{cbf6c42 2125:com.android.calendar/u0a101}
+      proc=ProcessRecord{9073eb1 1601:com.android.music/u0a102}
+      proc=ProcessRecord{2fb666f 2157:com.android.camera2/u0a103}
+      proc=ProcessRecord{7ec160a 1998:com.android.quicksearchbox/u0a107}
+      proc=ProcessRecord{57ad303 1910:com.android.messaging/u0a108}
+      proc=ProcessRecord{535f51f 1494:com.android.inputmethod.latin/u0a109}
+      proc=ProcessRecord{5fda6be 1600:com.android.sdksetup/u0a110}
+      proc=ProcessRecord{7143aee 1533:com.android.carrierconfig/u0a111}
+      proc=ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+      proc=ProcessRecord{c50e7a1 873:com.android.systemui/u0a117}
+      proc=ProcessRecord{ccd2a53 1567:com.android.providers.media.module/u0a122}
+      proc=ProcessRecord{6aa5057 885:com.android.permissioncontroller/u0a124}
+      proc=ProcessRecord{1b33e0 1329:com.android.cellbroadcastreceiver.module/u0a125}
+      proc=ProcessRecord{922ea09 1499:android.ext.services/u0a133}
+      proc=ProcessRecord{f372 2461:com.android.rkpdapp/u0a134}
+      proc=ProcessRecord{7a4a27b 1598:com.android.devicelockcontroller/u0a138}
+      proc=ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+    #42: fg     TOP  LCMNFU 2704:com.brickbahrain.g0gl/u0a141 act:activities|recents
+    Proc # 0: fg     T/A/TOP  LCMNFU  t: 0 2704:com.brickbahrain.g0gl/u0a141 (top-activity)
+    PID #527: ProcessRecord{3f287df 527:system/1000}
+    PID #873: ProcessRecord{c50e7a1 873:com.android.systemui/u0a117}
+    PID #885: ProcessRecord{6aa5057 885:com.android.permissioncontroller/u0a124}
+    PID #1042: ProcessRecord{4c727c1 1042:com.android.networkstack.process/1073}
+    PID #1068: ProcessRecord{37a1583 1068:com.android.bluetooth/1002}
+    PID #1082: ProcessRecord{2a54a9a 1082:com.android.se/1068}
+    PID #1084: ProcessRecord{4b58e4a 1084:com.android.phone/1001}
+    PID #1087: ProcessRecord{9f606dd 1087:com.android.settings/1000}
+    PID #1138: ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+    PID #1329: ProcessRecord{1b33e0 1329:com.android.cellbroadcastreceiver.module/u0a125}
+    PID #1373: ProcessRecord{4655b2f 1373:com.android.cellbroadcastreceiver/u0a64}
+    PID #1494: ProcessRecord{535f51f 1494:com.android.inputmethod.latin/u0a109}
+    PID #1499: ProcessRecord{922ea09 1499:android.ext.services/u0a133}
+    PID #1533: ProcessRecord{7143aee 1533:com.android.carrierconfig/u0a111}
+    PID #1567: ProcessRecord{ccd2a53 1567:com.android.providers.media.module/u0a122}
+    PID #1570: ProcessRecord{2cc3e49 1570:com.android.emulator.multidisplay/1000}
+    PID #1598: ProcessRecord{7a4a27b 1598:com.android.devicelockcontroller/u0a138}
+    PID #1599: ProcessRecord{8679e0e 1599:com.android.printspooler/u0a78}
+    PID #1600: ProcessRecord{5fda6be 1600:com.android.sdksetup/u0a110}
+    PID #1601: ProcessRecord{9073eb1 1601:com.android.music/u0a102}
+    PID #1602: ProcessRecord{9ea438c 1602:com.android.keychain/1000}
+    PID #1655: ProcessRecord{75a9503 1655:android.process.acore/u0a57}
+    PID #1695: ProcessRecord{c0beb74 1695:com.android.imsserviceentitlement/u0a94}
+    PID #1773: ProcessRecord{53e3518 1773:com.android.documentsui/u0a71}
+    PID #1836: ProcessRecord{885bd86 1836:android.process.media/u0a65}
+    PID #1867: ProcessRecord{1994df 1867:com.android.managedprovisioning/u0a69}
+    PID #1910: ProcessRecord{57ad303 1910:com.android.messaging/u0a108}
+    PID #1976: ProcessRecord{f1f8fd5 1976:com.android.providers.calendar/u0a61}
+    PID #1987: ProcessRecord{fad2177 1987:com.android.externalstorage/u0a70}
+    PID #1998: ProcessRecord{7ec160a 1998:com.android.quicksearchbox/u0a107}
+    PID #2058: ProcessRecord{a67b50 2058:com.android.localtransport/1000}
+    PID #2090: ProcessRecord{231926e 2090:com.android.traceur/u0a92}
+    PID #2125: ProcessRecord{cbf6c42 2125:com.android.calendar/u0a101}
+    PID #2157: ProcessRecord{2fb666f 2157:com.android.camera2/u0a103}
+    PID #2187: ProcessRecord{53fc27a 2187:com.android.carrierdefaultapp/u0a84}
+    PID #2315: ProcessRecord{d9009a0 2315:com.android.contacts/u0a95}
+    PID #2358: ProcessRecord{6cbc40d 2358:com.android.dynsystem/1000}
+    PID #2407: ProcessRecord{b972df8 2407:com.android.dynsystem:dynsystem/1000}
+    PID #2441: ProcessRecord{b4ce801 2441:com.android.packageinstaller/u0a67}
+    PID #2461: ProcessRecord{f372 2461:com.android.rkpdapp/u0a134}
+    PID #2484: ProcessRecord{3c9c1a8 2484:com.android.shell/2000}
+    PID #2501: ProcessRecord{cbbc7a1 2501:com.android.statementservice/u0a59}
+    PID #2704: ProcessRecord{6b549b5 2704:com.brickbahrain.g0gl/u0a141}
+  mHomeProcess: ProcessRecord{e47f2b 1138:com.android.launcher3/u0a112}
+
+===== FINAL WINDOWS =====
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #0 Window{1a39091 u0 ScreenDecorOverlayBottom}:
+      mSurface=Surface(name=ScreenDecorOverlayBottom)/@0x794bdac
+    isVisible=true
+  Window #1 Window{59b895b u0 ScreenDecorOverlay}:
+      mSurface=Surface(name=ScreenDecorOverlay)/@0x8cf5a0a
+    isVisible=true
+  Window #2 Window{8f038a4 u0 NavigationBar0}:
+      mLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a mAnimationType=insets_animation
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=8f038a4 NavigationBar0)/@0x64a3b10 - animation-leash of insets_animation)/@0x3338a6a
+      mSurface=Surface(name=NavigationBar0)/@0xea028f1
+    isVisible=false
+  Window #3 Window{1028464 u0 InputMethod}:
+      mLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x5f7c5f8 mAnimationType=insets_animation
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=1028464 InputMethod)/@0x11c5c8a - animation-leash of insets_animation)/@0x5f7c5f8
+    isVisible=false
+  Window #4 Window{e912562 u0 ImmersiveModeConfirmation}:
+      mSurface=Surface(name=ImmersiveModeConfirmation)/@0x6fd632d
+    isVisible=true
+  Window #5 Window{62cb189 u0 NotificationShade}:
+    isVisible=false
+  Window #6 Window{fcf6ffd u0 StatusBar}:
+      mLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b mAnimationType=insets_animation
+        ControlAdapter mCapturedLeash=Surface(name=Surface(name=fcf6ffd StatusBar)/@0x4a84bbb - animation-leash of insets_animation)/@0x91a6b5b
+      mSurface=Surface(name=StatusBar)/@0xa7a0529
+    isVisible=false
+  Window #7 Window{b099895 u0 ShellDropTarget}:
+    isVisible=false
+  Window #8 Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}:
+    mOwnerUid=10141 showForAllUsers=false package=com.brickbahrain.g0gl appop=NONE
+    mBaseLayer=21000 mSubLayer=0    mToken=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    mActivityRecord=ActivityRecord{c157cf2 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t9}
+    WindowStateAnimator{4cb106b com.brickbahrain.g0gl/com.godot.game.GodotApp}:
+      mSurface=Surface(name=com.brickbahrain.g0gl/com.godot.game.GodotApp)/@0x738c7c8
+    isVisible=true
+  Window #9 Window{835afdb u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}:
+    isVisible=false
+  Window #10 Window{364552c u0 com.android.systemui.wallpapers.ImageWallpaper}:
+      mSurface=Surface(name=com.android.systemui.wallpapers.ImageWallpaper)/@0x1884847
+    isVisible=false
+  imeLayeringTarget in display# 0 Window{e912562 u0 ImmersiveModeConfirmation}
+  imeInputTarget in display# 0 Window{e912562 u0 ImmersiveModeConfirmation}
+  imeControlTarget in display# 0 Window{e912562 u0 ImmersiveModeConfirmation}
+  mInputMethodWindow=Window{1028464 u0 InputMethod}
+
+===== FINAL MEMINFO =====
+Applications Memory Usage (in Kilobytes):
+Uptime: 131733 Realtime: 131733
+** MEMINFO in pid 2704 [com.brickbahrain.g0gl] **
+           TOTAL PSS:   183414            TOTAL RSS:   293848      TOTAL SWAP (KB):        0

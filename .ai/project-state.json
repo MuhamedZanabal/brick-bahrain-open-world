@@ -1,22 +1,9 @@
 {
-  "schema_version": 1,
-  "project": {
-    "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
-    "repository": "MuhamedZanabal/brick-bahrain-open-world",
-    "branch": "work/bahrain-brick-graphics-upgrade-v1",
-    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
-    "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
-    "last_verified_material_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
-    "current_commit": null,
-    "head_tracking_note": "Resolve packaging head from the branch ref; this ledger cannot contain its own SHA.",
-    "parent_pr": 59,
-    "implementation_pr": 60,
-    "phase": "G0"
-  },
-  "milestones": [
-    {"id": "G0", "state": "BLOCKED", "gate_state": "G0_EVIDENCE_INSUFFICIENT"},
-    {"id": "G1", "state": "BLOCKED", "blocked_by": ["G0"]},
-    {"id": "G2-G10", "state": "BLOCKED", "blocked_by": ["G0"]}
+  "artifacts": [
+    "reports/graphics/g0/G0_TERMINAL_REPORT.json",
+    "reports/graphics/g0/G0_TERMINAL_REPORT.md",
+    "reports/graphics/g0/tier_b_reduction/",
+    "reports/graphics/g0/device_handoff/"
   ],
   "decisions": [
     "PR #59 remains immutable.",
@@ -26,28 +13,86 @@
     "The single authorized Tier B retry is run 30086966524; no further retries are permitted.",
     "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived."
   ],
-  "verification": {
-    "source_authority": "PASS",
-    "protected_files": "PASS",
-    "tier_a": "PASS",
-    "tier_b": "FAIL: TIER_B_APP_LAUNCH_FAILURE",
-    "physical_devices": "NOT_AVAILABLE",
-    "renderer_qualification": "G0_EVIDENCE_INSUFFICIENT",
-    "retry_limit_compliance": "FAIL: one authorized retry plus one unintended duplicate replay"
-  },
   "defects": [
-    {"id": "G0-AUTH-001", "state": "RESOLVED", "resolution": "Exact frozen world.gd byte protection."},
-    {"id": "G0-TIER-B-001", "state": "OPEN", "classification": "TIER_B_APP_LAUNCH_FAILURE"},
-    {"id": "G0-AUTOMATION-001", "state": "CLOSED_WITH_EXCEPTION", "evidence": "duplicate run 30087878937; cancellation run 30088001461 succeeded too late"}
+    {
+      "id": "G0-AUTH-001",
+      "resolution": "Exact frozen world.gd byte protection.",
+      "state": "RESOLVED"
+    },
+    {
+      "classification": "TIER_B_APP_LAUNCH_FAILURE",
+      "id": "G0-TIER-B-001",
+      "state": "OPEN"
+    },
+    {
+      "evidence": "duplicate run 30087878937; cancellation run 30088001461 succeeded too late",
+      "id": "G0-AUTOMATION-001",
+      "state": "CLOSED_WITH_EXCEPTION"
+    }
   ],
-  "artifacts": [
-    "reports/graphics/g0/G0_TERMINAL_REPORT.json",
-    "reports/graphics/g0/G0_TERMINAL_REPORT.md",
-    "reports/graphics/g0/tier_b_reduction/",
-    "reports/graphics/g0/device_handoff/"
+  "milestones": [
+    {
+      "gate_state": "G0_EVIDENCE_INSUFFICIENT",
+      "id": "G0",
+      "state": "BLOCKED"
+    },
+    {
+      "blocked_by": [
+        "G0"
+      ],
+      "id": "G1",
+      "state": "BLOCKED"
+    },
+    {
+      "blocked_by": [
+        "G0"
+      ],
+      "id": "G2-G10",
+      "state": "BLOCKED"
+    }
   ],
   "next_action": {
-    "micro_task_id": "GFX-011",
-    "action": "Execute the physical-device handoff on named minimum, target and high-end devices. Any API 34 launch investigation requires a separately authorized checkpoint."
+    "action": "Await explicit authorization for a separate harness-only corrective implementation. Do not begin G1.",
+    "stage": "G0.1 closed"
+  },
+  "project": {
+    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "branch": "work/bahrain-brick-graphics-upgrade-v1",
+    "current_commit": null,
+    "head_tracking_note": "Resolve packaging head from the branch ref; this ledger cannot contain its own SHA.",
+    "implementation_pr": 60,
+    "last_verified_material_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+    "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
+    "parent_pr": 59,
+    "phase": "G0",
+    "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+    "repository": "MuhamedZanabal/brick-bahrain-open-world"
+  },
+  "schema_version": 1,
+  "stage_g0_1": {
+    "activity_start_result": "ok",
+    "android_evidence_run_id": 30126561161,
+    "apk_reused_without_rebuild": true,
+    "corrective_implementation_performed": false,
+    "g1_authorized": false,
+    "launcher_resolved": true,
+    "package_installed": true,
+    "primary_classification": "G0_1_CAUSE_NOT_PROVEN",
+    "process_created": true,
+    "process_remained_alive": true,
+    "reducer_run_id": 30126886903,
+    "smallest_corrective_action": "Harden only the historical Tier B evidence harness launch and process/window acquisition logic.",
+    "state": "CLOSED",
+    "title": "ANDROID APPLICATION STARTUP ROOT-CAUSE QUALIFICATION",
+    "window_became_visible": true
+  },
+  "verification": {
+    "physical_devices": "NOT_AVAILABLE",
+    "protected_files": "PASS",
+    "renderer_qualification": "G0_EVIDENCE_INSUFFICIENT",
+    "retry_limit_compliance": "FAIL: one authorized retry plus one unintended duplicate replay",
+    "source_authority": "PASS",
+    "tier_a": "PASS",
+    "tier_b": "FAIL: TIER_B_APP_LAUNCH_FAILURE"
   }
 }

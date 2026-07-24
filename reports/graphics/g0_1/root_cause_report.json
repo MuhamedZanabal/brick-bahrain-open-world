@@ -1,0 +1,65 @@
+{
+  "activity_start_result": "ok",
+  "affected_file_or_configuration": ".github/workflows/bahrain-brick-graphics-g0.yml-tier-b-resume.yml historical launch-acquisition logic at commit 5eb4cf30081af917e5ef0ae87d8adb99d2d6c9cc",
+  "apk_rebuild_required": false,
+  "apk_reused_without_rebuild": true,
+  "decisive_evidence": [
+    "The package installed successfully and pm path returned the installed base APK.",
+    "The binary manifest and PackageManager resolve com.brickbahrain.g0gl/com.godot.game.GodotApp as an enabled exported MAIN/LAUNCHER activity.",
+    "Monkey returned 0; ActivityManager recorded START and Start proc 2673 even though the immediate pidof snapshot was empty.",
+    "Explicit am start -W -S returned Status: ok, Activity com.brickbahrain.g0gl/com.godot.game.GodotApp, TotalTime 819 ms, and WaitTime 828 ms.",
+    "PID 2704 was present immediately after explicit launch and remained alive after 60 seconds.",
+    "The activity remained top-resumed with a visible GodotApp window and Surface.",
+    "Godot reached engine startup, renderer identity, setup, main loop, mission start, scene readiness, warmup, capture frame 300, and live evidence.",
+    "No Java fatal exception, native fatal signal, linker failure, ANR, or process death was found.",
+    "The earlier Tier B non-live-process condition was not reproduced; current evidence cannot prove why that separate run failed its PID acquisition loop."
+  ],
+  "duplicate_execution_exception": {
+    "adjudicative": false,
+    "android_run_conclusion": "cancelled",
+    "android_run_id": 30126886822,
+    "cancellation_run_id": 30126988648,
+    "evidence_use": "EXCLUDED_FROM_ADJUDICATION",
+    "reducer_run_conclusion": "cancelled",
+    "reducer_run_id": 30126952569
+  },
+  "evidence_complete": false,
+  "java_crash_detected": false,
+  "launcher_resolved": true,
+  "linker_failure_detected": false,
+  "native_crash_detected": false,
+  "package_installed": true,
+  "primary_classification": "G0_1_CAUSE_NOT_PROVEN",
+  "process_created": true,
+  "process_remained_alive": true,
+  "protected_authority_impact": "None. No frozen, gameplay, control, mission, renderer-default, production-scene, material, or asset change is justified.",
+  "qualification_boundary": "G0.1 proves the exact APK can start and run on the API 34 emulator. It does not prove the cause of the earlier non-reproducible Tier B PID-acquisition failure and does not authorize renderer selection or G1.",
+  "regression_tests_required": [
+    "No-rebuild API 34 x86_64 cold start using the exact resolved component.",
+    "Assert am start -W Status: ok and record TotalTime/WaitTime.",
+    "Poll PID plus top-resumed visible-window state with a bounded timeout.",
+    "Capture full logcat before launch and scan Java/native/linker/ANR failures.",
+    "Require Godot renderer, scene-readiness, mission, capture, and evidence-live markers."
+  ],
+  "schema_version": 1,
+  "smallest_corrective_action": "Do not modify the APK or production project. Correct only the Tier B evidence harness: resolve the launcher component, start pre-launch logcat, use explicit am start -W -S, retain ActivityManager start/process evidence, and poll both PID and visible-window state before declaring application startup failure.",
+  "stage": "BAHRAIN BRICK \u2014 STAGE G0.1",
+  "successful_runtime_markers": {
+    "capture_frame": true,
+    "evidence_live": true,
+    "godot_engine": true,
+    "mission_started": true,
+    "renderer_identity": true,
+    "scene_ready": true,
+    "warmup_complete": true
+  },
+  "why_correction_is_minimal": "The exact APK launches and reaches the full evidence scene without application, renderer, scene, Java, native, linker, ABI, or manifest failure. Only the evidence-acquisition method requires hardening.",
+  "window_became_visible": true,
+  "workflow_process_exception": {
+    "artifact_upload": "success",
+    "ordered_investigation_step": "success",
+    "post_capture_guard_failure": "The prohibited-token grep matched the literal tokens inside its own guard command.",
+    "raw_evidence_job_final_conclusion": "failure",
+    "technical_evidence_effect": "none"
+  }
+}

@@ -1,0 +1,14 @@
+name: Bahrain Brick G0.1 Evidence Reducer — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'G0.1 reduction is fixed to source artifact 8609540209. Do not rerun after compact evidence is emitted.'
