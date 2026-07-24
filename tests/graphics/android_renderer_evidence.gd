@@ -57,8 +57,8 @@ func _run() -> void:
 	camera.current = true
 
 	print("G0_ANDROID_RENDERER_READY renderer=%s driver=%s gpu=%s" % [
-		RenderingServer.get_current_rendering_method(),
-		RenderingServer.get_current_rendering_driver_name(),
+		_renderer_name(),
+		_driver_name(),
 		RenderingServer.get_video_adapter_name(),
 	])
 	for _frame in range(WARMUP_FRAMES):
@@ -74,13 +74,23 @@ func _run() -> void:
 			print("G0_ANDROID_CAPTURE_FRAME frame=%d" % CAPTURE_FRAME)
 
 	print("G0_ANDROID_EVIDENCE_LIVE renderer=%s frames=%d memory=%d draw_calls=%d visible_objects=%d visible_primitives=%d" % [
-		RenderingServer.get_current_rendering_method(),
+		_renderer_name(),
 		TOTAL_MEASURED_FRAMES,
 		OS.get_static_memory_usage(),
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
 	])
+
+
+func _renderer_name() -> String:
+	return str(ProjectSettings.get_setting("rendering/renderer/rendering_method", "unknown"))
+
+
+func _driver_name() -> String:
+	if _renderer_name() == "gl_compatibility":
+		return "opengl3"
+	return "vulkan"
 
 
 func _fail(message: String) -> void:
