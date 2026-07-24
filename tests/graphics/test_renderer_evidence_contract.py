@@ -43,15 +43,14 @@ class RendererEvidenceContractTests(unittest.TestCase):
             self.assertIn(fragment, text)
         self.assertNotIn("ProjectSettings.save", text)
 
-    def test_harness_uses_godot_43_compatible_renderer_identity(self) -> None:
+    def test_harness_uses_godot_43_compatible_renderer_metadata(self) -> None:
         harness = HARNESS.read_text(encoding="utf-8")
-        workflow = WORKFLOW.read_text(encoding="utf-8")
+        finalizer = FINALIZER.read_text(encoding="utf-8")
         self.assertNotIn("RenderingServer.get_current_rendering_method()", harness)
         self.assertNotIn("RenderingServer.get_current_rendering_driver_name()", harness)
-        self.assertIn('OS.get_environment("G0_EXPECTED_RENDERER")', harness)
-        self.assertIn('OS.get_environment("G0_EXPECTED_DRIVER")', harness)
-        self.assertIn('G0_EXPECTED_RENDERER="$method"', workflow)
-        self.assertIn('G0_EXPECTED_DRIVER="$driver"', workflow)
+        self.assertIn('ProjectSettings.get_setting("rendering/renderer/rendering_method"', harness)
+        self.assertIn("parse_renderer_startup", finalizer)
+        self.assertIn('renderer = startup["renderer"]', finalizer)
 
     def test_workflow_reuses_one_imported_state_for_both_renderers(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
