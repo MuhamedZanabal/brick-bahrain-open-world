@@ -89,8 +89,8 @@ class AndroidTierBContractTests(unittest.TestCase):
         module = load_module(FINALIZER, "finalize_android_emulator_evidence")
         # 1x1 non-black RGBA PNG.
         png = base64.b64decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF"
-            "gAI/6Zl94QAAAABJRU5ErkJggg=="
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAF"
+            "AAH/iZk9HQAAAABJRU5ErkJggg=="
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
