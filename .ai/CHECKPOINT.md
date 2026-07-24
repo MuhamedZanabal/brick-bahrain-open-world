@@ -1,86 +1,49 @@
-# Bahrain Brick Graphics Upgrade v1 — Checkpoint
+# Bahrain Brick Graphics Upgrade v1 — Terminal G0 Checkpoint
 
-Recorded: 2026-07-22
+Recorded: 2026-07-24
 
-## Objective
+## Classification
 
-Deliver the accepted Bahrain Brick graphics upgrade through staged, evidence-gated pull requests without changing frozen PR #59, protected gameplay controls, mission behaviour, vehicle behaviour, regression thresholds, or validated asset authority.
+`G0_EVIDENCE_INSUFFICIENT`
 
-## Repository State
+G0 is terminal for this checkpoint but not passed. PR #60 remains draft. G1-G10 remain blocked.
 
-- Repository: `MuhamedZanabal/brick-bahrain-open-world`
-- Active implementation branch: `work/bahrain-brick-graphics-upgrade-v1`
-- Frozen parent PR: `#59`
-- Frozen parent head: `5b4e2466ef84f3984f3bf336b31925d4d2e97a7f`
-- Frozen parent base: `fc8f00182f97c39015610d6603fa7c9c44364c5d`
-- Current phase: G0 — Authority, Baseline, and Risk Control
-- G0 gate: FAILED / OPEN
+## Frozen authority
 
-## Verified Completed Work
+- PR #59: open, draft, unmerged, unchanged.
+- Frozen head: `5b4e2466ef84f3984f3bf336b31925d4d2e97a7f`.
+- Renderer-evidence commit: `6ade72ed02084791128dcf4a91223e695d802c15`.
+- Source census: 1,256 frozen files; 1,279 graphics files; 23 authorized additions; zero frozen modifications or removals.
+- Contracts: 21 passed, 0 failed.
+- `scripts/world.gd` rule: `BYTE_PROTECT_EXACT_FROZEN_WORLD_GD`; `_exit_tree` is absent.
 
-- Confirmed PR #59 open, draft, unmerged, and unchanged before branch creation.
-- Created the child graphics branch from the exact frozen PR #59 head.
-- Recorded a machine-readable authority contract.
-- Added a SHA-256 and ancestry regression contract for protected files.
-- Added read-only GitHub Actions G0 authority/baseline workflow.
-- Recorded the renderer conflict as unresolved.
-- Inventoried all 35 deterministic Manama Souq layout placements.
-- Recorded startup/menu/HUD and inspected resource architecture.
-- Defined provisional minimum, target, high-end, ultra, and CI-emulator device tiers.
-- Added visual/performance evidence matrix.
-- Added licence, provenance, originality, and no-copied-trade-dress gate.
-- Added the accepted graphics specification and project state ledger.
+## Tier A
 
-## Active Failure / Blocker
+Run `30064876927`, job `89393944500`: **success**. Both GL Compatibility and Mobile Vulkan completed the same scene under one byte-identical imported state. Both produced valid 1920×1080 non-black screenshots, readiness and mission markers, 360 metric rows, and zero critical errors. Host performance is diagnostic only.
 
-GFX-009 cannot be executed in the current tool environment because Godot runtime, Android emulator/physical-device execution, direct repository checkout, screenshots, profiler capture, and package generation are unavailable.
+## Tier B
 
-This blocks:
+Existing artifact classification: `TIER_B_APK_VERIFICATION_FAILURE` at legacy `aapt dump badging`, after both APKs were exported, signed and signature-verified.
 
-- paired GL Compatibility versus Mobile Vulkan evidence;
-- renderer-specific failure/difference record;
-- authoritative renderer selection;
-- compatibility fallback policy;
-- baseline screenshots;
-- frame time, draw calls, triangles, memory, load time, and APK size;
-- named physical-device qualification;
-- Gate G0.
+Reducer run `30086594777`: success. It inspected the existing artifact without rerunning Android.
 
-## Authority Inconsistency
+One targeted retry, run `30086966524`, reused exact APK bytes and corrected verification with AAPT2. Both APKs verified and the API 34 emulator booted. GL installed and launcher injection returned 0, but no application process became alive. Final classification: `TIER_B_APP_LAUNCH_FAILURE`. Mobile emulator execution was not attempted. No renderer failure is proven. No further Tier B retry is permitted in this checkpoint.
 
-`docs/superpowers/specs/2026-07-16-manama-souq-playable-district-v1-design.md` protects `scripts/world.gd::_exit_tree`. The symbol was not found in the inspected PR #59 head source ranges. Until reconstructed-source evidence resolves this, do not modify `scripts/world.gd`.
+## Remaining blockers
 
-## Unresolved Risks
+1. Named minimum, target and high-end physical-device evidence.
+2. Five-minute traversal, frame metrics, memory, thermal and lifecycle evidence.
+3. Fatal/ANR/native-crash scans on physical devices.
+4. API 34 GL launch root cause is unknown because no pre-PID process log was retained.
+5. Renderer selection and fallback policy remain null.
 
-1. Mobile Vulkan may fail minimum-device or driver reliability gates.
-2. GL Compatibility may limit the target visual stack.
-3. A dual renderer path may create unacceptable shader/material maintenance cost.
-4. Baseline performance and APK size are not recorded.
-5. Named physical devices and GPU drivers are not assigned.
-6. The complete tree-wide UI/material/font/shader/environment inventory is not finished because a full checkout/reconstruction was unavailable.
+## Outputs
 
-## Exact Next Action
+- `reports/graphics/g0/G0_TERMINAL_REPORT.json`
+- `reports/graphics/g0/G0_TERMINAL_REPORT.md`
+- `reports/graphics/g0/tier_b_reduction/`
+- `reports/graphics/g0/device_handoff/`
 
-Execute GFX-009 on a runner with the reconstructed source, Godot 4.3 authority, Android SDK/emulator, and physical-device access:
+## Stop condition
 
-1. Build or launch the exact same deterministic Manama Souq scene under `gl_compatibility`.
-2. Repeat under `mobile`.
-3. Keep source commit, camera, viewport, render scale, quality, mission state, warm-up, and capture path identical.
-4. Record screenshots, logs, renderer/device identity, cold/warm load time, frame-time series, draw calls, triangles, memory, package bytes, and SHA-256.
-5. Run the five-minute mission traversal and thirty-minute soak on minimum, target, and high-end physical devices.
-6. Update `docs/graphics/visual_acceptance_matrix.md`, `docs/graphics/device_matrix.md`, `.ai/project-state.json`, and the renderer decision.
-7. Do not begin G1 until G0 passes.
-
-## Reproduction / Verification Commands
-
-```bash
-python3 tests/graphics/test_graphics_upgrade_g0_contract.py
-```
-
-The GitHub Actions workflow is:
-
-```text
-.github/workflows/bahrain-brick-graphics-g0.yml
-```
-
-It requires full Git history and verifies PR #59 through the GitHub API.
+Tier A is terminal; Tier B is reduced and diagnosed; exactly one targeted Tier B retry is complete; terminal reports and the physical-device handoff are emitted. No renderer defaults, production scenes, gameplay, controls, missions, materials, or production assets were changed. G1 has not begun.

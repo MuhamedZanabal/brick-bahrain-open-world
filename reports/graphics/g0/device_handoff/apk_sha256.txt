@@ -1,0 +1,2 @@
+8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb  bahrain-brick-g0-gl-compatibility-x86_64.apk
+0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02  bahrain-brick-g0-mobile-vulkan-x86_64.apk

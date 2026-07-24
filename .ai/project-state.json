@@ -1,208 +1,79 @@
 {
-  "schema_version": 1,
-  "project": {
-    "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
-    "objective": "Reproduce the accepted Bahrain Brick art direction and premium mobile presentation while preserving frozen gameplay, controls, mission behaviour, asset authority, and PR #59.",
-    "repository": "MuhamedZanabal/brick-bahrain-open-world",
-    "branch": "work/bahrain-brick-graphics-upgrade-v1",
-    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
-    "current_commit": null,
-    "last_verified_material_commit": "6446f8d7b7fac85f5717328040844f984af3662a",
-    "head_tracking_note": "Resolve the current commit from the branch ref. The ledger commit cannot truthfully contain its own SHA.",
-    "parent_pr": 59,
-    "implementation_pr": 60,
-    "phase": "G0"
-  },
-  "requirements": [
-    "PR #59 remains open, draft, unmerged, and unchanged at its frozen head.",
-    "Protected movement, touch, vehicle, mission, regression, and asset authorities remain unchanged.",
-    "Renderer authority is selected only from paired scene and Android device evidence.",
-    "No large graphics asset batch or cosmetic phase begins before G0 passes.",
-    "All new production assets have recorded rights and provenance."
-  ],
-  "milestones": [
-    {
-      "id": "G0",
-      "title": "Authority, Baseline, and Risk Control",
-      "state": "IN_PROGRESS",
-      "gate_state": "FAILED_OPEN"
-    },
-    {
-      "id": "G1",
-      "title": "Art Bible and Design System",
-      "state": "BLOCKED",
-      "blocked_by": ["G0"]
-    },
-    {
-      "id": "G2-G10",
-      "title": "Visual implementation, optimisation, verification, and release evidence",
-      "state": "BLOCKED",
-      "blocked_by": ["G0", "phase dependencies"]
-    }
-  ],
-  "micro_tasks": [
-    {
-      "id": "GFX-000",
-      "state": "COMPLETED",
-      "evidence": "PR #59 recorded as open, draft, unmerged; base fc8f0018; head 5b4e2466; 99 commits; 54 changed files."
-    },
-    {
-      "id": "GFX-001",
-      "state": "COMPLETED",
-      "evidence": "PR #59 verified immediately before child branch creation."
-    },
-    {
-      "id": "GFX-002",
-      "state": "COMPLETED",
-      "evidence": "Child branch created from exact frozen head."
-    },
-    {
-      "id": "GFX-003",
-      "state": "COMPLETED",
-      "evidence": "Machine-readable protected-file contract and executable SHA-256/ancestry test."
-    },
-    {
-      "id": "GFX-004",
-      "state": "IN_PROGRESS",
-      "evidence": "Startup/menu/HUD and inspected resource inventory recorded.",
-      "blocked_reason": "Complete tree census requires checkout or reconstructed source artifact."
-    },
-    {
-      "id": "GFX-005",
-      "state": "COMPLETED",
-      "evidence": "All 35 deterministic layout placements inventoried by family and asset ID."
-    },
-    {
-      "id": "GFX-006",
-      "state": "BLOCKED",
-      "blocked_reason": "Requires Godot runtime and display/device capture."
-    },
-    {
-      "id": "GFX-007",
-      "state": "BLOCKED",
-      "blocked_reason": "Requires runtime profiler, Android package, and device evidence."
-    },
-    {
-      "id": "GFX-008",
-      "state": "COMPLETED",
-      "evidence": "GL Compatibility versus Mobile Vulkan conflict confirmed; no renderer selected."
-    },
-    {
-      "id": "GFX-009",
-      "state": "BLOCKED",
-      "blocked_reason": "Godot and Android execution are unavailable in the current environment."
-    },
-    {
-      "id": "GFX-010",
-      "state": "BLOCKED",
-      "blocked_reason": "Depends on GFX-009."
-    },
-    {
-      "id": "GFX-011",
-      "state": "BLOCKED",
-      "blocked_reason": "Depends on paired renderer and physical-device evidence."
-    },
-    {
-      "id": "GFX-012",
-      "state": "COMPLETED",
-      "evidence": "docs/graphics/device_matrix.md",
-      "residual_risk": "Named physical devices and GPU drivers remain unassigned."
-    },
-    {
-      "id": "GFX-013",
-      "state": "COMPLETED",
-      "evidence": "docs/graphics/provenance_ledger.md"
-    },
-    {
-      "id": "GFX-014",
-      "state": "COMPLETED",
-      "evidence": "Originality, trade-dress, reference-image, font, model, icon, and licence prohibitions recorded."
-    },
-    {
-      "id": "GFX-015",
-      "state": "COMPLETED",
-      "evidence": ".github/workflows/bahrain-brick-graphics-g0.yml"
-    }
+  "artifacts": [
+    "reports/graphics/g0/G0_TERMINAL_REPORT.json",
+    "reports/graphics/g0/G0_TERMINAL_REPORT.md",
+    "reports/graphics/g0/tier_b_reduction/archive_inventory.json",
+    "reports/graphics/g0/tier_b_reduction/retained_inventory.json",
+    "reports/graphics/g0/tier_b_reduction/excluded_inventory.json",
+    "reports/graphics/g0/tier_b_reduction/missing_expected_paths.json",
+    "reports/graphics/g0/tier_b_reduction/reduction_summary.md",
+    "reports/graphics/g0/device_handoff/README.md",
+    "reports/graphics/g0/device_handoff/device_result.schema.json",
+    "reports/graphics/g0/device_handoff/run_device_test.sh",
+    "reports/graphics/g0/device_handoff/run_device_test.ps1",
+    "reports/graphics/g0/device_handoff/adb_capture_commands.txt",
+    "reports/graphics/g0/device_handoff/expected_markers.txt",
+    "reports/graphics/g0/device_handoff/apk_sha256.txt"
   ],
   "decisions": [
-    {
-      "id": "G0-DEC-001",
-      "decision": "Use a child branch from the exact PR #59 head and never push graphics changes to PR #59."
-    },
-    {
-      "id": "G0-DEC-002",
-      "decision": "Keep renderer state UNRESOLVED until paired runtime and physical-device evidence exists."
-    },
-    {
-      "id": "G0-DEC-003",
-      "decision": "Treat scripts/world.gd as protected until the missing _exit_tree authority inconsistency is resolved."
-    },
-    {
-      "id": "G0-DEC-004",
-      "decision": "Keep PR #60 draft and block G1-G10 while G0 is open."
-    }
-  ],
-  "risks": [
-    {
-      "id": "G0-RISK-001",
-      "severity": "critical",
-      "description": "Renderer selection without device evidence could invalidate shaders, performance targets, and Android compatibility."
-    },
-    {
-      "id": "G0-RISK-002",
-      "severity": "high",
-      "description": "The accepted design protects scripts/world.gd::_exit_tree, but the symbol is not visible in the inspected frozen-head source."
-    },
-    {
-      "id": "G0-RISK-003",
-      "severity": "high",
-      "description": "Baseline screenshots, frame/memory/package metrics, and named physical-device evidence do not exist."
-    }
+    {"decision": "Never modify or merge PR #59 from this graphics branch.", "id": "G0-DEC-001"},
+    {"decision": "Keep renderer decision null and defaults unchanged.", "id": "G0-DEC-002"},
+    {"decision": "Use BYTE_PROTECT_EXACT_FROZEN_WORLD_GD; _exit_tree is absent.", "id": "G0-DEC-003"},
+    {"decision": "Keep PR #60 draft and block G1-G10.", "id": "G0-DEC-004"},
+    {"decision": "No further Tier B retry is permitted in this checkpoint; the single targeted retry is exhausted.", "id": "G0-DEC-005"}
   ],
   "defects": [
-    {
-      "id": "G0-AUTH-001",
-      "severity": "high",
-      "state": "OPEN",
-      "description": "Protected world.gd::_exit_tree symbol authority cannot be reconciled against inspected PR #59 head source."
-    }
+    {"id": "G0-AUTH-001", "resolution": "Exact frozen world.gd is byte-protected; _exit_tree is absent.", "state": "RESOLVED"},
+    {"classification": "TIER_B_APP_LAUNCH_FAILURE", "description": "GL APK installs and receives launcher event but no process becomes alive; root cause not proven.", "id": "G0-TIER-B-001", "state": "OPEN"}
   ],
-  "verification": [
-    {
-      "claim": "PR #60 is isolated from PR #59 gameplay authority.",
-      "method": "Commit comparison from 5b4e2466 to 6446f8d7.",
-      "result": "PASS: 10 commits ahead, zero behind, 10 added G0 files, no protected file modification."
-    },
-    {
-      "claim": "Frozen PR metadata is continuously checkable.",
-      "method": "Connector verification plus read-only GitHub Actions API gate.",
-      "result": "PASS at branch/PR creation; no CI status was observable at reconciliation time."
-    },
-    {
-      "claim": "Protected mobile-control files are byte-identical.",
-      "method": "SHA-256 contract against composite authority.",
-      "result": "Test committed; workflow execution evidence pending."
-    },
-    {
-      "claim": "Renderer qualification is complete.",
-      "method": "Paired renderer and physical-device evidence matrix.",
-      "result": "FAIL / NOT RUN."
-    }
+  "micro_tasks": [
+    {"evidence": "PR #59 frozen authority recorded and revalidated.", "id": "GFX-000", "state": "COMPLETED"},
+    {"evidence": "PR #59 unchanged before child branch creation.", "id": "GFX-001", "state": "COMPLETED"},
+    {"evidence": "Child branch created from exact frozen head.", "id": "GFX-002", "state": "COMPLETED"},
+    {"evidence": "Protected-file SHA-256 and ancestry contracts passed.", "id": "GFX-003", "state": "COMPLETED"},
+    {"evidence": "Exact source census: 1,256 frozen files, 1,279 graphics files, 23 additions, zero modifications/removals.", "id": "GFX-004", "state": "COMPLETED"},
+    {"evidence": "All 35 deterministic Souq placements inventoried.", "id": "GFX-005", "state": "COMPLETED"},
+    {"evidence": "Tier A 1920x1080 screenshots exist for both renderers; named physical-device baseline remains absent.", "id": "GFX-006", "state": "IN_PROGRESS"},
+    {"blocked_reason": "Tier B app launch failed before runtime metrics and named physical-device evidence is unavailable.", "id": "GFX-007", "state": "BLOCKED"},
+    {"evidence": "Renderer conflict confirmed and paired Tier A host evidence recorded.", "id": "GFX-008", "state": "COMPLETED"},
+    {"evidence": "Tier A passed; Tier B original APK verification failure was corrected, then one targeted retry ended at TIER_B_APP_LAUNCH_FAILURE.", "id": "GFX-009", "state": "FAILED"},
+    {"evidence": "Tier A visual differences and exact Tier B failure stages recorded in G0 terminal report.", "id": "GFX-010", "state": "COMPLETED"},
+    {"blocked_reason": "No renderer decision is admissible without named physical-device evidence.", "id": "GFX-011", "state": "BLOCKED"},
+    {"evidence": "Device matrix and compact physical-device handoff emitted.", "id": "GFX-012", "state": "COMPLETED"},
+    {"evidence": "Provenance ledger exists.", "id": "GFX-013", "state": "COMPLETED"},
+    {"evidence": "Originality and trade-dress prohibitions recorded.", "id": "GFX-014", "state": "COMPLETED"},
+    {"evidence": "Source, Tier A, Tier B, reducer, and targeted-resume CI infrastructure exists.", "id": "GFX-015", "state": "COMPLETED"}
   ],
-  "artifacts": [
-    "authority/bahrain_brick_graphics_upgrade_v1.json",
-    "tests/graphics/test_graphics_upgrade_g0_contract.py",
-    ".github/workflows/bahrain-brick-graphics-g0.yml",
-    "docs/graphics/bahrain_brick_graphics_upgrade_v1.md",
-    "docs/graphics/g0_authority_baseline.md",
-    "docs/graphics/device_matrix.md",
-    "docs/graphics/visual_acceptance_matrix.md",
-    "docs/graphics/provenance_ledger.md",
-    ".ai/CHECKPOINT.md"
+  "milestones": [
+    {"gate_state": "G0_EVIDENCE_INSUFFICIENT", "id": "G0", "state": "BLOCKED", "title": "Authority, Baseline, and Risk Control"},
+    {"blocked_by": ["G0"], "id": "G1", "state": "BLOCKED", "title": "Art Bible and Design System"},
+    {"blocked_by": ["G0", "phase dependencies"], "id": "G2-G10", "state": "BLOCKED", "title": "Visual implementation, optimisation, verification, and release evidence"}
   ],
   "next_action": {
-    "micro_task_id": "GFX-009",
-    "reason": "Paired renderer execution is the first unresolved dependency for renderer policy, screenshots, performance baseline, device qualification, and all cosmetic phases.",
-    "action": "Run the deterministic Manama Souq scene under gl_compatibility and mobile with identical source, camera, viewport, quality, and Android device metadata; capture screenshots, frame/load/memory metrics, logs, and package hash."
-  }
+    "action": "Execute the device handoff on named minimum, target, and high-end devices. Investigate the API 34 GL launch failure only under a separately authorized checkpoint; no retries remain here.",
+    "micro_task_id": "GFX-011",
+    "reason": "Physical-device evidence is the remaining decision boundary."
+  },
+  "project": {
+    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "branch": "work/bahrain-brick-graphics-upgrade-v1",
+    "current_commit": null,
+    "head_tracking_note": "Resolve the current packaging commit from the branch ref; this ledger cannot contain its own SHA.",
+    "implementation_pr": 60,
+    "last_verified_material_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+    "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
+    "objective": "Evidence-gated graphics upgrade preserving frozen gameplay, controls, missions, asset authority, and PR #59.",
+    "parent_pr": 59,
+    "phase": "G0",
+    "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+    "repository": "MuhamedZanabal/brick-bahrain-open-world"
+  },
+  "schema_version": 1,
+  "verification": [
+    {"claim": "Source authority and protected files", "result": "PASS"},
+    {"claim": "Tier A paired host functional evidence", "result": "PASS"},
+    {"claim": "Tier B API 34 functional evidence", "result": "FAIL: TIER_B_APP_LAUNCH_FAILURE after one targeted retry"},
+    {"claim": "Named physical-device qualification", "result": "NOT AVAILABLE"},
+    {"claim": "Renderer qualification", "result": "G0_EVIDENCE_INSUFFICIENT"}
+  ]
 }

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bahrain Brick G0 Physical Device Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "test_status", "device", "renderer", "quality_preset", "apk_sha256", "cold_start", "scene_readiness", "traversal", "memory", "thermal", "lifecycle", "crash_scan"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "test_status": {"enum": ["PASS", "FAIL", "INCOMPLETE"]},
+    "device": {
+      "type": "object",
+      "required": ["manufacturer", "exact_model", "soc", "gpu", "ram_bytes", "android_version", "api_level", "screen_resolution"],
+      "properties": {
+        "manufacturer": {"type": "string"},
+        "exact_model": {"type": "string"},
+        "soc": {"type": "string"},
+        "gpu": {"type": "string"},
+        "ram_bytes": {"type": ["integer", "null"]},
+        "android_version": {"type": "string"},
+        "api_level": {"type": "integer"},
+        "screen_resolution": {"type": "string"},
+        "build_fingerprint": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "renderer": {"enum": ["gl_compatibility", "mobile"]},
+    "quality_preset": {"type": "string"},
+    "apk_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "cold_start": {
+      "type": "object",
+      "required": ["launch_exit_code", "process_alive", "milliseconds"],
+      "properties": {"launch_exit_code": {"type": "integer"}, "process_alive": {"type": "boolean"}, "milliseconds": {"type": ["number", "null"]}},
+      "additionalProperties": true
+    },
+    "scene_readiness": {
+      "type": "object",
+      "required": ["ready_marker", "mission_marker"],
+      "properties": {"ready_marker": {"type": "boolean"}, "mission_marker": {"type": "boolean"}, "seconds": {"type": ["number", "null"]}},
+      "additionalProperties": true
+    },
+    "traversal": {
+      "type": "object",
+      "required": ["duration_seconds", "completed"],
+      "properties": {"duration_seconds": {"type": "integer", "minimum": 300}, "completed": {"type": "boolean"}, "frame_metrics_file": {"type": ["string", "null"]}},
+      "additionalProperties": true
+    },
+    "memory": {"type": "object", "required": ["peak_pss_kb"], "properties": {"peak_pss_kb": {"type": ["integer", "null"]}, "peak_rss_kb": {"type": ["integer", "null"]}}, "additionalProperties": true},
+    "thermal": {"type": "object", "required": ["start_state", "end_state"], "properties": {"start_state": {}, "end_state": {}}, "additionalProperties": true},
+    "lifecycle": {"type": "object", "required": ["pause_observed", "resume_observed", "process_alive_after_resume"], "properties": {"pause_observed": {"type": "boolean"}, "resume_observed": {"type": "boolean"}, "process_alive_after_resume": {"type": "boolean"}}, "additionalProperties": true},
+    "crash_scan": {"type": "object", "required": ["fatal_count", "anr_count", "native_crash_count"], "properties": {"fatal_count": {"type": "integer"}, "anr_count": {"type": "integer"}, "native_crash_count": {"type": "integer"}, "log_file": {"type": "string"}}, "additionalProperties": true},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}
