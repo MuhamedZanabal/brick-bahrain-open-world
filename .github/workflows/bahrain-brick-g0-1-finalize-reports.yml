@@ -65,63 +65,65 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import json
-          state_path=Path('.ai/project-state.json')
-          state=json.loads(state_path.read_text())
-          state['stage_g0_1']={
-            'title':'ANDROID APPLICATION STARTUP ROOT-CAUSE QUALIFICATION',
-            'state':'CLOSED',
-            'primary_classification':'G0_1_CAUSE_NOT_PROVEN',
-            'apk_reused_without_rebuild':True,
-            'android_evidence_run_id':30126561161,
-            'reducer_run_id':30126886903,
-            'package_installed':True,
-            'launcher_resolved':True,
-            'activity_start_result':'ok',
-            'process_created':True,
-            'process_remained_alive':True,
-            'window_became_visible':True,
-            'corrective_implementation_performed':False,
-            'smallest_corrective_action':'Harden only the historical Tier B evidence harness launch and process/window acquisition logic.',
-            'g1_authorized':False,
+          state_path = Path('.ai/project-state.json')
+          state = json.loads(state_path.read_text())
+          state['stage_g0_1'] = {
+              'title': 'ANDROID APPLICATION STARTUP ROOT-CAUSE QUALIFICATION',
+              'state': 'CLOSED',
+              'primary_classification': 'G0_1_CAUSE_NOT_PROVEN',
+              'apk_reused_without_rebuild': True,
+              'android_evidence_run_id': 30126561161,
+              'reducer_run_id': 30126886903,
+              'package_installed': True,
+              'launcher_resolved': True,
+              'activity_start_result': 'ok',
+              'process_created': True,
+              'process_remained_alive': True,
+              'window_became_visible': True,
+              'corrective_implementation_performed': False,
+              'smallest_corrective_action': 'Harden only the historical Tier B evidence harness launch and process/window acquisition logic.',
+              'g1_authorized': False,
           }
-          state['next_action']={
-            'stage':'G0.1 closed',
-            'action':'Await explicit authorization for a separate harness-only corrective implementation. Do not begin G1.',
+          state['next_action'] = {
+              'stage': 'G0.1 closed',
+              'action': 'Await explicit authorization for a separate harness-only corrective implementation. Do not begin G1.',
           }
-          state_path.write_text(json.dumps(state,indent=2,sort_keys=True)+'\n')
-          Path('.ai/CHECKPOINT.md').write_text('''# Bahrain Brick Graphics — G0.1 Checkpoint
-
-Recorded: 2026-07-24
-
-## Terminal state
-
-- Stage: **BAHRAIN BRICK — STAGE G0.1**
-- Classification: `G0_1_CAUSE_NOT_PROVEN`
-- Exact APK reused without rebuild: yes
-- Package installation: passed
-- Launcher resolution: passed
-- Explicit `am start -W -S`: `Status: ok`
-- Process remained alive: yes
-- Window became visible: yes
-- Java/native/linker crash: not detected
-- Corrective implementation: not performed
-- Renderer defaults: unchanged
-- G1: unauthorized
-
-## Evidence authority
-
-- Android run: `30126561161`
-- Raw artifact: `8609540209`
-- Reducer run: `30126886903`
-- Reduced artifact: `8609597152`
-- Required reports: `reports/graphics/g0_1/`
-
-## Boundary
-
-The exact accepted APK starts and reaches the Godot renderer, mission, scene-readiness, capture, and live-evidence markers on the API 34 x86_64 emulator. The earlier Tier B no-process condition was not reproduced, so its transient cause is not proven.
-
-The smallest proposal is harness-only: resolve the launcher component, start logcat before launch, use `am start -W -S`, preserve ActivityManager process-start evidence, and poll PID plus visible-window state. Await separate authorization before implementing it.
-''')
+          state_path.write_text(json.dumps(state, indent=2, sort_keys=True) + '\n')
+          checkpoint = [
+              '# Bahrain Brick Graphics — G0.1 Checkpoint',
+              '',
+              'Recorded: 2026-07-24',
+              '',
+              '## Terminal state',
+              '',
+              '- Stage: **BAHRAIN BRICK — STAGE G0.1**',
+              '- Classification: `G0_1_CAUSE_NOT_PROVEN`',
+              '- Exact APK reused without rebuild: yes',
+              '- Package installation: passed',
+              '- Launcher resolution: passed',
+              '- Explicit `am start -W -S`: `Status: ok`',
+              '- Process remained alive: yes',
+              '- Window became visible: yes',
+              '- Java/native/linker crash: not detected',
+              '- Corrective implementation: not performed',
+              '- Renderer defaults: unchanged',
+              '- G1: unauthorized',
+              '',
+              '## Evidence authority',
+              '',
+              '- Android run: `30126561161`',
+              '- Raw artifact: `8609540209`',
+              '- Reducer run: `30126886903`',
+              '- Reduced artifact: `8609597152`',
+              '- Required reports: `reports/graphics/g0_1/`',
+              '',
+              '## Boundary',
+              '',
+              'The exact accepted APK starts and reaches the Godot renderer, mission, scene-readiness, capture, and live-evidence markers on the API 34 x86_64 emulator. The earlier Tier B no-process condition was not reproduced, so its transient cause is not proven.',
+              '',
+              'The smallest proposal is harness-only: resolve the launcher component, start logcat before launch, use `am start -W -S`, preserve ActivityManager process-start evidence, and poll PID plus visible-window state. Await separate authorization before implementing it.',
+          ]
+          Path('.ai/CHECKPOINT.md').write_text('\n'.join(checkpoint) + '\n')
           PY
 
       - name: Validate reports and staged authority boundary
@@ -132,19 +134,19 @@ The smallest proposal is harness-only: resolve the launcher component, start log
           python3 - <<'PY'
           from pathlib import Path
           import json
-          root=Path('reports/graphics/g0_1')
-          required=[
-            'authority.json','package_resolution.txt','launch_attempts.json','logcat_full.txt',
-            'logcat_critical.txt','process_state.json','activity_state.txt','apk_native_inventory.json',
-            'manifest_report.json','emulator_environment.json','root_cause_report.json','root_cause_report.md',
+          root = Path('reports/graphics/g0_1')
+          required = [
+              'authority.json', 'package_resolution.txt', 'launch_attempts.json', 'logcat_full.txt',
+              'logcat_critical.txt', 'process_state.json', 'activity_state.txt', 'apk_native_inventory.json',
+              'manifest_report.json', 'emulator_environment.json', 'root_cause_report.json', 'root_cause_report.md',
           ]
           for name in required:
-            path=root/name
-            assert path.is_file() and path.stat().st_size>0, name
+              path = root / name
+              assert path.is_file() and path.stat().st_size > 0, name
           for name in [item for item in required if item.endswith('.json')]:
-            json.loads((root/name).read_text())
-          report=json.loads((root/'root_cause_report.json').read_text())
-          assert report['primary_classification']=='G0_1_CAUSE_NOT_PROVEN'
+              json.loads((root / name).read_text())
+          report = json.loads((root / 'root_cause_report.json').read_text())
+          assert report['primary_classification'] == 'G0_1_CAUSE_NOT_PROVEN'
           assert report['evidence_complete'] is False
           assert report['apk_reused_without_rebuild'] is True
           assert report['package_installed'] is True
@@ -160,22 +162,26 @@ The smallest proposal is harness-only: resolve the launcher component, start log
         shell: bash
         run: |
           set -euo pipefail
-          cat > .github/workflows/bahrain-brick-g0-1-finalize-reports.yml <<'YAML'
-          name: Bahrain Brick G0.1 Finalize Root-Cause Reports — Archived
-
-          on:
-            workflow_dispatch:
-
-          permissions:
-            contents: read
-
-          jobs:
-            archived:
-              if: false
-              runs-on: ubuntu-24.04
-              steps:
-                - run: echo 'G0.1 root-cause reports are terminal. Do not rerun.'
-          YAML
+          python3 - <<'PY'
+          from pathlib import Path
+          archived = [
+              'name: Bahrain Brick G0.1 Finalize Root-Cause Reports — Archived',
+              '',
+              'on:',
+              '  workflow_dispatch:',
+              '',
+              'permissions:',
+              '  contents: read',
+              '',
+              'jobs:',
+              '  archived:',
+              '    if: false',
+              '    runs-on: ubuntu-24.04',
+              '    steps:',
+              "      - run: echo 'G0.1 root-cause reports are terminal. Do not rerun.'",
+          ]
+          Path('.github/workflows/bahrain-brick-g0-1-finalize-reports.yml').write_text('\n'.join(archived) + '\n')
+          PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add reports/graphics/g0_1 .ai/project-state.json .ai/CHECKPOINT.md .github/workflows/bahrain-brick-g0-1-finalize-reports.yml
