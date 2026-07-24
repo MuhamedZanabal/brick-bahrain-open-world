@@ -1,0 +1,45 @@
+{
+  "apk": {
+    "filename": "bahrain-brick-g0-gl-compatibility-x86_64.apk",
+    "launcher_activity": "com.godot.game.GodotApp",
+    "minimum_sdk": 21,
+    "package_id": "com.brickbahrain.g0gl",
+    "resolved_component": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+    "sha256": "8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb",
+    "signing_certificate_sha256": "cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387",
+    "supported_abis": [
+      "x86_64"
+    ],
+    "target_sdk": 34,
+    "version_code": 1404,
+    "version_name": "1.4.0.4-premium-visual-qa"
+  },
+  "apk_reused_without_rebuild": true,
+  "frozen_head": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+  "non_goals": {
+    "apk_rebuilt": false,
+    "g1_started": false,
+    "renderer_defaults_modified": false
+  },
+  "parent_graphics_head": "2ec1aaae3bd52e12a20cb130f5b3293e237d26da",
+  "renderer_evidence_source_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+  "repository": "MuhamedZanabal/brick-bahrain-open-world",
+  "schema_version": 1,
+  "source_evidence": {
+    "g0_1_job_id": 89591337940,
+    "g0_1_raw_artifact_digest": "sha256:dd1f798d2ceee3c63b50916c4d8b6a0695f4d54e34f0d86479e26bde5ef684a5",
+    "g0_1_raw_artifact_id": 8609540209,
+    "g0_1_workflow_run_id": 30126561161,
+    "ordered_investigation_step": "success",
+    "reduced_artifact_digest": "sha256:152a3a2f9df4a2db9b0ba701d3f6f00d0032adbb783c9eb064c8990f56f3f722",
+    "reduced_artifact_id": 8609597152,
+    "reducer_job_id": 89592376989,
+    "reducer_run_id": 30126886903,
+    "tier_b_artifact_digest": "sha256:4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee",
+    "tier_b_artifact_id": 8586122615,
+    "workflow_failure_boundary": "post-capture self-referential prohibited-token grep",
+    "workflow_final_conclusion": "failure"
+  },
+  "stage": "BAHRAIN BRICK \u2014 STAGE G0.1",
+  "title": "ANDROID APPLICATION STARTUP ROOT-CAUSE QUALIFICATION"
+}

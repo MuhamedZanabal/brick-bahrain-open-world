@@ -1,0 +1,71 @@
+{
+  "aapt2_package_name": "com.brickbahrain.g0gl",
+  "aapt2_xmltree_exit_code": 0,
+  "activities": [
+    {
+      "enabled": null,
+      "exported": "true",
+      "intent_filters": [
+        {
+          "actions": [
+            "android.intent.action.MAIN"
+          ],
+          "categories": [
+            "android.intent.category.DEFAULT",
+            "android.intent.category.LAUNCHER"
+          ]
+        }
+      ],
+      "kind": "activity",
+      "launch_mode": "4",
+      "launcher": true,
+      "name": "com.godot.game.GodotApp",
+      "orientation": "11",
+      "process": null,
+      "target_activity": null,
+      "theme": "@ref/0x7f0c0009"
+    },
+    {
+      "enabled": null,
+      "exported": "false",
+      "intent_filters": [],
+      "kind": "activity",
+      "launch_mode": null,
+      "launcher": false,
+      "name": "org.godotengine.godot.utils.ProcessPhoenix",
+      "orientation": null,
+      "process": ":phoenix",
+      "target_activity": null,
+      "theme": "@ref/0x01030010"
+    }
+  ],
+  "allow_backup": "false",
+  "application_class": null,
+  "application_process": null,
+  "application_theme": null,
+  "binary_manifest_sha256": "3e95711d5e4d58f66be6bd004bb04433f17e53c289cac47cbbcfa47b749ec6b4",
+  "compile_sdk": "34",
+  "debuggable": "true",
+  "features": [
+    {
+      "gl_es_version": "0x30000",
+      "name": null,
+      "required": "true"
+    }
+  ],
+  "launcher_activity": "com.godot.game.GodotApp",
+  "launcher_exported": "true",
+  "minimum_sdk": "21",
+  "native_library_extraction": "true",
+  "package_id": "com.brickbahrain.g0gl",
+  "permissions": [
+    null,
+    null
+  ],
+  "resolved_component": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+  "schema_version": 1,
+  "target_sdk": "34",
+  "tool_authority": "apkanalyzer manifest print; legacy aapt dump badging excluded",
+  "version_code": "1404",
+  "version_name": "1.4.0.4-premium-visual-qa"
+}

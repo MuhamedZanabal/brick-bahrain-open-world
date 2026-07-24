@@ -1,0 +1,31 @@
+{
+  "clear_state": {
+    "force_stop_exit_code": 0,
+    "pm_clear_exit_code": 0,
+    "pm_clear_stderr": "",
+    "pm_clear_stdout": "Success\n"
+  },
+  "explicit_component": {
+    "activity": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+    "command": "adb shell am start -W -S -n com.brickbahrain.g0gl/com.godot.game.GodotApp",
+    "exit_code": 0,
+    "launch_state": "COLD",
+    "pid_after_60_seconds": "2704",
+    "pid_immediate": "2704",
+    "status": "ok",
+    "stderr": "",
+    "stdout": "Stopping: com.brickbahrain.g0gl\nStarting: Intent { cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp }\nStatus: ok\nLaunchState: COLD\nActivity: com.brickbahrain.g0gl/com.godot.game.GodotApp\nTotalTime: 819\nWaitTime: 828\nComplete\n",
+    "total_time_ms": 819,
+    "wait_time_ms": 828
+  },
+  "monkey": {
+    "activity_manager_start_proc_observed": true,
+    "exit_code": 0,
+    "pid_immediate": null,
+    "stderr": "args: [-p, com.brickbahrain.g0gl, -c, android.intent.category.LAUNCHER, 1]\n arg: \"-p\"\n arg: \"com.brickbahrain.g0gl\"\n arg: \"-c\"\n arg: \"android.intent.category.LAUNCHER\"\n arg: \"1\"\ndata=\"com.brickbahrain.g0gl\"\ndata=\"android.intent.category.LAUNCHER\"\n",
+    "stdout": "  bash arg: -p\n  bash arg: com.brickbahrain.g0gl\n  bash arg: -c\n  bash arg: android.intent.category.LAUNCHER\n  bash arg: 1\nEvents injected: 1\n## Network stats: elapsed time=10ms (0ms mobile, 0ms wifi, 10ms not connected)\n"
+  },
+  "package_id": "com.brickbahrain.g0gl",
+  "resolved_component": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+  "schema_version": 1
+}

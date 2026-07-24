@@ -1,0 +1,28 @@
+{
+  "abi": "x86_64",
+  "abi_list": [
+    "x86_64"
+  ],
+  "acceleration": "accel:\n0\nKVM (version 12) is installed and usable.\naccel\n",
+  "android_api": 34,
+  "android_version": "14",
+  "boot_complete": true,
+  "build_fingerprint": "Android/sdk_phone64_x86_64/emu64x:14/UE1A.230829.036.A1/11228894:userdebug/test-keys",
+  "density": "Physical density: 420",
+  "gpu_mode": "swiftshader",
+  "image_identifier": "system-images;android-34;default;x86_64",
+  "installation_user": 0,
+  "opengl_es_version_property": 196608,
+  "ram_total_kb": 4016092,
+  "resolution": "Physical size: 1080x2400\nOverride size: 2400x1080",
+  "schema_version": 1,
+  "storage": "Filesystem       Size Used Avail Use% Mounted on\n/dev/block/dm-38 5.8G 226M  5.4G   4% /data/user/0\n",
+  "surfaceflinger_gles": "Google (Google Inc.), Android Emulator OpenGL ES Translator (Google SwiftShader), OpenGL ES 3.0 (OpenGL ES 3.0 SwiftShader 4.0.0.1)",
+  "uname_machine": "x86_64",
+  "vulkan_features": [
+    "feature:android.hardware.vulkan.compute",
+    "feature:android.hardware.vulkan.level=1",
+    "feature:android.hardware.vulkan.version=4206592",
+    "feature:android.software.vulkan.deqp.level=132580097"
+  ]
+}

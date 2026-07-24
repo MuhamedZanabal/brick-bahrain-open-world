@@ -1,0 +1,548 @@
+07-24 21:08:55.406   527   616 D ActivityManager: freezing 1533 com.android.carrierconfig
+07-24 21:08:56.050   527   616 D ActivityManager: freezing 1601 com.android.music
+07-24 21:08:56.743   527   616 D ActivityManager: freezing 1373 com.android.cellbroadcastreceiver
+07-24 21:08:57.252   527   616 D ActivityManager: freezing 1600 com.android.sdksetup
+07-24 21:09:00.187   527   616 D ActivityManager: freezing 2187 com.android.carrierdefaultapp
+07-24 21:09:00.434   527   616 D ActivityManager: freezing 1599 com.android.printspooler
+07-24 21:09:00.735     0     0 I init    : Sending signal 9 to service 'idmap2d' (pid 452) process group...
+07-24 21:09:00.743     0     0 I init    : Control message: Processed ctl.stop for 'idmap2d' from pid: 527 (system_server)
+07-24 21:09:00.745     0     0 I init    : Service 'idmap2d' (pid 452) received signal 9
+07-24 21:09:01.275   527   616 D ActivityManager: freezing 1998 com.android.quicksearchbox
+07-24 21:09:01.367   527   581 I AppsFilter: interaction: PackageSetting{1461ea com.brickbahrain.g0gl/10141} -> PackageSetting{7d9520 com.android.rkpdapp/10134} BLOCKED
+07-24 21:09:03.832   527   616 D ActivityManager: freezing 1987 com.android.externalstorage
+07-24 21:09:04.240   527   933 D ActivityManager: sync unfroze 1987 com.android.externalstorage for 7
+07-24 21:09:16.058   527   616 D ActivityManager: freezing 1773 com.android.documentsui
+07-24 21:09:16.059   527   616 D ActivityManager: freezing 1987 com.android.externalstorage
+07-24 21:09:18.236   527   616 D ActivityManager: freezing 2090 com.android.traceur
+07-24 21:09:18.480   527   616 D ActivityManager: freezing 1329 com.android.cellbroadcastreceiver.module
+07-24 21:09:18.491   527   616 D ActivityManager: freezing 1695 com.android.imsserviceentitlement
+07-24 21:09:18.538   527   616 D ActivityManager: freezing 1910 com.android.messaging
+07-24 21:09:18.574   527   616 D ActivityManager: freezing 1976 com.android.providers.calendar
+07-24 21:09:18.706   527   616 D ActivityManager: freezing 2125 com.android.calendar
+07-24 21:09:18.843   527   616 D ActivityManager: freezing 2157 com.android.camera2
+07-24 21:09:20.361   527   616 D ActivityManager: freezing 2315 com.android.contacts
+07-24 21:09:20.579   527   616 D ActivityManager: freezing 2407 com.android.dynsystem:dynsystem
+07-24 21:09:20.579   527   616 D ActivityManager: freezing 2358 com.android.dynsystem
+07-24 21:09:20.579   527   616 D ActivityManager: freezing 2058 com.android.localtransport
+07-24 21:09:20.579   527   616 D ActivityManager: freezing 1602 com.android.keychain
+07-24 21:09:21.219   527   616 D ActivityManager: freezing 2461 com.android.rkpdapp
+07-24 21:09:21.498   527   616 D ActivityManager: freezing 2501 com.android.statementservice
+07-24 21:09:24.621   527   786 I ActivityManager: Force stopping com.brickbahrain.g0gl appid=10141 user=0: from pid 2639
+07-24 21:09:24.627  1084  1084 D CarrierSvcBindHelper: onHandleForceStop: [com.brickbahrain.g0gl]
+07-24 21:09:24.627   527   616 D ActivityManager: freezing 885 com.android.permissioncontroller
+07-24 21:09:24.656   527   786 I ActivityManager: Force stopping com.brickbahrain.g0gl appid=10141 user=0: clear data
+07-24 21:09:24.657   527   558 I ActivityManager: Force stopping com.brickbahrain.g0gl appid=10141 user=-1: clearApplicationUserData
+07-24 21:09:24.663  1084  1084 D CarrierSvcBindHelper: onHandleForceStop: [com.brickbahrain.g0gl]
+07-24 21:09:24.670   527   558 D ActivityManager: sync unfroze 1773 com.android.documentsui for 3
+07-24 21:09:24.672   527   558 D ActivityManager: sync unfroze 885 com.android.permissioncontroller for 3
+07-24 21:09:24.684  1567  1997 D MediaProvider: Deleted 0 Android/media items belonging to com.brickbahrain.g0gl on /data/user/0/com.android.providers.media.module/databases/external.db
+07-24 21:09:24.685  1567  1997 D MediaGrants: Removed 0 media_grants for 0 user for com.brickbahrain.g0gl. Reason: Package orphaned
+07-24 21:09:24.701   885   885 D PersistedStoragePackageUninstalledReceiver: Received android.intent.action.PACKAGE_DATA_CLEARED for com.brickbahrain.g0gl for u0
+07-24 21:09:24.750  2651  2651 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+07-24 21:09:24.754  2651  2651 I AndroidRuntime: Using default boot image
+07-24 21:09:24.754  2651  2651 I AndroidRuntime: Leaving lock profiling enabled
+07-24 21:09:24.808  2651  2651 D nativeloader: InitDefaultPublicLibraries for_preload=1: libandroid.so:libaaudio.so:libamidi.so:libbinder_ndk.so:libc.so:libcamera2ndk.so:libdl.so:libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libicu.so:libicui18n.so:libicuuc.so:libjnigraphics.so:liblog.so:libmediandk.so:libm.so:libnativehelper.so:libnativewindow.so:libOpenMAXAL.so:libOpenSLES.so:libRS.so:libstdc++.so:libsync.so:libvulkan.so:libwebviewchromium_plat_support.so:libz.so
+07-24 21:09:24.839  2651  2651 W libc    : Access denied finding property "ro.product.name_for_attestation"
+07-24 21:09:24.839  2651  2651 W libc    : Access denied finding property "ro.product.brand_for_attestation"
+07-24 21:09:24.839  2651  2651 W libc    : Access denied finding property "ro.product.model_for_attestation"
+07-24 21:09:24.841  2651  2651 D AndroidRuntime: Calling main entry com.android.commands.monkey.Monkey
+07-24 21:09:24.841  2651  2651 W Monkey  : args: [-p, com.brickbahrain.g0gl, -c, android.intent.category.LAUNCHER, 1]
+07-24 21:09:24.842  2651  2651 W Monkey  :  arg: "com.brickbahrain.g0gl"
+07-24 21:09:24.842  2651  2651 W Monkey  : data="com.brickbahrain.g0gl"
+07-24 21:09:24.853   527  1834 W ActivityManager: registerReceiverWithFeature: no app for null
+07-24 21:09:24.865   527  1834 V SplashScreenExceptionList: SplashScreen checking exception for package com.brickbahrain.g0gl (target sdk:34) -> false
+07-24 21:09:24.866   527  1834 I ActivityTaskManager: START u0 {act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp} with LAUNCH_SINGLE_INSTANCE_PER_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+07-24 21:09:24.866   873   913 V WindowManagerShell: Transition requested: android.os.BinderProxy@6687076 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp } baseActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} topActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} numActivities=1 lastActiveTime=68908 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@e000677} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{f0532e4 com.godot.game.GodotApp} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-24 21:09:24.869  2651  2651 I AndroidRuntime: VM exiting with result code 0.
+07-24 21:09:24.886   527   559 I ActivityManager: Start proc 2673:com.brickbahrain.g0gl/u0a141 for next-top-activity {com.brickbahrain.g0gl/com.godot.game.GodotApp}
+07-24 21:09:24.892   527   936 D CoreBackPreview: Window{d2a4b48 u0 Splash Screen com.brickbahrain.g0gl}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@53cd3f4, mPriority=0, mIsAnimationCallback=false}
+07-24 21:09:25.059   873   913 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@90c24b9, appThread = android.app.IApplicationThread$Stub$Proxy@d7230fe, debugName = QuickstepLaunchHome }}
+07-24 21:09:25.060   527   546 V WindowManager: Sent Transition #8 createdAt=07-24 21:09:24.861 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp } baseActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} topActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} numActivities=1 lastActiveTime=68908 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{eeb7cea Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{14fabdb com.godot.game.GodotApp} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-24 21:09:25.061   527   546 V WindowManager:     info={id=8 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{eeb7cea Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}}} m=OPEN f=NONE leash=Surface(name=Task=8)/@0xc3aad8c sb=Rect(0, 0 - 2400, 1080) eb=Rect(0, 0 - 2400, 1080) d=0},{WCT{RemoteToken{f542d4 Task{a152ac4 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xdd3c9a6 sb=Rect(0, 0 - 2400, 1080) eb=Rect(0, 0 - 2400, 1080) d=0}]}
+07-24 21:09:25.100  2673  2673 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory
+07-24 21:09:25.100  2673  2673 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory
+07-24 21:09:25.175  2673  2673 D nativeloader: Configuring clns-6 for other apk /data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/lib/x86_64:/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.brickbahrain.g0gl
+07-24 21:09:25.177   527  1834 I ActivityManager: Force stopping com.brickbahrain.g0gl appid=10141 user=0: from pid 2700
+07-24 21:09:25.178   527  1834 I ActivityManager: Killing 2673:com.brickbahrain.g0gl/u0a141 (adj 0): stop com.brickbahrain.g0gl due to from pid 2700
+07-24 21:09:25.179   527  1834 W ActivityTaskManager: Force removing ActivityRecord{6d3fb94 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp t8 f}}: app died, no saved state
+07-24 21:09:25.179   873   913 V WindowManagerShell: Transition requested: android.os.BinderProxy@4bd7c2d TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=false baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} numActivities=0 lastActiveTime=69069 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@851c562} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-24 21:09:25.188  1084  1084 D CarrierSvcBindHelper: onHandleForceStop: [com.brickbahrain.g0gl]
+07-24 21:09:25.197   527   786 V ActivityManager: Got obituary of 2673:com.brickbahrain.g0gl
+07-24 21:09:25.198   348   348 I Zygote  : Process 2673 exited due to signal 9 (Killed)
+07-24 21:09:25.217   527   546 V WindowManager: Sent Transition #9 createdAt=07-24 21:09:25.179 via request=TransitionRequestInfo { type = CLOSE, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=false baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp } baseActivity=null topActivity=null origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} numActivities=0 lastActiveTime=69069 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{eeb7cea Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=null launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=true isVisible=true isVisibleRequested=true isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-24 21:09:25.218   527   546 V WindowManager:     info={id=9 t=CLOSE f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{eeb7cea Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl}}} m=CLOSE f=NONE leash=Surface(name=Task=8)/@0xc3aad8c sb=Rect(0, 0 - 2400, 1080) eb=Rect(0, 0 - 2400, 1080) d=0},{WCT{RemoteToken{f542d4 Task{a152ac4 #1 type=home}}} m=TO_FRONT f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xdd3c9a6 sb=Rect(0, 0 - 2400, 1080) eb=Rect(0, 0 - 2400, 1080) d=0}]}
+07-24 21:09:25.236   873   913 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@90c24b9, appThread = android.app.IApplicationThread$Stub$Proxy@d7230fe, debugName = QuickstepLaunchHome }}
+07-24 21:09:25.463   527  1834 V SplashScreenExceptionList: SplashScreen checking exception for package com.brickbahrain.g0gl (target sdk:34) -> false
+07-24 21:09:25.465   527  1834 I ActivityTaskManager: Add Task{761663d #8 type=standard A=10141:com.brickbahrain.g0gl} to hidden list because adding Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}
+07-24 21:09:25.465   527  1834 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp} with LAUNCH_SINGLE_INSTANCE_PER_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+07-24 21:09:25.472   873   913 V WindowManagerShell: Transition requested: android.os.BinderProxy@291b4e0 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=9 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp } baseActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} topActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} numActivities=1 lastActiveTime=69507 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@2667399} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{e2e065e com.godot.game.GodotApp} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-24 21:09:25.490   527   559 I ActivityManager: Start proc 2704:com.brickbahrain.g0gl/u0a141 for next-top-activity {com.brickbahrain.g0gl/com.godot.game.GodotApp}
+07-24 21:09:25.500   527  1215 W InputManager-JNI: Input channel object 'd2a4b48 Splash Screen com.brickbahrain.g0gl (client)' was disposed without first being removed with the input manager!
+07-24 21:09:25.528   527  1215 D CoreBackPreview: Window{968284 u0 Splash Screen com.brickbahrain.g0gl}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@ba306a2, mPriority=0, mIsAnimationCallback=false}
+07-24 21:09:25.596   527   546 V WindowManager: Sent Transition #10 createdAt=07-24 21:09:25.440 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=9 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.brickbahrain.g0gl/com.godot.game.GodotApp } baseActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} topActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0gl/com.godot.game.GodotApp} numActivities=1 lastActiveTime=69507 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{740d069 Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{4eeaee com.godot.game.GodotApp} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-24 21:09:25.596   527   546 V WindowManager:     info={id=10 t=OPEN f=0x0 trk=1 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{740d069 Task{6641f43 #9 type=standard A=10141:com.brickbahrain.g0gl}}} m=OPEN f=NONE leash=Surface(name=Task=9)/@0x3bb5f33 sb=Rect(0, 0 - 2400, 1080) eb=Rect(0, 0 - 2400, 1080) d=0},{WCT{RemoteToken{f542d4 Task{a152ac4 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xdd3c9a6 sb=Rect(0, 0 - 2400, 1080) eb=Rect(0, 0 - 2400, 1080) d=0}]}
+07-24 21:09:25.598   873   913 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@90c24b9, appThread = android.app.IApplicationThread$Stub$Proxy@d7230fe, debugName = QuickstepLaunchHome }}
+07-24 21:09:25.664  2704  2704 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory
+07-24 21:09:25.664  2704  2704 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory
+07-24 21:09:25.740  2704  2704 D nativeloader: Configuring clns-6 for other apk /data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/lib/x86_64:/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.brickbahrain.g0gl
+07-24 21:09:25.762  2704  2704 V GraphicsEnvironment: ANGLE GameManagerService for com.brickbahrain.g0gl: false
+07-24 21:09:25.762  2704  2704 V GraphicsEnvironment: com.brickbahrain.g0gl is not listed in per-application setting
+07-24 21:09:25.791   527  1215 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 10141. pid: 2704
+07-24 21:09:25.856  2704  2704 V GodotActivity: Creating new Godot fragment instance.
+07-24 21:09:25.897  2704  2704 V Godot   : OnCreate: GodotFragment{42b2599} (97ae9de2-22da-492d-9b1a-11b617ea3215 id=0x7f070033)
+07-24 21:09:25.897  2704  2704 V Godot   : Initializing Godot plugin registry
+07-24 21:09:25.900  2704  2704 V Godot   : OnInitNativeLayer: GodotFragment{42b2599} (97ae9de2-22da-492d-9b1a-11b617ea3215 id=0x7f070033)
+07-24 21:09:25.911  2704  2704 V Godot   : Godot native layer initialization completed: true
+07-24 21:09:25.923   527  2727 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-24 21:09:25.946  2704  2704 V Godot   : Godot native layer setup completed
+07-24 21:09:25.947  2704  2704 V Godot   : OnInitRenderView: GodotFragment{42b2599} (97ae9de2-22da-492d-9b1a-11b617ea3215 id=0x7f070033)
+07-24 21:09:25.965   527   616 D ActivityManager: freezing 1087 com.android.settings
+07-24 21:09:25.997  2704  2704 V Godot   : OnStart: GodotFragment{42b2599} (97ae9de2-22da-492d-9b1a-11b617ea3215 id=0x7f070033)
+07-24 21:09:26.001  2704  2704 V Godot   : OnResume: GodotFragment{42b2599} (97ae9de2-22da-492d-9b1a-11b617ea3215 id=0x7f070033)
+07-24 21:09:26.008  2704  2704 W OpenGLRenderer: Unknown dataspace 0
+07-24 21:09:26.030   527  1215 D CoreBackPreview: Window{1ed92e4 u0 com.brickbahrain.g0gl/com.godot.game.GodotApp}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@4f27e02, mPriority=0, mIsAnimationCallback=false}
+07-24 21:09:26.065  2704  2724 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-24 21:09:26.194   527   538 I system_server: NativeAlloc concurrent copying GC freed 165334(8179KB) AllocSpace objects, 33(1172KB) LOS objects, 49% free, 16MB/32MB, paused 47us,60us total 111.444ms
+07-24 21:09:26.194   527   539 W JavaBinder: BinderProxy is being destroyed but the application did not call unlinkToDeath to unlink all of its death recipients beforehand.  Releasing leaked death recipient: com.android.server.am.ActivityManagerService$14
+07-24 21:09:26.205   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:26.209   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:26.217  2704  2733 I godot   : Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+07-24 21:09:26.258   527   546 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory
+07-24 21:09:26.259   527   546 I ActivityTaskManager: Displayed com.brickbahrain.g0gl/com.godot.game.GodotApp for user 0: +819ms
+07-24 21:09:26.355   527  1215 I ImeTracker: com.brickbahrain.g0gl:f28f092: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+07-24 21:09:26.355   527  1215 I ImeTracker: com.brickbahrain.g0gl:f28f092: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-24 21:09:27.274     0     0 I init    : Sending signal 9 to service 'artd' (pid 2576) process group...
+07-24 21:09:27.086  2704  2736 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(wmsSync-VRI[GodotApp]#1) as ready
+07-24 21:09:27.086  2704  2736 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(VRI[GodotApp]#2) as ready
+07-24 21:09:27.089  2704  2736 E SurfaceSyncGroup: Failed to receive transaction ready in 1000ms. Marking SurfaceSyncGroup(SurfaceView[com.brickbahrain.g0gl/com.godot.game.GodotApp]#0) as ready
+07-24 21:09:27.186   527  1215 W InputManager-JNI: Input channel object '968284 Splash Screen com.brickbahrain.g0gl (client)' was disposed without first being removed with the input manager!
+07-24 21:09:27.187   527  1834 D CoreBackPreview: Window{968284 u0 Splash Screen com.brickbahrain.g0gl EXITING}: Setting back callback null
+07-24 21:09:27.199   527   936 D ActivityManager: freezer override set to true
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 1533 com.android.carrierconfig for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 1601 com.android.music for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 1373 com.android.cellbroadcastreceiver for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 1602 com.android.keychain for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 2058 com.android.localtransport for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 2090 com.android.traceur for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 2125 com.android.calendar for 19
+07-24 21:09:27.199   527   936 D ActivityManager: sync unfroze 1600 com.android.sdksetup for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 2157 com.android.camera2 for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 2187 com.android.carrierdefaultapp for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 1910 com.android.messaging for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 1695 com.android.imsserviceentitlement for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 1329 com.android.cellbroadcastreceiver.module for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 1599 com.android.printspooler for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 2315 com.android.contacts for 19
+07-24 21:09:27.200   527   936 D ActivityManager: sync unfroze 2358 com.android.dynsystem for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 2407 com.android.dynsystem:dynsystem for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 1998 com.android.quicksearchbox for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 2501 com.android.statementservice for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 2461 com.android.rkpdapp for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 1976 com.android.providers.calendar for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 1987 com.android.externalstorage for 19
+07-24 21:09:27.207   527   936 D ActivityManager: sync unfroze 1087 com.android.settings for 19
+07-24 21:09:27.358   527   936 D ActivityManager: freezer override set to false
+07-24 21:09:27.772  2704  2733 I godot   : 1: 
+07-24 21:09:27.772  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:27.772  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:27.772  2704  2733 E godot   : 
+07-24 21:09:27.772  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:27.772  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:27.772  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:27.787  2704  2733 I godot   : 1: 
+07-24 21:09:27.787  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:27.787  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:27.787  2704  2733 E godot   : 
+07-24 21:09:27.787  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:27.787  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:27.787  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:27.797  2704  2733 I godot   : 1: 
+07-24 21:09:27.797  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:27.797  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:27.797  2704  2733 E godot   : 
+07-24 21:09:27.797  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:27.797  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:27.797  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:27.804  2704  2733 I godot   : 1: 
+07-24 21:09:27.804  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:27.804  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:27.804  2704  2733 E godot   : 
+07-24 21:09:27.804  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:27.804  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:27.804  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:27.805  2704  2733 E godot   : USER WARNING: shader failed to compile, unable to bind shader.
+07-24 21:09:27.805  2704  2733 E godot   :    at: _version_bind_shader (./drivers/gles3/shader_gles3.h:222)
+07-24 21:09:27.807  2704  2733 I godot   : OpenGL API OpenGL ES 3.0 (OpenGL ES 3.0 SwiftShader 4.0.0.1) - Compatibility - Using Device: Google (Google Inc.) - Android Emulator OpenGL ES Translator (Google SwiftShader)
+07-24 21:09:27.820  2704  2733 I godot   : 
+07-24 21:09:27.955   527   793 E WifiHealthMonitor:  Hit PackageManager exception
+07-24 21:09:27.955   527   793 E WifiHealthMonitor: android.content.pm.PackageManager$NameNotFoundException: No module info for package: com.android.wifi
+07-24 21:09:27.955   527   793 E WifiHealthMonitor: 	at android.app.ApplicationPackageManager.getModuleInfo(ApplicationPackageManager.java:1190)
+07-24 21:09:29.157  2704  2733 V Godot   : OnGodotSetupCompleted
+07-24 21:09:29.352  2704  2733 I godot   : [AssetLoader] Loaded 14 buildings, 4 skyscrapers, 10 cars, 6 palms, 4 trees, 4 nature, 3 roads
+07-24 21:09:29.357  2704  2733 I godot   : AuthoritativeServer: server
+07-24 21:09:29.358  2704  2733 V Godot   : OnGodotMainLoopStarted
+07-24 21:09:31.461  2704  2733 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-24 21:09:31.461  2704  2733 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-24 21:09:31.469  2704  2733 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-24 21:09:31.469  2704  2733 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-24 21:09:31.476  2704  2733 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-24 21:09:31.476  2704  2733 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-24 21:09:31.483  2704  2733 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-24 21:09:31.483  2704  2733 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-24 21:09:31.490  2704  2733 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-24 21:09:31.490  2704  2733 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-24 21:09:31.498  2704  2733 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-24 21:09:31.498  2704  2733 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-24 21:09:31.518  2704  2733 I godot   : BAHRAIN_BRICK_KARAK_MISSION_STARTED
+07-24 21:09:31.518  2704  2733 I godot   : BAHRAIN_BRICK_SOUQ_SLICE_READY assets=35 pedestrians=12 traffic=6
+07-24 21:09:31.518  2704  2733 I godot   : G0_ANDROID_RENDERER_READY renderer=gl_compatibility driver=opengl3 gpu=Android Emulator OpenGL ES Translator (Google SwiftShader)
+07-24 21:09:31.791  2704  2733 I godot   : 1: 
+07-24 21:09:31.791  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.791  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.791  2704  2733 E godot   : 
+07-24 21:09:31.791  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.791  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.791  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.806  2704  2733 I godot   : 1: 
+07-24 21:09:31.806  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.806  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.806  2704  2733 E godot   : 
+07-24 21:09:31.806  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.806  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.806  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.815  2704  2733 I godot   : 1: 
+07-24 21:09:31.815  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.815  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.815  2704  2733 E godot   : 
+07-24 21:09:31.815  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.815  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.815  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.822  2704  2733 I godot   : 1: 
+07-24 21:09:31.822  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.822  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.822  2704  2733 E godot   : 
+07-24 21:09:31.822  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.822  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.822  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.829  2704  2733 I godot   : 1: 
+07-24 21:09:31.830  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.830  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.830  2704  2733 E godot   : 
+07-24 21:09:31.830  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.830  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.830  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.891  2704  2733 I godot   : 1: 
+07-24 21:09:31.891  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.891  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.891  2704  2733 E godot   : 
+07-24 21:09:31.891  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.891  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.891  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.906  2704  2733 I godot   : 1: 
+07-24 21:09:31.906  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.906  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.906  2704  2733 E godot   : 
+07-24 21:09:31.906  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.906  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.906  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.913  2704  2733 I godot   : 1: 
+07-24 21:09:31.913  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.913  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.913  2704  2733 E godot   : 
+07-24 21:09:31.913  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.913  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.913  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.920  2704  2733 I godot   : 1: 
+07-24 21:09:31.920  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.920  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.920  2704  2733 E godot   : 
+07-24 21:09:31.921  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.921  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.921  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.930  2704  2733 I godot   : 1: 
+07-24 21:09:31.930  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.930  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.930  2704  2733 E godot   : 
+07-24 21:09:31.930  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.930  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.930  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.948  2704  2733 I godot   : 1: 
+07-24 21:09:31.948  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.948  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.948  2704  2733 E godot   : 
+07-24 21:09:31.948  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.948  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.948  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.967  2704  2733 I godot   : 1: 
+07-24 21:09:31.967  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.967  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.967  2704  2733 E godot   : 
+07-24 21:09:31.967  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.967  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.967  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.974  2704  2733 I godot   : 1: 
+07-24 21:09:31.974  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.974  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.974  2704  2733 E godot   : 
+07-24 21:09:31.974  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.974  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.974  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.981  2704  2733 I godot   : 1: 
+07-24 21:09:31.981  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.981  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.981  2704  2733 E godot   : 
+07-24 21:09:31.981  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.981  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.981  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:31.989  2704  2733 I godot   : 1: 
+07-24 21:09:31.989  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:31.989  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:31.989  2704  2733 E godot   : 
+07-24 21:09:31.989  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:31.989  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:31.989  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.005  2704  2733 I godot   : 1: 
+07-24 21:09:32.006  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.006  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.006  2704  2733 E godot   : 
+07-24 21:09:32.006  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.006  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.006  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.027  2704  2733 I godot   : 1: 
+07-24 21:09:32.027  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.027  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.027  2704  2733 E godot   : 
+07-24 21:09:32.027  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.027  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.027  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.037  2704  2733 I godot   : 1: 
+07-24 21:09:32.037  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.037  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.037  2704  2733 E godot   : 
+07-24 21:09:32.037  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.037  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.037  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.047  2704  2733 I godot   : 1: 
+07-24 21:09:32.047  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.047  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.047  2704  2733 E godot   : 
+07-24 21:09:32.047  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.047  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.047  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.058  2704  2733 I godot   : 1: 
+07-24 21:09:32.058  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.058  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.058  2704  2733 E godot   : 
+07-24 21:09:32.058  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.058  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.058  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.069  2704  2733 I godot   : 1: 
+07-24 21:09:32.069  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.069  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.069  2704  2733 E godot   : 
+07-24 21:09:32.069  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.069  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.069  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.137  2704  2733 I godot   : 1: 
+07-24 21:09:32.137  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.137  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.137  2704  2733 E godot   : 
+07-24 21:09:32.137  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.137  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.137  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.149  2704  2733 I godot   : 1: 
+07-24 21:09:32.149  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.149  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.149  2704  2733 E godot   : 
+07-24 21:09:32.149  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.149  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.149  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.161  2704  2733 I godot   : 1: 
+07-24 21:09:32.161  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.161  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.161  2704  2733 E godot   : 
+07-24 21:09:32.161  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.161  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.161  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.178  2704  2733 I godot   : 1: 
+07-24 21:09:32.178  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.178  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.178  2704  2733 E godot   : 
+07-24 21:09:32.178  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.178  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.178  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.201  2704  2733 I godot   : 1: 
+07-24 21:09:32.201  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.201  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.201  2704  2733 E godot   : 
+07-24 21:09:32.201  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.201  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.201  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.216  2704  2733 I godot   : 1: 
+07-24 21:09:32.216  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.216  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.216  2704  2733 E godot   : 
+07-24 21:09:32.216  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.216  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.216  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.227  2704  2733 I godot   : 1: 
+07-24 21:09:32.227  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.227  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.227  2704  2733 E godot   : 
+07-24 21:09:32.227  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.227  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.227  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.237  2704  2733 I godot   : 1: 
+07-24 21:09:32.238  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.238  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.238  2704  2733 E godot   : 
+07-24 21:09:32.238  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.238  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.238  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.251  2704  2733 I godot   : 1: 
+07-24 21:09:32.251  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.251  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.251  2704  2733 E godot   : 
+07-24 21:09:32.251  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.251  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.251  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.267  2704  2733 I godot   : 1: 
+07-24 21:09:32.267  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.267  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.267  2704  2733 E godot   : 
+07-24 21:09:32.267  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.267  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.267  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.284  2704  2733 I godot   : 1: 
+07-24 21:09:32.284  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.284  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.284  2704  2733 E godot   : 
+07-24 21:09:32.284  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.284  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.284  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.293  2704  2733 I godot   : 1: 
+07-24 21:09:32.293  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.293  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.293  2704  2733 E godot   : 
+07-24 21:09:32.293  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.293  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.293  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.302  2704  2733 I godot   : 1: 
+07-24 21:09:32.302  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.302  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.302  2704  2733 E godot   : 
+07-24 21:09:32.302  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.302  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.302  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.313  2704  2733 I godot   : 1: 
+07-24 21:09:32.313  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.313  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.313  2704  2733 E godot   : 
+07-24 21:09:32.313  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.313  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.313  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.335  2704  2733 I godot   : 1: 
+07-24 21:09:32.335  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.335  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.335  2704  2733 E godot   : 
+07-24 21:09:32.335  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.335  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.335  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.355  2704  2733 I godot   : 1: 
+07-24 21:09:32.355  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.355  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.355  2704  2733 E godot   : 
+07-24 21:09:32.355  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.355  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.355  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.362  2704  2733 I godot   : 1: 
+07-24 21:09:32.362  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.362  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.362  2704  2733 E godot   : 
+07-24 21:09:32.362  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.362  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.362  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.371  2704  2733 I godot   : 1: 
+07-24 21:09:32.371  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.371  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.371  2704  2733 E godot   : 
+07-24 21:09:32.371  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.371  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.371  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:32.386  2704  2733 I godot   : 1: 
+07-24 21:09:32.386  2704  2733 E godot   : USER ERROR: SceneShaderGLES3: Program linking failed:
+07-24 21:09:32.386  2704  2733 E godot   : Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS (261)
+07-24 21:09:32.386  2704  2733 E godot   : 
+07-24 21:09:32.386  2704  2733 E godot   :    at: _display_error_with_code (drivers/gles3/shader_gles3.cpp:254)
+07-24 21:09:32.386  2704  2733 E godot   : USER ERROR: Method/function failed.
+07-24 21:09:32.386  2704  2733 E godot   :    at: _compile_specialization (drivers/gles3/shader_gles3.cpp:456)
+07-24 21:09:34.662   527   616 D ActivityManager: freezing 1655 android.process.acore
+07-24 21:09:34.662   527   616 D ActivityManager: freezing 1836 android.process.media
+07-24 21:09:34.672   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.673   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.673   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.673   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.674   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.674   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.676   527   548 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-24 21:09:34.712   527   616 D ActivityManager: freezing 1773 com.android.documentsui
+07-24 21:09:34.713   527   616 D ActivityManager: freezing 885 com.android.permissioncontroller
+07-24 21:09:37.367   527   616 D ActivityManager: freezing 1533 com.android.carrierconfig
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 1601 com.android.music
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 1373 com.android.cellbroadcastreceiver
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 1602 com.android.keychain
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 2058 com.android.localtransport
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 2090 com.android.traceur
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 2125 com.android.calendar
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 1600 com.android.sdksetup
+07-24 21:09:37.368   527   616 D ActivityManager: freezing 2157 com.android.camera2
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 2187 com.android.carrierdefaultapp
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 1910 com.android.messaging
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 1695 com.android.imsserviceentitlement
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 1329 com.android.cellbroadcastreceiver.module
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 1599 com.android.printspooler
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 2315 com.android.contacts
+07-24 21:09:37.369   527   616 D ActivityManager: freezing 2358 com.android.dynsystem
+07-24 21:09:37.370   527   616 D ActivityManager: freezing 2407 com.android.dynsystem:dynsystem
+07-24 21:09:37.370   527   616 D ActivityManager: freezing 1998 com.android.quicksearchbox
+07-24 21:09:37.370   527   616 D ActivityManager: freezing 2501 com.android.statementservice
+07-24 21:09:37.370   527   616 D ActivityManager: freezing 2461 com.android.rkpdapp
+07-24 21:09:37.370   527   616 D ActivityManager: freezing 1976 com.android.providers.calendar
+07-24 21:09:37.370   527   616 D ActivityManager: freezing 1987 com.android.externalstorage
+07-24 21:09:37.374   527   616 D ActivityManager: freezing 1087 com.android.settings
+07-24 21:09:39.337   527   857 D ActivityManager: sync unfroze 885 com.android.permissioncontroller for 6
+07-24 21:09:49.341  2704  2733 I godot   : G0_ANDROID_WARMUP_COMPLETE frame=180
+07-24 21:09:59.557   527   616 D ActivityManager: freezing 885 com.android.permissioncontroller
+07-24 21:10:16.029  2704  2733 I godot   : G0_ANDROID_CAPTURE_FRAME frame=300
+07-24 21:10:21.295  2704  2733 I godot   : G0_ANDROID_EVIDENCE_LIVE renderer=gl_compatibility frames=360 memory=50212074 draw_calls=4 visible_objects=2186 visible_primitives=633112
+07-24 21:10:27.671   527  1949 D ActivityManager: freezer override set to true
+07-24 21:10:27.672   527  1949 D ActivityManager: sync unfroze 1533 com.android.carrierconfig for 19
+07-24 21:10:27.672   527  1949 D ActivityManager: sync unfroze 1601 com.android.music for 19
+07-24 21:10:27.673   527  1949 D ActivityManager: sync unfroze 1373 com.android.cellbroadcastreceiver for 19
+07-24 21:10:27.673   527  1949 D ActivityManager: sync unfroze 1602 com.android.keychain for 19
+07-24 21:10:27.673   527  1949 D ActivityManager: sync unfroze 2058 com.android.localtransport for 19
+07-24 21:10:27.673   527  1949 D ActivityManager: sync unfroze 2090 com.android.traceur for 19
+07-24 21:10:27.674   527  1949 D ActivityManager: sync unfroze 2125 com.android.calendar for 19
+07-24 21:10:27.674   527  1949 D ActivityManager: sync unfroze 1600 com.android.sdksetup for 19
+07-24 21:10:27.674   527  1949 D ActivityManager: sync unfroze 2157 com.android.camera2 for 19
+07-24 21:10:27.675   527  1949 D ActivityManager: sync unfroze 2187 com.android.carrierdefaultapp for 19
+07-24 21:10:27.680   527  1949 D ActivityManager: sync unfroze 1910 com.android.messaging for 19
+07-24 21:10:27.681   527  1949 D ActivityManager: sync unfroze 1695 com.android.imsserviceentitlement for 19
+07-24 21:10:27.681   527  1949 D ActivityManager: sync unfroze 1329 com.android.cellbroadcastreceiver.module for 19
+07-24 21:10:27.682   527  1949 D ActivityManager: sync unfroze 1599 com.android.printspooler for 19
+07-24 21:10:27.682   527  1949 D ActivityManager: sync unfroze 2315 com.android.contacts for 19
+07-24 21:10:27.682   527  1949 D ActivityManager: sync unfroze 2358 com.android.dynsystem for 19
+07-24 21:10:27.683   527  1949 D ActivityManager: sync unfroze 2407 com.android.dynsystem:dynsystem for 19
+07-24 21:10:27.686   527  1949 D ActivityManager: sync unfroze 1998 com.android.quicksearchbox for 19
+07-24 21:10:27.687   527  1949 D ActivityManager: sync unfroze 1836 android.process.media for 19
+07-24 21:10:27.687   527  1949 D ActivityManager: sync unfroze 2501 com.android.statementservice for 19
+07-24 21:10:27.687   527  1949 D ActivityManager: sync unfroze 2461 com.android.rkpdapp for 19
+07-24 21:10:27.688   527  1949 D ActivityManager: sync unfroze 1976 com.android.providers.calendar for 19
+07-24 21:10:27.688   527  1949 D ActivityManager: sync unfroze 1987 com.android.externalstorage for 19
+07-24 21:10:27.688   527  1949 D ActivityManager: sync unfroze 1655 android.process.acore for 19
+07-24 21:10:27.688   527  1949 D ActivityManager: sync unfroze 1087 com.android.settings for 19
+07-24 21:10:27.689   527  1949 D ActivityManager: sync unfroze 1773 com.android.documentsui for 19
+07-24 21:10:27.691   527  1949 D ActivityManager: sync unfroze 885 com.android.permissioncontroller for 19
+07-24 21:10:27.779   527  1949 D ActivityManager: freezer override set to false
+07-24 21:10:27.928  2794  2795 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory
+07-24 21:10:27.929  2794  2795 W ziparchive: Unable to open '/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.dm': No such file or directory

@@ -1,0 +1,36 @@
+{
+  "activity_top_resumed": true,
+  "explicit_start_process_id": "2704",
+  "memory_total_pss_kb": 183414,
+  "memory_total_rss_kb": 293848,
+  "monkey_process_start_observed": true,
+  "package_id": "com.brickbahrain.g0gl",
+  "package_user_state_after": {
+    "enabled_code": 0,
+    "hidden": false,
+    "installed": true,
+    "not_launched": false,
+    "raw": "User 0: ceDataInode=319598 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false",
+    "stopped": false,
+    "suspended": false
+  },
+  "package_user_state_before": {
+    "enabled_code": 0,
+    "hidden": false,
+    "installed": true,
+    "not_launched": true,
+    "raw": "User 0: ceDataInode=319598 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=true enabled=0 instant=false virtual=false",
+    "stopped": true,
+    "suspended": false
+  },
+  "pid_after_60_seconds": "2704",
+  "process_created": true,
+  "process_ids_observed": [
+    "2673",
+    "2704"
+  ],
+  "process_record_present": true,
+  "process_remained_alive": true,
+  "schema_version": 1,
+  "visible_window": true
+}

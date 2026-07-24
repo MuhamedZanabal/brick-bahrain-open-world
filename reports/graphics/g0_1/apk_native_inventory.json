@@ -1,0 +1,60 @@
+{
+  "apk_filename": "bahrain-brick-g0-gl-compatibility-x86_64.apk",
+  "apk_sha256": "8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb",
+  "dependency_boundary": "Android platform libraries are allowlisted; no missing packaged dependency is inferred for them.",
+  "duplicate_libraries": {},
+  "libraries": [
+    {
+      "abi": "x86_64",
+      "aligned_4": false,
+      "aligned_4096": false,
+      "compressed_size": 1737042,
+      "data_offset": 2093315,
+      "elf_class": "ELF64",
+      "elf_machine": "Advanced Micro Devices X86-64",
+      "minimum_android_api": null,
+      "needed_libraries": [
+        "libc.so",
+        "libdl.so"
+      ],
+      "path": "lib/x86_64/libc++_shared.so",
+      "soname": "libc++_shared.so",
+      "storage": "deflated",
+      "uncompressed_size": 6716064
+    },
+    {
+      "abi": "x86_64",
+      "aligned_4": false,
+      "aligned_4096": false,
+      "compressed_size": 22488493,
+      "data_offset": 3830417,
+      "elf_class": "ELF64",
+      "elf_machine": "Advanced Micro Devices X86-64",
+      "minimum_android_api": null,
+      "needed_libraries": [
+        "libOpenSLES.so",
+        "libEGL.so",
+        "libandroid.so",
+        "liblog.so",
+        "libz.so",
+        "libdl.so",
+        "libGLESv3.so",
+        "libc++_shared.so",
+        "libm.so",
+        "libc.so"
+      ],
+      "path": "lib/x86_64/libgodot_android.so",
+      "soname": "libgodot_android.so",
+      "storage": "deflated",
+      "uncompressed_size": 70699400
+    }
+  ],
+  "schema_version": 1,
+  "supported_abis": [
+    "x86_64"
+  ],
+  "unresolved_non_system_dependencies": [],
+  "x86_64_godot_runtime_present": true,
+  "zipalign_authority": "The captured command used an unsupported -P flag and is non-authoritative; ZIP offsets are computed directly.",
+  "zipalign_capture": "/usr/local/lib/android/sdk/build-tools/34.0.0/zipalign: invalid option -- 'P'\nERROR: unknown flag -?\nZip alignment utility\nCopyright (C) 2009 The Android Open Source Project\n\nUsage: zipalign [-f] [-p] [-v] [-z] <align> infile.zip outfile.zip\n       zipalign -c [-p] [-v] <align> infile.zip\n\n  <align>: alignment in bytes, e.g. '4' provides 32-bit alignment\n  -c: check alignment only (does not modify file)\n  -f: overwrite existing outfile.zip\n  -p: page-align uncompressed .so files\n  -v: verbose output\n  -z: recompress using Zopfli\n"
+}

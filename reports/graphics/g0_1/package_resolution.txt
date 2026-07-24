@@ -1,0 +1,253 @@
+===== adb shell pm path =====
+package:/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk
+
+
+===== adb shell dumpsys package before launch =====
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        66ee652 com.brickbahrain.g0gl/com.godot.game.GodotApp filter cd13d23
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.DEFAULT"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter 670887f
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter a9b37d9
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter 9f1159e
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter 8bb004c
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Domain verification status:
+
+Registered ContentProviders:
+  com.brickbahrain.g0gl/androidx.core.content.FileProvider:
+    Provider{3a313bf com.brickbahrain.g0gl/androidx.core.content.FileProvider}
+  com.brickbahrain.g0gl/androidx.startup.InitializationProvider:
+    Provider{12dca8c com.brickbahrain.g0gl/androidx.startup.InitializationProvider}
+
+ContentProvider Authorities:
+  [com.brickbahrain.g0gl.fileprovider]:
+    Provider{3a313bf com.brickbahrain.g0gl/androidx.core.content.FileProvider}
+      applicationInfo=ApplicationInfo{87e15d5 com.brickbahrain.g0gl}
+
+Key Set Manager:
+  [com.brickbahrain.g0gl]
+      Signing KeySets: 19
+
+Packages:
+  Package [com.brickbahrain.g0gl] (1461ea):
+    appId=10141
+    pkg=Package{37f2cdb com.brickbahrain.g0gl}
+    codePath=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==
+    resourcePath=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==
+    legacyNativeLibraryDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/lib
+    extractNativeLibs=true
+    primaryCpuAbi=x86_64
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1404 minSdk=21 targetSdk=34
+    minExtensionVersions=[]
+    versionName=1.4.0.4-premium-visual-qa
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=3
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    dataDir=/data/user/0/com.brickbahrain.g0gl
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    timeStamp=2026-07-24 21:08:52
+    lastUpdateTime=2026-07-24 21:08:54
+    installerPackageName=null
+    installerPackageUid=-1
+    initiatingPackageName=com.android.shell
+    originatingPackageName=null
+    packageSource=1
+    appMetadataFilePath=null
+    signatures=PackageSignatures{9330378 version:3, signatures:[9779eefd], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privatePkgFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    apexModuleName=null
+    requested permissions:
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.INTERNET
+    install permissions:
+      android.permission.INTERNET: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+    User 0: ceDataInode=319598 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=true enabled=0 instant=false virtual=false
+      installReason=0
+      firstInstallTime=2026-07-24 21:08:54
+      uninstallReason=0
+      overlay paths:
+        /product/overlay/EmulationPixel6/EmulationPixel6Overlay.apk
+      legacy overlay paths:
+        /product/overlay/EmulationPixel6/EmulationPixel6Overlay.apk
+      gids=[3003]
+      runtime permissions:
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    com.android.settings.intelligence:
+      com.brickbahrain.g0gl
+  queryable via interaction:
+    User 0:
+  queryable via uses-library:
+
+Dexopt state:
+  [com.brickbahrain.g0gl]
+    path: /data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk
+      x86_64: [status=run-from-apk] [reason=unknown] [primary-abi]
+        [location is error]
+
+Compiler stats:
+  [com.brickbahrain.g0gl]
+    (No recorded stats)
+
+
+===== resolve-activity package =====
+priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+com.brickbahrain.g0gl/com.godot.game.GodotApp
+
+
+===== resolve MAIN/LAUNCHER intent =====
+priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+com.brickbahrain.g0gl/com.godot.game.GodotApp
+
+
+===== query MAIN/LAUNCHER activities =====
+1 activities found:
+  Activity #0:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.brickbahrain.g0gl/com.godot.game.GodotApp
+
+
+===== adb shell dumpsys package after launch =====
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        66ee652 com.brickbahrain.g0gl/com.godot.game.GodotApp filter cd13d23
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.DEFAULT"
+          Category: "android.intent.category.LAUNCHER"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      androidx.profileinstaller.action.SAVE_PROFILE:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter 670887f
+          Action: "androidx.profileinstaller.action.SAVE_PROFILE"
+      androidx.profileinstaller.action.INSTALL_PROFILE:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter a9b37d9
+          Action: "androidx.profileinstaller.action.INSTALL_PROFILE"
+      androidx.profileinstaller.action.SKIP_FILE:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter 9f1159e
+          Action: "androidx.profileinstaller.action.SKIP_FILE"
+      androidx.profileinstaller.action.BENCHMARK_OPERATION:
+        1c9e220 com.brickbahrain.g0gl/androidx.profileinstaller.ProfileInstallReceiver filter 8bb004c
+          Action: "androidx.profileinstaller.action.BENCHMARK_OPERATION"
+
+Domain verification status:
+
+Registered ContentProviders:
+  com.brickbahrain.g0gl/androidx.core.content.FileProvider:
+    Provider{3a313bf com.brickbahrain.g0gl/androidx.core.content.FileProvider}
+  com.brickbahrain.g0gl/androidx.startup.InitializationProvider:
+    Provider{12dca8c com.brickbahrain.g0gl/androidx.startup.InitializationProvider}
+
+ContentProvider Authorities:
+  [com.brickbahrain.g0gl.fileprovider]:
+    Provider{3a313bf com.brickbahrain.g0gl/androidx.core.content.FileProvider}
+      applicationInfo=ApplicationInfo{c44790e com.brickbahrain.g0gl}
+
+Key Set Manager:
+  [com.brickbahrain.g0gl]
+      Signing KeySets: 19
+
+Packages:
+  Package [com.brickbahrain.g0gl] (4ddff2f):
+    appId=10141
+    pkg=Package{37f2cdb com.brickbahrain.g0gl}
+    codePath=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==
+    resourcePath=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==
+    legacyNativeLibraryDir=/data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/lib
+    extractNativeLibs=true
+    primaryCpuAbi=x86_64
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=1404 minSdk=21 targetSdk=34
+    minExtensionVersions=[]
+    versionName=1.4.0.4-premium-visual-qa
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=3
+    flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    dataDir=/data/user/0/com.brickbahrain.g0gl
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    timeStamp=2026-07-24 21:08:52
+    lastUpdateTime=2026-07-24 21:08:54
+    installerPackageName=null
+    installerPackageUid=-1
+    initiatingPackageName=com.android.shell
+    originatingPackageName=null
+    packageSource=1
+    appMetadataFilePath=null
+    signatures=PackageSignatures{9330378 version:3, signatures:[9779eefd], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]
+    privatePkgFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    apexModuleName=null
+    requested permissions:
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.INTERNET
+    install permissions:
+      android.permission.INTERNET: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+    User 0: ceDataInode=319598 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+      installReason=0
+      firstInstallTime=2026-07-24 21:08:54
+      uninstallReason=0
+      overlay paths:
+        /product/overlay/EmulationPixel6/EmulationPixel6Overlay.apk
+      legacy overlay paths:
+        /product/overlay/EmulationPixel6/EmulationPixel6Overlay.apk
+      gids=[3003]
+      runtime permissions:
+
+Queries:
+  system apps queryable: false
+  queries via forceQueryable:
+  queries via package name:
+  queries via component:
+    com.android.settings.intelligence:
+      com.brickbahrain.g0gl
+  queryable via interaction:
+    User 0:
+      [android,com.android.server.telecom,com.android.keychain,com.android.location.fused,com.android.dynsystem,com.android.emulator.multidisplay,com.android.settings,com.android.localtransport,com.android.wallpaperbackup,com.android.inputdevices,com.android.providers.settings]:
+        com.brickbahrain.g0gl
+      com.android.inputmethod.latin:
+        com.brickbahrain.g0gl
+  queryable via uses-library:
+
+Dexopt state:
+  [com.brickbahrain.g0gl]
+    path: /data/app/~~SjqGlBCgsXdfz2rn6WIVyg==/com.brickbahrain.g0gl-azxUaYJ66K64O6nZmrg80g==/base.apk
+      x86_64: [status=run-from-apk] [reason=unknown] [primary-abi]
+        [location is error]
+
+Compiler stats:
+  [com.brickbahrain.g0gl]
+    (No recorded stats)
