@@ -157,35 +157,15 @@ jobs:
           PY
           test "$(git diff --name-only | grep -Ev '^(reports/graphics/g0_1/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$)' | wc -l)" -eq 0
 
-      - name: Archive finalizer and commit reports
+      - name: Commit reports and reconciled state
         if: hashFiles('reports/graphics/g0_1/root_cause_report.json') != ''
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          archived = [
-              'name: Bahrain Brick G0.1 Finalize Root-Cause Reports — Archived',
-              '',
-              'on:',
-              '  workflow_dispatch:',
-              '',
-              'permissions:',
-              '  contents: read',
-              '',
-              'jobs:',
-              '  archived:',
-              '    if: false',
-              '    runs-on: ubuntu-24.04',
-              '    steps:',
-              "      - run: echo 'G0.1 root-cause reports are terminal. Do not rerun.'",
-          ]
-          Path('.github/workflows/bahrain-brick-g0-1-finalize-reports.yml').write_text('\n'.join(archived) + '\n')
-          PY
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add reports/graphics/g0_1 .ai/project-state.json .ai/CHECKPOINT.md .github/workflows/bahrain-brick-g0-1-finalize-reports.yml
-          allowed='^(reports/graphics/g0_1/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$|\.github/workflows/bahrain-brick-g0-1-finalize-reports\.yml$)'
+          git add reports/graphics/g0_1 .ai/project-state.json .ai/CHECKPOINT.md
+          allowed='^(reports/graphics/g0_1/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$)'
           unexpected="$(git diff --cached --name-only | grep -Ev "$allowed" || true)"
           test -z "$unexpected"
           if git diff --cached --quiet; then
