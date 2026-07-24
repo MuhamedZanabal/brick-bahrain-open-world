@@ -1,0 +1,91 @@
+name: Bahrain Brick G0 Evidence Reducer
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-manama-souq-vertical-slice-v1]
+    types: [synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-graphics-g0.yml-reducer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  reduce_tier_b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      SOURCE_RUN_ID: '30064876896'
+      SOURCE_ARTIFACT_ID: '8586122615'
+      SOURCE_ARTIFACT_NAME: bahrain-brick-graphics-g0-tier-b-30064876896
+      SOURCE_ARTIFACT_SHA256: 4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee
+    steps:
+      - name: Download exact Tier B artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/source build/reduced
+          gh run download "$SOURCE_RUN_ID" \
+            --repo "$GITHUB_REPOSITORY" \
+            --name "$SOURCE_ARTIFACT_NAME" \
+            --dir build/source
+
+      - name: Reduce to reports and diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,shutil,os
+          source=Path('build/source'); reduced=Path('build/reduced')
+          keep_names={
+            'TIER_B_EVIDENCE_INVENTORY.json','CLONE_IDENTITY.json','DEVICE_BASELINE.json',
+            'GL_VARIANT_OVERRIDE.json','MOBILE_VARIANT_OVERRIDE.json','HARNESS_INJECTION.json',
+            'EMULATOR_ACCELERATION.txt','EMULATOR_ACCELERATION_PRECHECK.txt',
+            'FROZEN_CONTROLS_PRE.json','FROZEN_CONTROLS_POST.json','FINAL_TREE_AUTHORITY.json',
+            'APK_SHA256SUMS.txt','GODOT_VERSION.txt'
+          }
+          copied=[]
+          for path in sorted(p for p in source.rglob('*') if p.is_file()):
+              rel=path.relative_to(source)
+              posix=rel.as_posix()
+              keep='/reports/graphics/g0/' in f'/{posix}' or path.name in keep_names
+              if keep and path.suffix.lower() != '.apk':
+                  target=reduced/rel
+                  target.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(path,target)
+                  copied.append(target)
+          for path in source.rglob('tier-b-runner.log'):
+              target=reduced/'tier-b-runner.tail.log'
+              lines=path.read_text(encoding='utf-8',errors='replace').splitlines()
+              target.write_text('\n'.join(lines[-12000:])+'\n',encoding='utf-8')
+              copied.append(target)
+              break
+          metadata={
+            'schema_version':1,'source_run_id':int(os.environ['SOURCE_RUN_ID']),
+            'source_artifact_id':int(os.environ['SOURCE_ARTIFACT_ID']),
+            'source_artifact_name':os.environ['SOURCE_ARTIFACT_NAME'],
+            'source_artifact_digest':'sha256:'+os.environ['SOURCE_ARTIFACT_SHA256'],
+            'reduction_policy':'reports, JSON, text diagnostics, screenshots and log tail; APK binaries excluded',
+          }
+          (reduced/'REDUCER_SOURCE.json').write_text(json.dumps(metadata,indent=2,sort_keys=True)+'\n')
+          output=reduced/'REDUCED_EVIDENCE_INVENTORY.json'; files=[]
+          for path in sorted(p for p in reduced.rglob('*') if p.is_file() and p!=output):
+              data=path.read_bytes(); files.append({'path':path.relative_to(reduced).as_posix(),'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest()})
+          output.write_text(json.dumps({'schema_version':1,'files':files,'aggregate_bytes':sum(x['bytes'] for x in files)},indent=2,sort_keys=True)+'\n')
+          if any(path.suffix.lower()=='.apk' for path in reduced.rglob('*')): raise SystemExit('APK leaked into reduced artifact')
+          if sum(x['bytes'] for x in files) > 100_000_000: raise SystemExit('reduced artifact unexpectedly exceeds 100 MB')
+          if not any(path.name=='runtime.json' for path in reduced.rglob('*')): raise SystemExit('runtime.json evidence missing')
+          PY
+
+      - name: Upload reduced Tier B evidence
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-graphics-g0-tier-b-reduced-${{ github.run_id }}
+          path: build/reduced
+          if-no-files-found: error
+          retention-days: 30
