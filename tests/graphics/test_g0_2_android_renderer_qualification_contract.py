@@ -64,16 +64,19 @@ class G02ContractTest(unittest.TestCase):
             "0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02",
         ])
 
-    def test_workflow_is_one_shot_and_no_rebuild(self) -> None:
+    def test_workflow_is_terminal_packaging_only(self) -> None:
         text = WORKFLOW.read_text()
-        self.assertIn("types: [opened, synchronize]", text)
+        self.assertIn("types: [synchronize]", text)
         self.assertIn("paths:\n      - .github/workflows/bahrain-brick-g0-2-android-paired.yml", text)
-        self.assertIn("8586122615", text)
-        self.assertNotIn("reconstruct_manama_souq_composite", text)
-        self.assertNotIn("--export-debug", text)
-        self.assertNotIn("project.godot", text)
-        self.assertIn("run_g0_2_android_paired.sh", text)
-        self.assertIn("finalize_g0_2_android_evidence.py", text)
+        self.assertIn("8624118896", text)
+        self.assertIn("package_g0_2_terminal.py", text)
+        self.assertIn("G0_2_TERMINAL_REPORT.json", text)
+        for prohibited in (
+            "android-actions/setup-android", "system-images;android-34", "adb shell",
+            "run_g0_2_android_paired.sh", "reconstruct_manama_souq_composite",
+            "--export-debug", "project.godot",
+        ):
+            self.assertNotIn(prohibited, text)
 
     def test_runner_contains_ordered_independent_state_machine(self) -> None:
         text = RUNNER.read_text()
