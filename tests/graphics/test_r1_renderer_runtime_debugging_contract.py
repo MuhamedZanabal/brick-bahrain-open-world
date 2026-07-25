@@ -10,6 +10,7 @@ AUTHORITY = ROOT / "authority/bahrain_brick_r1_renderer_runtime_debugging.json"
 HARNESS = ROOT / "tests/graphics/r1_renderer_runtime_debug.gd"
 RUNNER = ROOT / "tools/graphics/run_r1_renderer_debug.sh"
 FINALIZER = ROOT / "tools/graphics/finalize_r1_renderer_debug.py"
+PATCHER = ROOT / "tools/graphics/patch_r1_reconstruction_preflight.py"
 WORKFLOW = ROOT / ".github/workflows/bahrain-brick-r1-renderer-runtime-debugging.yml"
 
 GL_MODES = (
@@ -64,40 +65,11 @@ class R1ContractTest(unittest.TestCase):
 
     def test_runner_is_diagnostic_only_and_uses_shared_import(self) -> None:
         text = RUNNER.read_text()
+        patch = PATCHER.read_text()
+        combined = text + "\n" + patch
         self.assertIn("IMPORTED_STATE_MANIFEST.json", text)
         self.assertIn("CLONE_IDENTITY.json", text)
         self.assertIn("GL_MAX_FRAGMENT_UNIFORM_VECTORS", text)
-        self.assertIn("R1_RECONSTRUCTION_ENVIRONMENT.json", text)
-        self.assertIn("SOURCE_TREE_EQUIVALENCE.json", text)
-        self.assertIn("reports/graphics/g0_2/shared_import_equivalence.json", text)
-        self.assertIn("R1_ACTUAL_IMAGE_VERSION", text)
-        self.assertNotIn('ImageVersion=20260714.240.1', text)
-        for mode in GL_MODES + MOBILE_MODES:
-            self.assertIn(mode, text)
-        self.assertIn("debuggerd -b", text)
-        self.assertIn("dumpsys gfxinfo", text)
-        self.assertNotIn("renderer/rendering_method=\"", text)
-        self.assertNotIn("G1", text)
-
-    def test_finalizer_requires_unique_evidence_backed_classification(self) -> None:
-        text = FINALIZER.read_text()
-        for value in MOBILE_CLASSIFICATIONS:
-            self.assertIn(value, text)
-        self.assertIn("Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS", text)
-        self.assertIn("diagnosis_proven", text)
-        self.assertIn("production_fix_authorized", text)
-        self.assertIn("G0_EVIDENCE_INSUFFICIENT", text)
-
-    def test_workflow_is_bounded_to_r1(self) -> None:
-        text = WORKFLOW.read_text()
-        self.assertIn("work/bahrain-brick-renderer-runtime-debugging-r1", text)
-        self.assertIn("types: [opened, synchronize]", text)
-        self.assertIn("paths:\n      - .github/workflows/bahrain-brick-r1-renderer-runtime-debugging.yml", text)
-        self.assertIn("run_r1_renderer_debug.sh", text)
-        self.assertIn("finalize_r1_renderer_debug.py", text)
-        self.assertNotIn("project.godot", text)
-        self.assertNotIn("renderer default", text.lower())
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertIn("R1_RECONSTRUCTION_ENVIRONMENT.json", combined)
+        self.assertIn("SOURCE_TREE_EQUIVALENCE.json", combined)
+        self.assertIn("FINAL_TREE_MANIESTä¹©Í½¸ˆ°½µ‰¥¹•¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ9½Ñ%¸ ‰É•Á½ÉÑÌ½É…Á¡¥Ì½œÁ|È½Í¡…É•‘}¥µÁ½ÉÑ}•ÅÕ¥Ù…±•¹”¹©Í½¸ˆ°Á…Ñ ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰HÅ}QU1}%5}YIM%=8ˆ°½µ‰¥¹•¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ9½Ñ%¸ %µ…•Y•ÉÍ¥½¸ôÈÀÈØÀÜÄÐ¸ÈÐÀ¸Äœ°Ñ•áÐ¤(€€€€€€€™½Èµ½‘”¥¸1}5=L€¬5=	%1}5=Lè(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸¡µ½‘”°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰‘•‰Õ•É€µˆˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰‘ÕµÁÍåÌ™á¥¹™¼ˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ9½Ñ%¸ ‰É•¹‘•É•È½É•¹‘•É¥¹}µ•Ñ¡½õpˆˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ9½Ñ%¸ ‰Äˆ°Ñ•áÐ¤((€€€‘•˜Ñ•ÍÑ}™¥¹…±¥é•É}É•ÅÕ¥É•Í}Õ¹¥ÅÕ•}•Ù¥‘•¹•}‰…­•‘}±…ÍÍ¥™¥…Ñ¥½¸¡Í•±˜¤€´ø9½¹”è(€€€€€€€Ñ•áÐ€ô%91%iH¹É•…‘}Ñ•áÐ ¤(€€€€€€€™½ÈÙ…±Õ”¥¸5=	%1}1MM%%Q%=9Lè(€€€€€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸¡Ù…±Õ”°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰É…µ•¹ÐÍ¡…‘•È…Ñ¥Ù”Õ¹¥™½ÉµÌ•á••1}5a}I59Q}U9%=I5}YQ=ILˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰‘¥…¹½Í¥Í}ÁÉ½Ù•¸ˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰ÁÉ½‘ÕÑ¥½¹}™¥á}…ÕÑ¡½É¥é•ˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰Á}Y%9}%9MU%%9Pˆ°Ñ•áÐ¤((€€€‘•˜Ñ•ÍÑ}Ý½É­™±½Ý}¥Í}‰½Õ¹‘•‘}Ñ½}ÈÄ¡Í•±˜¤€´ø9½¹”è(€€€€€€€Ñ•áÐ€ô]=I-1=\¹É•…‘}Ñ•áÐ ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰Ý½É¬½‰…¡É…¥¸µ‰É¥¬µÉ•¹‘•É•ÈµÉÕ¹Ñ¥µ”µ‘•‰Õ¥¹œµÈÄˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰ÑåÁ•Ìèm½Á•¹•°Íå¹¡É½¹¥é•tˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰Á…Ñ¡Ìéq¸€€€€€€´€¹¥Ñ¡Õˆ½Ý½É­™±½ÝÌ½‰…¡É…¥¸µ‰É¥¬µÈÄµÉ•¹‘•É•ÈµÉÕ¹Ñ¥µ”µ‘•‰Õ¥¹œ¹åµ°ˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰ÉÕ¹}ÈÅ}É•¹‘•É•É}‘•‰Õœ¹Í ˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ%¸ ‰™¥¹…±¥é•}ÈÅ}É•¹‘•É•É}‘•‰Õœ¹Áäˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ9½Ñ%¸ ‰ÁÉ½©•Ð¹½‘½Ðˆ°Ñ•áÐ¤(€€€€€€€Í•±˜¹…ÍÍ•ÉÑ9½Ñ%¸ ‰É•¹‘•É•È‘•™…Õ±Ðˆ°Ñ•áÐ¹±½Ý•È ¤¤(()¥˜}}¹…µ•}|€ôô€‰}}µ…¥¹}|ˆè(€€€Õ¹¥ÑÑ•ÍÐ¹µ…¥¸ ¤(

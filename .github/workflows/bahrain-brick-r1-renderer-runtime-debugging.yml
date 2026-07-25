@@ -44,7 +44,8 @@ jobs:
           set -euo pipefail
           python3 -m unittest tests/graphics/test_r1_renderer_runtime_debugging_contract.py -v
           python3 -m unittest tests/graphics/test_r1_finalize_runtime_debug.py -v
-          python3 -m py_compile tools/graphics/prepare_r1_android_variant.py tools/graphics/finalize_r1_renderer_debug.py
+          python3 -m unittest tests/graphics/test_r1_reconstruction_preflight.py -v
+          python3 -m py_compile tools/graphics/prepare_r1_android_variant.py tools/graphics/finalize_r1_renderer_debug.py tools/graphics/patch_r1_reconstruction_preflight.py
           bash -n tools/graphics/run_r1_renderer_debug.sh
 
       - name: Set up Java 17
