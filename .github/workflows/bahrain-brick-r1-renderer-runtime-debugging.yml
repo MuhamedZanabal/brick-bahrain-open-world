@@ -3,7 +3,9 @@ name: Bahrain Brick R1 Renderer Runtime Debugging
 on:
   pull_request:
     branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
-    types: [opened]
+    types: [opened, synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-r1-renderer-runtime-debugging.yml
 
 permissions:
   contents: read
@@ -25,6 +27,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+
+      - name: Materialize bounded reconstruction preflight correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/r1
+          python3 tools/graphics/patch_r1_reconstruction_preflight.py \
+            --runner tools/graphics/run_r1_renderer_debug.sh \
+            --report build/r1/RUNNER_PREFLIGHT_PATCH.json
+          cp tools/graphics/run_r1_renderer_debug.sh build/r1/executed-runner.sh
 
       - name: Validate R1 diagnostic contracts
         shell: bash
@@ -102,6 +114,8 @@ jobs:
             build/r1/GL_VARIANT_OVERRIDE.json
             build/r1/MOBILE_VARIANT_OVERRIDE.json
             build/r1/GODOT_VERSION.txt
+            build/r1/R1_RECONSTRUCTION_ENVIRONMENT.json
+            build/r1/SOURCE_TREE_EQUIVALENCE.json
             build/r1/shared-import.log
             build/r1-runner.log
             build-r1-acceleration.txt

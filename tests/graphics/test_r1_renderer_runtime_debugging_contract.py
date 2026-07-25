@@ -67,11 +67,16 @@ class R1ContractTest(unittest.TestCase):
         self.assertIn("IMPORTED_STATE_MANIFEST.json", text)
         self.assertIn("CLONE_IDENTITY.json", text)
         self.assertIn("GL_MAX_FRAGMENT_UNIFORM_VECTORS", text)
+        self.assertIn("R1_RECONSTRUCTION_ENVIRONMENT.json", text)
+        self.assertIn("SOURCE_TREE_EQUIVALENCE.json", text)
+        self.assertIn("reports/graphics/g0_2/shared_import_equivalence.json", text)
+        self.assertIn("R1_ACTUAL_IMAGE_VERSION", text)
+        self.assertNotIn('ImageVersion=20260714.240.1', text)
         for mode in GL_MODES + MOBILE_MODES:
             self.assertIn(mode, text)
         self.assertIn("debuggerd -b", text)
         self.assertIn("dumpsys gfxinfo", text)
-        self.assertNotIn('renderer/rendering_method="', text)
+        self.assertNotIn("renderer/rendering_method=\"", text)
         self.assertNotIn("G1", text)
 
     def test_finalizer_requires_unique_evidence_backed_classification(self) -> None:
@@ -86,6 +91,8 @@ class R1ContractTest(unittest.TestCase):
     def test_workflow_is_bounded_to_r1(self) -> None:
         text = WORKFLOW.read_text()
         self.assertIn("work/bahrain-brick-renderer-runtime-debugging-r1", text)
+        self.assertIn("types: [opened, synchronize]", text)
+        self.assertIn("paths:\n      - .github/workflows/bahrain-brick-r1-renderer-runtime-debugging.yml", text)
         self.assertIn("run_r1_renderer_debug.sh", text)
         self.assertIn("finalize_r1_renderer_debug.py", text)
         self.assertNotIn("project.godot", text)
