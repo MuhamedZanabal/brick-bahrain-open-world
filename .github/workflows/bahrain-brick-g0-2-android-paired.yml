@@ -1,5 +1,5 @@
 name: Bahrain Brick G0.2 Terminal Evidence Packaging
-# terminal-state contract corrected
+# packaging-helper cleanup authorized
 
 on:
   pull_request:
@@ -114,7 +114,7 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add tools/graphics/package_g0_2_terminal.py tools/graphics/finalize_g0_2_android_evidence.py tests/graphics/test_finalize_g0_2_android_evidence.py reports/graphics/g0_2 reports/graphics/g0/device_handoff .ai/project-state.json .ai/CHECKPOINT.md
           git rm tools/graphics/package_g0_2_terminal.py.gz.b64 tools/graphics/materialize_g0_2_terminal_packager.py tools/graphics/apply_g0_2_finalizer_fix.py
-          allowed='^(tools/graphics/package_g0_2_terminal.py|tools/graphics/finalize_g0_2_android_evidence.py|tests/graphics/test_finalize_g0_2_android_evidence.py|reports/graphics/g0_2/|reports/graphics/g0/device_handoff/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$)'
+          allowed='^(tools/graphics/(package_g0_2_terminal.py|finalize_g0_2_android_evidence.py|package_g0_2_terminal.py.gz.b64|materialize_g0_2_terminal_packager.py|apply_g0_2_finalizer_fix.py)|tests/graphics/test_finalize_g0_2_android_evidence.py|reports/graphics/g0_2/|reports/graphics/g0/device_handoff/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$)'
           unexpected="$(git diff --cached --name-only | grep -Ev "$allowed" || true)"
           test -z "$unexpected"
           git commit -m 'G0.2: emit paired Android terminal qualification reports'
