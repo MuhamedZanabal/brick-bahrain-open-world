@@ -1,4 +1,4 @@
-name: Bahrain Brick G0.2 Terminal Packager Diagnostic
+name: Bahrain Brick G0.2 Terminal Evidence Packaging
 
 on:
   pull_request:
@@ -8,15 +8,19 @@ on:
       - .github/workflows/bahrain-brick-g0-2-android-paired.yml
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 concurrency:
-  group: bahrain-brick-g0-2-terminal-packager-diagnostic
+  group: bahrain-brick-g0-2-terminal-packaging
   cancel-in-progress: false
 
+env:
+  REDUCED_ARTIFACT_ID: '8624118896'
+  REDUCED_ARTIFACT_SHA256: 6581fef39feed0501af438ae73ef6abbb9118851fd10e7ec8ffa6dac0b6f7156
+
 jobs:
-  diagnose_terminal_packager:
+  package_terminal_evidence:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -26,48 +30,91 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
+      - name: Determine whether packaging is required
+        id: gate
+        shell: bash
+        run: |
+          if test -s reports/graphics/g0_2/G0_2_TERMINAL_REPORT.json; then
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install report dependency
+        if: steps.gate.outputs.needed == 'true'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil
 
-      - name: Capture deterministic packager stdout and stderr
+      - name: Download exact compact adjudicative evidence
+        if: steps.gate.outputs.needed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          set -uo pipefail
-          mkdir -p build/g0_2_packager_diagnostic
-          python3 tools/graphics/materialize_g0_2_terminal_packager.py \
-            > build/g0_2_packager_diagnostic/materialize.stdout.txt \
-            2> build/g0_2_packager_diagnostic/materialize.stderr.txt
-          materialize_code=$?
-          printf '%s\n' "$materialize_code" > build/g0_2_packager_diagnostic/materialize.exit-code.txt
-          set +e
+          set -euo pipefail
+          mkdir -p build/g0_2_terminal
+          curl --fail --location --retry 3 --retry-all-errors \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$REDUCED_ARTIFACT_ID/zip" \
+            --output build/g0_2_terminal/reduced.zip
+          echo "$REDUCED_ARTIFACT_SHA256  build/g0_2_terminal/reduced.zip" | sha256sum -c -
+
+      - name: Materialize and execute tested terminal packager
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/materialize_g0_2_terminal_packager.py
+          python3 -m py_compile tools/graphics/package_g0_2_terminal.py
           python3 tools/graphics/package_g0_2_terminal.py \
-            > build/g0_2_packager_diagnostic/package.stdout.txt \
-            2> build/g0_2_packager_diagnostic/package.stderr.txt
-          package_code=$?
-          set -e
-          printf '%s\n' "$package_code" > build/g0_2_packager_diagnostic/package.exit-code.txt
-          find reports/graphics/g0_2 -maxdepth 3 -type f -printf '%P\t%s\n' \
-            > build/g0_2_packager_diagnostic/generated-files.txt 2>/dev/null || true
+            --artifact-zip build/g0_2_terminal/reduced.zip \
+            --work-dir build/g0_2_terminal/work
+
+      - name: Validate repository evidence boundary
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import json
-          root=Path('build/g0_2_packager_diagnostic')
-          value={
-            'schema_version':1,
-            'materialize_exit_code':int((root/'materialize.exit-code.txt').read_text()),
-            'package_exit_code':int((root/'package.exit-code.txt').read_text()),
-            'terminal_report_exists':Path('reports/graphics/g0_2/G0_2_TERMINAL_REPORT.json').is_file(),
-            'android_execution_performed':False,
-          }
-          (root/'summary.json').write_text(json.dumps(value,indent=2,sort_keys=True)+'\n')
+          root=Path('reports/graphics/g0_2')
+          required=[
+            'authority.json','shared_import_equivalence.json','emulator_environment.json','apk_inventory.json',
+            'gl_compatibility/state_machine.json','gl_compatibility/package_report.json','gl_compatibility/launch_report.json','gl_compatibility/runtime.json','gl_compatibility/frame_metrics.csv','gl_compatibility/logcat_full.txt','gl_compatibility/logcat_critical.txt','gl_compatibility/screenshot.png','gl_compatibility/classification.json',
+            'mobile_vulkan/state_machine.json','mobile_vulkan/package_report.json','mobile_vulkan/launch_report.json','mobile_vulkan/runtime.json','mobile_vulkan/frame_metrics.csv','mobile_vulkan/logcat_full.txt','mobile_vulkan/logcat_critical.txt','mobile_vulkan/screenshot.png','mobile_vulkan/classification.json',
+            'screenshot_comparison.json','screenshot_difference.png','G0_2_TERMINAL_REPORT.json','G0_2_TERMINAL_REPORT.md']
+          for rel in required:
+            path=root/rel
+            assert path.is_file() and path.stat().st_size>0, rel
+          for path in root.rglob('*.json'): json.loads(path.read_text())
+          terminal=json.loads((root/'G0_2_TERMINAL_REPORT.json').read_text())
+          assert terminal['terminal_outcome']=='G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL'
+          assert terminal['gl_compatibility']['classification']=='ANDROID_CRITICAL_RUNTIME_FAILURE'
+          assert terminal['mobile_vulkan']['classification']=='ANDROID_SCENE_READINESS_FAILURE'
+          assert terminal['gate_g0']=='G0_EVIDENCE_INSUFFICIENT'
+          assert terminal['renderer_decision'] is None
+          assert terminal['renderer_defaults_modified'] is False
+          assert terminal['g1_authorized'] is False
+          assert terminal['device_handoff_tests_performed'] is False
+          assert terminal['screenshot_comparison']['comparison_performed'] is False
           PY
+          bash -n reports/graphics/g0/device_handoff/run_device_test.sh
+          python3 -m unittest tests/graphics/test_finalize_g0_2_android_evidence.py -v
+          python3 -m unittest tests/graphics/test_g0_2_android_renderer_qualification_contract.py -v
 
-      - name: Upload compact packager diagnostic
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with:
-          name: bahrain-brick-g0-2-packager-diagnostic-${{ github.run_id }}
-          path: build/g0_2_packager_diagnostic
-          if-no-files-found: error
-          retention-days: 7
+      - name: Commit terminal evidence and remove packaging helpers
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tools/graphics/package_g0_2_terminal.py tools/graphics/finalize_g0_2_android_evidence.py tests/graphics/test_finalize_g0_2_android_evidence.py reports/graphics/g0_2 reports/graphics/g0/device_handoff .ai/project-state.json .ai/CHECKPOINT.md
+          git rm tools/graphics/package_g0_2_terminal.py.gz.b64 tools/graphics/materialize_g0_2_terminal_packager.py tools/graphics/apply_g0_2_finalizer_fix.py
+          allowed='^(tools/graphics/package_g0_2_terminal.py|tools/graphics/finalize_g0_2_android_evidence.py|tests/graphics/test_finalize_g0_2_android_evidence.py|reports/graphics/g0_2/|reports/graphics/g0/device_handoff/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$)'
+          unexpected="$(git diff --cached --name-only | grep -Ev "$allowed" || true)"
+          test -z "$unexpected"
+          git commit -m 'G0.2: emit paired Android terminal qualification reports'
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
