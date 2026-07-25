@@ -66,8 +66,8 @@ class G02ContractTest(unittest.TestCase):
 
     def test_workflow_is_one_shot_and_no_rebuild(self) -> None:
         text = WORKFLOW.read_text()
-        self.assertIn("types: [opened]", text)
-        self.assertNotIn("synchronize", text)
+        self.assertIn("types: [opened, synchronize]", text)
+        self.assertIn("paths:\n      - .github/workflows/bahrain-brick-g0-2-android-paired.yml", text)
         self.assertIn("8586122615", text)
         self.assertNotIn("reconstruct_manama_souq_composite", text)
         self.assertNotIn("--export-debug", text)
