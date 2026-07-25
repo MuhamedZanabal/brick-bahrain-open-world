@@ -64,17 +64,15 @@ class G02ContractTest(unittest.TestCase):
             "0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02",
         ])
 
-    def test_workflow_is_terminal_packaging_only(self) -> None:
+    def test_workflow_is_terminally_archived(self) -> None:
         text = WORKFLOW.read_text()
-        self.assertIn("types: [synchronize]", text)
-        self.assertIn("paths:\n      - .github/workflows/bahrain-brick-g0-2-android-paired.yml", text)
-        self.assertIn("8624118896", text)
-        self.assertIn("package_g0_2_terminal.py", text)
-        self.assertIn("G0_2_TERMINAL_REPORT.json", text)
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("if: false", text)
+        self.assertIn("Do not rerun", text)
         for prohibited in (
-            "android-actions/setup-android", "system-images;android-34", "adb shell",
-            "run_g0_2_android_paired.sh", "reconstruct_manama_souq_composite",
-            "--export-debug", "project.godot",
+            "pull_request:", "android-actions/setup-android", "system-images;android-34",
+            "adb shell", "run_g0_2_android_paired.sh", "package_g0_2_terminal.py",
+            "reconstruct_manama_souq_composite", "--export-debug", "project.godot",
         ):
             self.assertNotIn(prohibited, text)
 
