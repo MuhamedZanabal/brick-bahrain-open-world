@@ -3,7 +3,9 @@ name: Bahrain Brick G0.2 Android Paired Renderer Qualification
 on:
   pull_request:
     branches: [work/bahrain-brick-g0-1-android-startup-root-cause-v1]
-    types: [opened]
+    types: [opened, synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-g0-2-android-paired.yml
   workflow_dispatch:
 
 permissions:
@@ -36,16 +38,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/graphics/bootstrap_g0_2_payload.py
+          changed=false
+          if test -f tools/graphics/bootstrap_g0_2_payload.py; then
+            python3 tools/graphics/bootstrap_g0_2_payload.py
+            git add tools/graphics/run_g0_2_android_paired.sh tools/graphics/finalize_g0_2_android_evidence.py
+            git rm -r tools/graphics/g0_2_payload tools/graphics/bootstrap_g0_2_payload.py
+            changed=true
+          fi
+          if test -f tools/graphics/apply_g0_2_scope_fix.py; then
+            python3 tools/graphics/apply_g0_2_scope_fix.py
+            git add tools/graphics/run_g0_2_android_paired.sh tests/graphics/test_g0_2_android_renderer_qualification_contract.py
+            git rm tools/graphics/apply_g0_2_scope_fix.py
+            changed=true
+          fi
           bash -n tools/graphics/run_g0_2_android_paired.sh
           python3 -m py_compile tools/graphics/finalize_g0_2_android_evidence.py
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add tools/graphics/run_g0_2_android_paired.sh tools/graphics/finalize_g0_2_android_evidence.py
-          git rm -r tools/graphics/g0_2_payload tools/graphics/bootstrap_g0_2_payload.py
-          git commit -m 'G0.2: materialize paired Android collector and finalizer'
-          target_branch="${GITHUB_HEAD_REF:-work/bahrain-brick-graphics-g0-2-android-renderer-qualification}"
-          git push origin "HEAD:$target_branch"
+          if test "$changed" = true; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git commit -m 'G0.2: materialize and correct paired Android harness'
+            target_branch="${GITHUB_HEAD_REF:-work/bahrain-brick-graphics-g0-2-android-renderer-qualification}"
+            git push origin "HEAD:$target_branch"
+          fi
 
       - name: Validate G0.2 contract before execution
         shell: bash
