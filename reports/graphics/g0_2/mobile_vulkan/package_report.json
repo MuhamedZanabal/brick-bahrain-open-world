@@ -1,0 +1,129 @@
+{
+  "filename": "bahrain-brick-g0-mobile-vulkan-x86_64.apk",
+  "import_state_authority": "shared_import_equivalence.json",
+  "install_exit_code": 0,
+  "manifest": {
+    "application_class": null,
+    "debuggable": "true",
+    "exported": "true",
+    "graphics_feature_requirements": [
+      "android.hardware.vulkan.level",
+      "android.hardware.vulkan.version"
+    ],
+    "hardware_feature_requirements": [
+      "android.hardware.vulkan.level",
+      "android.hardware.vulkan.version"
+    ],
+    "launch_mode": "4",
+    "launcher_activity": "com.godot.game.GodotApp",
+    "minimum_sdk": 21,
+    "native_library_extraction_policy": "true",
+    "orientation": "11",
+    "package_id": "com.brickbahrain.g0mobile",
+    "permissions": [],
+    "process_name": null,
+    "target_sdk": 34,
+    "theme": "@ref/0x01030010",
+    "version_code": 1404,
+    "version_name": "1.4.0.4-premium-visual-qa"
+  },
+  "native_inventory": {
+    "all_x86_64_machine": true,
+    "duplicate_library_filenames": [],
+    "libraries": [
+      {
+        "abi": "x86_64",
+        "alignment_mod_4096": 202,
+        "android_notes": "\nDisplaying notes found in: .note.android.ident\n  Owner                Data size \tDescription\n  Android              0x00000084\tNT_VERSION (version)\n   description data: 15 00 00 00 72 32 33 63 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 38 35 36 38 33 31 33 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 \n\nDisplaying notes found in: .note.gnu.build-id\n  Owner                Data size \tDescription\n  GNU                  0x00000014\tNT_GNU_BUILD_ID (unique build ID bitstring)\n    Build ID: d913f3a68606faabde8ac6c515348decf14d6f5b\n",
+        "bytes": 6716064,
+        "compressed": true,
+        "compression_method": 8,
+        "elf_class": "ELF64",
+        "filename": "libc++_shared.so",
+        "local_header_offset": 2093258,
+        "machine": "Advanced Micro Devices X86-64",
+        "missing_bundled_or_system_dependencies": [],
+        "needed": [
+          "libc.so",
+          "libdl.so"
+        ],
+        "path": "lib/x86_64/libc++_shared.so",
+        "sha256": "22b0fa946465327af7ad84a32787595d03d2667b53f2304ec72f0a80b34fc393"
+      },
+      {
+        "abi": "x86_64",
+        "alignment_mod_4096": 597,
+        "android_notes": "\nDisplaying notes found in: .note.android.ident\n  Owner                Data size \tDescription\n  Android              0x00000084\tNT_VERSION (version)\n   description data: 15 00 00 00 72 32 33 63 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 38 35 36 38 33 31 33 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 \n",
+        "bytes": 70699400,
+        "compressed": true,
+        "compression_method": 8,
+        "elf_class": "ELF64",
+        "filename": "libgodot_android.so",
+        "local_header_offset": 3830357,
+        "machine": "Advanced Micro Devices X86-64",
+        "missing_bundled_or_system_dependencies": [],
+        "needed": [
+          "libOpenSLES.so",
+          "libEGL.so",
+          "libandroid.so",
+          "liblog.so",
+          "libz.so",
+          "libdl.so",
+          "libGLESv3.so",
+          "libc++_shared.so",
+          "libm.so",
+          "libc.so"
+        ],
+        "path": "lib/x86_64/libgodot_android.so",
+        "sha256": "e22959e2b4ef7b4cb8a1da646a6586020ba64fe87ee20b5304128fd0e956e80d"
+      }
+    ],
+    "missing_dependencies": [],
+    "schema_version": 1,
+    "supported_abis": [
+      "x86_64"
+    ],
+    "x86_64_godot_runtime_present": true
+  },
+  "package_id": "com.brickbahrain.g0mobile",
+  "package_inspection_passed": true,
+  "pm_path": "package:/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.apk",
+  "renderer_override": {
+    "architectures": {
+      "arm64-v8a": false,
+      "armeabi-v7a": false,
+      "x86_64": true
+    },
+    "changed_keys": [
+      "application/run/main_scene",
+      "rendering/renderer/rendering_method",
+      "rendering/renderer/rendering_method.mobile",
+      "android/architectures/armeabi-v7a",
+      "android/architectures/arm64-v8a",
+      "android/architectures/x86_64",
+      "android/package/unique_name"
+    ],
+    "export_preset": {
+      "after_sha256": "472d0992df20cf96a843036d9c1b6d3f0ac8992c65ae792959baa89a0c5a0591",
+      "before_sha256": "db315e04903502e85ddb492f538a3656e81182da4771c8a934f02eec9f72918b",
+      "changed": true,
+      "path": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/g0-android/tier-b/android_mobile_vulkan/export_presets.cfg"
+    },
+    "package_name": "com.brickbahrain.g0mobile",
+    "project": {
+      "after_sha256": "de3a1a33fe0c1120c9e643b6fb2469f7fb54394821e2c19411fa4ce7ee8bd61c",
+      "before_sha256": "6d69f4cb542225debfae546da688a9550b016ada323e01b687c47b2b2c94a422",
+      "changed": true,
+      "path": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/g0-android/tier-b/android_mobile_vulkan/project.godot"
+    },
+    "qa_main_scene": "res://tests/graphics/android_renderer_evidence.tscn",
+    "qa_override_only": true,
+    "renderer": "mobile",
+    "schema_version": 1
+  },
+  "resolved_component": "com.brickbahrain.g0mobile/com.godot.game.GodotApp",
+  "schema_version": 1,
+  "sha256": "0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02",
+  "signature_digest_sha256": "cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387",
+  "source_authority": "6ade72ed02084791128dcf4a91223e695d802c15"
+}

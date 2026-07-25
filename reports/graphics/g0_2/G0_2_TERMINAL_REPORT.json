@@ -1,0 +1,253 @@
+{
+  "branch": "work/bahrain-brick-graphics-g0-2-android-renderer-qualification",
+  "device_handoff_tests_performed": false,
+  "emulator_baselines_equivalent": true,
+  "execution_authority": {
+    "adjudicative_job_id": 89722664363,
+    "adjudicative_workflow_run_id": 30175169997,
+    "android_rerun_during_finalization": false,
+    "raw_artifact_digest": "sha256:677c0b55a937ee46f1f85dc600c9ac09c716bae58fd92638824f868792f90d69",
+    "raw_artifact_id": 8624075667,
+    "reduced_artifact_digest": "sha256:6581fef39feed0501af438ae73ef6abbb9118851fd10e7ec8ffa6dac0b6f7156",
+    "reduced_artifact_id": 8624118896,
+    "reducer_job_id": 89723763711,
+    "reducer_run_id": 30175596770
+  },
+  "frozen_head": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+  "g1_authorized": false,
+  "gate_g0": "G0_EVIDENCE_INSUFFICIENT",
+  "gl_compatibility": {
+    "classification": "ANDROID_CRITICAL_RUNTIME_FAILURE",
+    "critical_log_scan": {
+      "counts": {
+        "anr": 0,
+        "java_fatal": 0,
+        "linker_failure": 0,
+        "missing_resource": 0,
+        "native_fatal": 0,
+        "renderer_blocking_shader": 45
+      },
+      "passed": false,
+      "schema_version": 1,
+      "total": 45
+    },
+    "decisive_evidence": "45 renderer-blocking SceneShaderGLES3 program-link failures; Java/native/linker/ANR/missing-resource counts were zero.",
+    "earliest_failed_state": "CRITICAL_LOG_SCAN_PASSED",
+    "frame_metrics": {
+      "average_fps": 7.514858342218657,
+      "mean_frame_time_ms": 133.0697073,
+      "median_frame_time_ms": 125.620213,
+      "one_percent_low_fps": 3.494584908294701,
+      "p95_frame_time_ms": 286.157019,
+      "p99_frame_time_ms": 286.157019,
+      "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+      "row_count": 10
+    },
+    "functional_pass": false,
+    "launch_status": "ok",
+    "memory": {
+      "peak_java_heap_kb": 7024,
+      "peak_native_heap_kb": 96736,
+      "peak_pss_kb": 172943,
+      "peak_rss_kb": 283604,
+      "samples": [
+        {
+          "java_heap_kb": 7024,
+          "native_heap_kb": 96736,
+          "pss_kb": 172943,
+          "rss_kb": 283604,
+          "sample": "01.txt"
+        },
+        {
+          "java_heap_kb": 6696,
+          "native_heap_kb": 96260,
+          "pss_kb": 172178,
+          "rss_kb": 283020,
+          "sample": "02.txt"
+        },
+        {
+          "java_heap_kb": 6696,
+          "native_heap_kb": 96264,
+          "pss_kb": 172182,
+          "rss_kb": 283024,
+          "sample": "03.txt"
+        },
+        {
+          "java_heap_kb": 6696,
+          "native_heap_kb": 96264,
+          "pss_kb": 172182,
+          "rss_kb": 283024,
+          "sample": "04.txt"
+        },
+        {
+          "java_heap_kb": 6708,
+          "native_heap_kb": 96264,
+          "pss_kb": 172202,
+          "rss_kb": 283040,
+          "sample": "05.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96264,
+          "pss_kb": 172198,
+          "rss_kb": 283036,
+          "sample": "06.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96264,
+          "pss_kb": 172202,
+          "rss_kb": 283044,
+          "sample": "07.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96264,
+          "pss_kb": 172214,
+          "rss_kb": 283056,
+          "sample": "08.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96264,
+          "pss_kb": 172214,
+          "rss_kb": 283056,
+          "sample": "09.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96268,
+          "pss_kb": 172218,
+          "rss_kb": 283060,
+          "sample": "10.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96272,
+          "pss_kb": 172222,
+          "rss_kb": 283064,
+          "sample": "11.txt"
+        },
+        {
+          "java_heap_kb": 6704,
+          "native_heap_kb": 96276,
+          "pss_kb": 172226,
+          "rss_kb": 283068,
+          "sample": "12.txt"
+        }
+      ]
+    },
+    "renderer_identity": "G0_ANDROID_RENDERER_READY renderer=gl_compatibility driver=opengl3 gpu=Android Emulator OpenGL ES Translator (Google SwiftShader)",
+    "screenshot": {
+      "average_luminance": 0.435074900523481,
+      "black_pixel_ratio": 0.0,
+      "exists": true,
+      "height": 1080,
+      "output_file_present": true,
+      "perceptual_hash": "d8c0c3c3c3ffffff",
+      "placeholder": false,
+      "sha256": "9b5ea707fe53efd6c117fec73bb057db3cd915fa522d8d6b13b6260b83ceac82",
+      "source_evidence_present": true,
+      "valid_non_black": true,
+      "width": 1920
+    }
+  },
+  "mobile_vulkan": {
+    "classification": "ANDROID_SCENE_READINESS_FAILURE",
+    "decisive_evidence": "Process, visible window, Godot, Vulkan renderer identity, mission, and scene readiness passed; warm-up/capture-frame markers were absent at the bounded timeout.",
+    "earliest_failed_state": "CAPTURE_FRAME_REACHED",
+    "functional_pass": false,
+    "launch_status": "ok",
+    "process_created": true,
+    "renderer_identity": "G0_ANDROID_RENDERER_READY renderer=mobile driver=vulkan gpu=SwiftShader Device (Subzero)",
+    "screenshot": {
+      "average_luminance": 0.0,
+      "black_pixel_ratio": 1.0,
+      "exists": false,
+      "height": 1080,
+      "output_file_present": true,
+      "perceptual_hash": "ffffffffffffffff",
+      "placeholder": true,
+      "sha256": "51e457f4207c6361d8d22571976947233d81f61b45221f4e79f79d25d0d56cf1",
+      "source_evidence_present": false,
+      "valid_non_black": false,
+      "width": 1920
+    },
+    "window_became_visible": true
+  },
+  "non_adjudicative_exceptions": [
+    {
+      "boundary": "pre-emulator shell-scope harness failure",
+      "evidence_use": "EXCLUDED_FROM_ADJUDICATION",
+      "run_id": 30174847173
+    },
+    {
+      "boundary": "pre-Android contract failure",
+      "evidence_use": "EXCLUDED_FROM_ADJUDICATION",
+      "run_id": 30175107599
+    },
+    {
+      "boundary": "duplicate run cancelled during candidate execution",
+      "cancellation_run_id": 30175548334,
+      "evidence_use": "EXCLUDED_FROM_ADJUDICATION",
+      "run_id": 30175210630
+    }
+  ],
+  "parent_g0_1_head": "d89d3e22e25bba8c266219dcca3cfd223e658b7b",
+  "performance_acceptance": false,
+  "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+  "physical_device_evidence_complete": false,
+  "renderer_decision": null,
+  "renderer_defaults_modified": false,
+  "renderer_evidence_source_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+  "schema_version": 1,
+  "screenshot_comparison": {
+    "comparison_is_descriptive_only": true,
+    "comparison_performed": false,
+    "comparison_reason": "both captured, valid, non-black screenshots are required",
+    "gl": {
+      "average_luminance": 0.435074900523481,
+      "black_pixel_ratio": 0.0,
+      "exists": true,
+      "height": 1080,
+      "output_file_present": true,
+      "perceptual_hash": "d8c0c3c3c3ffffff",
+      "placeholder": false,
+      "sha256": "9b5ea707fe53efd6c117fec73bb057db3cd915fa522d8d6b13b6260b83ceac82",
+      "source_evidence_present": true,
+      "valid_non_black": true,
+      "width": 1920
+    },
+    "mean_absolute_channel_delta": null,
+    "mobile": {
+      "average_luminance": 0.0,
+      "black_pixel_ratio": 1.0,
+      "exists": false,
+      "height": 1080,
+      "output_file_present": true,
+      "perceptual_hash": "ffffffffffffffff",
+      "placeholder": true,
+      "sha256": "51e457f4207c6361d8d22571976947233d81f61b45221f4e79f79d25d0d56cf1",
+      "source_evidence_present": false,
+      "valid_non_black": false,
+      "width": 1920
+    },
+    "perceptual_hash_hamming_distance": null,
+    "schema_version": 1,
+    "structural_comparison": null
+  },
+  "shared_import_aggregate_byte_count": 736836845,
+  "shared_import_aggregate_sha256": "e0360a68b2ac1d4ccfc0ced390a822950ac38a7f18509dfc585e98caea097197",
+  "shared_import_equivalence_passed": true,
+  "shared_import_file_count": 8214,
+  "source_artifact_id": 8586122615,
+  "stage": "BAHRAIN BRICK \u2014 STAGE G0.2",
+  "terminal_outcome": "G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL",
+  "unresolved_blockers": [
+    "GL Compatibility emitted renderer-blocking GLES3 shader program-link failures on the API 34 emulator.",
+    "Mobile Vulkan did not reach warm-up frame 180 or capture frame 300 within the bounded evidence window.",
+    "Paired valid Android screenshots and paired lifecycle evidence are incomplete because Mobile stopped before capture.",
+    "Named physical-device qualification is unavailable.",
+    "Emulator measurements are diagnostic only and cannot select the production renderer."
+  ]
+}

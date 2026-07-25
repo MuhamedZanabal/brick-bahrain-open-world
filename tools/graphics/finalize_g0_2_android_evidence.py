@@ -12,7 +12,7 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
-from PIL import Image, ImageChops, ImageEnhance, ImageOps
+from PIL import Image, ImageChops, ImageEnhance, ImageOps, UnidentifiedImageError
 
 PERFORMANCE_LABEL = "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE"
 GATE_G0 = "G0_EVIDENCE_INSUFFICIENT"
@@ -231,10 +231,11 @@ def parse_am_start(text: str) -> dict[str, Any]:
         match = re.search(pattern, text, re.M)
         if not match:
             return None
+        captured = match.group(1) if match.lastindex else match.group(0)
         try:
-            return cast(match.group(1))
+            return cast(captured)
         except (TypeError, ValueError):
-            return match.group(1)
+            return captured
 
     return {
         "status": value(r"^Status:\s*(\S+)"),
@@ -322,30 +323,51 @@ def parse_meminfo_samples(directory: Path) -> dict[str, Any]:
     }
 
 
-def image_report(path: Path) -> dict[str, Any]:
-    result: dict[str, Any] = {"exists": path.is_file(), "valid_non_black": False}
-    if not path.is_file():
+def materialize_screenshot(source: Path, target: Path) -> bool:
+    """Retain captured evidence or create an explicit non-evidence placeholder."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.is_file() and source.stat().st_size > 0:
+        shutil.copy2(source, target)
+        return True
+    Image.new("RGB", (1920, 1080), "black").save(target)
+    return False
+
+
+def image_report(path: Path, *, source_evidence_present: bool | None = None) -> dict[str, Any]:
+    output_present = path.is_file() and path.stat().st_size > 0
+    evidence_present = output_present if source_evidence_present is None else bool(source_evidence_present)
+    result: dict[str, Any] = {
+        "exists": evidence_present,
+        "source_evidence_present": evidence_present,
+        "output_file_present": output_present,
+        "placeholder": output_present and not evidence_present,
+        "valid_non_black": False,
+    }
+    if not output_present:
+        result["error"] = "missing_or_empty_png"
         return result
-    with Image.open(path) as image:
-        rgb = image.convert("RGB")
-        gray = rgb.convert("L")
-        pixels = list(gray.getdata())
-        average = sum(pixels) / (len(pixels) * 255.0) if pixels else 0.0
-        black_ratio = sum(1 for value in pixels if value <= 5) / len(pixels) if pixels else 1.0
-        small = gray.resize((8, 8), Image.Resampling.LANCZOS)
-        small_values = list(small.getdata())
-        threshold = sum(small_values) / len(small_values)
-        bits = "".join("1" if value >= threshold else "0" for value in small_values)
-        phash = f"{int(bits, 2):016x}"
-        result.update({
-            "width": rgb.width,
-            "height": rgb.height,
-            "average_luminance": average,
-            "black_pixel_ratio": black_ratio,
-            "perceptual_hash": phash,
-            "sha256": sha256(path),
-            "valid_non_black": rgb.size == (1920, 1080) and average > 0.005 and black_ratio < 0.98,
-        })
+    try:
+        with Image.open(path) as image:
+            rgb = image.convert("RGB")
+            gray = rgb.convert("L")
+            pixels = list(gray.getdata())
+            average = sum(pixels) / (len(pixels) * 255.0) if pixels else 0.0
+            black_ratio = sum(1 for value in pixels if value <= 5) / len(pixels) if pixels else 1.0
+            small = gray.resize((8, 8), Image.Resampling.LANCZOS)
+            small_values = list(small.getdata())
+            threshold = sum(small_values) / len(small_values) if small_values else 0.0
+            bits = "".join("1" if value >= threshold else "0" for value in small_values)
+            result.update({
+                "width": rgb.width,
+                "height": rgb.height,
+                "average_luminance": average,
+                "black_pixel_ratio": black_ratio,
+                "perceptual_hash": f"{int(bits, 2):016x}" if bits else None,
+                "sha256": sha256(path),
+                "valid_non_black": evidence_present and rgb.size == (1920, 1080) and average > 0.005 and black_ratio < 0.98,
+            })
+    except (UnidentifiedImageError, OSError) as exc:
+        result.update({"error": f"invalid_png:{exc}", "sha256": sha256(path)})
     return result
 
 
@@ -428,13 +450,19 @@ def finalize_candidate(raw_dir: Path, out_dir: Path, *, expected_renderer: str, 
         ("state_machine.json", "state_machine.json"),
         ("logcat_full.txt", "logcat_full.txt"),
         ("logcat_critical.txt", "logcat_critical.txt"),
-        ("screenshot.png", "screenshot.png"),
     ):
         source = raw_dir / source_name
-        if source.is_file():
-            shutil.copy2(source, out_dir / target_name)
+        target = out_dir / target_name
+        if source.is_file() and source.stat().st_size > 0:
+            shutil.copy2(source, target)
+        elif target_name == "logcat_critical.txt":
+            target.write_text(
+                "NOT_CAPTURED: candidate stopped before the critical-log-scan state; no absence-of-errors claim is made.\n",
+                encoding="utf-8",
+            )
         else:
-            (out_dir / target_name).write_bytes(b"") if target_name.endswith(".png") else (out_dir / target_name).write_text("")
+            target.write_text("NOT_CAPTURED: source evidence file is absent.\n", encoding="utf-8")
+    screenshot_source_present = materialize_screenshot(raw_dir / "screenshot.png", out_dir / "screenshot.png")
 
     manifest_text = read_text(raw_dir / "manifest.xml")
     dumpsys_text = read_text(raw_dir / "dumpsys-package.txt")
@@ -457,15 +485,18 @@ def finalize_candidate(raw_dir: Path, out_dir: Path, *, expected_renderer: str, 
     write_json(out_dir / "package_report.json", package_report)
 
     launch = parse_am_start(read_text(raw_dir / "am-start.txt"))
+    machine = read_json(raw_dir / "state_machine.json", {"states": []})
+    states = state_map(machine)
     liveness = read_json(raw_dir / "liveness.json", {})
     launch_start = int(liveness.get("launch_start_epoch_ms") or 0)
     visible = int(liveness.get("first_visible_window_epoch_ms") or 0)
     launch.update({
         "resolved_component": package_report["resolved_component"],
-        "process_created": bool(liveness.get("initial_pid")),
-        "initial_pid": liveness.get("initial_pid"),
+        "process_created": is_pass(states, "PROCESS_CREATED"),
+        "initial_pid": liveness.get("initial_pid") or (read_text(raw_dir / "pid-initial.txt").strip() or None),
         "final_pid": liveness.get("final_pid"),
-        "process_remained_alive_60s": bool(liveness.get("process_remained_alive_60s")),
+        "process_remained_alive_60s": liveness.get("process_remained_alive_60s") if liveness else None,
+        "window_became_visible": is_pass(states, "WINDOW_VISIBLE"),
         "first_visible_window_time_ms": visible - launch_start if visible and launch_start else None,
     })
     write_json(out_dir / "launch_report.json", launch)
@@ -477,7 +508,7 @@ def finalize_candidate(raw_dir: Path, out_dir: Path, *, expected_renderer: str, 
         writer.writerows(frames)
     frame_times = [float(item["frame_time_ms"]) for item in frames]
     average_ms = sum(frame_times) / len(frame_times) if frame_times else 0.0
-    screenshot = image_report(out_dir / "screenshot.png")
+    screenshot = image_report(out_dir / "screenshot.png", source_evidence_present=screenshot_source_present)
     memory = parse_meminfo_samples(raw_dir / "meminfo_samples")
     markers = parse_runtime_markers(read_text(raw_dir / "logcat_full.txt"))
     critical = read_json(raw_dir / "critical_scan.json", {"counts": {}, "passed": False, "total": None})
@@ -507,7 +538,7 @@ def finalize_candidate(raw_dir: Path, out_dir: Path, *, expected_renderer: str, 
         "apk_sha256": apk_sha,
         "process_created": launch["process_created"],
         "process_remained_alive_60s": launch["process_remained_alive_60s"],
-        "window_became_visible": state_map(read_json(raw_dir / "state_machine.json", {"states": []})).get("WINDOW_VISIBLE", {}).get("result") == "PASS",
+        "window_became_visible": launch["window_became_visible"],
         "markers": markers,
         "launch": {key: value for key, value in launch.items() if key != "raw_stdout"},
         "screenshot": screenshot,
@@ -538,17 +569,28 @@ def finalize_candidate(raw_dir: Path, out_dir: Path, *, expected_renderer: str, 
     return {"classification": classification, "runtime": runtime, "package_report": package_report}
 
 
-def compare_screenshots(gl_path: Path, mobile_path: Path, output_root: Path) -> dict[str, Any]:
+def compare_screenshots(
+    gl_path: Path,
+    mobile_path: Path,
+    output_root: Path,
+    *,
+    gl_report: dict[str, Any] | None = None,
+    mobile_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
         "schema_version": 1,
-        "gl": image_report(gl_path),
-        "mobile": image_report(mobile_path),
+        "gl": gl_report or image_report(gl_path),
+        "mobile": mobile_report or image_report(mobile_path),
         "structural_comparison": None,
         "mean_absolute_channel_delta": None,
         "perceptual_hash_hamming_distance": None,
         "comparison_is_descriptive_only": True,
     }
-    if not gl_path.is_file() or not mobile_path.is_file():
+    if not result["gl"].get("valid_non_black") or not result["mobile"].get("valid_non_black"):
+        result.update({
+            "comparison_performed": False,
+            "comparison_reason": "both captured, valid, non-black screenshots are required",
+        })
         write_json(output_root / "screenshot_comparison.json", result)
         Image.new("RGB", (1920, 1080), "black").save(output_root / "screenshot_difference.png")
         Image.new("RGB", (3840, 1080), "black").save(output_root / "screenshot_side_by_side.png")
@@ -583,6 +625,7 @@ def compare_screenshots(gl_path: Path, mobile_path: Path, output_root: Path) -> 
             "mean_absolute_channel_delta": mean_abs,
             "perceptual_hash_hamming_distance": (phash_gl ^ phash_mobile).bit_count(),
             "dimensions_equal": gl.size == mobile.size,
+            "comparison_performed": True,
         })
     write_json(output_root / "screenshot_comparison.json", result)
     return result
@@ -774,7 +817,13 @@ def finalize(raw_root: Path, output_root: Path, handoff_output: Path) -> dict[st
     }
     write_json(output_root / "emulator_environment.json", emulator_environment)
 
-    comparison = compare_screenshots(output_root / "gl_compatibility/screenshot.png", output_root / "mobile_vulkan/screenshot.png", output_root)
+    comparison = compare_screenshots(
+        output_root / "gl_compatibility/screenshot.png",
+        output_root / "mobile_vulkan/screenshot.png",
+        output_root,
+        gl_report=results["gl_compatibility"]["runtime"]["screenshot"],
+        mobile_report=results["mobile_vulkan"]["runtime"]["screenshot"],
+    )
     gl_class = results["gl_compatibility"]["classification"]
     mobile_class = results["mobile_vulkan"]["classification"]
     outcome = terminal_outcome(gl_class, mobile_class)

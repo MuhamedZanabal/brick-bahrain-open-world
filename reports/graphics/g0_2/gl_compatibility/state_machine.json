@@ -1,0 +1,158 @@
+{
+  "candidate": "gl_compatibility",
+  "expected_renderer": "gl_compatibility",
+  "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+  "schema_version": 1,
+  "states": [
+    {
+      "command_or_signal": "apksigner + aapt2 + apkanalyzer + unzip",
+      "evidence_path": "gl_compatibility/apksigner.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:13:37.287Z",
+      "state": "PACKAGE_VERIFIED",
+      "terminal_timestamp": "2026-07-25T21:13:43.741Z"
+    },
+    {
+      "command_or_signal": "adb install; pm path; cmd package resolve-activity",
+      "evidence_path": "gl_compatibility/resolve-activity.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:26.197Z",
+      "state": "LAUNCHER_RESOLVED",
+      "terminal_timestamp": "2026-07-25T21:14:26.234Z"
+    },
+    {
+      "command_or_signal": "adb logcat -v threadtime",
+      "evidence_path": "gl_compatibility/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:26.281Z",
+      "state": "LOG_CAPTURE_STARTED",
+      "terminal_timestamp": "2026-07-25T21:14:28.284Z"
+    },
+    {
+      "command_or_signal": "adb shell am start -W -S -n com.brickbahrain.g0gl/com.godot.game.GodotApp",
+      "evidence_path": "gl_compatibility/am-start.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:28.394Z",
+      "state": "ACTIVITY_START_REQUESTED",
+      "terminal_timestamp": "2026-07-25T21:14:29.601Z"
+    },
+    {
+      "command_or_signal": "pidof + dumpsys activity processes + ActivityManager log",
+      "evidence_path": "gl_compatibility/activity-processes.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:29.705Z",
+      "state": "PROCESS_CREATED",
+      "terminal_timestamp": "2026-07-25T21:14:30.078Z"
+    },
+    {
+      "command_or_signal": "dumpsys activity activities + dumpsys window windows top-resumed visible Surface",
+      "evidence_path": "gl_compatibility/window-state.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:30.149Z",
+      "state": "WINDOW_VISIBLE",
+      "terminal_timestamp": "2026-07-25T21:14:30.349Z"
+    },
+    {
+      "command_or_signal": "Godot Engine startup log marker",
+      "evidence_path": "gl_compatibility/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:30.401Z",
+      "state": "GODOT_STARTED",
+      "terminal_timestamp": "2026-07-25T21:14:30.407Z"
+    },
+    {
+      "command_or_signal": "Godot startup log plus G0_ANDROID_RENDERER_READY",
+      "evidence_path": "gl_compatibility/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:30.453Z",
+      "state": "RENDERER_IDENTIFIED",
+      "terminal_timestamp": "2026-07-25T21:14:34.475Z"
+    },
+    {
+      "command_or_signal": "BAHRAIN_BRICK_KARAK_MISSION_STARTED marker",
+      "evidence_path": "gl_compatibility/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:34.513Z",
+      "state": "MISSION_STARTED",
+      "terminal_timestamp": "2026-07-25T21:14:34.518Z"
+    },
+    {
+      "command_or_signal": "BAHRAIN_BRICK_SOUQ_SLICE_READY marker",
+      "evidence_path": "gl_compatibility/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:34.551Z",
+      "state": "SCENE_READY",
+      "terminal_timestamp": "2026-07-25T21:14:34.556Z"
+    },
+    {
+      "command_or_signal": "warmup frame 180 and capture frame 300 markers",
+      "evidence_path": "gl_compatibility/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:14:34.592Z",
+      "state": "CAPTURE_FRAME_REACHED",
+      "terminal_timestamp": "2026-07-25T21:15:17.978Z"
+    },
+    {
+      "command_or_signal": "adb exec-out screencap -p at 1920x1080",
+      "evidence_path": "gl_compatibility/screenshot.png",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:16:20.578Z",
+      "state": "SCREENSHOT_CAPTURED",
+      "terminal_timestamp": "2026-07-25T21:16:21.041Z"
+    },
+    {
+      "command_or_signal": "HOME key then explicit activity resume",
+      "evidence_path": "gl_compatibility/lifecycle.json",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:16:21.119Z",
+      "state": "PAUSE_RESUME_PASSED",
+      "terminal_timestamp": "2026-07-25T21:16:22.652Z"
+    },
+    {
+      "command_or_signal": "critical log scan",
+      "evidence_path": "gl_compatibility/critical_scan.json",
+      "exit_code": 1,
+      "failure_reason": "critical Java/native/linker/ANR/resource/shader evidence detected",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:16:23.205Z",
+      "state": "CRITICAL_LOG_SCAN_PASSED",
+      "terminal_timestamp": "2026-07-25T21:16:23.454Z"
+    },
+    {
+      "command_or_signal": "not executed",
+      "evidence_path": "gl_compatibility/logcat_critical.txt",
+      "exit_code": 1,
+      "failure_reason": "critical Java/native/linker/ANR/resource/shader evidence detected",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:16:23.500Z",
+      "state": "EVIDENCE_FINALIZED",
+      "terminal_timestamp": "2026-07-25T21:16:23.500Z"
+    }
+  ]
+}

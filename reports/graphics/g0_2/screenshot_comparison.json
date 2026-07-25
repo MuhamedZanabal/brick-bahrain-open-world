@@ -1,0 +1,35 @@
+{
+  "comparison_is_descriptive_only": true,
+  "comparison_performed": false,
+  "comparison_reason": "both captured, valid, non-black screenshots are required",
+  "gl": {
+    "average_luminance": 0.435074900523481,
+    "black_pixel_ratio": 0.0,
+    "exists": true,
+    "height": 1080,
+    "output_file_present": true,
+    "perceptual_hash": "d8c0c3c3c3ffffff",
+    "placeholder": false,
+    "sha256": "9b5ea707fe53efd6c117fec73bb057db3cd915fa522d8d6b13b6260b83ceac82",
+    "source_evidence_present": true,
+    "valid_non_black": true,
+    "width": 1920
+  },
+  "mean_absolute_channel_delta": null,
+  "mobile": {
+    "average_luminance": 0.0,
+    "black_pixel_ratio": 1.0,
+    "exists": false,
+    "height": 1080,
+    "output_file_present": true,
+    "perceptual_hash": "ffffffffffffffff",
+    "placeholder": true,
+    "sha256": "51e457f4207c6361d8d22571976947233d81f61b45221f4e79f79d25d0d56cf1",
+    "source_evidence_present": false,
+    "valid_non_black": false,
+    "width": 1920
+  },
+  "perceptual_hash_hamming_distance": null,
+  "schema_version": 1,
+  "structural_comparison": null
+}

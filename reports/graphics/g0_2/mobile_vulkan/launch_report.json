@@ -1,0 +1,16 @@
+{
+  "activity": "com.brickbahrain.g0mobile/com.godot.game.GodotApp",
+  "complete": true,
+  "final_pid": null,
+  "first_visible_window_time_ms": null,
+  "initial_pid": "2618",
+  "process_created": true,
+  "process_remained_alive_60s": null,
+  "raw_stdout": "Stopping: com.brickbahrain.g0mobile\nStarting: Intent { cmp=com.brickbahrain.g0mobile/com.godot.game.GodotApp }\nStatus: ok\nLaunchState: COLD\nActivity: com.brickbahrain.g0mobile/com.godot.game.GodotApp\nTotalTime: 866\nWaitTime: 872\nComplete\n",
+  "resolved_component": "com.brickbahrain.g0mobile/com.godot.game.GodotApp",
+  "status": "ok",
+  "this_time_ms": null,
+  "total_time_ms": 866,
+  "wait_time_ms": 872,
+  "window_became_visible": true
+}

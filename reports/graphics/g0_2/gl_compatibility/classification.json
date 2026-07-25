@@ -1,0 +1,7 @@
+{
+  "classification": "ANDROID_CRITICAL_RUNTIME_FAILURE",
+  "earliest_failed_state": "CRITICAL_LOG_SCAN_PASSED",
+  "functional_pass": false,
+  "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+  "schema_version": 1
+}

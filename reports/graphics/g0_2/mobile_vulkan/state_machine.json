@@ -1,0 +1,158 @@
+{
+  "candidate": "mobile_vulkan",
+  "expected_renderer": "mobile",
+  "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+  "schema_version": 1,
+  "states": [
+    {
+      "command_or_signal": "apksigner + aapt2 + apkanalyzer + unzip",
+      "evidence_path": "mobile_vulkan/apksigner.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:16:26.571Z",
+      "state": "PACKAGE_VERIFIED",
+      "terminal_timestamp": "2026-07-25T21:16:29.547Z"
+    },
+    {
+      "command_or_signal": "adb install; pm path; cmd package resolve-activity",
+      "evidence_path": "mobile_vulkan/resolve-activity.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:11.462Z",
+      "state": "LAUNCHER_RESOLVED",
+      "terminal_timestamp": "2026-07-25T21:17:11.515Z"
+    },
+    {
+      "command_or_signal": "adb logcat -v threadtime",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:11.562Z",
+      "state": "LOG_CAPTURE_STARTED",
+      "terminal_timestamp": "2026-07-25T21:17:13.565Z"
+    },
+    {
+      "command_or_signal": "adb shell am start -W -S -n com.brickbahrain.g0mobile/com.godot.game.GodotApp",
+      "evidence_path": "mobile_vulkan/am-start.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:13.675Z",
+      "state": "ACTIVITY_START_REQUESTED",
+      "terminal_timestamp": "2026-07-25T21:17:14.832Z"
+    },
+    {
+      "command_or_signal": "pidof + dumpsys activity processes + ActivityManager log",
+      "evidence_path": "mobile_vulkan/activity-processes.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:14.944Z",
+      "state": "PROCESS_CREATED",
+      "terminal_timestamp": "2026-07-25T21:17:15.084Z"
+    },
+    {
+      "command_or_signal": "dumpsys activity activities + dumpsys window windows top-resumed visible Surface",
+      "evidence_path": "mobile_vulkan/window-state.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:15.207Z",
+      "state": "WINDOW_VISIBLE",
+      "terminal_timestamp": "2026-07-25T21:17:15.334Z"
+    },
+    {
+      "command_or_signal": "Godot Engine startup log marker",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:15.419Z",
+      "state": "GODOT_STARTED",
+      "terminal_timestamp": "2026-07-25T21:17:15.433Z"
+    },
+    {
+      "command_or_signal": "Godot startup log plus G0_ANDROID_RENDERER_READY",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:15.513Z",
+      "state": "RENDERER_IDENTIFIED",
+      "terminal_timestamp": "2026-07-25T21:17:23.562Z"
+    },
+    {
+      "command_or_signal": "BAHRAIN_BRICK_KARAK_MISSION_STARTED marker",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:23.603Z",
+      "state": "MISSION_STARTED",
+      "terminal_timestamp": "2026-07-25T21:17:23.608Z"
+    },
+    {
+      "command_or_signal": "BAHRAIN_BRICK_SOUQ_SLICE_READY marker",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 0,
+      "failure_reason": null,
+      "result": "PASS",
+      "start_timestamp": "2026-07-25T21:17:23.643Z",
+      "state": "SCENE_READY",
+      "terminal_timestamp": "2026-07-25T21:17:23.650Z"
+    },
+    {
+      "command_or_signal": "warmup frame 180 and capture frame 300 markers",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 1,
+      "failure_reason": "warmup or capture-frame marker absent",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:17:23.685Z",
+      "state": "CAPTURE_FRAME_REACHED",
+      "terminal_timestamp": "2026-07-25T21:20:25.422Z"
+    },
+    {
+      "command_or_signal": "not executed",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 1,
+      "failure_reason": "warmup or capture-frame marker absent",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:20:25.514Z",
+      "state": "SCREENSHOT_CAPTURED",
+      "terminal_timestamp": "2026-07-25T21:20:25.514Z"
+    },
+    {
+      "command_or_signal": "not executed",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 1,
+      "failure_reason": "warmup or capture-frame marker absent",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:20:25.514Z",
+      "state": "PAUSE_RESUME_PASSED",
+      "terminal_timestamp": "2026-07-25T21:20:25.514Z"
+    },
+    {
+      "command_or_signal": "not executed",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 1,
+      "failure_reason": "warmup or capture-frame marker absent",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:20:25.514Z",
+      "state": "CRITICAL_LOG_SCAN_PASSED",
+      "terminal_timestamp": "2026-07-25T21:20:25.514Z"
+    },
+    {
+      "command_or_signal": "not executed",
+      "evidence_path": "mobile_vulkan/logcat_full.txt",
+      "exit_code": 1,
+      "failure_reason": "warmup or capture-frame marker absent",
+      "result": "FAIL",
+      "start_timestamp": "2026-07-25T21:20:25.514Z",
+      "state": "EVIDENCE_FINALIZED",
+      "terminal_timestamp": "2026-07-25T21:20:25.514Z"
+    }
+  ]
+}

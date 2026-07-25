@@ -1,25 +1,15 @@
-# Replace PACKAGE and OUT before use. These commands are reference only.
-adb get-state
-adb shell getprop ro.product.manufacturer
-adb shell getprop ro.product.model
-adb shell getprop ro.soc.model
-adb shell getprop ro.build.version.release
-adb shell getprop ro.build.version.sdk
-adb shell getprop ro.product.cpu.abi
-adb shell getprop ro.build.fingerprint
-adb shell wm size
-adb shell wm density
-adb shell cat /proc/meminfo
-adb shell dumpsys SurfaceFlinger > OUT/surfaceflinger.txt
-adb shell dumpsys thermalservice > OUT/thermal-start.txt
+# Replace <package> and <component> for each candidate.
+adb install -r -t <apk>
+adb shell pm path <package>
+adb shell cmd package resolve-activity --brief <package>
 adb logcat -c
-adb shell monkey -p PACKAGE -c android.intent.category.LAUNCHER 1
-adb shell pidof PACKAGE
-adb logcat -d -v threadtime > OUT/logcat-runtime.txt
-adb exec-out screencap -p > OUT/screenshot.png
-adb shell dumpsys gfxinfo PACKAGE framestats > OUT/gfxinfo-framestats.txt
-adb shell dumpsys meminfo PACKAGE > OUT/app-meminfo.txt
-adb shell dumpsys thermalservice > OUT/thermal-end.txt
-adb shell input keyevent 3
-adb shell monkey -p PACKAGE -c android.intent.category.LAUNCHER 1
-adb logcat -d -v threadtime > OUT/logcat-final.txt
+adb shell am force-stop <package>
+adb shell pm clear <package>
+adb shell am start -W -S -n <component>
+adb shell pidof <package>
+adb shell dumpsys activity activities
+adb shell dumpsys window windows
+adb shell dumpsys gfxinfo <package> framestats
+adb shell dumpsys meminfo <package>
+adb shell dumpsys thermalservice
+adb logcat -d -v threadtime
