@@ -89,6 +89,8 @@ class G02ContractTest(unittest.TestCase):
         self.assertIn("sleep 60", text)
         self.assertIn("1920x1080", text)
         self.assertIn("DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE", text)
+        self.assertNotIn('local out="$OUTPUT_ROOT/$key" state_file="$out/state_machine.json"', text)
+        self.assertIn('local state_file="$out/state_machine.json"', text)
 
     def test_finalizer_declares_all_classifications_and_outputs(self) -> None:
         text = FINALIZER.read_text()

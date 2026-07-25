@@ -185,7 +185,8 @@ PY
 
 run_candidate() {
   local key="$1" expected_renderer="$2" package="$3" apk="$4" override="$5"
-  local out="$OUTPUT_ROOT/$key" state_file="$out/state_machine.json"
+  local out="$OUTPUT_ROOT/$key"
+  local state_file="$out/state_machine.json"
   mkdir -p "$out/gfxinfo_samples" "$out/meminfo_samples"
   printf '{"schema_version":1,"candidate":"%s","expected_renderer":"%s","performance_label":"%s","states":[]}\n' "$key" "$expected_renderer" "$PERFORMANCE_LABEL" > "$state_file"
   cp "$override" "$out/renderer_override.json"
