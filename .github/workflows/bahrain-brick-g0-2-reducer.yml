@@ -1,117 +1,14 @@
-name: Bahrain Brick G0.2 Evidence Reducer and Finalizer Replay
+name: Bahrain Brick G0.2 Evidence Reducer and Finalizer Replay — Archived
 
 on:
-  pull_request:
-    branches: [work/bahrain-brick-g0-1-android-startup-root-cause-v1]
-    types: [synchronize]
-    paths:
-      - .github/workflows/bahrain-brick-g0-2-reducer.yml
+  workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
 
-concurrency:
-  group: bahrain-brick-g0-2-reducer
-  cancel-in-progress: false
-
-env:
-  SOURCE_ARTIFACT_ID: '8624075667'
-  SOURCE_ARTIFACT_SHA256: 677c0b55a937ee46f1f85dc600c9ac09c716bae58fd92638824f868792f90d69
-
 jobs:
-  reduce_and_finalize:
+  archived:
+    if: false
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
     steps:
-      - name: Check out G0.2 evidence tools
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 1
-
-      - name: Install report dependency
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil
-
-      - name: Download exact adjudicative raw artifact
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/g0_2_reducer
-          curl --fail --location --retry 3 --retry-all-errors \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip" \
-            --output build/g0_2_reducer/source.zip
-          echo "$SOURCE_ARTIFACT_SHA256  build/g0_2_reducer/source.zip" | sha256sum -c -
-
-      - name: Retain candidate diagnostics and exclude emulator disks
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib,json,re,zipfile
-          root=Path('build/g0_2_reducer')
-          archive=root/'source.zip'; retained=root/'retained'; retained.mkdir(parents=True,exist_ok=True)
-          inventory=[]; kept=[]; excluded=[]
-          excluded_pattern=re.compile(r'(^|/)(avd-|emulator-home-)|(?:^|/)(?:userdata|cache|system|vendor|encryptionkey|sdcard)\.img(?:\.qcow2)?$|\.qcow2$|\.apk$',re.I)
-          allowed_prefixes=('raw/','reports/','staged_device_handoff/','source/SOURCE_EXTRACTION.json','paired-runner.log','EMULATOR_ACCELERATION.txt')
-          with zipfile.ZipFile(archive) as zf:
-              for info in zf.infolist():
-                  if info.is_dir():
-                      continue
-                  path=info.filename
-                  record={'path':path,'uncompressed_size':info.file_size,'compressed_size':info.compress_size}
-                  reason=None
-                  if not path.startswith(allowed_prefixes): reason='outside_reducer_scope'
-                  elif excluded_pattern.search(path): reason='emulator_disk_or_apk_binary'
-                  elif info.file_size > 100*1024*1024: reason='per_file_ceiling_100mb'
-                  if reason:
-                      record.update({'retained':False,'exclusion_reason':reason,'sha256':None}); excluded.append(record); inventory.append(record); continue
-                  data=zf.read(info)
-                  digest=hashlib.sha256(data).hexdigest()
-                  target=retained/path; target.parent.mkdir(parents=True,exist_ok=True); target.write_bytes(data)
-                  record.update({'retained':True,'exclusion_reason':None,'sha256':digest}); kept.append(record); inventory.append(record)
-          for name,payload in [('archive_inventory.json',inventory),('retained_inventory.json',kept),('excluded_inventory.json',excluded)]:
-              (root/name).write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
-          summary={'schema_version':1,'source_artifact_id':8624075667,'retained_files':len(kept),'excluded_files':len(excluded),'retained_bytes':sum(x['uncompressed_size'] for x in kept),'android_rerun_performed':False}
-          (root/'reduction_summary.json').write_text(json.dumps(summary,indent=2,sort_keys=True)+'\n')
-          PY
-          rm -f build/g0_2_reducer/source.zip
-
-      - name: Replay finalizer against retained raw evidence
-        shell: bash
-        run: |
-          set -uo pipefail
-          mkdir -p build/g0_2_reducer/replayed_reports build/g0_2_reducer/replayed_handoff
-          set +e
-          python3 tools/graphics/finalize_g0_2_android_evidence.py \
-            --raw build/g0_2_reducer/retained/raw \
-            --output build/g0_2_reducer/replayed_reports \
-            --handoff-output build/g0_2_reducer/replayed_handoff \
-            > build/g0_2_reducer/finalizer.stdout.txt \
-            2> build/g0_2_reducer/finalizer.stderr.txt
-          code=$?
-          set -e
-          printf '%s\n' "$code" > build/g0_2_reducer/finalizer.exit-code.txt
-          python3 - <<'PY'
-          from pathlib import Path
-          import json
-          root=Path('build/g0_2_reducer')
-          code=int((root/'finalizer.exit-code.txt').read_text())
-          required=['raw/gl_compatibility/state_machine.json','raw/mobile_vulkan/state_machine.json','raw/gl_compatibility/logcat_full.txt','raw/mobile_vulkan/logcat_full.txt']
-          payload={'schema_version':1,'finalizer_exit_code':code,'required_raw_present':{item:(root/'retained'/item).is_file() for item in required},'reports_generated':(root/'replayed_reports/G0_2_TERMINAL_REPORT.json').is_file()}
-          (root/'finalizer_replay_summary.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
-          PY
-
-      - name: Upload compact reduction and replay evidence
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with:
-          name: bahrain-brick-g0-2-reduced-${{ github.run_id }}
-          path: build/g0_2_reducer
-          if-no-files-found: error
-          retention-days: 30
+      - run: echo 'Reduction completed in run 30175596770. Do not rerun Android or reduction.'
