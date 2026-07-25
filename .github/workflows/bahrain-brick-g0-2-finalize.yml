@@ -1,0 +1,304 @@
+name: Bahrain Brick G0.2 Terminal Report Finalization
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-g0-1-android-startup-root-cause-v1]
+    types: [synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-g0-2-finalize.yml
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bahrain-brick-g0-2-terminal-finalization
+  cancel-in-progress: false
+
+env:
+  REDUCED_ARTIFACT_ID: '8624118896'
+  REDUCED_ARTIFACT_SHA256: 6581fef39feed0501af438ae73ef6abbb9118851fd10e7ec8ffa6dac0b6f7156
+
+jobs:
+  finalize_terminal_reports:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact G0.2 branch head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Determine whether terminal packaging is required
+        id: gate
+        shell: bash
+        run: |
+          if test -s reports/graphics/g0_2/G0_2_TERMINAL_REPORT.json; then
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install report dependency
+        if: steps.gate.outputs.needed == 'true'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends python3-pil
+
+      - name: Apply and verify finalizer corrections
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/apply_g0_2_finalizer_fix.py
+          python3 -m py_compile tools/graphics/finalize_g0_2_android_evidence.py
+          python3 -m unittest tests/graphics/test_finalize_g0_2_android_evidence.py -v
+          python3 -m unittest tests/graphics/test_g0_2_android_renderer_qualification_contract.py -v
+
+      - name: Download exact compact adjudicative evidence
+        if: steps.gate.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/g0_2_terminal/reduced
+          curl --fail --location --retry 3 --retry-all-errors \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$REDUCED_ARTIFACT_ID/zip" \
+            --output build/g0_2_terminal/reduced.zip
+          echo "$REDUCED_ARTIFACT_SHA256  build/g0_2_terminal/reduced.zip" | sha256sum -c -
+          unzip -q build/g0_2_terminal/reduced.zip -d build/g0_2_terminal/reduced
+          rm -f build/g0_2_terminal/reduced.zip
+
+      - name: Generate G0.2 terminal reports and dual-device handoff
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/finalize_g0_2_android_evidence.py \
+            --raw build/g0_2_terminal/reduced/retained/raw \
+            --output build/g0_2_terminal/reports \
+            --handoff-output build/g0_2_terminal/handoff
+
+      - name: Reconcile exact terminal authority and project ledger
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+
+          reports=Path('build/g0_2_terminal/reports')
+          terminal_path=reports/'G0_2_TERMINAL_REPORT.json'
+          terminal=json.loads(terminal_path.read_text())
+          gl=json.loads((reports/'gl_compatibility/runtime.json').read_text())
+          mobile=json.loads((reports/'mobile_vulkan/runtime.json').read_text())
+          shared=json.loads((reports/'shared_import_equivalence.json').read_text())
+          gl_class=json.loads((reports/'gl_compatibility/classification.json').read_text())
+          mobile_class=json.loads((reports/'mobile_vulkan/classification.json').read_text())
+          comparison=json.loads((reports/'screenshot_comparison.json').read_text())
+          terminal.update({
+            'execution_authority':{
+              'adjudicative_workflow_run_id':30175169997,
+              'adjudicative_job_id':89722664363,
+              'raw_artifact_id':8624075667,
+              'raw_artifact_digest':'sha256:677c0b55a937ee46f1f85dc600c9ac09c716bae58fd92638824f868792f90d69',
+              'reducer_run_id':30175596770,
+              'reducer_job_id':89723763711,
+              'reduced_artifact_id':8624118896,
+              'reduced_artifact_digest':'sha256:6581fef39feed0501af438ae73ef6abbb9118851fd10e7ec8ffa6dac0b6f7156',
+              'android_rerun_during_finalization':False,
+            },
+            'non_adjudicative_exceptions':[
+              {'run_id':30174847173,'boundary':'pre-emulator shell-scope harness failure','evidence_use':'EXCLUDED_FROM_ADJUDICATION'},
+              {'run_id':30175107599,'boundary':'pre-Android contract failure','evidence_use':'EXCLUDED_FROM_ADJUDICATION'},
+              {'run_id':30175210630,'boundary':'duplicate run cancelled during candidate execution','cancellation_run_id':30175548334,'evidence_use':'EXCLUDED_FROM_ADJUDICATION'},
+            ],
+            'shared_import_file_count':shared.get('file_count'),
+            'shared_import_aggregate_byte_count':shared.get('aggregate_byte_count'),
+            'shared_import_aggregate_sha256':shared.get('aggregate_sha256'),
+            'gl_compatibility':{
+              'classification':'ANDROID_CRITICAL_RUNTIME_FAILURE',
+              'functional_pass':False,
+              'earliest_failed_state':gl_class.get('earliest_failed_state'),
+              'decisive_evidence':'45 renderer-blocking SceneShaderGLES3 program-link failures; Java/native/linker/ANR/missing-resource counts were zero.',
+              'launch_status':gl.get('launch',{}).get('status'),
+              'renderer_identity':gl.get('renderer_identity'),
+              'screenshot':gl.get('screenshot'),
+              'critical_log_scan':gl.get('critical_log_scan'),
+              'frame_metrics':gl.get('frame_metrics'),
+              'memory':gl.get('memory'),
+            },
+            'mobile_vulkan':{
+              'classification':'ANDROID_SCENE_READINESS_FAILURE',
+              'functional_pass':False,
+              'earliest_failed_state':mobile_class.get('earliest_failed_state'),
+              'decisive_evidence':'Process, visible window, Godot, Vulkan renderer identity, mission, and scene readiness passed; warm-up/capture-frame markers were absent at the bounded timeout.',
+              'launch_status':mobile.get('launch',{}).get('status'),
+              'renderer_identity':mobile.get('renderer_identity'),
+              'process_created':mobile.get('process_created'),
+              'window_became_visible':mobile.get('window_became_visible'),
+              'screenshot':mobile.get('screenshot'),
+            },
+            'terminal_outcome':'G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL',
+            'screenshot_comparison':comparison,
+            'gate_g0':'G0_EVIDENCE_INSUFFICIENT',
+            'renderer_decision':None,
+            'renderer_defaults_modified':False,
+            'physical_device_evidence_complete':False,
+            'device_handoff_tests_performed':False,
+            'g1_authorized':False,
+            'unresolved_blockers':[
+              'GL Compatibility emitted renderer-blocking GLES3 shader program-link failures on the API 34 emulator.',
+              'Mobile Vulkan did not reach warm-up frame 180 or capture frame 300 within the bounded evidence window.',
+              'Paired valid Android screenshots and paired lifecycle evidence are incomplete because Mobile stopped before capture.',
+              'Named physical-device qualification is unavailable.',
+              'Emulator measurements are diagnostic only and cannot select the production renderer.',
+            ],
+          })
+          terminal_path.write_text(json.dumps(terminal,indent=2,sort_keys=True)+'\n')
+          (reports/'G0_2_TERMINAL_REPORT.md').write_text(f'''# Bahrain Brick — Stage G0.2 Terminal Report
+
+## Terminal outcome
+
+`G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL`
+
+- GL Compatibility: `ANDROID_CRITICAL_RUNTIME_FAILURE`. Package, explicit launch, process, visible window, OpenGL renderer identity, mission, scene readiness, capture frame 300, valid 1920 × 1080 screenshot, 60-second liveness, and pause/resume passed. The earliest failed state was `CRITICAL_LOG_SCAN_PASSED`, with 45 `SceneShaderGLES3: Program linking failed` events.
+- Mobile Vulkan: `ANDROID_SCENE_READINESS_FAILURE`. Package, explicit launch, process creation, visible window, Godot, Vulkan renderer identity, mission, and scene readiness passed. The earliest failed state was `CAPTURE_FRAME_REACHED`: warm-up frame 180 and capture frame 300 were absent at the bounded timeout.
+- Shared imported-state equivalence: `{shared.get('byte_identical_clones')}` across `{shared.get('file_count')}` files, aggregate SHA-256 `{shared.get('aggregate_sha256')}`.
+- Emulator measurements are `DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE`.
+
+## Screenshot boundary
+
+GL produced a valid non-black 1920 × 1080 screenshot. Mobile did not reach screenshot capture. Its required PNG output is an explicit black missing-evidence placeholder marked `source_evidence_present=false`; structural and pixel comparison were not performed.
+
+## Execution authority
+
+- Adjudicative Android run: `30175169997`, job `89722664363`.
+- Raw artifact: `8624075667`, digest `sha256:677c0b55a937ee46f1f85dc600c9ac09c716bae58fd92638824f868792f90d69`.
+- Reducer/finalizer replay: `30175596770`, job `89723763711`.
+- Reduced artifact: `8624118896`, digest `sha256:6581fef39feed0501af438ae73ef6abbb9118851fd10e7ec8ffa6dac0b6f7156`.
+- No Android rerun was performed during terminal report generation.
+
+## Gate boundary
+
+The graphics gate remains `G0_EVIDENCE_INSUFFICIENT`. No renderer is selected, renderer defaults remain unchanged, the dual-renderer physical-device handoff remains unexecuted, and G1 remains unauthorized.
+''')
+
+          state_path=Path('.ai/project-state.json')
+          state=json.loads(state_path.read_text())
+          state['stage_g0_2']={
+            'title':'ANDROID PAIRED-RENDERER FUNCTIONAL QUALIFICATION',
+            'state':'CLOSED',
+            'terminal_outcome':'G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL',
+            'gl_classification':'ANDROID_CRITICAL_RUNTIME_FAILURE',
+            'mobile_classification':'ANDROID_SCENE_READINESS_FAILURE',
+            'adjudicative_run_id':30175169997,
+            'raw_artifact_id':8624075667,
+            'reducer_run_id':30175596770,
+            'reduced_artifact_id':8624118896,
+            'shared_import_equivalence_passed':True,
+            'renderer_decision':None,
+            'renderer_defaults_modified':False,
+            'physical_device_evidence_complete':False,
+            'device_handoff_tests_performed':False,
+            'g1_authorized':False,
+          }
+          state['next_action']={
+            'stage':'G0.2 closed',
+            'action':'Execute the dual-renderer handoff on named physical devices only after explicit authorization. Do not select a renderer or begin G1.',
+          }
+          state_path.write_text(json.dumps(state,indent=2,sort_keys=True)+'\n')
+          Path('.ai/CHECKPOINT.md').write_text('''# Bahrain Brick Graphics — G0.2 Checkpoint
+
+Recorded: 2026-07-25
+
+## Terminal state
+
+- Stage: **BAHRAIN BRICK — STAGE G0.2**
+- Outcome: `G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL`
+- GL Compatibility: `ANDROID_CRITICAL_RUNTIME_FAILURE`
+- Mobile Vulkan: `ANDROID_SCENE_READINESS_FAILURE`
+- Shared imported-state equivalence: passed
+- Renderer selected: no
+- Renderer defaults changed: no
+- Physical-device tests: not executed
+- Graphics gate: `G0_EVIDENCE_INSUFFICIENT`
+- G1: unauthorized
+
+## Decisive evidence
+
+GL completed launch, rendering, scene, capture, screenshot, liveness, and lifecycle, but emitted 45 renderer-blocking GLES3 program-link failures. Mobile completed launch, process, visible window, Vulkan identity, mission, and scene readiness, but did not reach warm-up frame 180 or capture frame 300 before the bounded timeout.
+
+## Evidence authority
+
+- Android run `30175169997`, job `89722664363`
+- Raw artifact `8624075667`
+- Reducer run `30175596770`, job `89723763711`
+- Reduced artifact `8624118896`
+- Reports: `reports/graphics/g0_2/`
+- Dual-device handoff: `reports/graphics/g0/device_handoff/` — generated, not executed
+
+## Boundary
+
+No renderer is selected. Renderer defaults and production paths remain unchanged. Named physical-device evidence is still required. Do not begin G1.
+''')
+          PY
+
+      - name: Validate and stage terminal outputs
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('build/g0_2_terminal/reports')
+          required=[
+            'authority.json','shared_import_equivalence.json','emulator_environment.json','apk_inventory.json',
+            'gl_compatibility/state_machine.json','gl_compatibility/package_report.json','gl_compatibility/launch_report.json','gl_compatibility/runtime.json','gl_compatibility/frame_metrics.csv','gl_compatibility/logcat_full.txt','gl_compatibility/logcat_critical.txt','gl_compatibility/screenshot.png','gl_compatibility/classification.json',
+            'mobile_vulkan/state_machine.json','mobile_vulkan/package_report.json','mobile_vulkan/launch_report.json','mobile_vulkan/runtime.json','mobile_vulkan/frame_metrics.csv','mobile_vulkan/logcat_full.txt','mobile_vulkan/logcat_critical.txt','mobile_vulkan/screenshot.png','mobile_vulkan/classification.json',
+            'screenshot_comparison.json','screenshot_difference.png','G0_2_TERMINAL_REPORT.json','G0_2_TERMINAL_REPORT.md',
+          ]
+          for rel in required:
+            path=root/rel
+            assert path.is_file() and path.stat().st_size>0,(rel,path.stat().st_size if path.exists() else None)
+          for path in root.rglob('*.json'): json.loads(path.read_text())
+          terminal=json.loads((root/'G0_2_TERMINAL_REPORT.json').read_text())
+          assert terminal['terminal_outcome']=='G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL'
+          assert terminal['gl_compatibility']['classification']=='ANDROID_CRITICAL_RUNTIME_FAILURE'
+          assert terminal['mobile_vulkan']['classification']=='ANDROID_SCENE_READINESS_FAILURE'
+          assert terminal['gate_g0']=='G0_EVIDENCE_INSUFFICIENT'
+          assert terminal['renderer_decision'] is None
+          assert terminal['renderer_defaults_modified'] is False
+          assert terminal['g1_authorized'] is False
+          assert terminal['device_handoff_tests_performed'] is False
+          assert terminal['screenshot_comparison']['comparison_performed'] is False
+          handoff=Path('build/g0_2_terminal/handoff')
+          for name in ('README.md','device_result.schema.json','run_device_test.sh','run_device_test.ps1','adb_capture_commands.txt','expected_markers.txt','apk_sha256.txt'):
+            path=handoff/name; assert path.is_file() and path.stat().st_size>0,name
+          json.loads((handoff/'device_result.schema.json').read_text())
+          PY
+          bash -n build/g0_2_terminal/handoff/run_device_test.sh
+          rm -rf reports/graphics/g0_2
+          mkdir -p reports/graphics/g0_2 reports/graphics/g0/device_handoff
+          cp -R build/g0_2_terminal/reports/. reports/graphics/g0_2/
+          cp build/g0_2_terminal/handoff/* reports/graphics/g0/device_handoff/
+
+      - name: Commit terminal reports and reconciled state
+        if: steps.gate.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add tools/graphics/finalize_g0_2_android_evidence.py tests/graphics/test_finalize_g0_2_android_evidence.py reports/graphics/g0_2 reports/graphics/g0/device_handoff .ai/project-state.json .ai/CHECKPOINT.md
+          git rm tools/graphics/apply_g0_2_finalizer_fix.py
+          allowed='^(tools/graphics/finalize_g0_2_android_evidence.py|tests/graphics/test_finalize_g0_2_android_evidence.py|reports/graphics/g0_2/|reports/graphics/g0/device_handoff/|\.ai/project-state\.json$|\.ai/CHECKPOINT\.md$)'
+          unexpected="$(git diff --cached --name-only | grep -Ev "$allowed" || true)"
+          test -z "$unexpected"
+          git commit -m 'G0.2: emit paired Android terminal qualification reports'
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
