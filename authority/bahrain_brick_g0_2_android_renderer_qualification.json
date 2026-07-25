@@ -10,6 +10,17 @@
   "frozen_head": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
   "source_artifact_id": 8586122615,
   "source_artifact_digest": "sha256:4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee",
+  "execution_evidence": {
+    "adjudicative_workflow_run_id": 30175169997,
+    "adjudicative_job_id": 89722664363,
+    "raw_artifact_id": 8624075667,
+    "raw_artifact_digest": "sha256:677c0b55a937ee46f1f85dc600c9ac09c716bae58fd92638824f868792f90d69",
+    "reducer_run_id": 30175596770,
+    "reducer_job_id": 89723763711,
+    "reduced_artifact_id": 8624118896,
+    "reduced_artifact_digest": "sha256:6581fef39feed0501af438ae73ef6abbb9118851fd10e7ec8ffa6dac0b6f7156",
+    "android_rerun_during_terminal_finalization": false
+  },
   "apk_variants": [
     {
       "key": "gl_compatibility",
