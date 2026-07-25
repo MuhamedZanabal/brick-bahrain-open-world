@@ -1,4 +1,5 @@
 name: Bahrain Brick G0.2 Terminal Evidence Packaging
+# terminal-state contract corrected
 
 on:
   pull_request:
