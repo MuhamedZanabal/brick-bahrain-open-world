@@ -1,0 +1,21 @@
+name: Cancel Duplicate G0.2 Android Run
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-g0-1-android-startup-root-cause-v1]
+    types: [synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-g0-2-cancel-duplicates.yml
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cancel_duplicate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Cancel only non-adjudicative duplicate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh api --method POST repos/$GITHUB_REPOSITORY/actions/runs/30175210630/cancel
