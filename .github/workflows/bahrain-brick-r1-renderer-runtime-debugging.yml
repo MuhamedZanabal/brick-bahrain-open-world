@@ -1,0 +1,109 @@
+name: Bahrain Brick R1 Renderer Runtime Debugging
+
+on:
+  pull_request:
+    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
+    types: [opened]
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: bahrain-brick-r1-runtime-debugging
+  cancel-in-progress: false
+
+jobs:
+  renderer_runtime_diagnostics:
+    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - name: Check out exact R1 head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Validate R1 diagnostic contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/graphics/test_r1_renderer_runtime_debugging_contract.py -v
+          python3 -m unittest tests/graphics/test_r1_finalize_runtime_debug.py -v
+          python3 -m py_compile tools/graphics/prepare_r1_android_variant.py tools/graphics/finalize_r1_renderer_debug.py
+          bash -n tools/graphics/run_r1_renderer_debug.sh
+
+      - name: Set up Java 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+          check-latest: false
+
+      - name: Set up API 34 AOSP x86_64 Android environment
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            emulator
+            platforms;android-34
+            build-tools;34.0.0
+            system-images;android-34;default;x86_64
+
+      - name: Install host diagnostic dependencies and enable KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+          "$ANDROID_SDK_ROOT/emulator/emulator" -accel-check | tee build-r1-acceleration.txt || true
+
+      - name: Execute independent Track A and Track B diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/graphics/run_r1_renderer_debug.sh "$PWD" "$PWD/build/r1" \
+            2>&1 | tee build/r1-runner.log
+
+      - name: Re-run report classifier from retained raw evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/finalize_r1_renderer_debug.py \
+            --raw build/r1/raw \
+            --output build/r1/reports/graphics/r1
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('build/r1/reports/graphics/r1')
+          report=json.loads((root/'R1_DIAGNOSTIC_REPORT.json').read_text())
+          assert report['governing_gate']=='G0_EVIDENCE_INSUFFICIENT'
+          assert report['production_fixes_applied'] is False
+          assert report['production_fix_authorized'] is False
+          assert report['renderer_defaults_modified'] is False
+          assert report['g1_authorized'] is False
+          assert (root/'track_a_gl/scenario_matrix.json').is_file()
+          assert (root/'track_b_mobile/classification.json').is_file()
+          PY
+
+      - name: Upload bounded R1 diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-r1-runtime-debug-${{ github.run_id }}
+          path: |
+            build/r1/reports/graphics/r1
+            build/r1/raw
+            build/r1/APK_SHA256SUMS.txt
+            build/r1/GL_VARIANT_OVERRIDE.json
+            build/r1/MOBILE_VARIANT_OVERRIDE.json
+            build/r1/GODOT_VERSION.txt
+            build/r1/shared-import.log
+            build/r1-runner.log
+            build-r1-acceleration.txt
+          if-no-files-found: error
+          retention-days: 30
