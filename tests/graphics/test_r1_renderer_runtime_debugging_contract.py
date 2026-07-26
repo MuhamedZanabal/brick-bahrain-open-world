@@ -98,7 +98,7 @@ class R1ContractTest(unittest.TestCase):
     def test_workflow_is_bounded_to_r1(self) -> None:
         text = WORKFLOW.read_text()
         self.assertIn("work/bahrain-brick-renderer-runtime-debugging-r1", text)
-        self.assertIn("types: [opened, synchronize]", text)
+        self.assertIn("types: [synchronize]", text)
         self.assertIn("paths:\n      - .github/workflows/bahrain-brick-r1-renderer-runtime-debugging.yml", text)
         self.assertIn("run_r1_renderer_debug.sh", text)
         self.assertIn("finalize_r1_renderer_debug.py", text)
