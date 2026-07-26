@@ -17,6 +17,7 @@ NEW_BLOCK = '''write_mode_file() {
   local local_mode_file="$OUTPUT_ROOT/r1-mode-${package//./_}.txt"
   printf '%s' "$mode" > "$local_mode_file"
   "$ADB" push "$local_mode_file" /data/local/tmp/r1_mode.txt >/dev/null
+  "$ADB" shell run-as "$package" mkdir -p files
   "$ADB" shell run-as "$package" cp /data/local/tmp/r1_mode.txt files/r1_mode.txt
   "$ADB" shell rm -f /data/local/tmp/r1_mode.txt
   "$ADB" exec-out run-as "$package" cat files/r1_mode.txt > "$local_mode_file.verified"
@@ -46,6 +47,7 @@ def patch_runner(runner: Path, report: Path) -> dict[str, object]:
         raise ValueError("fragile nested run-as shell mode writer remains")
     for marker in (
         b'/data/local/tmp/r1_mode.txt',
+        b'run-as "$package" mkdir -p files',
         b'run-as "$package" cp /data/local/tmp/r1_mode.txt files/r1_mode.txt',
         b'cmp -s "$local_mode_file" "$local_mode_file.verified"',
     ):
@@ -61,7 +63,7 @@ def patch_runner(runner: Path, report: Path) -> dict[str, object]:
         "before_sha256": sha256(before),
         "after_sha256": sha256(after),
         "changed": before != after,
-        "mode_file_transfer": "ADB_PUSH_THEN_RUN_AS_CP_WITH_ROUND_TRIP_COMPARE",
+        "mode_file_transfer": "ADB_PUSH_THEN_RUN_AS_MKDIR_CP_WITH_ROUND_TRIP_COMPARE",
         "production_source_modified": False,
         "renderer_defaults_modified": False,
     }
