@@ -30,7 +30,11 @@ class R1ModeTransferPatchTest(unittest.TestCase):
             patched = runner.read_text()
             self.assertEqual(result["status"], "patched")
             self.assertNotIn('run-as "$package" sh -c "mkdir -p files', patched)
-            self.assertIn('run-as "$package" cp /data/local/tmp/r1_mode.txt files/r1_mode.txt', patched)
+            self.assertIn('run-as "$package" mkdir -p files', patched)
+            self.assertLess(
+                patched.index('run-as "$package" mkdir -p files'),
+                patched.index('run-as "$package" cp /data/local/tmp/r1_mode.txt files/r1_mode.txt'),
+            )
             self.assertIn('cmp -s "$local_mode_file" "$local_mode_file.verified"', patched)
             self.assertTrue(report.is_file())
 
