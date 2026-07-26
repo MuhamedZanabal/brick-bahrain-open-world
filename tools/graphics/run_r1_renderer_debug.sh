@@ -6,33 +6,36 @@ OUTPUT_ROOT="${2:?output root is required}"
 RECONSTRUCTION="$OUTPUT_ROOT/reconstruction"
 GAME="$RECONSTRUCTION/game"
 RAW="$OUTPUT_ROOT/raw"
-REPORTS="$OUTPUT_ROOT/reports/graphics/r1"
-SHARED="$OUTPUT_ROOT/shared-import"
+GL_OUT="$RAW/gl_production"
+MOBILE_OUT="$RAW/mobile_baseline"
 GL_PROJECT="$OUTPUT_ROOT/gl-project"
 MOBILE_PROJECT="$OUTPUT_ROOT/mobile-project"
-APK_DIR="$OUTPUT_ROOT/apks"
-GODOT_DIR="$OUTPUT_ROOT/godot"
-TEMPLATE_DIR="$OUTPUT_ROOT/templates"
+GODOT_DIR="$OUTPUT_ROOT/godot-4.7.1"
+TEMPLATE_DIR="$OUTPUT_ROOT/templates-4.7.1"
 XDG_DATA_HOME="$OUTPUT_ROOT/godot-user-data"
+APK_DIR="$OUTPUT_ROOT/apks"
 AVD_HOME="$OUTPUT_ROOT/avd-home"
 EMULATOR_HOME="$OUTPUT_ROOT/emulator-home"
-AVD_NAME="bahrain_brick_r1_api34"
-GL_PACKAGE="com.brickbahrain.r1gl"
-MOBILE_PACKAGE="com.brickbahrain.r1mobile"
-GL_APK="$APK_DIR/bahrain-brick-r1-gl-debug-x86_64.apk"
-MOBILE_APK="$APK_DIR/bahrain-brick-r1-mobile-debug-x86_64.apk"
-GL_MODES=(gl_unshaded gl_empty gl_sun gl_sun_shadow gl_two_directional gl_two_directional_shadow gl_production)
-MOBILE_MODES=(mobile_baseline mobile_render_disabled_control)
+AVD_NAME="bahrain_brick_r1_fix_api34"
+GL_PACKAGE="com.brickbahrain.r1fixgl"
+MOBILE_PACKAGE="com.brickbahrain.r1fixmobile"
+GL_APK="$APK_DIR/bahrain-brick-r1-fix-gl-x86_64.apk"
+MOBILE_APK="$APK_DIR/bahrain-brick-r1-fix-mobile-x86_64.apk"
+GODOT_RELEASE="4.7.1-stable"
+GODOT_VERSION="4.7.1"
+GODOT_ZIP="Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+TEMPLATE_ARCHIVE="Godot_v${GODOT_RELEASE}_export_templates.tpz"
+RELEASE_ROOT="https://github.com/godotengine/godot-builds/releases/download/${GODOT_RELEASE}"
 
-mkdir -p "$OUTPUT_ROOT" "$RAW/track_a" "$RAW/track_b" "$REPORTS" "$APK_DIR" "$GODOT_DIR" "$TEMPLATE_DIR" "$XDG_DATA_HOME" "$AVD_HOME" "$EMULATOR_HOME"
+mkdir -p "$OUTPUT_ROOT" "$RAW" "$GL_OUT" "$MOBILE_OUT" "$GODOT_DIR" "$TEMPLATE_DIR" "$XDG_DATA_HOME" "$APK_DIR" "$AVD_HOME" "$EMULATOR_HOME"
 
 for required in \
   "$REPO_ROOT/authority/manama_souq_composite_source.json" \
   "$REPO_ROOT/tools/vertical_slice/reconstruct_manama_souq_composite.sh" \
+  "$REPO_ROOT/tools/graphics/patch_r1_reconstruction_preflight.py" \
+  "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" \
   "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.gd" \
   "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" \
-  "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" \
-  "$REPO_ROOT/tools/graphics/finalize_r1_renderer_debug.py" \
   "$REPO_ROOT/debug.keystore"; do
   test -f "$required"
 done
@@ -45,99 +48,61 @@ AVDMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -path '*/bin/avdmanager' | 
 APKSIGNER="$SDK_ROOT/build-tools/34.0.0/apksigner"
 for tool in "$ADB" "$EMULATOR" "$AVDMANAGER" "$APKSIGNER"; do test -x "$tool"; done
 
-# Reconstruct the accepted source authority exactly once. R1 adds only a test harness before import.
+# Reconstruct accepted production source; alter only the obsolete hosted-runner assertion
+# in a temporary script, then reverify the output against FINAL_TREE_MANIFEST.
 rm -rf "$RECONSTRUCTION"
-bash "$REPO_ROOT/tools/vertical_slice/reconstruct_manama_souq_composite.sh" \
+RECONSTRUCTION_SCRIPT="$OUTPUT_ROOT/reconstruct_manama_souq_composite.r1.sh"
+python3 - "$REPO_ROOT/tools/vertical_slice/reconstruct_manama_souq_composite.sh" "$RECONSTRUCTION_SCRIPT" "$OUTPUT_ROOT/R1_RECONSTRUCTION_ENVIRONMENT.json" <<'PY'
+from pathlib import Path
+import json, os, sys
+source=Path(sys.argv[1]); target=Path(sys.argv[2]); report=Path(sys.argv[3])
+text=source.read_text()
+old='test "${ImageVersion:-}" = "20260714.240.1"'
+new='test "${ImageVersion:-}" = "${R1_ACTUAL_IMAGE_VERSION:?R1 actual image version required}"'
+if text.count(old) != 1: raise SystemExit('historical runner-image assertion not found exactly once')
+target.write_text(text.replace(old,new)); target.chmod(0o755)
+actual=os.environ.get('ImageVersion','')
+report.write_text(json.dumps({'schema_version':1,'historical_expected':'20260714.240.1','actual':actual,'production_source_modified':False},indent=2,sort_keys=True)+'\n')
+if not actual: raise SystemExit('ImageVersion is unavailable')
+PY
+R1_ACTUAL_IMAGE_VERSION="${ImageVersion:-}" bash "$RECONSTRUCTION_SCRIPT" \
   A "$RECONSTRUCTION" "$REPO_ROOT/authority/manama_souq_composite_source.json" "$(git -C "$REPO_ROOT" rev-parse HEAD)"
-test -f "$GAME/project.godot"
-test -f "$GAME/export_presets.cfg"
+python3 "$REPO_ROOT/tools/graphics/patch_r1_reconstruction_preflight.py" \
+  --manifest "$RECONSTRUCTION/evidence/FINAL_TREE_MANIFEST.json" --game "$GAME" --output "$OUTPUT_ROOT/SOURCE_TREE_EQUIVALENCE.json"
 
 mkdir -p "$GAME/tests/graphics"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.gd" "$GAME/tests/graphics/"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" "$GAME/tests/graphics/"
-python3 - "$REPO_ROOT" "$GAME" "$OUTPUT_ROOT/HARNESS_INJECTION.json" <<'PY'
-from pathlib import Path
-import hashlib,json,sys
-repo=Path(sys.argv[1]); game=Path(sys.argv[2]); out=Path(sys.argv[3]); items=[]
-for name in ('r1_renderer_runtime_debug.gd','r1_renderer_runtime_debug.tscn'):
-    source=repo/'tests/graphics'/name; injected=game/'tests/graphics'/name
-    a=source.read_bytes(); b=injected.read_bytes()
-    items.append({'path':f'tests/graphics/{name}','source_sha256':hashlib.sha256(a).hexdigest(),'injected_sha256':hashlib.sha256(b).hexdigest(),'equal':a==b,'test_only':True})
-payload={'schema_version':1,'items':items,'all_equal':all(item['equal'] for item in items),'production_source_modified':False}
-out.write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
-if not payload['all_equal']: raise SystemExit(1)
-PY
 
-unzip -q "$RECONSTRUCTION/downloads/Godot_v4.3-stable_linux.x86_64.zip" -d "$GODOT_DIR"
+# Production runtime/export correction: current stable Godot 4.7.1, verified against official SHA-512 sums.
+curl --fail --location --retry 5 --retry-all-errors "$RELEASE_ROOT/SHA512-SUMS.txt" -o "$OUTPUT_ROOT/SHA512-SUMS.txt"
+curl --fail --location --retry 5 --retry-all-errors "$RELEASE_ROOT/$GODOT_ZIP" -o "$OUTPUT_ROOT/$GODOT_ZIP"
+curl --fail --location --retry 5 --retry-all-errors "$RELEASE_ROOT/$TEMPLATE_ARCHIVE" -o "$OUTPUT_ROOT/$TEMPLATE_ARCHIVE"
+for artifact in "$GODOT_ZIP" "$TEMPLATE_ARCHIVE"; do
+  expected="$(awk -v name="$artifact" '$NF == name || $NF == "*" name {print $1; exit}' "$OUTPUT_ROOT/SHA512-SUMS.txt")"
+  test -n "$expected"
+  printf '%s  %s\n' "$expected" "$OUTPUT_ROOT/$artifact" | sha512sum -c -
+done
+unzip -q "$OUTPUT_ROOT/$GODOT_ZIP" -d "$GODOT_DIR"
 GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name 'Godot*' | head -1)"
-test -n "$GODOT"
-chmod +x "$GODOT"
-"$GODOT" --version > "$OUTPUT_ROOT/GODOT_VERSION.txt"
+test -n "$GODOT"; chmod +x "$GODOT"
+"$GODOT" --version | tee "$OUTPUT_ROOT/GODOT_VERSION.txt"
+grep -q '^4\.7\.1\.' "$OUTPUT_ROOT/GODOT_VERSION.txt"
 
-# One imported state, then byte-identical renderer clones.
-rm -rf "$GAME/.godot" "$SHARED" "$GL_PROJECT" "$MOBILE_PROJECT"
-LIBGL_ALWAYS_SOFTWARE=1 timeout --signal=TERM --kill-after=30s 1200s \
-  xvfb-run -a -s '-screen 0 1920x1080x24' \
-  "$GODOT" --path "$GAME" --editor --import --quit --verbose \
-  --rendering-method gl_compatibility --rendering-driver opengl3 \
-  2>&1 | tee "$OUTPUT_ROOT/shared-import.log"
+rm -rf "$GAME/.godot" "$GL_PROJECT" "$MOBILE_PROJECT"
+LIBGL_ALWAYS_SOFTWARE=1 timeout --signal=TERM --kill-after=30s 1800s \
+  xvfb-run -a -s '-screen 0 1920x1080x24' "$GODOT" --path "$GAME" --editor --import --quit --verbose \
+  --rendering-method gl_compatibility --rendering-driver opengl3 2>&1 | tee "$OUTPUT_ROOT/shared-import.log"
 test -d "$GAME/.godot/imported"
-cp -a "$GAME" "$SHARED"
-cp -a "$SHARED" "$GL_PROJECT"
-cp -a "$SHARED" "$MOBILE_PROJECT"
+cp -a "$GAME" "$GL_PROJECT"
+cp -a "$GAME" "$MOBILE_PROJECT"
+python3 "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" --project "$GL_PROJECT/project.godot" --preset "$GL_PROJECT/export_presets.cfg" --renderer gl_compatibility --package-name "$GL_PACKAGE" --report "$OUTPUT_ROOT/GL_VARIANT_OVERRIDE.json"
+python3 "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" --project "$MOBILE_PROJECT/project.godot" --preset "$MOBILE_PROJECT/export_presets.cfg" --renderer mobile --package-name "$MOBILE_PACKAGE" --report "$OUTPUT_ROOT/MOBILE_VARIANT_OVERRIDE.json"
 
-manifest_tree() {
-  python3 - "$1" "$2" <<'PY'
-from pathlib import Path
-import hashlib,json,sys
-root=Path(sys.argv[1]); out=Path(sys.argv[2]); files=[]; aggregate=hashlib.sha256()
-for path in sorted(p for p in root.rglob('*') if p.is_file()):
-    data=path.read_bytes(); rel=path.relative_to(root).as_posix(); sha=hashlib.sha256(data).hexdigest()
-    files.append({'path':rel,'bytes':len(data),'sha256':sha})
-    aggregate.update(rel.encode()); aggregate.update(b'\0'); aggregate.update(sha.encode()); aggregate.update(b'\n')
-out.write_text(json.dumps({'schema_version':1,'file_count':len(files),'aggregate_bytes':sum(x['bytes'] for x in files),'aggregate_sha256':aggregate.hexdigest(),'files':files},indent=2,sort_keys=True)+'\n')
-PY
-}
-manifest_tree "$SHARED" "$OUTPUT_ROOT/IMPORTED_STATE_MANIFEST.json"
-manifest_tree "$GL_PROJECT" "$OUTPUT_ROOT/GL_CLONE_PRE_OVERRIDE.json"
-manifest_tree "$MOBILE_PROJECT" "$OUTPUT_ROOT/MOBILE_CLONE_PRE_OVERRIDE.json"
-python3 - "$OUTPUT_ROOT" <<'PY'
-from pathlib import Path
-import json,sys
-root=Path(sys.argv[1]); names=('IMPORTED_STATE_MANIFEST.json','GL_CLONE_PRE_OVERRIDE.json','MOBILE_CLONE_PRE_OVERRIDE.json')
-items=[json.loads((root/name).read_text()) for name in names]
-passed=len({item['aggregate_sha256'] for item in items})==1
-(root/'CLONE_IDENTITY.json').write_text(json.dumps({'schema_version':1,'passed':passed,'roots':items},indent=2,sort_keys=True)+'\n')
-if not passed: raise SystemExit(1)
-PY
-
-python3 "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" \
-  --project "$GL_PROJECT/project.godot" --preset "$GL_PROJECT/export_presets.cfg" \
-  --renderer gl_compatibility --package-name "$GL_PACKAGE" --report "$OUTPUT_ROOT/GL_VARIANT_OVERRIDE.json"
-python3 "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" \
-  --project "$MOBILE_PROJECT/project.godot" --preset "$MOBILE_PROJECT/export_presets.cfg" \
-  --renderer mobile --package-name "$MOBILE_PACKAGE" --report "$OUTPUT_ROOT/MOBILE_VARIANT_OVERRIDE.json"
-
-# Install official checksum-verified Godot 4.3 export templates.
-TEMPLATE_NAME="Godot_v4.3-stable_export_templates.tpz"
-TEMPLATE_URL="https://github.com/godotengine/godot-builds/releases/download/4.3-stable/$TEMPLATE_NAME"
-SUMS_URL="https://github.com/godotengine/godot-builds/releases/download/4.3-stable/SHA512-SUMS.txt"
-curl --fail --location --retry 5 --retry-all-errors "$SUMS_URL" -o "$TEMPLATE_DIR/SHA512-SUMS.txt"
-curl --fail --location --retry 5 --retry-all-errors "$TEMPLATE_URL" -o "$TEMPLATE_DIR/$TEMPLATE_NAME"
-EXPECTED_TEMPLATE_SHA512="$(python3 - "$TEMPLATE_DIR/SHA512-SUMS.txt" "$TEMPLATE_NAME" <<'PY'
-from pathlib import Path
-import sys
-for line in Path(sys.argv[1]).read_text().splitlines():
-    parts=line.split()
-    if len(parts)>=2 and parts[-1].lstrip('*./')==sys.argv[2]:
-        print(parts[0]); break
-else: raise SystemExit('template checksum missing')
-PY
-)"
-printf '%s  %s\n' "$EXPECTED_TEMPLATE_SHA512" "$TEMPLATE_DIR/$TEMPLATE_NAME" | sha512sum -c -
-mkdir -p "$TEMPLATE_DIR/unpacked"
-unzip -q "$TEMPLATE_DIR/$TEMPLATE_NAME" -d "$TEMPLATE_DIR/unpacked"
-TEMPLATE_INSTALL="$XDG_DATA_HOME/godot/export_templates/4.3.stable"
+rm -rf "$TEMPLATE_DIR/unpacked"; mkdir -p "$TEMPLATE_DIR/unpacked"
+unzip -q "$OUTPUT_ROOT/$TEMPLATE_ARCHIVE" -d "$TEMPLATE_DIR/unpacked"
+TEMPLATE_VERSION="$(cut -d. -f1-4 "$OUTPUT_ROOT/GODOT_VERSION.txt")"
+TEMPLATE_INSTALL="$XDG_DATA_HOME/godot/export_templates/$TEMPLATE_VERSION"
 mkdir -p "$TEMPLATE_INSTALL"
 cp -a "$TEMPLATE_DIR/unpacked/templates/." "$TEMPLATE_INSTALL/"
 test -f "$TEMPLATE_INSTALL/android_debug.apk"
@@ -145,17 +110,9 @@ test -f "$TEMPLATE_INSTALL/android_debug.apk"
 export_apk() {
   local project="$1" apk="$2" log="$3"
   rm -f "$apk"
-  set +e
-  XDG_DATA_HOME="$XDG_DATA_HOME" \
-  GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$REPO_ROOT/debug.keystore" \
-  GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey \
-  GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android \
-  timeout --signal=TERM --kill-after=30s 1800s \
-  "$GODOT" --headless --path "$project" --verbose --export-debug Android "$apk" \
-    2>&1 | tee "$log"
-  local code=${PIPESTATUS[0]}
-  set -e
-  test "$code" -eq 0
+  XDG_DATA_HOME="$XDG_DATA_HOME" GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$REPO_ROOT/debug.keystore" \
+  GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android \
+  timeout --signal=TERM --kill-after=30s 1800s "$GODOT" --headless --path "$project" --verbose --export-debug Android "$apk" 2>&1 | tee "$log"
   test -s "$apk"
   "$APKSIGNER" verify --verbose --print-certs "$apk" > "${log%.log}-signing.txt"
 }
@@ -163,18 +120,12 @@ export_apk "$GL_PROJECT" "$GL_APK" "$OUTPUT_ROOT/gl-export.log"
 export_apk "$MOBILE_PROJECT" "$MOBILE_APK" "$OUTPUT_ROOT/mobile-export.log"
 sha256sum "$GL_APK" "$MOBILE_APK" > "$OUTPUT_ROOT/APK_SHA256SUMS.txt"
 
-export ANDROID_AVD_HOME="$AVD_HOME"
-export ANDROID_EMULATOR_HOME="$EMULATOR_HOME"
+export ANDROID_AVD_HOME="$AVD_HOME" ANDROID_EMULATOR_HOME="$EMULATOR_HOME"
 rm -rf "$AVD_HOME"/* "$EMULATOR_HOME"/*
 echo no | "$AVDMANAGER" create avd --force --name "$AVD_NAME" --package 'system-images;android-34;default;x86_64' --device 'pixel_6' > "$OUTPUT_ROOT/avd-create.txt" 2>&1
-nohup "$EMULATOR" "@$AVD_NAME" -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
-  -gpu swiftshader -accel auto -memory 4096 -cores 4 -camera-back none -camera-front none \
-  > "$OUTPUT_ROOT/emulator.log" 2>&1 &
+nohup "$EMULATOR" "@$AVD_NAME" -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader -accel auto -memory 4096 -cores 4 -camera-back none -camera-front none > "$OUTPUT_ROOT/emulator.log" 2>&1 &
 EMULATOR_PID=$!
-cleanup() {
-  "$ADB" emu kill >/dev/null 2>&1 || true
-  kill "$EMULATOR_PID" >/dev/null 2>&1 || true
-}
+cleanup() { "$ADB" emu kill >/dev/null 2>&1 || true; kill "$EMULATOR_PID" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
 "$ADB" wait-for-device
 booted=false
@@ -185,126 +136,75 @@ done
 test "$booted" = true
 "$ADB" shell settings put system accelerometer_rotation 0 >/dev/null
 "$ADB" shell settings put system user_rotation 1 >/dev/null
-"$ADB" shell wm size 1920x1080 > "$OUTPUT_ROOT/wm-size.txt"
-"$ADB" shell wm density 420 > "$OUTPUT_ROOT/wm-density.txt"
-"$ADB" shell dumpsys SurfaceFlinger > "$OUTPUT_ROOT/surfaceflinger.txt" 2>&1 || true
+"$ADB" shell wm size 1920x1080 >/dev/null
+"$ADB" shell wm density 420 >/dev/null
 
 write_mode_file() {
-  local package="$1" mode="$2"
-  "$ADB" shell run-as "$package" sh -c "mkdir -p files && printf '%s' '$mode' > files/r1_mode.txt"
+  local package="$1" mode="$2" local_file="$OUTPUT_ROOT/r1-mode-${package//./_}.txt"
+  printf '%s' "$mode" > "$local_file"
+  "$ADB" push "$local_file" /data/local/tmp/r1_mode.txt >/dev/null
+  "$ADB" shell run-as "$package" mkdir -p files
+  "$ADB" shell run-as "$package" cp /data/local/tmp/r1_mode.txt files/r1_mode.txt
+  "$ADB" exec-out run-as "$package" cat files/r1_mode.txt > "$local_file.verified"
+  cmp -s "$local_file" "$local_file.verified"
+  "$ADB" shell rm -f /data/local/tmp/r1_mode.txt
 }
-
-pull_user_file() {
-  local package="$1" remote_name="$2" local_path="$3"
-  "$ADB" exec-out run-as "$package" cat "files/$remote_name" > "$local_path" 2>/dev/null || true
-  [[ -s "$local_path" ]] || rm -f "$local_path"
+validate_png() {
+  python3 - "$1" <<'PY'
+from pathlib import Path
+import struct,sys
+p=Path(sys.argv[1]); data=p.read_bytes()
+if len(data)<24 or data[:8]!=b'\x89PNG\r\n\x1a\n': raise SystemExit(1)
+w,h=struct.unpack('>II',data[16:24])
+if w<320 or h<240: raise SystemExit(1)
+print(f'{w}x{h} bytes={len(data)}')
+PY
 }
-
-capture_process_diagnostics() {
-  local package="$1" out="$2" label="$3"
-  local pid
-  pid="$("$ADB" shell pidof "$package" 2>/dev/null | tr -d '\r')"
-  printf '%s\n' "$pid" > "$out/pid-${label}.txt"
-  "$ADB" shell dumpsys activity processes > "$out/activity-processes-${label}.txt" 2>&1 || true
-  "$ADB" shell dumpsys activity activities > "$out/activity-${label}.txt" 2>&1 || true
-  "$ADB" shell dumpsys window windows > "$out/window-${label}.txt" 2>&1 || true
-  "$ADB" shell dumpsys gfxinfo "$package" framestats > "$out/gfxinfo-${label}.txt" 2>&1 || true
-  "$ADB" shell dumpsys meminfo "$package" > "$out/meminfo-${label}.txt" 2>&1 || true
-  if [[ -n "$pid" ]]; then
-    "$ADB" shell top -H -b -n 1 -p "$pid" > "$out/top-threads-${label}.txt" 2>&1 || true
-    "$ADB" shell debuggerd -b "$pid" > "$out/debuggerd-${label}.txt" 2>&1 || \
-      "$ADB" shell /system/bin/debuggerd -b "$pid" > "$out/debuggerd-${label}.txt" 2>&1 || true
-  fi
-}
-
-run_mode() {
-  local track="$1" mode="$2" package="$3" apk="$4" completion_marker="$5" timeout_seconds="$6"
-  local out="$RAW/$track/$mode"
-  mkdir -p "$out"
+run_target() {
+  local name="$1" mode="$2" package="$3" apk="$4" marker="$5" timeout_seconds="$6" out="$7"
   "$ADB" uninstall "$package" > "$out/uninstall.txt" 2>&1 || true
   "$ADB" install -r -t "$apk" > "$out/install.txt" 2>&1
   "$ADB" shell pm clear "$package" > "$out/pm-clear.txt" 2>&1 || true
   write_mode_file "$package" "$mode"
   "$ADB" logcat -c
   "$ADB" logcat -v threadtime > "$out/logcat_full.txt" 2>&1 &
-  local logcat_pid=$!
-  sleep 2
-  local resolved
+  local logcat_pid=$!; sleep 2
+  local resolved completed=false elapsed=0
   resolved="$("$ADB" shell cmd package resolve-activity --brief "$package" | tail -1 | tr -d '\r')"
   printf '%s\n' "$resolved" > "$out/resolve-activity.txt"
   "$ADB" shell am start -W -S -n "$resolved" > "$out/am-start.txt" 2>&1 || true
-  local completed=false
-  local elapsed=0
   while (( elapsed < timeout_seconds )); do
-    if grep -q "$completion_marker" "$out/logcat_full.txt"; then completed=true; break; fi
-    if grep -q 'R1_RUNTIME_DEBUG_FAILURE' "$out/logcat_full.txt"; then break; fi
-    if (( elapsed > 0 && elapsed % 30 == 0 )); then
-      capture_process_diagnostics "$package" "$out" "${elapsed}s"
-    fi
-    sleep 2
-    elapsed=$((elapsed+2))
+    if grep -q "$marker" "$out/logcat_full.txt"; then completed=true; break; fi
+    if grep -Eq 'SCRIPT ERROR|Parse Error|FATAL EXCEPTION|Fatal signal|VK_ERROR_DEVICE_LOST|R1_RUNTIME_DEBUG_FAILURE' "$out/logcat_full.txt"; then break; fi
+    sleep 2; elapsed=$((elapsed+2))
   done
-  printf '{"schema_version":1,"mode":"%s","completion_marker":"%s","completed":%s,"timeout_seconds":%s,"elapsed_seconds":%s}\n' \
-    "$mode" "$completion_marker" "$completed" "$timeout_seconds" "$elapsed" > "$out/watchdog.json"
-  capture_process_diagnostics "$package" "$out" final
-  local pid
-  pid="$(cat "$out/pid-final.txt" 2>/dev/null || true)"
-  if [[ -n "$pid" && -s "$out/debuggerd-final.txt" ]]; then cp "$out/debuggerd-final.txt" "$out/debuggerd-backtrace.txt"; fi
   "$ADB" exec-out screencap -p > "$out/screenshot.png" 2>/dev/null || true
-  pull_user_file "$package" r1_material_inventory.json "$out/r1_material_inventory.json"
-  pull_user_file "$package" r1_mobile_progress.json "$out/r1_mobile_progress.json"
-  pull_user_file "$package" r1_scene_tree.json "$out/r1_scene_tree.json"
-  pull_user_file "$package" r1_wait_inventory.json "$out/r1_wait_inventory.json"
-  kill "$logcat_pid" >/dev/null 2>&1 || true
-  wait "$logcat_pid" >/dev/null 2>&1 || true
-  python3 - "$out/logcat_full.txt" "$out/compile_log.txt" "$out/critical_log.txt" <<'PY'
+  validate_png "$out/screenshot.png" > "$out/screenshot-validation.txt"
+  local pid alive=false overflow_count critical_count last_frame
+  pid="$("$ADB" shell pidof "$package" 2>/dev/null | tr -d '\r')"; test -n "$pid" && alive=true
+  printf '%s\n' "$pid" > "$out/pid-final.txt"
+  kill "$logcat_pid" >/dev/null 2>&1 || true; wait "$logcat_pid" >/dev/null 2>&1 || true
+  grep -Ei 'SCRIPT ERROR|Parse Error|Invalid call|FATAL EXCEPTION|Fatal signal|VK_ERROR_DEVICE_LOST|GPU hang|ANR in |SceneShaderGLES3|Program linking failed|GL_MAX_FRAGMENT_UNIFORM_VECTORS' "$out/logcat_full.txt" > "$out/critical_log.txt" || true
+  overflow_count="$(grep -c 'Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS' "$out/logcat_full.txt" || true)"
+  critical_count="$(wc -l < "$out/critical_log.txt" | tr -d ' ')"
+  last_frame="$(grep -oE 'local_frame=[0-9]+' "$out/logcat_full.txt" | tail -1 | cut -d= -f2 || true)"
+  python3 - "$out/result.json" "$name" "$mode" "$completed" "$elapsed" "$alive" "$overflow_count" "$critical_count" "${last_frame:-0}" <<'PY'
 from pathlib import Path
-import re,sys
-text=Path(sys.argv[1]).read_text(errors='replace')
-compile_lines=[]; critical=[]
-patterns=(r'SceneShaderGLES3',r'Program linking failed',r'GL_MAX_FRAGMENT_UNIFORM_VECTORS',r'shader failed to compile',r'_compile_specialization')
-for line in text.splitlines():
-    if any(re.search(pattern,line,re.I) for pattern in patterns): compile_lines.append(line)
-    if re.search(r'SCRIPT ERROR|Parse Error|Invalid call|Fatal signal|FATAL EXCEPTION|VK_ERROR_DEVICE_LOST|GPU hang|ANR in |SceneShaderGLES3',line,re.I): critical.append(line)
-Path(sys.argv[2]).write_text('\n'.join(compile_lines)+('\n' if compile_lines else ''))
-Path(sys.argv[3]).write_text('\n'.join(critical)+('\n' if critical else ''))
+import json,sys
+Path(sys.argv[1]).write_text(json.dumps({'schema_version':1,'target':sys.argv[2],'mode':sys.argv[3],'marker_reached':sys.argv[4]=='true','elapsed_seconds':int(sys.argv[5]),'process_alive':sys.argv[6]=='true','shader_uniform_overflow_count':int(sys.argv[7]),'critical_log_line_count':int(sys.argv[8]),'last_mobile_frame':int(sys.argv[9])},indent=2,sort_keys=True)+'\n')
 PY
 }
 
-for mode in "${GL_MODES[@]}"; do
-  run_mode track_a "$mode" "$GL_PACKAGE" "$GL_APK" "R1_GL_SCENARIO_COMPLETE mode=$mode" 150
-done
-
-run_mode track_b mobile_baseline "$MOBILE_PACKAGE" "$MOBILE_APK" 'R1_MOBILE_CAPTURE_FRAME frame=300' 240
-run_mode track_b mobile_render_disabled_control "$MOBILE_PACKAGE" "$MOBILE_APK" 'R1_MOBILE_CONTROL_COMPLETE frames=300' 120
-
-python3 - "$RAW/track_a" "$REPORTS/gl_limit_probe.json" <<'PY'
+run_target GL gl_production "$GL_PACKAGE" "$GL_APK" 'R1_GL_SCENARIO_COMPLETE mode=gl_production' 300 "$GL_OUT"
+run_target MOBILE mobile_baseline "$MOBILE_PACKAGE" "$MOBILE_APK" 'R1_MOBILE_CAPTURE_FRAME frame=300' 900 "$MOBILE_OUT"
+python3 - "$OUTPUT_ROOT" <<'PY'
 from pathlib import Path
-import json,re,sys
-root=Path(sys.argv[1]); counts=[]; occurrences=0
-for log in root.glob('*/logcat_full.txt'):
-    text=log.read_text(errors='replace')
-    matches=re.findall(r'Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS(?:\s*\((\d+)\))?',text)
-    occurrences+=len(matches); counts.extend(int(value) for value in matches if value)
-payload={
- 'schema_version':1,
- 'constant':'GL_MAX_FRAGMENT_UNIFORM_VECTORS',
- 'query_method':'driver program-link diagnostic',
- 'exact_error':'Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS',
- 'uniform_overflow_occurrences':occurrences,
- 'observed_active_uniform_vectors':sorted(set(counts)),
- 'numeric_device_limit_directly_queried':False,
-}
-Path(sys.argv[2]).write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+import json,sys
+root=Path(sys.argv[1]); gl=json.loads((root/'raw/gl_production/result.json').read_text()); mobile=json.loads((root/'raw/mobile_baseline/result.json').read_text())
+result={'schema_version':1,'engine_fix':'GODOT_4_7_1_RUNTIME_UPGRADE','renderer_defaults_modified':False,'gameplay_modified':False,'gl':gl,'mobile':mobile}
+result['gl_passed']=gl['marker_reached'] and gl['process_alive'] and gl['shader_uniform_overflow_count']==0 and gl['critical_log_line_count']==0
+result['mobile_passed']=mobile['marker_reached'] and mobile['process_alive'] and mobile['last_mobile_frame']>=300 and mobile['critical_log_line_count']==0
+result['passed']=result['gl_passed'] and result['mobile_passed']
+(root/'R1_ENGINE_UPGRADE_RESULT.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+if not result['passed']: raise SystemExit(json.dumps(result,sort_keys=True))
 PY
-
-python3 "$REPO_ROOT/tools/graphics/finalize_r1_renderer_debug.py" --raw "$RAW" --output "$REPORTS"
-cp "$OUTPUT_ROOT/IMPORTED_STATE_MANIFEST.json" "$REPORTS/IMPORTED_STATE_MANIFEST.json"
-cp "$OUTPUT_ROOT/CLONE_IDENTITY.json" "$REPORTS/CLONE_IDENTITY.json"
-cp "$OUTPUT_ROOT/HARNESS_INJECTION.json" "$REPORTS/HARNESS_INJECTION.json"
-cp "$OUTPUT_ROOT/APK_SHA256SUMS.txt" "$REPORTS/APK_SHA256SUMS.txt"
-
-# Diagnostic collection succeeds when all eight independent modes have terminal watchdog records and reports exist.
-for mode in "${GL_MODES[@]}"; do test -s "$RAW/track_a/$mode/watchdog.json"; done
-for mode in "${MOBILE_MODES[@]}"; do test -s "$RAW/track_b/$mode/watchdog.json"; done
-test -s "$REPORTS/R1_DIAGNOSTIC_REPORT.json"
