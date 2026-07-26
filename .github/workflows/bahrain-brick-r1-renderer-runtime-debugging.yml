@@ -1,14 +1,77 @@
-name: Bahrain Brick R1 GL Budget Fix — Archived
+name: Bahrain Brick R1 GL Budget Fix
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
+    types: [synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-r1-renderer-runtime-debugging.yml
 
 permissions:
   contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: bahrain-brick-r1-gl-budget-fix
+  cancel-in-progress: false
 
 jobs:
-  archived:
-    if: false
+  targeted_gl_fix:
+    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
     steps:
-      - run: echo 'Workflow inactive while the GL Compatibility light-budget fix is committed.'
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Run focused fix tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/graphics/test_r1_gl_compatibility_fix.py -v
+          python3 -m py_compile tools/graphics/apply_r1_gl_compatibility_fix.py
+          bash -n tools/graphics/run_r1_renderer_debug.sh
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+      - uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            emulator
+            platforms;android-34
+            build-tools;34.0.0
+            system-images;android-34;default;x86_64
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth
+          if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
+      - name: Build and launch GL only
+        id: gl
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          bash tools/graphics/run_r1_renderer_debug.sh "$PWD" "$PWD/build/r1" 2>&1 | tee build-r1-gl.log
+      - name: Upload GL proof
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-r1-gl-budget-${{ github.run_id }}
+          path: |
+            build/r1/R1_GL_BUDGET_RESULT.json
+            build/r1/GL_COMPATIBILITY_FIX.json
+            build/r1/raw/gl_production
+            build/r1/APK_SHA256SUMS.txt
+            build/r1/GODOT_VERSION.txt
+            build-r1-gl.log
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Enforce improvement
+        if: always()
+        run: test '${{ steps.gl.outcome }}' = success
