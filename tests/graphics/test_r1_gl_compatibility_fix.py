@@ -38,7 +38,9 @@ class R1GLCompatibilityFixTest(unittest.TestCase):
         text = RUNNER.read_text()
         self.assertIn("apply_r1_gl_compatibility_fix.py", text)
         self.assertIn("Godot_v4.3-stable_linux.x86_64.zip", text)
-        self.assertIn("run_target GL gl_production", text)
+        self.assertIn("printf 'gl_production'", text)
+        self.assertIn("R1_GL_SCENARIO_COMPLETE mode=gl_production", text)
+        self.assertNotIn("MOBILE_PACKAGE", text)
         self.assertNotIn("run_target MOBILE", text)
 
 
