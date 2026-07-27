@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "stage": "BAHRAIN BRICK — STAGE R1",
+  "title": "RENDERER RUNTIME DEBUGGING",
+  "state": "ENGINEERING_STOP",
+  "recorded_date": "2026-07-28",
+  "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
+  "r1_exit_criteria_met": false,
+  "production_fix_authorized": false,
+  "renderer_selected": null,
+  "renderer_defaults_modified": false,
+  "g1_authorized": false,
+  "track_a_gl": {
+    "defect": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
+    "baseline_link_failures": 45,
+    "best_link_failures": 44,
+    "best_setting": "rendering/limits/opengl/max_lights_per_object=7",
+    "caps_6_5_4_link_failures": 44,
+    "critical_runtime_error_count": 0,
+    "project_level_cap_range_exhausted": true,
+    "exit_criterion_met": false,
+    "evidence_run_id": 30208525378,
+    "evidence_artifact_id": 8633929596
+  },
+  "track_b_mobile": {
+    "defect": "RENDER_PIPELINE_STALL",
+    "baseline_last_completed_frame": 90,
+    "render_disabled_control_last_completed_frame": 300,
+    "critical_runtime_error_count": 0,
+    "failed_correction_count": 3,
+    "corrections": [
+      {
+        "experiment": "disable LateAfternoonSun shadow",
+        "last_completed_frame": 80,
+        "decision": "reverted"
+      },
+      {
+        "experiment": "directional shadow size 2048 to 1024",
+        "last_completed_frame": 90,
+        "decision": "reverted",
+        "run_id": 30310393343,
+        "artifact_id": 8670646110
+      },
+      {
+        "experiment": "LateAfternoonSun shadow distance 150 to 100",
+        "last_completed_frame": 70,
+        "decision": "reverted",
+        "run_id": 30312058073,
+        "artifact_id": 8671241285
+      }
+    ],
+    "render_scale_experiment_executed": false,
+    "exit_criterion_met": false
+  },
+  "stop_reason": "Three isolated Mobile corrections failed to improve the proven render-pipeline stall. A fourth parameter tweak is not authorized without renewed root-cause evidence.",
+  "next_action": "Return to root-cause diagnosis at the renderer/engine boundary and obtain named physical-device evidence before authorizing another correction."
+}
