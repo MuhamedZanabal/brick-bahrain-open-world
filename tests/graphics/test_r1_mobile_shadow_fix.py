@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "tools/graphics/apply_r1_mobile_shadow_fix.py"
+RUNNER = ROOT / "tools/graphics/run_r1_renderer_debug.sh"
 
 
 def load_module():
@@ -36,6 +37,15 @@ class R1MobileShadowFixTest(unittest.TestCase):
             self.assertEqual(result["changed_shadow_count"], 1)
             self.assertTrue(result["qa_override_only"])
             self.assertFalse(result["production_source_modified"])
+
+    def test_runner_is_mobile_only_and_uses_godot_43(self) -> None:
+        text = RUNNER.read_text()
+        self.assertIn("apply_r1_mobile_shadow_fix.py", text)
+        self.assertIn("mobile_baseline", text)
+        self.assertIn("--renderer mobile", text)
+        self.assertIn("Godot_v4.3-stable_linux.x86_64.zip", text)
+        self.assertNotIn("gl_production", text)
+        self.assertNotIn("GL_PACKAGE", text)
 
 
 if __name__ == "__main__":
