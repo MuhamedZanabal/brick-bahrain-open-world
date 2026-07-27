@@ -101,8 +101,8 @@ import json,struct,sys
 png=Path(sys.argv[1]).read_bytes(); valid=len(png)>=24 and png[:8]==b'\x89PNG\r\n\x1a\n'
 w=h=0
 if valid: w,h=struct.unpack('>II',png[16:24]); valid=w>=320 and h>=240
-count=int(sys.argv[5]); result={'schema_version':1,'fix':'MAX_LIGHTS_PER_OBJECT_8_TO_7','before_link_failures':45,'after_link_failures':count,'marker_reached':sys.argv[3]=='true','process_alive':bool(sys.argv[4]),'critical_runtime_errors':int(sys.argv[6]),'screenshot_valid':valid,'screenshot_size':[w,h],'elapsed_seconds':int(sys.argv[7]),'renderer_defaults_modified':False}
-result['improved']=count<45 and result['marker_reached'] and result['process_alive'] and valid and result['critical_runtime_errors']==0
+count=int(sys.argv[5]); result={'schema_version':1,'fix':'MAX_LIGHTS_PER_OBJECT_7_TO_6','before_link_failures':44,'after_link_failures':count,'marker_reached':sys.argv[3]=='true','process_alive':bool(sys.argv[4]),'critical_runtime_errors':int(sys.argv[6]),'screenshot_valid':valid,'screenshot_size':[w,h],'elapsed_seconds':int(sys.argv[7]),'renderer_defaults_modified':False}
+result['improved']=count<44 and result['marker_reached'] and result['process_alive'] and valid and result['critical_runtime_errors']==0
 Path(sys.argv[2]).write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
 print(json.dumps(result,sort_keys=True))
 if not result['improved']: raise SystemExit(1)
