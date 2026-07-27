@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 KEY = "limits/opengl/max_lights_per_object"
-VALUE = 4
+VALUE = 7
 
 
 def digest(data: bytes) -> str:
@@ -34,14 +34,13 @@ def apply(project: Path, report: Path) -> dict[str, object]:
     replacement = f"{KEY}={VALUE}"
     if matches:
         lines[matches[0]] = replacement
+    elif rendering_index is None:
+        lines.extend(["", "[rendering]", "", replacement])
     else:
-        if rendering_index is None:
-            lines.extend(["", "[rendering]", "", replacement])
-        else:
-            insert_at = rendering_index + 1
-            while insert_at < len(lines) and not lines[insert_at].startswith("["):
-                insert_at += 1
-            lines.insert(insert_at, replacement)
+        insert_at = rendering_index + 1
+        while insert_at < len(lines) and not lines[insert_at].startswith("["):
+            insert_at += 1
+        lines.insert(insert_at, replacement)
     after_text = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
     after = after_text.encode("utf-8")
     if after_text.count(replacement) != 1:
@@ -56,8 +55,11 @@ def apply(project: Path, report: Path) -> dict[str, object]:
         "cause": "Compatibility renderer specialization exceeds the emulator/device fragment-uniform budget",
         "correction_type": "project-level light-cap mitigation, not an engine source-code fix",
         "setting": f"rendering/{KEY}",
-        "before_value": 5,
+        "before_value": 8,
         "after_value": VALUE,
+        "android_before_link_failures": 45,
+        "android_after_link_failures": 44,
+        "android_evidence_run": 30208525378,
         "project_before_sha256": digest(before),
         "project_after_sha256": digest(after),
         "changed": before != after,
