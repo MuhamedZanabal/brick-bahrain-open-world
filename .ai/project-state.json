@@ -3,7 +3,9 @@
     "reports/graphics/g0/G0_TERMINAL_REPORT.json",
     "reports/graphics/g0/G0_TERMINAL_REPORT.md",
     "reports/graphics/g0/tier_b_reduction/",
-    "reports/graphics/g0/device_handoff/"
+    "reports/graphics/g0/device_handoff/",
+    "reports/graphics/r1/R1_ENGINEERING_LOG.md",
+    "reports/graphics/r1/R1_ENGINEERING_STOP.json"
   ],
   "decisions": [
     "PR #59 remains immutable.",
@@ -11,7 +13,12 @@
     "scripts/world.gd uses BYTE_PROTECT_EXACT_FROZEN_WORLD_GD; _exit_tree is absent.",
     "PR #60 remains draft; G1-G10 remain blocked.",
     "The single authorized Tier B retry is run 30086966524; no further retries are permitted.",
-    "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived."
+    "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived.",
+    "R1 confirmed a GL Compatibility engine-generated fragment-uniform overflow: baseline 45 link failures, best project-level light-cap result 44; the authorized cap range is exhausted.",
+    "R1 confirmed Mobile RENDER_PIPELINE_STALL: render-disabled control reached frame 300 while baseline reached frame 90.",
+    "Three isolated Mobile corrections failed to improve progression (80, 90, and 70 completed frames); no fourth parameter tweak is authorized without renewed root-cause evidence.",
+    "The queued Mobile render-scale experiment was not executed and is removed from the branch.",
+    "R1 exit criteria remain unmet; renderer decision remains null, renderer defaults remain unchanged, and G1-G10 remain blocked."
   ],
   "defects": [
     {
@@ -28,6 +35,18 @@
       "evidence": "duplicate run 30087878937; cancellation run 30088001461 succeeded too late",
       "id": "G0-AUTOMATION-001",
       "state": "CLOSED_WITH_EXCEPTION"
+    },
+    {
+      "classification": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
+      "evidence": "45 baseline SceneShaderGLES3 link failures; best project-level max_lights_per_object result 44",
+      "id": "R1-GL-001",
+      "state": "OPEN_ENGINE_BOUNDARY"
+    },
+    {
+      "classification": "RENDER_PIPELINE_STALL",
+      "evidence": "Mobile baseline frame 90; render-disabled control frame 300; three focused corrections ended at frames 80, 90, and 70",
+      "id": "R1-MOBILE-001",
+      "state": "OPEN_ROOT_CAUSE_NOT_UNIQUELY_PROVEN"
     }
   ],
   "milestones": [
@@ -52,19 +71,19 @@
     }
   ],
   "next_action": {
-    "action": "Execute the dual-renderer handoff on named physical devices only after explicit authorization. Do not select a renderer or begin G1.",
-    "stage": "G0.2 closed"
+    "action": "Return Mobile to root-cause diagnosis at the renderer/engine boundary and obtain named physical-device evidence before authorizing another correction. Do not run the queued render-scale tweak, select a renderer, change renderer defaults, or begin G1.",
+    "stage": "R1 engineering stop"
   },
   "project": {
     "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
-    "branch": "work/bahrain-brick-graphics-upgrade-v1",
+    "branch": "work/bahrain-brick-renderer-runtime-debugging-r1",
     "current_commit": null,
     "head_tracking_note": "Resolve packaging head from the branch ref; this ledger cannot contain its own SHA.",
-    "implementation_pr": 60,
+    "implementation_pr": 63,
     "last_verified_material_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
     "name": "BAHRAIN BRICK GRAPHICS UPGRADE v1.0",
     "parent_pr": 59,
-    "phase": "G0",
+    "phase": "R1",
     "renderer_evidence_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
     "repository": "MuhamedZanabal/brick-bahrain-open-world"
   },
@@ -102,6 +121,54 @@
     "state": "CLOSED",
     "terminal_outcome": "G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL",
     "title": "ANDROID PAIRED-RENDERER FUNCTIONAL QUALIFICATION"
+  },
+  "stage_r1": {
+    "date": "2026-07-28",
+    "g1_authorized": false,
+    "gl": {
+      "baseline_link_failures": 45,
+      "best_link_failures": 44,
+      "best_setting": "rendering/limits/opengl/max_lights_per_object=7",
+      "critical_runtime_errors": 0,
+      "exit_criterion_met": false,
+      "project_level_cap_range_exhausted": true
+    },
+    "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
+    "mobile": {
+      "baseline_last_completed_frame": 90,
+      "classification": "RENDER_PIPELINE_STALL",
+      "corrections": [
+        {
+          "decision": "reverted",
+          "experiment": "disable LateAfternoonSun shadow",
+          "last_completed_frame": 80
+        },
+        {
+          "artifact_id": 8670646110,
+          "decision": "reverted",
+          "experiment": "directional shadow size 2048 to 1024",
+          "last_completed_frame": 90,
+          "run_id": 30310393343
+        },
+        {
+          "artifact_id": 8671241285,
+          "decision": "reverted",
+          "experiment": "LateAfternoonSun shadow distance 150 to 100",
+          "last_completed_frame": 70,
+          "run_id": 30312058073
+        }
+      ],
+      "critical_runtime_errors": 0,
+      "exit_criterion_met": false,
+      "failed_correction_count": 3,
+      "render_disabled_control_frame": 300,
+      "render_scale_experiment_executed": false
+    },
+    "production_fix_authorized": false,
+    "renderer_defaults_modified": false,
+    "renderer_selected": null,
+    "state": "ENGINEERING_STOP",
+    "title": "RENDERER RUNTIME DEBUGGING"
   },
   "verification": {
     "physical_devices": "NOT_AVAILABLE",
