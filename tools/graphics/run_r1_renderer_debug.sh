@@ -6,15 +6,15 @@ OUTPUT_ROOT="${2:?output root is required}"
 RECONSTRUCTION="$OUTPUT_ROOT/reconstruction"
 GAME="$RECONSTRUCTION/game"
 PROJECT="$OUTPUT_ROOT/mobile-project"
-OUT="$OUTPUT_ROOT/raw/mobile_secondary_light"
-APK="$OUTPUT_ROOT/bahrain-brick-r1-mobile-secondary-light-x86_64.apk"
-PACKAGE="com.brickbahrain.r1mobilenofill"
+OUT="$OUTPUT_ROOT/raw/mobile_shadow_size"
+APK="$OUTPUT_ROOT/bahrain-brick-r1-mobile-shadow-size-x86_64.apk"
+PACKAGE="com.brickbahrain.r1mobileshadowsize"
 GODOT_DIR="$OUTPUT_ROOT/godot"
 XDG_DATA_HOME="$OUTPUT_ROOT/godot-user-data"
 TEMPLATE_DIR="$OUTPUT_ROOT/templates"
 AVD_HOME="$OUTPUT_ROOT/avd-home"
 EMULATOR_HOME="$OUTPUT_ROOT/emulator-home"
-AVD_NAME="bahrain_brick_r1_mobile_secondary_light"
+AVD_NAME="bahrain_brick_r1_mobile_shadow_size"
 mkdir -p "$OUTPUT_ROOT" "$OUT" "$GODOT_DIR" "$XDG_DATA_HOME" "$TEMPLATE_DIR" "$AVD_HOME" "$EMULATOR_HOME"
 
 SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
@@ -38,7 +38,7 @@ PY
 bash "$PATCHED_RECONSTRUCTION" A "$RECONSTRUCTION" "$REPO_ROOT/authority/manama_souq_composite_source.json" "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 python3 "$REPO_ROOT/tools/graphics/patch_r1_reconstruction_preflight.py" --manifest "$RECONSTRUCTION/evidence/FINAL_TREE_MANIFEST.json" --game "$GAME" --output "$OUTPUT_ROOT/SOURCE_TREE_EQUIVALENCE.json"
 
-python3 "$REPO_ROOT/tools/graphics/apply_r1_mobile_secondary_light_fix.py" --script "$GAME/scripts/manama_souq_vertical_slice.gd" --report "$OUTPUT_ROOT/MOBILE_SECONDARY_LIGHT_FIX.json"
+python3 "$REPO_ROOT/tools/graphics/apply_r1_mobile_shadow_size_fix.py" --project "$GAME/project.godot" --report "$OUTPUT_ROOT/MOBILE_SHADOW_SIZE_FIX.json"
 mkdir -p "$GAME/tests/graphics"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.gd" "$GAME/tests/graphics/"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" "$GAME/tests/graphics/"
@@ -139,7 +139,7 @@ wait "$LOGCAT_PID" >/dev/null 2>&1 || true
 CRITICAL="$(grep -Ec 'SCRIPT ERROR|Parse Error|FATAL EXCEPTION|Fatal signal|VK_ERROR_DEVICE_LOST|ANR in|linker:.*(error|cannot)|R1_RUNTIME_DEBUG_FAILURE' "$OUT/logcat_full.txt" || true)"
 SCENE_READY=false
 grep -q 'R1_PRODUCTION_SCENE_READY' "$OUT/logcat_full.txt" && SCENE_READY=true
-python3 - "$OUT/mobile_progress.json" "$OUT/screenshot.png" "$OUT/am-start.txt" "$OUTPUT_ROOT/R1_MOBILE_SECONDARY_LIGHT_RESULT.json" "$PID_BEFORE" "$CRITICAL" "$PAUSE_RESUME" "$SCENE_READY" "$elapsed" <<'PY'
+python3 - "$OUT/mobile_progress.json" "$OUT/screenshot.png" "$OUT/am-start.txt" "$OUTPUT_ROOT/R1_MOBILE_SHADOW_SIZE_RESULT.json" "$PID_BEFORE" "$CRITICAL" "$PAUSE_RESUME" "$SCENE_READY" "$elapsed" <<'PY'
 from pathlib import Path
 import json,sys
 from PIL import Image, ImageStat
@@ -173,7 +173,7 @@ passed=(reached_300 and non_black and process_alive and pause_resume and critica
 result={
   'schema_version':1,
   'defect':'RENDER_PIPELINE_STALL',
-  'experiment':'SECONDARY_DIRECTIONAL_LIGHT_DISABLED',
+  'experiment':'DIRECTIONAL_SHADOW_SIZE_MOBILE_2048_TO_1024',
   'before_last_completed_frame':90,
   'last_completed_frame':last,
   'time_to_frame_180_ms':first_time(180),
