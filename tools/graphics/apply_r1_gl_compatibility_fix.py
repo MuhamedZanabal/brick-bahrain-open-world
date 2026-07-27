@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 KEY = "limits/opengl/max_lights_per_object"
-VALUE = 7
+VALUE = 6
 
 
 def digest(data: bytes) -> str:
@@ -49,9 +49,9 @@ def apply(project: Path, report: Path) -> dict[str, object]:
     project.write_bytes(after)
     result = {
         "schema_version": 1,
-        "defect": "GLES3_CORE_SCENE_SHADER_UNIFORM_VECTOR_OVERFLOW",
+        "defect": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
         "setting": f"rendering/{KEY}",
-        "before_value": 8,
+        "before_value": 7,
         "after_value": VALUE,
         "project_before_sha256": digest(before),
         "project_after_sha256": digest(after),
