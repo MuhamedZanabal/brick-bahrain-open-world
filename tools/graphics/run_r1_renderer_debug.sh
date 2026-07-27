@@ -38,7 +38,7 @@ PY
 bash "$PATCHED_RECONSTRUCTION" A "$RECONSTRUCTION" "$REPO_ROOT/authority/manama_souq_composite_source.json" "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 python3 "$REPO_ROOT/tools/graphics/patch_r1_reconstruction_preflight.py" --manifest "$RECONSTRUCTION/evidence/FINAL_TREE_MANIFEST.json" --game "$GAME" --output "$OUTPUT_ROOT/SOURCE_TREE_EQUIVALENCE.json"
 
-python3 "$REPO_ROOT/tools/graphics/apply_r1_mobile_shadow_distance_fix.py" --scene "$GAME/scenes/manama_souq_vertical_slice.tscn" --report "$OUTPUT_ROOT/MOBILE_SHADOW_DISTANCE_FIX.json"
+python3 "$REPO_ROOT/tools/graphics/apply_r1_mobile_shadow_distance_fix.py" --script "$GAME/scripts/manama_souq_vertical_slice.gd" --report "$OUTPUT_ROOT/MOBILE_SHADOW_DISTANCE_FIX.json"
 mkdir -p "$GAME/tests/graphics"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.gd" "$GAME/tests/graphics/"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" "$GAME/tests/graphics/"
@@ -173,7 +173,7 @@ passed=(reached_300 and non_black and process_alive and pause_resume and critica
 result={
   'schema_version':1,
   'defect':'RENDER_PIPELINE_STALL',
-  'experiment':'DIRECTIONAL_SHADOW_MAX_DISTANCE_100_TO_50',
+  'experiment':'DIRECTIONAL_SHADOW_MAX_DISTANCE_150_TO_75',
   'before_last_completed_frame':90,
   'last_completed_frame':last,
   'time_to_frame_180_ms':first_time(180),
