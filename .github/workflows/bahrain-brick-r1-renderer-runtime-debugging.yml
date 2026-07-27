@@ -1,4 +1,4 @@
-name: Bahrain Brick R1 GL Budget Fix
+name: Bahrain Brick R1 GL Budget Fix 7 to 6
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: bahrain-brick-r1-gl-budget-fix
+  group: bahrain-brick-r1-gl-budget-fix-7-to-6
   cancel-in-progress: false
 
 jobs:
