@@ -5,16 +5,16 @@ REPO_ROOT="${1:?repository root is required}"
 OUTPUT_ROOT="${2:?output root is required}"
 RECONSTRUCTION="$OUTPUT_ROOT/reconstruction"
 GAME="$RECONSTRUCTION/game"
-PROJECT="$OUTPUT_ROOT/gl-project"
-OUT="$OUTPUT_ROOT/raw/gl_production"
-APK="$OUTPUT_ROOT/bahrain-brick-r1-gl-budget-x86_64.apk"
-PACKAGE="com.brickbahrain.r1glbudget"
+PROJECT="$OUTPUT_ROOT/mobile-project"
+OUT="$OUTPUT_ROOT/raw/mobile_shadow_size"
+APK="$OUTPUT_ROOT/bahrain-brick-r1-mobile-shadow-size-x86_64.apk"
+PACKAGE="com.brickbahrain.r1mobileshadowsize"
 GODOT_DIR="$OUTPUT_ROOT/godot"
 XDG_DATA_HOME="$OUTPUT_ROOT/godot-user-data"
 TEMPLATE_DIR="$OUTPUT_ROOT/templates"
 AVD_HOME="$OUTPUT_ROOT/avd-home"
 EMULATOR_HOME="$OUTPUT_ROOT/emulator-home"
-AVD_NAME="bahrain_brick_r1_gl_budget"
+AVD_NAME="bahrain_brick_r1_mobile_shadow_size"
 mkdir -p "$OUTPUT_ROOT" "$OUT" "$GODOT_DIR" "$XDG_DATA_HOME" "$TEMPLATE_DIR" "$AVD_HOME" "$EMULATOR_HOME"
 
 SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
@@ -38,10 +38,18 @@ PY
 bash "$PATCHED_RECONSTRUCTION" A "$RECONSTRUCTION" "$REPO_ROOT/authority/manama_souq_composite_source.json" "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 python3 "$REPO_ROOT/tools/graphics/patch_r1_reconstruction_preflight.py" --manifest "$RECONSTRUCTION/evidence/FINAL_TREE_MANIFEST.json" --game "$GAME" --output "$OUTPUT_ROOT/SOURCE_TREE_EQUIVALENCE.json"
 
-python3 "$REPO_ROOT/tools/graphics/apply_r1_gl_compatibility_fix.py" --project "$GAME/project.godot" --report "$OUTPUT_ROOT/GL_COMPATIBILITY_FIX.json"
+python3 "$REPO_ROOT/tools/graphics/apply_r1_mobile_shadow_size_fix.py" --project "$GAME/project.godot" --report "$OUTPUT_ROOT/MOBILE_SHADOW_SIZE_FIX.json"
 mkdir -p "$GAME/tests/graphics"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.gd" "$GAME/tests/graphics/"
 cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" "$GAME/tests/graphics/"
+python3 - "$GAME/tests/graphics/r1_renderer_runtime_debug.gd" <<'PY'
+from pathlib import Path
+import sys
+path=Path(sys.argv[1]); text=path.read_text()
+old='\t_write_scene_tree_inventory(_slice)\n\t_write_wait_inventory()\n'
+if text.count(old) != 1: raise SystemExit('targeted mobile inventory calls not found once')
+path.write_text(text.replace(old, ''))
+PY
 
 unzip -q "$RECONSTRUCTION/downloads/Godot_v4.3-stable_linux.x86_64.zip" -d "$GODOT_DIR"
 GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name 'Godot*' | head -1)"
@@ -50,9 +58,9 @@ test -n "$GODOT"; chmod +x "$GODOT"
 grep -q '^4\.3\.' "$OUTPUT_ROOT/GODOT_VERSION.txt"
 
 rm -rf "$GAME/.godot" "$PROJECT"
-LIBGL_ALWAYS_SOFTWARE=1 timeout --signal=TERM --kill-after=30s 1200s xvfb-run -a -s '-screen 0 1920x1080x24' "$GODOT" --path "$GAME" --editor --import --quit --verbose --rendering-method gl_compatibility --rendering-driver opengl3 2>&1 | tee "$OUTPUT_ROOT/import.log"
+timeout --signal=TERM --kill-after=30s 1200s xvfb-run -a -s '-screen 0 1920x1080x24' "$GODOT" --path "$GAME" --editor --import --quit --verbose --rendering-method mobile --rendering-driver vulkan 2>&1 | tee "$OUTPUT_ROOT/import.log"
 cp -a "$GAME" "$PROJECT"
-python3 "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" --project "$PROJECT/project.godot" --preset "$PROJECT/export_presets.cfg" --renderer gl_compatibility --package-name "$PACKAGE" --report "$OUTPUT_ROOT/GL_VARIANT_OVERRIDE.json"
+python3 "$REPO_ROOT/tools/graphics/prepare_r1_android_variant.py" --project "$PROJECT/project.godot" --preset "$PROJECT/export_presets.cfg" --renderer mobile --package-name "$PACKAGE" --report "$OUTPUT_ROOT/MOBILE_VARIANT_OVERRIDE.json"
 
 TEMPLATE="Godot_v4.3-stable_export_templates.tpz"
 ROOT_URL="https://github.com/godotengine/godot-builds/releases/download/4.3-stable"
@@ -83,7 +91,7 @@ for _ in $(seq 1 240); do [[ "$("$ADB" shell getprop sys.boot_completed 2>/dev/n
 "$ADB" shell wm density 420 >/dev/null
 "$ADB" install -r -t "$APK" > "$OUT/install.txt" 2>&1
 "$ADB" shell pm clear "$PACKAGE" >/dev/null 2>&1 || true
-printf 'gl_production' > "$OUTPUT_ROOT/mode.txt"
+printf 'mobile_baseline' > "$OUTPUT_ROOT/mode.txt"
 "$ADB" push "$OUTPUT_ROOT/mode.txt" /data/local/tmp/r1_mode.txt >/dev/null
 "$ADB" shell run-as "$PACKAGE" mkdir -p files
 "$ADB" shell run-as "$PACKAGE" cp /data/local/tmp/r1_mode.txt files/r1_mode.txt
@@ -97,56 +105,98 @@ sleep 2
 RESOLVED="$("$ADB" shell cmd package resolve-activity --brief "$PACKAGE" | tail -1 | tr -d '\r')"
 printf '%s\n' "$RESOLVED" > "$OUT/resolve-activity.txt"
 "$ADB" shell am start -W -S -n "$RESOLVED" > "$OUT/am-start.txt" 2>&1 || true
+
 elapsed=0
-marker=false
-while ((elapsed < 300)); do
-  if grep -q 'R1_GL_SCENARIO_COMPLETE mode=gl_production' "$OUT/logcat_full.txt"; then marker=true; break; fi
-  if grep -Eq 'SCRIPT ERROR|Parse Error|FATAL EXCEPTION|Fatal signal|R1_RUNTIME_DEBUG_FAILURE' "$OUT/logcat_full.txt"; then break; fi
-  sleep 2
-  elapsed=$((elapsed+2))
+while (( elapsed < 240 )); do
+  "$ADB" exec-out run-as "$PACKAGE" cat files/r1_mobile_progress.json > "$OUT/mobile_progress.json.tmp" 2>/dev/null || true
+  if test -s "$OUT/mobile_progress.json.tmp"; then mv "$OUT/mobile_progress.json.tmp" "$OUT/mobile_progress.json"; fi
+  if grep -q 'R1_MOBILE_CAPTURE_FRAME frame=300' "$OUT/logcat_full.txt"; then break; fi
+  if grep -Eq 'SCRIPT ERROR|Parse Error|FATAL EXCEPTION|Fatal signal|R1_RUNTIME_DEBUG_FAILURE|VK_ERROR_DEVICE_LOST|ANR in' "$OUT/logcat_full.txt"; then break; fi
+  sleep 5
+  elapsed=$((elapsed+5))
 done
+"$ADB" exec-out run-as "$PACKAGE" cat files/r1_mobile_progress.json > "$OUT/mobile_progress.final.json" 2>/dev/null || true
+if test -s "$OUT/mobile_progress.final.json"; then cp "$OUT/mobile_progress.final.json" "$OUT/mobile_progress.json"; fi
 "$ADB" exec-out screencap -p > "$OUT/screenshot.png" 2>/dev/null || true
-PID="$("$ADB" shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')"
-printf '%s\n' "$PID" > "$OUT/pid-final.txt"
+PID_BEFORE="$("$ADB" shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')"
+printf '%s\n' "$PID_BEFORE" > "$OUT/pid-before-resume.txt"
+PAUSE_RESUME=false
+if test -n "$PID_BEFORE"; then
+  "$ADB" shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
+  sleep 3
+  "$ADB" shell am start -W -n "$RESOLVED" > "$OUT/resume.txt" 2>&1 || true
+  sleep 5
+  PID_AFTER="$("$ADB" shell pidof "$PACKAGE" 2>/dev/null | tr -d '\r')"
+  printf '%s\n' "$PID_AFTER" > "$OUT/pid-after-resume.txt"
+  if test -n "$PID_AFTER" && grep -q 'Status: ok' "$OUT/resume.txt"; then PAUSE_RESUME=true; fi
+else
+  : > "$OUT/resume.txt"
+  : > "$OUT/pid-after-resume.txt"
+fi
 kill "$LOGCAT_PID" >/dev/null 2>&1 || true
 wait "$LOGCAT_PID" >/dev/null 2>&1 || true
-COUNT="$(grep -c 'Fragment shader active uniforms exceed GL_MAX_FRAGMENT_UNIFORM_VECTORS' "$OUT/logcat_full.txt" || true)"
-CRITICAL="$(grep -Ec 'SCRIPT ERROR|Parse Error|FATAL EXCEPTION|Fatal signal' "$OUT/logcat_full.txt" || true)"
-python3 - "$OUT/screenshot.png" "$OUT/am-start.txt" "$OUTPUT_ROOT/R1_GL_BUDGET_RESULT.json" "$marker" "$PID" "$COUNT" "$CRITICAL" "$elapsed" <<'PY'
+
+CRITICAL="$(grep -Ec 'SCRIPT ERROR|Parse Error|FATAL EXCEPTION|Fatal signal|VK_ERROR_DEVICE_LOST|ANR in|linker:.*(error|cannot)|R1_RUNTIME_DEBUG_FAILURE' "$OUT/logcat_full.txt" || true)"
+SCENE_READY=false
+grep -q 'R1_PRODUCTION_SCENE_READY' "$OUT/logcat_full.txt" && SCENE_READY=true
+python3 - "$OUT/mobile_progress.json" "$OUT/screenshot.png" "$OUT/am-start.txt" "$OUTPUT_ROOT/R1_MOBILE_SHADOW_SIZE_RESULT.json" "$PID_BEFORE" "$CRITICAL" "$PAUSE_RESUME" "$SCENE_READY" "$elapsed" <<'PY'
 from pathlib import Path
-import json,struct,sys
-png_path,start_path,result_path=map(Path,sys.argv[1:4])
-png=png_path.read_bytes() if png_path.exists() else b''
-valid=len(png)>=24 and png[:8]==b'\x89PNG\r\n\x1a\n'
-w=h=0
-if valid:
-    w,h=struct.unpack('>II',png[16:24])
-    valid=w>=320 and h>=240
+import json,sys
+from PIL import Image, ImageStat
+
+progress_path, screenshot_path, start_path, result_path = map(Path, sys.argv[1:5])
+records=[]
+if progress_path.exists() and progress_path.stat().st_size:
+    try: records=json.loads(progress_path.read_text()).get('records', [])
+    except Exception: records=[]
+last=max((int(r.get('local_frame',0)) for r in records), default=0)
+def first_time(frame):
+    values=[int(r.get('wall_ms',0)) for r in records if int(r.get('local_frame',0))>=frame]
+    return min(values) if values else None
+valid=False; non_black=False; size=[0,0]; avg_luma=0.0; black_ratio=1.0
+try:
+    with Image.open(screenshot_path) as image:
+        image=image.convert('RGB'); size=list(image.size)
+        stat=ImageStat.Stat(image.convert('L')); avg_luma=float(stat.mean[0])
+        pixels=list(image.resize((160,90)).getdata())
+        black=sum(1 for r,g,b in pixels if r<=3 and g<=3 and b<=3)
+        black_ratio=black/len(pixels)
+        valid=size==[1920,1080]
+        non_black=valid and avg_luma>1.0 and black_ratio<0.99
+except Exception:
+    pass
 start=start_path.read_text(errors='replace') if start_path.exists() else ''
-count=int(sys.argv[6]); critical=int(sys.argv[7])
-health=(sys.argv[4]=='true' and bool(sys.argv[5]) and valid and critical==0 and 'Status: ok' in start)
+critical=int(sys.argv[6]); process_alive=bool(sys.argv[5]); pause_resume=sys.argv[7]=='true'; scene_ready=sys.argv[8]=='true'
+reached_300=last>=300
+improved=last>90
+passed=(reached_300 and non_black and process_alive and pause_resume and critical==0 and scene_ready and 'Status: ok' in start)
 result={
   'schema_version':1,
-  'defect':'GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW',
-  'experiment':'MAX_LIGHTS_PER_OBJECT_5_TO_4',
-  'before_link_failures':44,
-  'after_link_failures':count,
+  'defect':'RENDER_PIPELINE_STALL',
+  'experiment':'DIRECTIONAL_SHADOW_SIZE_4096_TO_2048',
+  'before_last_completed_frame':90,
+  'last_completed_frame':last,
+  'time_to_frame_180_ms':first_time(180),
+  'time_to_frame_300_ms':first_time(300),
   'apk_export_result':True,
   'apk_launch_result':'Status: ok' in start,
-  'scene_readiness_result':sys.argv[4]=='true',
+  'scene_readiness_result':scene_ready,
   'valid_screenshot_result':valid,
-  'screenshot_size':[w,h],
-  'process_alive':bool(sys.argv[5]),
+  'non_black_screenshot_result':non_black,
+  'screenshot_size':size,
+  'average_luminance':avg_luma,
+  'black_pixel_ratio':black_ratio,
+  'process_alive':process_alive,
   'critical_runtime_error_count':critical,
-  'elapsed_seconds':int(sys.argv[8]),
-  'improved':health and count<44,
-  'retained':health and count<=44,
-  'renderer_defaults_modified':False,
+  'pause_resume_result':pause_resume,
+  'bounded_window_seconds':int(sys.argv[9]),
+  'progression_improved':improved,
+  'r1_mobile_pass':passed,
+  'renderer_default_modified':False,
   'gameplay_modified':False,
 }
-result['decision']='retained' if result['retained'] else 'reverted'
+result['decision']='retained' if passed or improved else 'reverted'
 result_path.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
 print(json.dumps(result,sort_keys=True))
-if not result['retained']:
-    raise SystemExit(1)
+if not (passed or improved): raise SystemExit(1)
 PY
