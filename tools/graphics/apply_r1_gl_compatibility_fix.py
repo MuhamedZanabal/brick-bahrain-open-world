@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 KEY = "limits/opengl/max_lights_per_object"
-VALUE = 5
+VALUE = 4
 
 
 def digest(data: bytes) -> str:
@@ -56,7 +56,7 @@ def apply(project: Path, report: Path) -> dict[str, object]:
         "cause": "Compatibility renderer specialization exceeds the emulator/device fragment-uniform budget",
         "correction_type": "project-level light-cap mitigation, not an engine source-code fix",
         "setting": f"rendering/{KEY}",
-        "before_value": 6,
+        "before_value": 5,
         "after_value": VALUE,
         "project_before_sha256": digest(before),
         "project_after_sha256": digest(after),
