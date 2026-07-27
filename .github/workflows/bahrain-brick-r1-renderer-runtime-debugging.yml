@@ -1,4 +1,4 @@
-name: Bahrain Brick R1 Mobile Sun Shadow Distance
+name: Bahrain Brick R1 Mobile QA Render Scale
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: bahrain-brick-r1-mobile-sun-shadow-distance
+  group: bahrain-brick-r1-mobile-qa-render-scale
   cancel-in-progress: false
 
 jobs:
@@ -26,12 +26,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Run focused Mobile shadow-distance tests
+      - name: Run focused Mobile render-scale tests
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest tests/graphics/test_r1_mobile_shadow_distance_fix.py -v
-          python3 -m py_compile tools/graphics/apply_r1_mobile_shadow_distance_fix.py
+          python3 -m unittest tests/graphics/test_r1_mobile_render_scale_fix.py -v
+          python3 -m py_compile tools/graphics/apply_r1_mobile_render_scale_fix.py
           bash -n tools/graphics/run_r1_renderer_debug.sh
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
@@ -62,11 +62,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-r1-mobile-shadow-distance-${{ github.run_id }}
+          name: bahrain-brick-r1-mobile-render-scale-${{ github.run_id }}
           path: |
-            build/r1/R1_MOBILE_SHADOW_DISTANCE_RESULT.json
-            build/r1/MOBILE_SHADOW_DISTANCE_FIX.json
-            build/r1/raw/mobile_shadow_distance
+            build/r1/R1_MOBILE_RENDER_SCALE_RESULT.json
+            build/r1/MOBILE_RENDER_SCALE_FIX.json
+            build/r1/raw/mobile_render_scale
             build/r1/APK_SHA256SUMS.txt
             build/r1/GODOT_VERSION.txt
             build-r1-mobile.log
