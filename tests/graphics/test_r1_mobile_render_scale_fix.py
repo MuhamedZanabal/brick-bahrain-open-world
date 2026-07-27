@@ -55,6 +55,7 @@ class R1MobileRenderScaleFixTest(unittest.TestCase):
         self.assertIn("printf 'mobile_baseline'", text)
         self.assertIn("--renderer mobile", text)
         self.assertNotIn("apply_r1_mobile_secondary_light_fix.py", text)
+        self.assertNotIn("apply_r1_mobile_shadow_size_fix.py", text)
         self.assertNotIn("gl_production", text)
 
 
