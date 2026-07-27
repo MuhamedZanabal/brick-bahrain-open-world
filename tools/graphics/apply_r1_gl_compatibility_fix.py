@@ -50,6 +50,11 @@ def apply(project: Path, report: Path) -> dict[str, object]:
     result = {
         "schema_version": 1,
         "defect": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
+        "observed_in_unshaded_one_box_control": True,
+        "user_authored_shader_responsible": False,
+        "production_material_complexity_required": False,
+        "cause": "Compatibility renderer specialization exceeds the emulator/device fragment-uniform budget",
+        "correction_type": "project-level light-cap mitigation, not an engine source-code fix",
         "setting": f"rendering/{KEY}",
         "before_value": 6,
         "after_value": VALUE,
