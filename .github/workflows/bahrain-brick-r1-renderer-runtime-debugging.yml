@@ -1,4 +1,4 @@
-name: Bahrain Brick R1 GL Budget Fix 5 to 4
+name: Bahrain Brick R1 Mobile Shadow Size 4096 to 2048
 
 on:
   pull_request:
@@ -13,11 +13,11 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: bahrain-brick-r1-gl-budget-fix-5-to-4
+  group: bahrain-brick-r1-mobile-shadow-size-4096-to-2048
   cancel-in-progress: false
 
 jobs:
-  targeted_gl_fix:
+  targeted_mobile_fix:
     if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -26,12 +26,12 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - name: Run focused GL fix tests
+      - name: Run focused Mobile fix tests
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest tests/graphics/test_r1_gl_compatibility_fix.py -v
-          python3 -m py_compile tools/graphics/apply_r1_gl_compatibility_fix.py
+          python3 -m unittest tests/graphics/test_r1_mobile_shadow_size_fix.py -v
+          python3 -m py_compile tools/graphics/apply_r1_mobile_shadow_size_fix.py
           bash -n tools/graphics/run_r1_renderer_debug.sh
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
@@ -49,29 +49,29 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth
+          sudo apt-get install -y --no-install-recommends xvfb xauth mesa-vulkan-drivers vulkan-tools python3-pil
           if test -e /dev/kvm; then sudo chmod 666 /dev/kvm; fi
-      - name: Build and launch GL only
-        id: gl
+      - name: Build and launch Mobile only
+        id: mobile
         continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
-          bash tools/graphics/run_r1_renderer_debug.sh "$PWD" "$PWD/build/r1" 2>&1 | tee build-r1-gl.log
-      - name: Upload GL proof
+          bash tools/graphics/run_r1_renderer_debug.sh "$PWD" "$PWD/build/r1" 2>&1 | tee build-r1-mobile.log
+      - name: Upload Mobile proof
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-r1-gl-budget-${{ github.run_id }}
+          name: bahrain-brick-r1-mobile-shadow-size-${{ github.run_id }}
           path: |
-            build/r1/R1_GL_BUDGET_RESULT.json
-            build/r1/GL_COMPATIBILITY_FIX.json
-            build/r1/raw/gl_production
+            build/r1/R1_MOBILE_SHADOW_SIZE_RESULT.json
+            build/r1/MOBILE_SHADOW_SIZE_FIX.json
+            build/r1/raw/mobile_shadow_size
             build/r1/APK_SHA256SUMS.txt
             build/r1/GODOT_VERSION.txt
-            build-r1-gl.log
+            build-r1-mobile.log
           if-no-files-found: warn
           retention-days: 30
-      - name: Enforce retained result
+      - name: Enforce Mobile decision
         if: always()
-        run: test '${{ steps.gl.outcome }}' = success
+        run: test '${{ steps.mobile.outcome }}' = success
