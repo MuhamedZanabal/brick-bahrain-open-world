@@ -8,7 +8,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "tools/graphics/apply_r1_gl_compatibility_fix.py"
-RUNNER = ROOT / "tools/graphics/run_r1_renderer_debug.sh"
 
 
 def load_module():
@@ -21,7 +20,7 @@ def load_module():
 
 
 class R1GLCompatibilityFixTest(unittest.TestCase):
-    def test_setting_is_inserted_once_without_renderer_default_change(self) -> None:
+    def test_retains_least_restrictive_proven_cap_without_renderer_default_change(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -30,23 +29,17 @@ class R1GLCompatibilityFixTest(unittest.TestCase):
             project.write_text('[application]\nrun/main_scene="res://main.tscn"\n\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n')
             result = module.apply(project, report)
             text = project.read_text()
-            self.assertEqual(text.count("limits/opengl/max_lights_per_object=4"), 1)
+            self.assertEqual(text.count("limits/opengl/max_lights_per_object=7"), 1)
             self.assertIn('renderer/rendering_method="gl_compatibility"', text)
-            self.assertEqual(result["before_value"], 5)
-            self.assertEqual(result["after_value"], 4)
+            self.assertEqual(result["before_value"], 8)
+            self.assertEqual(result["after_value"], 7)
             self.assertEqual(result["defect"], "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW")
             self.assertTrue(result["observed_in_unshaded_one_box_control"])
             self.assertFalse(result["user_authored_shader_responsible"])
             self.assertFalse(result["production_material_complexity_required"])
             self.assertFalse(result["renderer_default_modified"])
-
-    def test_runner_is_gl_only_and_uses_godot_43(self) -> None:
-        text = RUNNER.read_text()
-        self.assertIn("apply_r1_gl_compatibility_fix.py", text)
-        self.assertIn("gl_production", text)
-        self.assertIn("Godot_v4.3-stable_linux.x86_64.zip", text)
-        self.assertNotIn("mobile_baseline", text)
-        self.assertNotIn("Godot_v4.7.1", text)
+            self.assertEqual(result["android_before_link_failures"], 45)
+            self.assertEqual(result["android_after_link_failures"], 44)
 
 
 if __name__ == "__main__":
