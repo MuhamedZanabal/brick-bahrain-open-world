@@ -128,7 +128,7 @@ health=(sys.argv[4]=='true' and bool(sys.argv[5]) and valid and critical==0 and 
 result={
   'schema_version':1,
   'defect':'GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW',
-  'experiment':'MAX_LIGHTS_PER_OBJECT_6_TO_5',
+  'experiment':'MAX_LIGHTS_PER_OBJECT_5_TO_4',
   'before_link_failures':44,
   'after_link_failures':count,
   'apk_export_result':True,
