@@ -1,4 +1,4 @@
-name: Bahrain Brick R1 Mobile Shadow Distance 150 to 75
+name: Bahrain Brick R1 Mobile Secondary Directional Light Off
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: bahrain-brick-r1-mobile-shadow-distance-150-to-75
+  group: bahrain-brick-r1-mobile-secondary-directional-light-off
   cancel-in-progress: false
 
 jobs:
@@ -30,8 +30,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest tests/graphics/test_r1_mobile_shadow_distance_fix.py -v
-          python3 -m py_compile tools/graphics/apply_r1_mobile_shadow_distance_fix.py
+          python3 -m unittest tests/graphics/test_r1_mobile_secondary_light_fix.py -v
+          python3 -m py_compile tools/graphics/apply_r1_mobile_secondary_light_fix.py
           bash -n tools/graphics/run_r1_renderer_debug.sh
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
@@ -62,11 +62,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-r1-mobile-shadow-distance-${{ github.run_id }}
+          name: bahrain-brick-r1-mobile-secondary-light-${{ github.run_id }}
           path: |
-            build/r1/R1_MOBILE_SHADOW_DISTANCE_RESULT.json
-            build/r1/MOBILE_SHADOW_DISTANCE_FIX.json
-            build/r1/raw/mobile_shadow_distance
+            build/r1/R1_MOBILE_SECONDARY_LIGHT_RESULT.json
+            build/r1/MOBILE_SECONDARY_LIGHT_FIX.json
+            build/r1/raw/mobile_secondary_light
             build/r1/APK_SHA256SUMS.txt
             build/r1/GODOT_VERSION.txt
             build-r1-mobile.log
