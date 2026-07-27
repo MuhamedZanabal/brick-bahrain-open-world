@@ -21,46 +21,47 @@ def load_module():
 
 
 class R1MobileShadowDistanceFixTest(unittest.TestCase):
-    def test_halves_only_active_sun_shadow_distance(self) -> None:
+    def test_halves_only_runtime_sun_shadow_distance(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            scene = root / "scene.tscn"
+            script = root / "manama_souq_vertical_slice.gd"
             report = root / "report.json"
-            scene.write_text(
-                '[gd_scene format=3]\n\n'
-                '[node name="LateAfternoonSun" type="DirectionalLight3D"]\n'
-                'shadow_enabled = true\n'
-                'directional_shadow_max_distance = 100.0\n\n'
-                '[node name="DirectionalFill" type="DirectionalLight3D"]\n'
-                'shadow_enabled = false\n'
-                'directional_shadow_max_distance = 100.0\n'
+            script.write_text(
+                'func _build_environment() -> void:\n'
+                '\tvar sun: DirectionalLight3D = DirectionalLight3D.new()\n'
+                '\tsun.name = "LateAfternoonSun"\n'
+                '\tsun.shadow_enabled = true\n'
+                '\tsun.directional_shadow_max_distance = 150.0\n'
+                '\tadd_child(sun)\n\n'
+                '\tvar fill: DirectionalLight3D = DirectionalLight3D.new()\n'
+                '\tfill.name = "SkyFill"\n'
+                '\tfill.shadow_enabled = false\n'
             )
-            result = module.apply(scene, report)
-            text = scene.read_text()
-            target = text.split('[node name="LateAfternoonSun"', 1)[1].split('[node name="DirectionalFill"', 1)[0]
-            fill = text.split('[node name="DirectionalFill"', 1)[1]
-            self.assertIn("directional_shadow_max_distance = 50.0", target)
-            self.assertIn("directional_shadow_max_distance = 100.0", fill)
-            self.assertEqual(result["before_value"], 100.0)
-            self.assertEqual(result["after_value"], 50.0)
+            result = module.apply(script, report)
+            text = script.read_text()
+            self.assertIn("sun.directional_shadow_max_distance = 75.0", text)
+            self.assertIn('fill.name = "SkyFill"', text)
+            self.assertIn("fill.shadow_enabled = false", text)
+            self.assertEqual(result["before_value"], 150.0)
+            self.assertEqual(result["after_value"], 75.0)
             self.assertEqual(result["target_node"], "LateAfternoonSun")
             self.assertTrue(result["qa_override_only"])
 
-    def test_inserts_half_default_when_property_is_absent(self) -> None:
+    def test_requires_the_named_shadow_casting_sun(self) -> None:
         module = load_module()
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            scene = root / "scene.tscn"
+            script = root / "manama_souq_vertical_slice.gd"
             report = root / "report.json"
-            scene.write_text('[node name="LateAfternoonSun" type="DirectionalLight3D"]\nshadow_enabled = true\n')
-            result = module.apply(scene, report)
-            self.assertIn("directional_shadow_max_distance = 50.0", scene.read_text())
-            self.assertEqual(result["before_value"], 100.0)
+            script.write_text('var sun = DirectionalLight3D.new()\nsun.shadow_enabled = true\nsun.directional_shadow_max_distance = 150.0\n')
+            with self.assertRaisesRegex(ValueError, "LateAfternoonSun"):
+                module.apply(script, report)
 
-    def test_runner_is_mobile_only_and_uses_distance_override(self) -> None:
+    def test_runner_is_mobile_only_and_uses_runtime_script_override(self) -> None:
         text = RUNNER.read_text()
         self.assertIn("apply_r1_mobile_shadow_distance_fix.py", text)
+        self.assertIn("scripts/manama_souq_vertical_slice.gd", text)
         self.assertIn("Godot_v4.3-stable_linux.x86_64.zip", text)
         self.assertIn("printf 'mobile_baseline'", text)
         self.assertIn("--renderer mobile", text)
