@@ -30,11 +30,14 @@ class R1GLCompatibilityFixTest(unittest.TestCase):
             project.write_text('[application]\nrun/main_scene="res://main.tscn"\n\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n')
             result = module.apply(project, report)
             text = project.read_text()
-            self.assertEqual(text.count("limits/opengl/max_lights_per_object=5"), 1)
+            self.assertEqual(text.count("limits/opengl/max_lights_per_object=4"), 1)
             self.assertIn('renderer/rendering_method="gl_compatibility"', text)
-            self.assertEqual(result["before_value"], 6)
-            self.assertEqual(result["after_value"], 5)
+            self.assertEqual(result["before_value"], 5)
+            self.assertEqual(result["after_value"], 4)
             self.assertEqual(result["defect"], "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW")
+            self.assertTrue(result["observed_in_unshaded_one_box_control"])
+            self.assertFalse(result["user_authored_shader_responsible"])
+            self.assertFalse(result["production_material_complexity_required"])
             self.assertFalse(result["renderer_default_modified"])
 
     def test_runner_is_gl_only_and_uses_godot_43(self) -> None:
