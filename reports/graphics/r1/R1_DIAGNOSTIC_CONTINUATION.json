@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "stage": "BAHRAIN BRICK — STAGE R1",
+  "title": "RENDERER RUNTIME DEBUGGING — DIAGNOSTIC CONTINUATION",
+  "state": "IN_PROGRESS",
+  "authorized_date": "2026-07-28",
+  "authorization_basis": "User explicitly requested continued execution until all executable tasks are complete.",
+  "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
+  "production_fix_authorized": false,
+  "renderer_selected": null,
+  "renderer_defaults_modified": false,
+  "g1_authorized": false,
+  "baseline_last_completed_frame": 90,
+  "completed_failed_corrections": 4,
+  "active_experiment": {
+    "id": "MOBILE_ENVIRONMENT_TONEMAPPER_FILMIC_TO_LINEAR",
+    "scope": "QA-only reconstructed Mobile source",
+    "single_change": "environment.tonemap_mode: TONE_MAPPER_FILMIC to TONE_MAPPER_LINEAR",
+    "prior_shadow_changes_stacked": false,
+    "render_scale_change_stacked": false,
+    "gl_change_stacked": false,
+    "gameplay_modified": false,
+    "renderer_default_modified": false,
+    "decision_rule": {
+      "frame_300_and_health_gates": "retain as R1 Mobile pass candidate",
+      "last_completed_frame_greater_than_90": "retain temporarily as proven improvement",
+      "last_completed_frame_less_than_or_equal_to_90": "revert"
+    }
+  }
+}
