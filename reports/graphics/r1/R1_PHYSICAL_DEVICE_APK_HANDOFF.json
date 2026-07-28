@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "stage": "BAHRAIN BRICK — STAGE R1",
+  "purpose": "Named physical-device renderer qualification APK handoff",
+  "recorded_date": "2026-07-28",
+  "workflow_run_id": 30385101264,
+  "workflow_conclusion": "success",
+  "source_commit": "ec2b7283e3fd28e3d83e8b035287966a929bb1ce",
+  "engine": "4.3.stable.official.77dcf97d8",
+  "architecture": "arm64-v8a",
+  "source_tree_equivalence_passed": true,
+  "renderer_defaults_modified": false,
+  "production_fix_authorized": false,
+  "g1_authorized": false,
+  "signature_verification": {
+    "v1": true,
+    "v2": true,
+    "v3": true,
+    "signer_certificate_sha256": "cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387"
+  },
+  "apks": [
+    {
+      "renderer": "gl_compatibility",
+      "default_mode": "gl_production",
+      "package": "com.brickbahrain.r1physical.gl",
+      "filename": "bahrain-brick-r1-physical-gl-arm64.apk",
+      "size_bytes": 299778961,
+      "sha256": "e417230ec4a0cb910cabdf1f7de44e4a0a7e4b58b79139a4f640416353164fd6",
+      "artifact_id": 8699173399,
+      "artifact_digest": "sha256:5e1a7a4091b2451dd9d6bdaba96751a0d6dfd91cce863a03c7406a600229f977"
+    },
+    {
+      "renderer": "mobile",
+      "default_mode": "mobile_baseline",
+      "package": "com.brickbahrain.r1physical.mobile",
+      "filename": "bahrain-brick-r1-physical-mobile-arm64.apk",
+      "size_bytes": 299778961,
+      "sha256": "ec4ea74480cd36e25c2e146aac03abdfeb8ef0bb22b78a7b726b871fe8c4e787",
+      "artifact_id": 8699178791,
+      "artifact_digest": "sha256:6fb201ae23614dba2c95536b8165089246fba58c483016152fb14c00fe850011"
+    }
+  ],
+  "install_note": "Install the GL and Mobile APKs separately. They use distinct package names and may coexist on one ARM64 Android device.",
+  "qualification_boundary": "These are debug-signed QA APKs for physical-device evidence. They do not select a renderer, change production defaults, authorize a production fix, or begin G1."
+}
