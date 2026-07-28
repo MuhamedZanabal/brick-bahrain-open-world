@@ -7,7 +7,8 @@
     "reports/graphics/r1/R1_ENGINEERING_LOG.md",
     "reports/graphics/r1/R1_ENGINEERING_STOP.json",
     "reports/graphics/r1/R1_DIAGNOSTIC_CONTINUATION.json",
-    "reports/graphics/r1/R1_ENGINE_UPGRADE_EXPERIMENT.json"
+    "reports/graphics/r1/R1_ENGINE_UPGRADE_EXPERIMENT.json",
+    "reports/graphics/r1/R1_ENGINE_UPGRADE_RESULT.json"
   ],
   "decisions": [
     "PR #59 remains immutable.",
@@ -16,68 +17,30 @@
     "PR #60 remains draft; G1-G10 remain blocked.",
     "The single authorized Tier B retry is run 30086966524; no further retries are permitted.",
     "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived.",
-    "R1 confirmed GL Compatibility engine-generated fragment-uniform overflow: baseline 45, best project-level result 44 at max_lights_per_object=7.",
-    "R1 confirmed Mobile RENDER_PIPELINE_STALL: render-disabled control frame 300, baseline frame 90.",
+    "R1 confirmed GL Compatibility engine-generated fragment-uniform overflow: baseline 45; best project-level and Godot 4.7.1 results are 44.",
+    "R1 confirmed Mobile RENDER_PIPELINE_STALL: render-disabled control frame 300; Godot 4.3 baseline frame 90.",
     "Five isolated Mobile corrections ended at frames 80, 90, 70, 90, and 70 and were reverted.",
-    "Tonemapper run 30370527664 and artifact 8693475134 are adjudicative evidence.",
-    "User authorized diagnostic continuation; production fixes, renderer selection, renderer-default changes, and G1 remain unauthorized.",
-    "The active experiment compares unmodified GL production and Mobile baseline on Godot 4.7.1-stable from one shared imported state.",
-    "Engine comparison run 30373598142 is non-adjudicative: Godot 4.7.1 import exceeded the 1200-second harness ceiling before exports or Android targets.",
-    "The authorized harness-only correction raises the import ceiling to 3600 seconds and adds phase-status evidence; target scope is unchanged."
+    "Godot 4.7.1 attempt 30373598142 is non-adjudicative because import exceeded 1200 seconds before exports.",
+    "Corrected Godot 4.7.1 run 30376596221 is adjudicative: GL 44 link failures and Mobile frame 0 with six Vulkan queue-present failures.",
+    "The 4.7.1 result is retained as diagnostic engine-boundary evidence only; production engine adoption is rejected.",
+    "R1 exit criteria remain unmet; renderer selection, renderer-default changes, production fixes, and G1 remain unauthorized.",
+    "The emulator-side experiment boundary is exhausted; named physical-device or upstream engine/driver evidence is required."
   ],
   "defects": [
-    {
-      "id": "G0-AUTH-001",
-      "resolution": "Exact frozen world.gd byte protection.",
-      "state": "RESOLVED"
-    },
-    {
-      "classification": "TIER_B_APP_LAUNCH_FAILURE",
-      "id": "G0-TIER-B-001",
-      "state": "OPEN"
-    },
-    {
-      "evidence": "duplicate run 30087878937; cancellation run 30088001461 succeeded too late",
-      "id": "G0-AUTOMATION-001",
-      "state": "CLOSED_WITH_EXCEPTION"
-    },
-    {
-      "classification": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
-      "evidence": "45 baseline link failures; best project-level result 44",
-      "id": "R1-GL-001",
-      "state": "IN_PROGRESS_ENGINE_COMPARISON"
-    },
-    {
-      "classification": "RENDER_PIPELINE_STALL",
-      "evidence": "baseline frame 90; render-disabled control frame 300; five focused corrections ended at 80, 90, 70, 90, 70",
-      "id": "R1-MOBILE-001",
-      "state": "IN_PROGRESS_ENGINE_COMPARISON"
-    }
+    {"id": "G0-AUTH-001", "resolution": "Exact frozen world.gd byte protection.", "state": "RESOLVED"},
+    {"classification": "TIER_B_APP_LAUNCH_FAILURE", "id": "G0-TIER-B-001", "state": "OPEN"},
+    {"evidence": "duplicate run 30087878937; cancellation run 30088001461 succeeded too late", "id": "G0-AUTOMATION-001", "state": "CLOSED_WITH_EXCEPTION"},
+    {"classification": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW", "evidence": "45 baseline link failures; best project-level and Godot 4.7.1 result 44", "id": "R1-GL-001", "state": "OPEN_ENGINE_BOUNDARY"},
+    {"classification": "RENDER_PIPELINE_STALL", "evidence": "4.3 baseline frame 90; render-disabled control 300; five corrections failed; 4.7.1 frame 0 with queue-present failures", "id": "R1-MOBILE-001", "state": "OPEN_ENGINE_DRIVER_BOUNDARY"}
   ],
   "milestones": [
-    {
-      "gate_state": "G0_EVIDENCE_INSUFFICIENT",
-      "id": "G0",
-      "state": "BLOCKED"
-    },
-    {
-      "blocked_by": [
-        "G0"
-      ],
-      "id": "G1",
-      "state": "BLOCKED"
-    },
-    {
-      "blocked_by": [
-        "G0"
-      ],
-      "id": "G2-G10",
-      "state": "BLOCKED"
-    }
+    {"gate_state": "G0_EVIDENCE_INSUFFICIENT", "id": "G0", "state": "BLOCKED"},
+    {"blocked_by": ["G0"], "id": "G1", "state": "BLOCKED"},
+    {"blocked_by": ["G0"], "id": "G2-G10", "state": "BLOCKED"}
   ],
   "next_action": {
-    "action": "Rerun the same unstacked Godot 4.7.1-stable GL production and Mobile baseline comparison with the corrected import ceiling.",
-    "stage": "R1 engine-boundary comparison harness retry"
+    "action": "Obtain named physical-device evidence and/or investigate the Godot/driver boundary upstream. No additional emulator parameter or engine-version experiment is authorized.",
+    "stage": "R1 engineering stop"
   },
   "project": {
     "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
@@ -128,82 +91,44 @@
     "title": "ANDROID PAIRED-RENDERER FUNCTIONAL QUALIFICATION"
   },
   "stage_r1": {
-    "active_experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
     "date": "2026-07-28",
-    "engine_comparison": {
-      "attempts": [
-        {
-          "adjudicative": false,
-          "artifact_id": 8694707194,
-          "classification": "HARNESS_IMPORT_TIMEOUT",
-          "run_id": 30373598142,
-          "targets_executed": false
-        }
-      ],
-      "candidate": "4.7.1-stable",
-      "import_timeout_seconds": 3600,
-      "phase_status_report": "R1_ENGINE_HARNESS_STATUS.json"
-    },
+    "title": "RENDERER RUNTIME DEBUGGING",
+    "state": "ENGINEERING_STOP",
+    "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
+    "active_experiment": null,
+    "production_fix_authorized": false,
+    "renderer_selected": null,
+    "renderer_defaults_modified": false,
     "g1_authorized": false,
     "gl": {
       "baseline_link_failures": 45,
       "best_link_failures": 44,
-      "best_setting": "rendering/limits/opengl/max_lights_per_object=7",
-      "critical_runtime_errors": 0,
-      "exit_criterion_met": false,
-      "project_level_cap_range_exhausted": true
+      "best_project_setting": "rendering/limits/opengl/max_lights_per_object=7",
+      "engine_4_7_1_link_failures": 44,
+      "engine_4_7_1_uniform_overflow_count": 46,
+      "project_level_cap_range_exhausted": true,
+      "exit_criterion_met": false
     },
-    "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
     "mobile": {
       "baseline_last_completed_frame": 90,
-      "classification": "RENDER_PIPELINE_STALL",
-      "corrections": [
-        {
-          "decision": "reverted",
-          "experiment": "disable LateAfternoonSun shadow",
-          "last_completed_frame": 80
-        },
-        {
-          "artifact_id": 8670646110,
-          "decision": "reverted",
-          "experiment": "directional shadow size 2048 to 1024",
-          "last_completed_frame": 90,
-          "run_id": 30310393343
-        },
-        {
-          "artifact_id": 8671241285,
-          "decision": "reverted",
-          "experiment": "LateAfternoonSun shadow distance 150 to 100",
-          "last_completed_frame": 70,
-          "run_id": 30312058073
-        },
-        {
-          "artifact_id": 8671766622,
-          "decision": "reverted",
-          "experiment": "Mobile QA render scale 1.0 to 0.75",
-          "last_completed_frame": 90,
-          "run_id": 30313623186
-        },
-        {
-          "artifact_id": 8693475134,
-          "decision": "reverted",
-          "experiment": "SouqWorldEnvironment filmic to linear tonemapper",
-          "last_completed_frame": 70,
-          "run_id": 30370527664
-        }
-      ],
-      "critical_runtime_errors": 0,
-      "exit_criterion_met": false,
-      "failed_correction_count": 5,
       "render_disabled_control_frame": 300,
-      "render_scale_experiment_executed": true,
-      "tonemapper_experiment_executed": true
+      "classification": "RENDER_PIPELINE_STALL",
+      "failed_correction_count": 5,
+      "correction_frames": [80, 90, 70, 90, 70],
+      "engine_4_7_1_last_completed_frame": 0,
+      "engine_4_7_1_vulkan_queue_present_failure_count": 6,
+      "exit_criterion_met": false
     },
-    "production_fix_authorized": false,
-    "renderer_defaults_modified": false,
-    "renderer_selected": null,
-    "state": "ENGINE_BOUNDARY_COMPARISON_HARNESS_RETRY",
-    "title": "RENDERER RUNTIME DEBUGGING"
+    "engine_comparison": {
+      "candidate": "4.7.1-stable",
+      "attempts": [
+        {"run_id": 30373598142, "artifact_id": 8694707194, "adjudicative": false, "classification": "HARNESS_IMPORT_TIMEOUT"},
+        {"run_id": 30376596221, "artifact_id": 8696886506, "artifact_digest": "sha256:2398209b65bb8a38fa809b9d70b3ace95c362b522bdfdb87fc364c17243f33be", "adjudicative": true, "classification": "DIAGNOSTIC_GL_IMPROVEMENT_WITH_MOBILE_REGRESSION"}
+      ],
+      "decision": "RETAIN_DIAGNOSTIC_EVIDENCE_REJECT_PRODUCTION_ENGINE_ADOPTION",
+      "production_engine_adoption_authorized": false
+    },
+    "emulator_side_experiment_boundary_exhausted": true
   },
   "verification": {
     "physical_devices": "NOT_AVAILABLE",
