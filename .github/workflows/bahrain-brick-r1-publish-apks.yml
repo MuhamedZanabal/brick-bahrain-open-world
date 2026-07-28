@@ -1,4 +1,4 @@
-name: Bahrain Brick Playable Mobile APK
+name: Bahrain Brick R1 Publish Physical APKs
 
 on:
   pull_request:
@@ -12,126 +12,68 @@ permissions:
   contents: write
 
 concurrency:
-  group: bahrain-brick-playable-mobile-apk
+  group: bahrain-brick-r1-publish-physical-apks
   cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  publish:
     if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
     runs-on: ubuntu-24.04
-    timeout-minutes: 75
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      OUTPUT_ROOT: ${{ runner.temp }}/bahrain-brick-playable-mobile
-      TAG: playable-mobile-${{ github.event.pull_request.head.sha }}
+      SOURCE_RUN: '30385101264'
+      TAG: r1-physical-apks-30385101264
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - uses: android-actions/setup-android@v3
-
-      - name: Install export dependencies
+      - name: Download verified APK artifacts
         shell: bash
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y xvfb unzip
-          sdkmanager 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0'
-          if [[ ! -f debug.keystore ]]; then
-            keytool -genkeypair -v \
-              -keystore debug.keystore \
-              -storepass android \
-              -alias androiddebugkey \
-              -keypass android \
-              -dname 'CN=Android Debug,O=Android,C=US' \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000
+          mkdir -p release/mobile release/gl
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "bahrain-brick-r1-physical-mobile-arm64-$SOURCE_RUN" --dir release/mobile
+          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "bahrain-brick-r1-physical-gl-arm64-$SOURCE_RUN" --dir release/gl
+          test -s release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk
+          test -s release/gl/bahrain-brick-r1-physical-gl-arm64.apk
+          sha256sum release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk release/gl/bahrain-brick-r1-physical-gl-arm64.apk | tee release/APK_SHA256SUMS.txt
+
+      - name: Publish prerelease assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" \
+              release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk \
+              release/gl/bahrain-brick-r1-physical-gl-arm64.apk \
+              release/APK_SHA256SUMS.txt \
+              --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" \
+              release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk \
+              release/gl/bahrain-brick-r1-physical-gl-arm64.apk \
+              release/APK_SHA256SUMS.txt \
+              --target "${{ github.event.pull_request.head.sha }}" \
+              --title 'Bahrain Brick R1 Physical Device APKs' \
+              --notes 'Diagnostic ARM64 builds for named physical-device and hosted renderer comparison. Production renderer defaults are unchanged.' \
+              --prerelease --repo "$GITHUB_REPOSITORY"
           fi
 
-      - name: Verify playable-export regression contract
+      - name: Verify public assets
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m unittest tests/graphics/test_r1_playable_apk_export.py -v
-          python3 -m py_compile tools/graphics/patch_r1_playable_export.py
-          bash -n tools/graphics/export_r1_playable_mobile_apk.sh
-
-      - name: Export production-scene APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/graphics/export_r1_playable_mobile_apk.sh "$GITHUB_WORKSPACE" "$OUTPUT_ROOT"
-
-      - name: Verify corrected APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p release
-          APK="$OUTPUT_ROOT/bahrain-brick-playable-mobile-arm64.apk"
-          test -s "$APK"
-          "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee release/playable-apk-signing.txt
-          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" | tee release/playable-apk-badging.txt
-          grep -q "package: name='com.brickbahrain.playable.mobile'" release/playable-apk-badging.txt
-          unzip -p "$APK" assets/project.binary > release/project.binary
-          grep -a -q 'res://scenes/splash_screen.tscn' release/project.binary
-          if grep -a -q 'res://tests/graphics/r1_renderer_runtime_debug.tscn' release/project.binary; then
-            echo 'Diagnostic main scene remains selected in the corrected package.' >&2
-            exit 1
-          fi
-          cp "$APK" release/
-          sha256sum release/bahrain-brick-playable-mobile-arm64.apk | tee release/PLAYABLE_APK_SHA256SUMS.txt
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets > release/release.json
           python3 - <<'PY'
-          from pathlib import Path
-          import hashlib, json, os
-          apk = Path('release/bahrain-brick-playable-mobile-arm64.apk')
-          h = hashlib.sha256()
-          with apk.open('rb') as stream:
-              for chunk in iter(lambda: stream.read(1024 * 1024), b''):
-                  h.update(chunk)
-          payload = {
-              'schema_version': 1,
-              'purpose': 'Playable Android package using the production splash and game scenes',
-              'source_commit': os.environ['GITHUB_SHA'],
-              'engine': '4.3-stable',
-              'renderer': 'mobile',
-              'architecture': 'arm64-v8a',
-              'package': 'com.brickbahrain.playable.mobile',
-              'filename': apk.name,
-              'size_bytes': apk.stat().st_size,
-              'sha256': h.hexdigest(),
-              'production_main_scene': 'res://scenes/splash_screen.tscn',
-              'production_main_scene_preserved': True,
-              'diagnostic_main_scene_selected': False,
-              'diagnostic_evidence_camera_selected': False,
-              'debug_signed': True,
-          }
-          Path('release/PLAYABLE_APK_HANDOFF.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
+          import json
+          data=json.load(open('release/release.json'))
+          names={a['name'] for a in data['assets']}
+          required={'bahrain-brick-r1-physical-mobile-arm64.apk','bahrain-brick-r1-physical-gl-arm64.apk','APK_SHA256SUMS.txt'}
+          missing=required-names
+          if missing:
+              raise SystemExit(f'missing release assets: {sorted(missing)}')
+          print(data['url'])
           PY
-
-      - name: Upload corrected APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bahrain-brick-playable-mobile-arm64-${{ github.run_id }}
-          path: release/
-          retention-days: 30
-
-      - name: Publish corrected prerelease
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh release create "$TAG" \
-            release/bahrain-brick-playable-mobile-arm64.apk \
-            release/PLAYABLE_APK_HANDOFF.json \
-            release/PLAYABLE_APK_SHA256SUMS.txt \
-            --target "${{ github.event.pull_request.head.sha }}" \
-            --title 'Bahrain Brick Playable Mobile APK' \
-            --notes 'Corrected ARM64 debug build. Uses the production splash/game scene and does not select the R1 diagnostic evidence camera.' \
-            --prerelease --repo "$GITHUB_REPOSITORY"
