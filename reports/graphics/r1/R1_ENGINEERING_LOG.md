@@ -47,8 +47,16 @@
 - **Operational gates:** export, launch, scene readiness, valid non-black 1920×1080 screenshot, process liveness, pause/resume, and zero critical runtime errors passed.
 - **Decision:** reverted.
 
+### Correction 5 — replace filmic tonemapping with linear tonemapping
+
+- **Change:** `SouqWorldEnvironment` tonemapper `Environment.TONE_MAPPER_FILMIC → Environment.TONE_MAPPER_LINEAR` in reconstructed Mobile QA source only.
+- **Evidence:** workflow run `30370527664`, artifact `8693475134`, artifact digest `sha256:90e0e65a3b3b9f232a3cee83bbff28d3ec32591d4ad50f4882e1c13c5927bd83`.
+- **Result:** frame progression regressed from 90 to 70; frame 180 and frame 300 were not reached.
+- **Operational gates:** export, launch, scene readiness, valid non-black 1920×1080 screenshot, process liveness, pause/resume, and zero critical runtime errors passed.
+- **Decision:** reverted.
+
 ## Current engineering boundary
 
-- The ordered shadow and render-scale reductions did not improve the proven render-pipeline stall: completed-frame outcomes were 80, 90, 70, and 90 against the frame-90 baseline.
+- Five isolated render-cost reductions did not improve the proven Mobile render-pipeline stall: completed-frame outcomes were 80, 90, 70, 90, and 70 against the frame-90 baseline.
 - R1 exit criteria remain unmet for both tracks. Renderer defaults remain unchanged, no renderer is selected, `G0_EVIDENCE_INSUFFICIENT` remains governing, and G1 remains unauthorized.
-- **Next smallest authorized action:** disable expensive environment effects one at a time in the Mobile QA clone, beginning with the active filmic tonemapper/environment path, then run the same single Mobile Android verification.
+- **Next highest-leverage action:** compare unmodified GL production and Mobile baseline on Godot `4.7.1-stable` using one imported state. This tests the shared engine boundary for both unresolved defects without stacking any project-level correction.
