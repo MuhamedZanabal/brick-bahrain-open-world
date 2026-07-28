@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: bahrain-brick-r1-physical-device-apk-export
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   export_arm64_apks:
