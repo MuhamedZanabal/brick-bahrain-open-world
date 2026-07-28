@@ -60,3 +60,11 @@
 - Five isolated render-cost reductions did not improve the proven Mobile render-pipeline stall: completed-frame outcomes were 80, 90, 70, 90, and 70 against the frame-90 baseline.
 - R1 exit criteria remain unmet for both tracks. Renderer defaults remain unchanged, no renderer is selected, `G0_EVIDENCE_INSUFFICIENT` remains governing, and G1 remains unauthorized.
 - **Next highest-leverage action:** compare unmodified GL production and Mobile baseline on Godot `4.7.1-stable` using one imported state. This tests the shared engine boundary for both unresolved defects without stacking any project-level correction.
+
+### Engine comparison attempt 1 — harness timeout
+
+- **Evidence:** workflow run `30373598142`, artifact `8694707194`, artifact digest `sha256:21ddb7af32a2797cfe695e27b0574e55fbdf4d183756f6bffde5376629edfff2`.
+- **Observed engine:** `4.7.1.stable.official.a13da4feb`; official binary and template checksums passed.
+- **Result:** the shared source import exceeded the historical 1,200-second ceiling and was terminated before either APK export or Android target. No GL or Mobile engine result exists.
+- **Classification:** `HARNESS_IMPORT_TIMEOUT`; non-adjudicative.
+- **Harness correction:** extend only the 4.7.1 import ceiling to 3,600 seconds and emit phase status to `R1_ENGINE_HARNESS_STATUS.json` before rerunning the same two targets.
