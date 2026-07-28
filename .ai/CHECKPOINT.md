@@ -1,45 +1,47 @@
-# Bahrain Brick Graphics — R1 Engine-Boundary Comparison
+# Bahrain Brick Graphics — R1 Final Engineering Stop
 
 Recorded: 2026-07-28
 
 ## Current state
 
 - Stage: **BAHRAIN BRICK — STAGE R1: RENDERER RUNTIME DEBUGGING**
-- Outcome: `DIAGNOSTIC_CONTINUATION`
+- Outcome: `ENGINEERING_STOP`
 - Governing gate: `G0_EVIDENCE_INSUFFICIENT`
 - R1 exit criteria met: no
 - Production fix authorized: no
+- Production engine upgrade authorized: no
 - Renderer selected: no
 - Renderer defaults changed: no
 - G1: unauthorized
 
-## Completed evidence
+## Final emulator evidence
 
-- GL 4.3 baseline: 45 link failures; best project cap result: 44 at `max_lights_per_object=7`.
-- Mobile 4.3 baseline: frame 90; render-disabled control: frame 300.
-- Five isolated Mobile corrections were reverted with frame outcomes 80, 90, 70, 90, and 70.
-- Correction 5, filmic-to-linear tonemapping: run `30370527664`, artifact `8693475134`, digest `sha256:90e0e65a3b3b9f232a3cee83bbff28d3ec32591d4ad50f4882e1c13c5927bd83`.
-- All correction runs retained export, launch, scene readiness, non-black screenshot, process/lifecycle health, and zero critical runtime errors.
+### GL Compatibility
 
-## Active micro-task
+- Godot 4.3 baseline: 45 `SceneShaderGLES3` link failures.
+- Best project-level result: 44 at `rendering/limits/opengl/max_lights_per_object=7`; caps 6, 5, and 4 also remained 44.
+- Godot 4.7.1 production-scene comparison: 44 link failures and 46 active-uniform overflow messages.
+- Export, launch, scene readiness, valid 1920×1080 screenshot, liveness, pause/resume, and zero classified critical runtime errors passed.
+- Exit criterion remains unmet because link failures are not zero.
 
-Compare Godot `4.7.1-stable` against the 4.3 evidence using one imported state and only:
+### Mobile Vulkan
 
-- `GL gl_production`
-- `MOBILE mobile_baseline`
+- Godot 4.3 baseline: frame 90 in 240 seconds.
+- Render-disabled control: frame 300.
+- Five isolated corrections were reverted with outcomes 80, 90, 70, 90, and 70.
+- Godot 4.7.1 comparison: frame 0, zero heartbeats, and six `Couldn't present to Vulkan queue` failures after scene readiness.
+- Launch, scene readiness, non-black 1920×1080 screenshot, liveness, and pause/resume passed, but the first rendered frame never completed.
+- Exit criterion remains unmet.
 
-No prior shadow, render-scale, tonemapper, GL cap, gameplay, mission, asset, or renderer-default change may be stacked.
+## Engine comparison authority
 
-Decision rule:
+- Attempt 1: run `30373598142`, artifact `8694707194`; `HARNESS_IMPORT_TIMEOUT`, non-adjudicative.
+- Corrected attempt: run `30376596221`, artifact `8696886506`, digest `sha256:2398209b65bb8a38fa809b9d70b3ace95c362b522bdfdb87fc364c17243f33be`.
+- The corrected harness completed import, both APK exports, both Android launches, proof validation, and decision enforcement.
+- Decision: retain the 4.7.1 result as diagnostic engine-boundary evidence because GL improved below 45; reject production engine adoption because Mobile regressed from frame 90 to frame 0.
 
-- Both tracks meet exit criteria: retain as R1 exit candidate.
-- GL link failures below 45 or Mobile frame above 90 with health gates: retain as proven engine-boundary improvement.
-- Neither track improves: revert and stop emulator-side parameter work.
+## Final boundary
 
-## Harness attempt 1
+The authorized emulator-side correction and engine-comparison graph is exhausted. Do not run another emulator parameter tweak or engine-version experiment, select a renderer, change renderer defaults, apply a production engine upgrade, or begin G1.
 
-- Run `30373598142`, artifact `8694707194`.
-- Godot `4.7.1.stable.official.a13da4feb` downloaded and verified.
-- Import exceeded 1,200 seconds; no APK was exported and neither target executed.
-- Classification: `HARNESS_IMPORT_TIMEOUT`, non-adjudicative.
-- Active correction: import ceiling `1200 → 3600` seconds with phase-status evidence; target scope remains unchanged.
+The remaining dependency is named physical-device evidence and/or upstream Godot/driver investigation outside the current emulator evidence boundary.
