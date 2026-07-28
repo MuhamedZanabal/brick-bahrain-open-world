@@ -28,7 +28,7 @@
     "baseline_last_completed_frame": 90,
     "render_disabled_control_last_completed_frame": 300,
     "critical_runtime_error_count": 0,
-    "failed_correction_count": 4,
+    "failed_correction_count": 5,
     "corrections": [
       {
         "experiment": "disable LateAfternoonSun shadow",
@@ -55,12 +55,20 @@
         "decision": "reverted",
         "run_id": 30313623186,
         "artifact_id": 8671766622
+      },
+      {
+        "experiment": "SouqWorldEnvironment filmic to linear tonemapper",
+        "last_completed_frame": 70,
+        "decision": "reverted",
+        "run_id": 30370527664,
+        "artifact_id": 8693475134
       }
     ],
     "render_scale_experiment_executed": true,
+    "tonemapper_experiment_executed": true,
     "exit_criterion_met": false
   },
-  "historical_stop_reason": "Four isolated Mobile corrections failed to improve the proven render-pipeline stall.",
-  "superseding_decision": "The user explicitly authorized continued execution. Continuation remains diagnostic-only and must preserve renderer, gameplay, asset, mission, and G1 boundaries.",
-  "next_action": "Run one isolated Mobile QA environment experiment: change the active filmic tonemapper to linear and apply the same frame-progression decision gate."
+  "historical_stop_reason": "Five isolated Mobile render-cost corrections failed to improve the proven render-pipeline stall.",
+  "superseding_decision": "The user explicitly authorized continued execution. Continuation remains diagnostic-only and preserves renderer, gameplay, asset, mission, and G1 boundaries.",
+  "next_action": "Run an unstacked Godot 4.7.1-stable engine comparison for GL production and Mobile baseline."
 }
