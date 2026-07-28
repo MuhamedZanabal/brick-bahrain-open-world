@@ -13,6 +13,8 @@ class R1EngineUpgradeTest(unittest.TestCase):
         self.assertIn('godotengine/godot-builds/releases/download', text)
         self.assertIn('SHA512-SUMS.txt', text)
         self.assertIn('run_target GL gl_production', text)
+        self.assertIn('3600s xvfb-run', text)
+        self.assertIn('R1_ENGINE_HARNESS_STATUS.json', text)
         self.assertIn('run_target MOBILE mobile_baseline', text)
         self.assertNotIn('gl_unshaded gl_empty gl_sun', text)
         self.assertNotIn('mobile_render_disabled_control', text)
