@@ -1,33 +1,40 @@
 {
-  "schema_version": 1,
-  "stage": "BAHRAIN BRICK — STAGE R1",
-  "title": "RENDERER RUNTIME DEBUGGING — DIAGNOSTIC CONTINUATION",
-  "state": "IN_PROGRESS",
-  "authorized_date": "2026-07-28",
-  "authorization_basis": "User explicitly requested continued execution until all executable tasks are complete.",
-  "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
-  "production_fix_authorized": false,
-  "renderer_selected": null,
-  "renderer_defaults_modified": false,
-  "g1_authorized": false,
-  "gl_baseline_link_failures": 45,
-  "mobile_baseline_last_completed_frame": 90,
-  "completed_failed_mobile_corrections": 5,
   "active_experiment": {
+    "decision_rule": {
+      "both_exit_criteria_met": "retain as R1 exit candidate",
+      "gl_link_failures_less_than_45_or_mobile_frame_greater_than_90_with_health_gates": "retain as proven engine-boundary improvement",
+      "neither_track_improves": "revert"
+    },
+    "first_attempt": {
+      "adjudicative": false,
+      "artifact_id": 8694707194,
+      "classification": "HARNESS_IMPORT_TIMEOUT",
+      "run_id": 30373598142
+    },
+    "gameplay_modified": false,
+    "harness_correction": "import timeout 1200 seconds to 3600 seconds plus phase-status evidence",
     "id": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
+    "project_corrections_stacked": false,
+    "renderer_defaults_modified": false,
     "scope": "QA-only GL production and Mobile baseline clones from one shared imported state",
     "single_change": "Godot engine and export templates 4.3-stable to 4.7.1-stable",
     "targets": [
       "GL gl_production",
       "MOBILE mobile_baseline"
-    ],
-    "project_corrections_stacked": false,
-    "renderer_defaults_modified": false,
-    "gameplay_modified": false,
-    "decision_rule": {
-      "both_exit_criteria_met": "retain as R1 exit candidate",
-      "gl_link_failures_less_than_45_or_mobile_frame_greater_than_90_with_health_gates": "retain as proven engine-boundary improvement",
-      "neither_track_improves": "revert"
-    }
-  }
+    ]
+  },
+  "authorization_basis": "User explicitly requested continued execution until all executable tasks are complete.",
+  "authorized_date": "2026-07-28",
+  "completed_failed_mobile_corrections": 5,
+  "g1_authorized": false,
+  "gl_baseline_link_failures": 45,
+  "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
+  "mobile_baseline_last_completed_frame": 90,
+  "production_fix_authorized": false,
+  "renderer_defaults_modified": false,
+  "renderer_selected": null,
+  "schema_version": 1,
+  "stage": "BAHRAIN BRICK — STAGE R1",
+  "state": "IN_PROGRESS",
+  "title": "RENDERER RUNTIME DEBUGGING — DIAGNOSTIC CONTINUATION"
 }
