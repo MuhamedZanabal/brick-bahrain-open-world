@@ -10,21 +10,24 @@
   "renderer_selected": null,
   "renderer_defaults_modified": false,
   "g1_authorized": false,
-  "baseline_last_completed_frame": 90,
-  "completed_failed_corrections": 4,
+  "gl_baseline_link_failures": 45,
+  "mobile_baseline_last_completed_frame": 90,
+  "completed_failed_mobile_corrections": 5,
   "active_experiment": {
-    "id": "MOBILE_ENVIRONMENT_TONEMAPPER_FILMIC_TO_LINEAR",
-    "scope": "QA-only reconstructed Mobile source",
-    "single_change": "environment.tonemap_mode: TONE_MAPPER_FILMIC to TONE_MAPPER_LINEAR",
-    "prior_shadow_changes_stacked": false,
-    "render_scale_change_stacked": false,
-    "gl_change_stacked": false,
+    "id": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
+    "scope": "QA-only GL production and Mobile baseline clones from one shared imported state",
+    "single_change": "Godot engine and export templates 4.3-stable to 4.7.1-stable",
+    "targets": [
+      "GL gl_production",
+      "MOBILE mobile_baseline"
+    ],
+    "project_corrections_stacked": false,
+    "renderer_defaults_modified": false,
     "gameplay_modified": false,
-    "renderer_default_modified": false,
     "decision_rule": {
-      "frame_300_and_health_gates": "retain as R1 Mobile pass candidate",
-      "last_completed_frame_greater_than_90": "retain temporarily as proven improvement",
-      "last_completed_frame_less_than_or_equal_to_90": "revert"
+      "both_exit_criteria_met": "retain as R1 exit candidate",
+      "gl_link_failures_less_than_45_or_mobile_frame_greater_than_90_with_health_gates": "retain as proven engine-boundary improvement",
+      "neither_track_improves": "revert"
     }
   }
 }
