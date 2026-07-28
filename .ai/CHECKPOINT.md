@@ -35,3 +35,11 @@ Decision rule:
 - Both tracks meet exit criteria: retain as R1 exit candidate.
 - GL link failures below 45 or Mobile frame above 90 with health gates: retain as proven engine-boundary improvement.
 - Neither track improves: revert and stop emulator-side parameter work.
+
+## Harness attempt 1
+
+- Run `30373598142`, artifact `8694707194`.
+- Godot `4.7.1.stable.official.a13da4feb` downloaded and verified.
+- Import exceeded 1,200 seconds; no APK was exported and neither target executed.
+- Classification: `HARNESS_IMPORT_TIMEOUT`, non-adjudicative.
+- Active correction: import ceiling `1200 → 3600` seconds with phase-status evidence; target scope remains unchanged.
