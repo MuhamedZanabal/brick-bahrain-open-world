@@ -4,11 +4,14 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPORTER = ROOT / "tools/graphics/export_r1_physical_device_apks.sh"
+RETRY = ROOT / "tools/graphics/export_r1_physical_device_apks_retry.sh"
 
 
 class R1PhysicalDeviceApkExportTest(unittest.TestCase):
     def test_exporter_is_arm64_export_only_and_preserves_r1_boundary(self) -> None:
         text = EXPORTER.read_text(encoding="utf-8")
+        retry = RETRY.read_text(encoding="utf-8")
+        combined = text + "\n" + retry
         self.assertIn('GODOT_RELEASE="4.3-stable"', text)
         self.assertIn('architectures/arm64-v8a=true', text)
         self.assertIn('architectures/armeabi-v7a=false', text)
@@ -21,10 +24,12 @@ class R1PhysicalDeviceApkExportTest(unittest.TestCase):
         self.assertIn('R1_PHYSICAL_DEVICE_APK_MANIFEST.json', text)
         self.assertIn('"renderer_defaults_modified": False', text)
         self.assertIn('"production_fix_authorized": False', text)
-        self.assertNotIn('avdmanager', text.lower())
-        self.assertNotIn('emulator ', text.lower())
-        self.assertNotIn('adb ', text.lower())
-        self.assertNotIn('run_target', text)
+        self.assertIn("! -name \'*.zip\'", retry)
+        self.assertIn('export_r1_physical_device_apks.patched.sh', retry)
+        self.assertNotIn('avdmanager', combined.lower())
+        self.assertNotIn('emulator ', combined.lower())
+        self.assertNotIn('adb ', combined.lower())
+        self.assertNotIn('run_target', combined)
 
 
 if __name__ == "__main__":
