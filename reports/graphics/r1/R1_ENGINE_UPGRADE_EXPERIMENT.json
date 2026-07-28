@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
+  "engine_before": "4.3-stable",
+  "engine_after": "4.7.1-stable",
+  "source": "godotengine/godot-builds official stable release",
+  "shared_import_state": true,
+  "targets": [
+    {
+      "track": "GL",
+      "mode": "gl_production",
+      "baseline_link_failures": 45,
+      "exit_criterion": "link failures = 0"
+    },
+    {
+      "track": "MOBILE",
+      "mode": "mobile_baseline",
+      "baseline_last_completed_frame": 90,
+      "exit_criterion": "frame 300 plus health gates"
+    }
+  ],
+  "full_gl_matrix_executed": false,
+  "render_disabled_control_executed": false,
+  "project_corrections_stacked": false,
+  "renderer_defaults_modified": false,
+  "gameplay_modified": false,
+  "production_fix_authorized": false,
+  "g1_authorized": false
+}
