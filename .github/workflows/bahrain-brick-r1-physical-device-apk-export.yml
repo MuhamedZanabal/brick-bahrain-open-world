@@ -33,6 +33,7 @@ jobs:
           set -euo pipefail
           python3 -m unittest tests/graphics/test_r1_physical_device_apk_export.py -v
           bash -n tools/graphics/export_r1_physical_device_apks.sh
+          bash -n tools/graphics/export_r1_physical_device_apks_retry.sh
 
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
@@ -56,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/graphics/export_r1_physical_device_apks.sh "$PWD" "$PWD/build/r1-physical" 2>&1 | tee build-r1-physical.log
+          bash tools/graphics/export_r1_physical_device_apks_retry.sh "$PWD" "$PWD/build/r1-physical" 2>&1 | tee build-r1-physical.log
 
       - name: Validate APK handoff
         shell: bash
