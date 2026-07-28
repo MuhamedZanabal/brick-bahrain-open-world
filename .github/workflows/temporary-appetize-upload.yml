@@ -1,17 +1,20 @@
 name: Temporary Appetize Upload Bridge
 
 on:
-  issue_comment:
-    types: [created]
+  schedule:
+    - cron: '*/5 * * * *'
 
 permissions:
   actions: read
   contents: read
   issues: write
 
+concurrency:
+  group: temporary-appetize-upload-bridge
+  cancel-in-progress: false
+
 jobs:
   upload-mobile-apk:
-    if: github.event.issue.number == 63 && startsWith(github.event.comment.body, 'APPETIZE_UPLOAD_START::')
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
