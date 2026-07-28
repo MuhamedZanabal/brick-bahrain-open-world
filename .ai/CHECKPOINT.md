@@ -1,4 +1,4 @@
-# Bahrain Brick Graphics — R1 Diagnostic Continuation
+# Bahrain Brick Graphics — R1 Engine-Boundary Comparison
 
 Recorded: 2026-07-28
 
@@ -13,29 +13,25 @@ Recorded: 2026-07-28
 - Renderer defaults changed: no
 - G1: unauthorized
 
-## Track A — GL Compatibility
+## Completed evidence
 
-- Baseline: 45 `SceneShaderGLES3` link failures.
-- Best project-level result: 44 failures at `rendering/limits/opengl/max_lights_per_object=7`.
-- Caps 6, 5, and 4 also produced 44 failures.
-- The authorized project-level light-cap range is exhausted; the zero-failure criterion remains unmet.
-
-## Track B — Mobile Vulkan
-
-- Classification: `RENDER_PIPELINE_STALL`.
-- Baseline: frame 90; render-disabled control: frame 300.
-- Four isolated corrections were reverted: sun shadow frame 80; shadow size frame 90; shadow distance frame 70; render scale frame 90.
-- Render-scale evidence: run `30313623186`, artifact `8671766622`, digest `sha256:8091552aa33eccfebf9ac1cbd757682bf8e90d3f09f891940a48f14509a92599`.
-- All operational health gates passed with zero critical runtime errors.
+- GL 4.3 baseline: 45 link failures; best project cap result: 44 at `max_lights_per_object=7`.
+- Mobile 4.3 baseline: frame 90; render-disabled control: frame 300.
+- Five isolated Mobile corrections were reverted with frame outcomes 80, 90, 70, 90, and 70.
+- Correction 5, filmic-to-linear tonemapping: run `30370527664`, artifact `8693475134`, digest `sha256:90e0e65a3b3b9f232a3cee83bbff28d3ec32591d4ad50f4882e1c13c5927bd83`.
+- All correction runs retained export, launch, scene readiness, non-black screenshot, process/lifecycle health, and zero critical runtime errors.
 
 ## Active micro-task
 
-Run one Mobile-only QA experiment changing `Environment.TONE_MAPPER_FILMIC` to `Environment.TONE_MAPPER_LINEAR` in `SouqWorldEnvironment`.
+Compare Godot `4.7.1-stable` against the 4.3 evidence using one imported state and only:
+
+- `GL gl_production`
+- `MOBILE mobile_baseline`
+
+No prior shadow, render-scale, tonemapper, GL cap, gameplay, mission, asset, or renderer-default change may be stacked.
 
 Decision rule:
 
-- Frame 300 plus health gates: retain as R1 Mobile pass candidate.
-- Last completed frame greater than 90: retain temporarily as proven improvement.
-- Last completed frame 90 or lower: revert.
-
-No prior shadow, render-scale, GL, gameplay, mission, asset, or renderer-default change may be stacked.
+- Both tracks meet exit criteria: retain as R1 exit candidate.
+- GL link failures below 45 or Mobile frame above 90 with health gates: retain as proven engine-boundary improvement.
+- Neither track improves: revert and stop emulator-side parameter work.
