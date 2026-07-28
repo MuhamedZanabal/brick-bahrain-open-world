@@ -27,23 +27,6 @@ jobs:
       ARTIFACT_ID: '8699178791'
       EXPECTED_SHA256: ec4ea74480cd36e25c2e146aac03abdfeb8ef0bb22b78a7b726b871fe8c4e787
     steps:
-      - name: Download and verify retained Mobile APK
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H 'Accept: application/vnd.github+json' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            "https://api.github.com/repos/${REPO}/actions/artifacts/${ARTIFACT_ID}/zip" \
-            -o mobile-artifact.zip
-          unzip -q mobile-artifact.zip
-          APK='bahrain-brick-r1-physical-mobile-arm64.apk'
-          test -f "$APK"
-          test "$(stat -c %s "$APK")" = '299778961'
-          echo "${EXPECTED_SHA256}  ${APK}" | sha256sum --check --status
-          echo "APK_PATH=${APK}" >> "$GITHUB_ENV"
-
       - name: Create ephemeral encrypted-token handoff
         shell: bash
         run: |
@@ -62,13 +45,12 @@ jobs:
             --data-binary @key-comment.json > key-comment-response.json
           jq -e '.id' key-comment-response.json >/dev/null
 
-      - name: Receive token and upload to Appetize
+      - name: Receive encrypted token
         shell: bash
         run: |
           set -euo pipefail
           MARKER="APPETIZE_TOKEN_CIPHERTEXT::${GITHUB_RUN_ID}::"
           CIPHERTEXT=''
-          COMMENT_ID=''
           for attempt in $(seq 1 120); do
             curl --fail --silent --show-error \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
@@ -79,7 +61,6 @@ jobs:
             MATCH=$(jq -r --arg marker "$MARKER" '[.[] | select(.body | startswith($marker))] | last // empty | @base64' comments.json)
             if [[ -n "$MATCH" ]]; then
               DECODED=$(printf '%s' "$MATCH" | base64 -d)
-              COMMENT_ID=$(printf '%s' "$DECODED" | jq -r '.id')
               BODY=$(printf '%s' "$DECODED" | jq -r '.body')
               CIPHERTEXT=${BODY#"$MARKER"}
               break
@@ -98,7 +79,30 @@ jobs:
           APPETIZE_TOKEN=$(cat token.txt)
           echo "::add-mask::${APPETIZE_TOKEN}"
           [[ "$APPETIZE_TOKEN" =~ ^tok_[A-Za-z0-9]+$ ]]
+          printf 'APPETIZE_TOKEN=%s\n' "$APPETIZE_TOKEN" >> "$GITHUB_ENV"
+          rm -f token.enc
 
+      - name: Download and verify retained Mobile APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPO}/actions/artifacts/${ARTIFACT_ID}/zip" \
+            -o mobile-artifact.zip
+          unzip -q mobile-artifact.zip
+          APK='bahrain-brick-r1-physical-mobile-arm64.apk'
+          test -f "$APK"
+          test "$(stat -c %s "$APK")" = '299778961'
+          echo "${EXPECTED_SHA256}  ${APK}" | sha256sum --check --status
+          echo "APK_PATH=${APK}" >> "$GITHUB_ENV"
+
+      - name: Upload to Appetize and publish link
+        shell: bash
+        run: |
+          set -euo pipefail
           HTTP_CODE=$(curl --silent --show-error --location \
             --max-time 1200 \
             -o appetize-response.json \
@@ -132,7 +136,7 @@ jobs:
           jq -e '.id' result-comment-response.json >/dev/null
           printf '%s\n' "$APP_URL" > APPETIZE_URL.txt
           printf '%s\n' "$PUBLIC_KEY" > APPETIZE_PUBLIC_KEY.txt
-          rm -f token.txt token.enc token-private.pem token-public.pem
+          rm -f token.txt token-private.pem token-public.pem
 
       - name: Publish non-secret upload receipt
         uses: actions/upload-artifact@v4
