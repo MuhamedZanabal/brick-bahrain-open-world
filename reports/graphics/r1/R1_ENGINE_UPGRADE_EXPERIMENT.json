@@ -1,29 +1,50 @@
 {
-  "schema_version": 1,
-  "experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
-  "engine_before": "4.3-stable",
-  "engine_after": "4.7.1-stable",
-  "source": "godotengine/godot-builds official stable release",
-  "shared_import_state": true,
-  "targets": [
+  "attempts": [
     {
-      "track": "GL",
-      "mode": "gl_production",
-      "baseline_link_failures": 45,
-      "exit_criterion": "link failures = 0"
-    },
-    {
-      "track": "MOBILE",
-      "mode": "mobile_baseline",
-      "baseline_last_completed_frame": 90,
-      "exit_criterion": "frame 300 plus health gates"
+      "adjudicative": false,
+      "android_targets_executed": false,
+      "apk_exports_executed": false,
+      "artifact_digest": "sha256:21ddb7af32a2797cfe695e27b0574e55fbdf4d183756f6bffde5376629edfff2",
+      "artifact_id": 8694707194,
+      "classification": "HARNESS_IMPORT_TIMEOUT",
+      "engine_result_available": false,
+      "engine_version_observed": "4.7.1.stable.official.a13da4feb",
+      "import_completed": false,
+      "import_timeout_seconds": 1200,
+      "run_id": 30373598142
     }
   ],
+  "engine_after": "4.7.1-stable",
+  "engine_before": "4.3-stable",
+  "experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
   "full_gl_matrix_executed": false,
-  "render_disabled_control_executed": false,
-  "project_corrections_stacked": false,
-  "renderer_defaults_modified": false,
+  "g1_authorized": false,
   "gameplay_modified": false,
+  "harness_revision": {
+    "import_timeout_seconds": 3600,
+    "phase_status_report": "R1_ENGINE_HARNESS_STATUS.json",
+    "reason": "Godot 4.7.1 import exceeded the historical 1200-second ceiling.",
+    "required_result_on_success": true
+  },
   "production_fix_authorized": false,
-  "g1_authorized": false
+  "project_corrections_stacked": false,
+  "render_disabled_control_executed": false,
+  "renderer_defaults_modified": false,
+  "schema_version": 1,
+  "shared_import_state": true,
+  "source": "godotengine/godot-builds official stable release",
+  "targets": [
+    {
+      "baseline_link_failures": 45,
+      "exit_criterion": "link failures = 0",
+      "mode": "gl_production",
+      "track": "GL"
+    },
+    {
+      "baseline_last_completed_frame": 90,
+      "exit_criterion": "frame 300 plus health gates",
+      "mode": "mobile_baseline",
+      "track": "MOBILE"
+    }
+  ]
 }
