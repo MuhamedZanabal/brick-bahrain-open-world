@@ -1,50 +1,61 @@
 {
-  "attempts": [
-    {
-      "adjudicative": false,
-      "android_targets_executed": false,
-      "apk_exports_executed": false,
-      "artifact_digest": "sha256:21ddb7af32a2797cfe695e27b0574e55fbdf4d183756f6bffde5376629edfff2",
-      "artifact_id": 8694707194,
-      "classification": "HARNESS_IMPORT_TIMEOUT",
-      "engine_result_available": false,
-      "engine_version_observed": "4.7.1.stable.official.a13da4feb",
-      "import_completed": false,
-      "import_timeout_seconds": 1200,
-      "run_id": 30373598142
-    }
-  ],
-  "engine_after": "4.7.1-stable",
-  "engine_before": "4.3-stable",
+  "schema_version": 1,
   "experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
+  "engine_before": "4.3-stable",
+  "engine_after": "4.7.1-stable",
+  "source": "godotengine/godot-builds official stable release",
+  "shared_import_state": true,
+  "targets": [
+    {"track": "GL", "mode": "gl_production", "baseline_link_failures": 45, "exit_criterion": "link failures = 0"},
+    {"track": "MOBILE", "mode": "mobile_baseline", "baseline_last_completed_frame": 90, "exit_criterion": "frame 300 plus health gates"}
+  ],
   "full_gl_matrix_executed": false,
-  "g1_authorized": false,
+  "render_disabled_control_executed": false,
+  "project_corrections_stacked": false,
+  "renderer_defaults_modified": false,
   "gameplay_modified": false,
+  "production_fix_authorized": false,
+  "g1_authorized": false,
   "harness_revision": {
     "import_timeout_seconds": 3600,
     "phase_status_report": "R1_ENGINE_HARNESS_STATUS.json",
     "reason": "Godot 4.7.1 import exceeded the historical 1200-second ceiling.",
     "required_result_on_success": true
   },
-  "production_fix_authorized": false,
-  "project_corrections_stacked": false,
-  "render_disabled_control_executed": false,
-  "renderer_defaults_modified": false,
-  "schema_version": 1,
-  "shared_import_state": true,
-  "source": "godotengine/godot-builds official stable release",
-  "targets": [
+  "attempts": [
     {
-      "baseline_link_failures": 45,
-      "exit_criterion": "link failures = 0",
-      "mode": "gl_production",
-      "track": "GL"
+      "run_id": 30373598142,
+      "artifact_id": 8694707194,
+      "artifact_digest": "sha256:21ddb7af32a2797cfe695e27b0574e55fbdf4d183756f6bffde5376629edfff2",
+      "adjudicative": false,
+      "classification": "HARNESS_IMPORT_TIMEOUT",
+      "engine_version_observed": "4.7.1.stable.official.a13da4feb",
+      "import_timeout_seconds": 1200,
+      "import_completed": false,
+      "apk_exports_executed": false,
+      "android_targets_executed": false,
+      "engine_result_available": false
     },
     {
-      "baseline_last_completed_frame": 90,
-      "exit_criterion": "frame 300 plus health gates",
-      "mode": "mobile_baseline",
-      "track": "MOBILE"
+      "run_id": 30376596221,
+      "artifact_id": 8696886506,
+      "artifact_digest": "sha256:2398209b65bb8a38fa809b9d70b3ace95c362b522bdfdb87fc364c17243f33be",
+      "adjudicative": true,
+      "classification": "DIAGNOSTIC_GL_IMPROVEMENT_WITH_MOBILE_REGRESSION",
+      "engine_version_observed": "4.7.1.stable.official.a13da4feb",
+      "import_timeout_seconds": 3600,
+      "import_completed": true,
+      "apk_exports_executed": true,
+      "android_targets_executed": true,
+      "engine_result_available": true,
+      "gl_link_failures": 44,
+      "mobile_last_completed_frame": 0,
+      "mobile_vulkan_queue_present_failures": 6,
+      "artifact_reported_decision": "retained"
     }
-  ]
+  ],
+  "outcome": "DIAGNOSTIC_EVIDENCE_RETAINED_PRODUCTION_ENGINE_REJECTED",
+  "result_report": "reports/graphics/r1/R1_ENGINE_UPGRADE_RESULT.json",
+  "production_engine_adoption_authorized": false,
+  "r1_exit_candidate": false
 }
