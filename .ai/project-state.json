@@ -21,7 +21,9 @@
     "Five isolated Mobile corrections ended at frames 80, 90, 70, 90, and 70 and were reverted.",
     "Tonemapper run 30370527664 and artifact 8693475134 are adjudicative evidence.",
     "User authorized diagnostic continuation; production fixes, renderer selection, renderer-default changes, and G1 remain unauthorized.",
-    "The active experiment compares unmodified GL production and Mobile baseline on Godot 4.7.1-stable from one shared imported state."
+    "The active experiment compares unmodified GL production and Mobile baseline on Godot 4.7.1-stable from one shared imported state.",
+    "Engine comparison run 30373598142 is non-adjudicative: Godot 4.7.1 import exceeded the 1200-second harness ceiling before exports or Android targets.",
+    "The authorized harness-only correction raises the import ceiling to 3600 seconds and adds phase-status evidence; target scope is unchanged."
   ],
   "defects": [
     {
@@ -74,8 +76,8 @@
     }
   ],
   "next_action": {
-    "action": "Run the unstacked Godot 4.7.1-stable GL production and Mobile baseline comparison and adjudicate both unresolved tracks.",
-    "stage": "R1 engine-boundary comparison"
+    "action": "Rerun the same unstacked Godot 4.7.1-stable GL production and Mobile baseline comparison with the corrected import ceiling.",
+    "stage": "R1 engine-boundary comparison harness retry"
   },
   "project": {
     "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
@@ -126,7 +128,22 @@
     "title": "ANDROID PAIRED-RENDERER FUNCTIONAL QUALIFICATION"
   },
   "stage_r1": {
+    "active_experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
     "date": "2026-07-28",
+    "engine_comparison": {
+      "attempts": [
+        {
+          "adjudicative": false,
+          "artifact_id": 8694707194,
+          "classification": "HARNESS_IMPORT_TIMEOUT",
+          "run_id": 30373598142,
+          "targets_executed": false
+        }
+      ],
+      "candidate": "4.7.1-stable",
+      "import_timeout_seconds": 3600,
+      "phase_status_report": "R1_ENGINE_HARNESS_STATUS.json"
+    },
     "g1_authorized": false,
     "gl": {
       "baseline_link_failures": 45,
@@ -182,11 +199,10 @@
       "render_scale_experiment_executed": true,
       "tonemapper_experiment_executed": true
     },
-    "active_experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
     "production_fix_authorized": false,
     "renderer_defaults_modified": false,
     "renderer_selected": null,
-    "state": "ENGINE_BOUNDARY_COMPARISON",
+    "state": "ENGINE_BOUNDARY_COMPARISON_HARNESS_RETRY",
     "title": "RENDERER RUNTIME DEBUGGING"
   },
   "verification": {
