@@ -1,11 +1,11 @@
-# Bahrain Brick Graphics — R1 Engineering Checkpoint
+# Bahrain Brick Graphics — R1 Diagnostic Continuation
 
 Recorded: 2026-07-28
 
 ## Current state
 
 - Stage: **BAHRAIN BRICK — STAGE R1: RENDERER RUNTIME DEBUGGING**
-- Outcome: `ENGINEERING_STOP`
+- Outcome: `DIAGNOSTIC_CONTINUATION`
 - Governing gate: `G0_EVIDENCE_INSUFFICIENT`
 - R1 exit criteria met: no
 - Production fix authorized: no
@@ -15,35 +15,27 @@ Recorded: 2026-07-28
 
 ## Track A — GL Compatibility
 
-- Classification: `GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW`
 - Baseline: 45 `SceneShaderGLES3` link failures.
 - Best project-level result: 44 failures at `rendering/limits/opengl/max_lights_per_object=7`.
 - Caps 6, 5, and 4 also produced 44 failures.
-- Export, launch, scene readiness, screenshot, liveness, and zero critical runtime errors passed.
-- Decision: the authorized project-level light-cap range is exhausted; the zero-failure R1 criterion is unmet.
+- The authorized project-level light-cap range is exhausted; the zero-failure criterion remains unmet.
 
 ## Track B — Mobile Vulkan
 
-- Classification: `RENDER_PIPELINE_STALL`
-- Baseline: frame 90 in the 240-second window.
-- Render-disabled control: frame 300.
-- Correction 1, disable `LateAfternoonSun` shadow: frame 80 — reverted.
-- Correction 2, shadow size `2048 → 1024`: frame 90 — reverted. Run `30310393343`, artifact `8670646110`.
-- Correction 3, shadow distance `150 → 100`: frame 70 — reverted. Run `30312058073`, artifact `8671241285`.
-- All three correction runs retained successful export, launch, scene readiness, valid non-black 1920×1080 screenshot, process liveness, pause/resume, and zero critical runtime errors.
-- The queued render-scale experiment was not executed.
+- Classification: `RENDER_PIPELINE_STALL`.
+- Baseline: frame 90; render-disabled control: frame 300.
+- Four isolated corrections were reverted: sun shadow frame 80; shadow size frame 90; shadow distance frame 70; render scale frame 90.
+- Render-scale evidence: run `30313623186`, artifact `8671766622`, digest `sha256:8091552aa33eccfebf9ac1cbd757682bf8e90d3f09f891940a48f14509a92599`.
+- All operational health gates passed with zero critical runtime errors.
 
-## Decision boundary
+## Active micro-task
 
-Three isolated Mobile corrections failed to improve progression. Do not execute a fourth parameter tweak, select a renderer, change renderer defaults, or begin G1 without renewed root-cause evidence.
+Run one Mobile-only QA experiment changing `Environment.TONE_MAPPER_FILMIC` to `Environment.TONE_MAPPER_LINEAR` in `SouqWorldEnvironment`.
 
-## Next action
+Decision rule:
 
-Return to root-cause diagnosis at the renderer/engine boundary and obtain named physical-device evidence before authorizing another correction.
+- Frame 300 plus health gates: retain as R1 Mobile pass candidate.
+- Last completed frame greater than 90: retain temporarily as proven improvement.
+- Last completed frame 90 or lower: revert.
 
-## Evidence authority
-
-- GL improvement run `30208525378`, artifact `8633929596`.
-- Mobile shadow-size run `30310393343`, artifact `8670646110`.
-- Mobile shadow-distance run `30312058073`, artifact `8671241285`.
-- Reports: `reports/graphics/r1/R1_ENGINEERING_LOG.md` and `reports/graphics/r1/R1_ENGINEERING_STOP.json`.
+No prior shadow, render-scale, GL, gameplay, mission, asset, or renderer-default change may be stacked.
