@@ -2,8 +2,9 @@
   "schema_version": 1,
   "stage": "BAHRAIN BRICK — STAGE R1",
   "title": "RENDERER RUNTIME DEBUGGING",
-  "state": "ENGINEERING_STOP",
+  "state": "ENGINEERING_STOP_SUPERSEDED",
   "recorded_date": "2026-07-28",
+  "superseded_by_user_continuation": true,
   "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
   "r1_exit_criteria_met": false,
   "production_fix_authorized": false,
@@ -27,7 +28,7 @@
     "baseline_last_completed_frame": 90,
     "render_disabled_control_last_completed_frame": 300,
     "critical_runtime_error_count": 0,
-    "failed_correction_count": 3,
+    "failed_correction_count": 4,
     "corrections": [
       {
         "experiment": "disable LateAfternoonSun shadow",
@@ -47,11 +48,19 @@
         "decision": "reverted",
         "run_id": 30312058073,
         "artifact_id": 8671241285
+      },
+      {
+        "experiment": "Mobile QA render scale 1.0 to 0.75",
+        "last_completed_frame": 90,
+        "decision": "reverted",
+        "run_id": 30313623186,
+        "artifact_id": 8671766622
       }
     ],
-    "render_scale_experiment_executed": false,
+    "render_scale_experiment_executed": true,
     "exit_criterion_met": false
   },
-  "stop_reason": "Three isolated Mobile corrections failed to improve the proven render-pipeline stall. A fourth parameter tweak is not authorized without renewed root-cause evidence.",
-  "next_action": "Return to root-cause diagnosis at the renderer/engine boundary and obtain named physical-device evidence before authorizing another correction."
+  "historical_stop_reason": "Four isolated Mobile corrections failed to improve the proven render-pipeline stall.",
+  "superseding_decision": "The user explicitly authorized continued execution. Continuation remains diagnostic-only and must preserve renderer, gameplay, asset, mission, and G1 boundaries.",
+  "next_action": "Run one isolated Mobile QA environment experiment: change the active filmic tonemapper to linear and apply the same frame-progression decision gate."
 }
