@@ -1,0 +1,156 @@
+name: Temporary Appetize Upload Bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  upload-mobile-apk:
+    if: github.event.issue.number == 63 && startsWith(github.event.comment.body, 'APPETIZE_UPLOAD_START::')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      REPO: MuhamedZanabal/brick-bahrain-open-world
+      PR_NUMBER: '63'
+      EXPECTED_SHA256: ec4ea74480cd36e25c2e146aac03abdfeb8ef0bb22b78a7b726b871fe8c4e787
+      EXPECTED_SIZE: '299778961'
+    steps:
+      - name: Create encrypted credential handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out token-private.pem 2>/dev/null
+          openssl pkey -in token-private.pem -pubout -out token-public.pem
+          PUBLIC_KEY_B64=$(base64 -w0 token-public.pem)
+          BODY="APPETIZE_KEY_REQUEST::${GITHUB_RUN_ID}::${PUBLIC_KEY_B64}"
+          jq -n --arg body "$BODY" '{body:$body}' > key-comment.json
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --data-binary @key-comment.json > key-comment-response.json
+          jq -e '.id' key-comment-response.json >/dev/null
+
+      - name: Receive encrypted Appetize token
+        shell: bash
+        run: |
+          set -euo pipefail
+          MARKER="APPETIZE_TOKEN_CIPHERTEXT::${GITHUB_RUN_ID}::"
+          CIPHERTEXT=''
+          for attempt in $(seq 1 120); do
+            curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments?per_page=100" \
+              -o comments.json
+            BODY=$(jq -r --arg marker "$MARKER" '[.[] | select(.body | startswith($marker))] | last | .body // empty' comments.json)
+            if [[ -n "$BODY" ]]; then
+              CIPHERTEXT=${BODY#"$MARKER"}
+              break
+            fi
+            sleep 5
+          done
+          test -n "$CIPHERTEXT"
+          printf '%s' "$CIPHERTEXT" | base64 -d > token.enc
+          openssl pkeyutl -decrypt \
+            -inkey token-private.pem \
+            -in token.enc \
+            -pkeyopt rsa_padding_mode:oaep \
+            -pkeyopt rsa_oaep_md:sha256 \
+            -pkeyopt rsa_mgf1_md:sha256 \
+            -out token.txt
+          APPETIZE_TOKEN=$(cat token.txt)
+          echo "::add-mask::${APPETIZE_TOKEN}"
+          [[ "$APPETIZE_TOKEN" =~ ^tok_[A-Za-z0-9]+$ ]]
+          printf 'APPETIZE_TOKEN=%s\n' "$APPETIZE_TOKEN" >> "$GITHUB_ENV"
+          rm -f token.enc
+
+      - name: Download retained Mobile APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bahrain-brick-r1-physical-mobile-arm64-30385101264
+          path: mobile-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 30385101264
+
+      - name: Verify retained Mobile APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK='mobile-artifact/bahrain-brick-r1-physical-mobile-arm64.apk'
+          test -f "$APK"
+          test "$(stat -c %s "$APK")" = "$EXPECTED_SIZE"
+          echo "${EXPECTED_SHA256}  ${APK}" | sha256sum --check --status
+          echo "APK_PATH=${APK}" >> "$GITHUB_ENV"
+
+      - name: Upload APK to Appetize
+        shell: bash
+        run: |
+          set -euo pipefail
+          HTTP_CODE=$(curl --silent --show-error --location \
+            --max-time 1200 \
+            -o appetize-response.json \
+            -w '%{http_code}' \
+            -X POST 'https://api.appetize.io/v1/apps' \
+            -H "X-API-KEY: ${APPETIZE_TOKEN}" \
+            -F "file=@${APK_PATH};type=application/vnd.android.package-archive" \
+            -F 'platform=android' \
+            -F 'note=Bahrain Brick R1 Mobile Vulkan diagnostic build' \
+            -F 'timeout=600' \
+            -F 'appPermissions.run=public')
+          printf 'Appetize HTTP status: %s\n' "$HTTP_CODE"
+          if [[ ! "$HTTP_CODE" =~ ^2 ]]; then
+            jq -c 'del(.token, .apiToken, .api_key)' appetize-response.json || head -c 2000 appetize-response.json
+            exit 1
+          fi
+          PUBLIC_KEY=$(jq -r '.publicKey // .buildId // empty' appetize-response.json)
+          test -n "$PUBLIC_KEY"
+          APP_URL="https://appetize.io/app/${PUBLIC_KEY}"
+          BUNDLE=$(jq -r '.bundle // empty' appetize-response.json)
+          NAME=$(jq -r '.name // .appDisplayName // empty' appetize-response.json)
+          RESULT_BODY="APPETIZE_UPLOAD_RESULT::${GITHUB_RUN_ID}::${APP_URL}::${PUBLIC_KEY}::${BUNDLE}::${NAME}"
+          jq -n --arg body "$RESULT_BODY" '{body:$body}' > result-comment.json
+          curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --data-binary @result-comment.json > result-comment-response.json
+          jq -e '.id' result-comment-response.json >/dev/null
+          printf '%s\n' "$APP_URL" > APPETIZE_URL.txt
+          printf '%s\n' "$PUBLIC_KEY" > APPETIZE_PUBLIC_KEY.txt
+          rm -f token.txt token-private.pem token-public.pem
+
+      - name: Publish non-secret upload receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-appetize-upload-${{ github.run_id }}
+          path: |
+            APPETIZE_URL.txt
+            APPETIZE_PUBLIC_KEY.txt
+            appetize-response.json
+          retention-days: 30
+
+      - name: Report bridge failure
+        if: failure()
+        shell: bash
+        run: |
+          BODY="APPETIZE_UPLOAD_FAILED::${GITHUB_RUN_ID}"
+          jq -n --arg body "$BODY" '{body:$body}' > failure-comment.json
+          curl --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/${REPO}/issues/${PR_NUMBER}/comments" \
+            --data-binary @failure-comment.json >/dev/null || true
+          rm -f token.txt token.enc token-private.pem token-public.pem
