@@ -1,121 +1,17 @@
-name: Bahrain Brick R1 Physical Device APK Export
+name: Bahrain Brick R1 Physical Device APK Export — Archived
 
 on:
-  pull_request:
-    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
-    types: [synchronize]
-    paths:
-      - .github/workflows/bahrain-brick-r1-physical-device-apk-export.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: read
-  pull-requests: read
-
-concurrency:
-  group: bahrain-brick-r1-physical-device-apk-export
-  cancel-in-progress: true
 
 jobs:
-  export_arm64_apks:
-    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
+  archived:
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
-      - name: Verify physical-device export contract
-        shell: bash
+      - name: Report archived handoff
         run: |
-          set -euo pipefail
-          python3 -m unittest tests/graphics/test_r1_physical_device_apk_export.py -v
-          bash -n tools/graphics/export_r1_physical_device_apks.sh
-          bash -n tools/graphics/export_r1_physical_device_apks_retry.sh
-
-      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
-        with:
-          distribution: temurin
-          java-version: '17.0.12'
-
-      - uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
-        with:
-          cmdline-tools-version: '14742923'
-          packages: >-
-            platform-tools
-            platforms;android-34
-            build-tools;34.0.0
-
-      - name: Install headless Godot dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth mesa-vulkan-drivers
-
-      - name: Export signed ARM64 APKs
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/graphics/export_r1_physical_device_apks_retry.sh "$PWD" "$PWD/build/r1-physical" 2>&1 | tee build-r1-physical.log
-
-      - name: Validate APK handoff
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -s build/r1-physical/bahrain-brick-r1-physical-gl-arm64.apk
-          test -s build/r1-physical/bahrain-brick-r1-physical-mobile-arm64.apk
-          python3 -m json.tool build/r1-physical/R1_PHYSICAL_DEVICE_APK_MANIFEST.json >/dev/null
-          test "$(python3 -c 'import json; d=json.load(open("build/r1-physical/R1_PHYSICAL_DEVICE_APK_MANIFEST.json")); print(len(d["apks"]))')" = 2
-          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' build/r1-physical/apk-signing.txt
-
-      - name: Upload GL Compatibility APK
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with:
-          name: bahrain-brick-r1-physical-gl-arm64-${{ github.run_id }}
-          path: |
-            build/r1-physical/bahrain-brick-r1-physical-gl-arm64.apk
-            build/r1-physical/R1_PHYSICAL_DEVICE_APK_MANIFEST.json
-            build/r1-physical/GL_VARIANT_OVERRIDE.json
-            build/r1-physical/APK_SHA256SUMS.txt
-            build/r1-physical/apk-signing.txt
-            build/r1-physical/GODOT_VERSION.txt
-            build/r1-physical/SOURCE_TREE_EQUIVALENCE.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload Mobile Vulkan APK
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with:
-          name: bahrain-brick-r1-physical-mobile-arm64-${{ github.run_id }}
-          path: |
-            build/r1-physical/bahrain-brick-r1-physical-mobile-arm64.apk
-            build/r1-physical/R1_PHYSICAL_DEVICE_APK_MANIFEST.json
-            build/r1-physical/MOBILE_VARIANT_OVERRIDE.json
-            build/r1-physical/APK_SHA256SUMS.txt
-            build/r1-physical/apk-signing.txt
-            build/r1-physical/GODOT_VERSION.txt
-            build/r1-physical/SOURCE_TREE_EQUIVALENCE.json
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload export logs
-        if: always()
-        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
-        with:
-          name: bahrain-brick-r1-physical-export-logs-${{ github.run_id }}
-          path: |
-            build-r1-physical.log
-            build/r1-physical/import.log
-            build/r1-physical/export-gl.log
-            build/r1-physical/export-mobile.log
-            build/r1-physical/IMPORT_COMPLETE.txt
-            build/r1-physical/GODOT_VERSION.txt
-            build/r1-physical/SOURCE_TREE_EQUIVALENCE.json
-            build/r1-physical/GL_VARIANT_OVERRIDE.json
-            build/r1-physical/MOBILE_VARIANT_OVERRIDE.json
-            build/r1-physical/R1_PHYSICAL_DEVICE_APK_MANIFEST.json
-            build/r1-physical/APK_SHA256SUMS.txt
-            build/r1-physical/apk-signing.txt
-          if-no-files-found: warn
-          retention-days: 30
+          echo 'Physical-device APK export completed in run 30385101264.'
+          echo 'Artifacts 8699173399 (GL) and 8699178791 (Mobile) are the retained handoff.'
+          exit 64
