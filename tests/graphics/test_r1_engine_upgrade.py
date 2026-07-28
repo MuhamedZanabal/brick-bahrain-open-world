@@ -1,30 +1,43 @@
 #!/usr/bin/env python3
-from pathlib import Path
+from __future__ import annotations
+
+import json
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE_RUNNER = ROOT / "tools/graphics/run_r1_renderer_debug.sh"
-RETRY_RUNNER = ROOT / "tools/graphics/run_r1_engine_retry.sh"
+EXPERIMENT = ROOT / "reports/graphics/r1/R1_ENGINE_UPGRADE_EXPERIMENT.json"
+RESULT = ROOT / "reports/graphics/r1/R1_ENGINE_UPGRADE_RESULT.json"
 
 
-class R1EngineUpgradeTest(unittest.TestCase):
-    def test_current_stable_engine_and_targeted_modes(self) -> None:
-        base = BASE_RUNNER.read_text()
-        retry = RETRY_RUNNER.read_text()
-        combined = base + "\n" + retry
-        self.assertIn('GODOT_RELEASE="4.7.1-stable"', base)
-        self.assertIn('godotengine/godot-builds/releases/download', base)
-        self.assertIn('SHA512-SUMS.txt', base)
-        self.assertIn('run_target GL gl_production', base)
-        self.assertIn('run_target MOBILE mobile_baseline', base)
-        self.assertIn('3600s xvfb-run', retry)
-        self.assertIn('R1_ENGINE_HARNESS_STATUS.json', retry)
-        self.assertIn('IMPORT_COMPLETE.txt', retry)
-        self.assertNotIn('gl_unshaded gl_empty gl_sun', combined)
-        self.assertNotIn('mobile_render_disabled_control', combined)
-        self.assertIn("'renderer_defaults_modified':False", combined)
-        self.assertNotIn('renderer/rendering_method="', combined)
+class R1EngineUpgradeResultTest(unittest.TestCase):
+    def test_corrected_attempt_is_adjudicative_and_complete(self) -> None:
+        data = json.loads(EXPERIMENT.read_text())
+        attempt = data["attempts"][-1]
+        self.assertEqual(attempt["run_id"], 30376596221)
+        self.assertEqual(attempt["artifact_id"], 8696886506)
+        self.assertTrue(attempt["adjudicative"])
+        self.assertTrue(attempt["import_completed"])
+        self.assertTrue(attempt["apk_exports_executed"])
+        self.assertTrue(attempt["android_targets_executed"])
+        self.assertFalse(data["production_engine_adoption_authorized"])
+        self.assertFalse(data["r1_exit_candidate"])
+
+    def test_mixed_engine_result_is_diagnostic_only(self) -> None:
+        data = json.loads(RESULT.read_text())
+        self.assertEqual(data["gl"]["link_failure_count"], 44)
+        self.assertFalse(data["gl"]["exit_criterion_met"])
+        self.assertEqual(data["mobile"]["last_completed_frame"], 0)
+        self.assertEqual(data["mobile"]["vulkan_queue_present_failure_count"], 6)
+        self.assertFalse(data["mobile"]["exit_criterion_met"])
+        self.assertEqual(
+            data["final_engineering_decision"],
+            "RETAIN_DIAGNOSTIC_EVIDENCE_REJECT_PRODUCTION_ENGINE_ADOPTION",
+        )
+        self.assertFalse(data["production_engine_adoption_authorized"])
+        self.assertFalse(data["production_fix_authorized"])
+        self.assertFalse(data["r1_exit_candidate"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
