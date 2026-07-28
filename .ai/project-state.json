@@ -5,7 +5,8 @@
     "reports/graphics/g0/tier_b_reduction/",
     "reports/graphics/g0/device_handoff/",
     "reports/graphics/r1/R1_ENGINEERING_LOG.md",
-    "reports/graphics/r1/R1_ENGINEERING_STOP.json"
+    "reports/graphics/r1/R1_ENGINEERING_STOP.json",
+    "reports/graphics/r1/R1_DIAGNOSTIC_CONTINUATION.json"
   ],
   "decisions": [
     "PR #59 remains immutable.",
@@ -14,11 +15,12 @@
     "PR #60 remains draft; G1-G10 remain blocked.",
     "The single authorized Tier B retry is run 30086966524; no further retries are permitted.",
     "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived.",
-    "R1 confirmed a GL Compatibility engine-generated fragment-uniform overflow: baseline 45 link failures, best project-level light-cap result 44; the authorized cap range is exhausted.",
-    "R1 confirmed Mobile RENDER_PIPELINE_STALL: render-disabled control reached frame 300 while baseline reached frame 90.",
-    "Three isolated Mobile corrections failed to improve progression (80, 90, and 70 completed frames); no fourth parameter tweak is authorized without renewed root-cause evidence.",
-    "The queued Mobile render-scale experiment was not executed and is removed from the branch.",
-    "R1 exit criteria remain unmet; renderer decision remains null, renderer defaults remain unchanged, and G1-G10 remain blocked."
+    "R1 confirmed GL Compatibility engine-generated fragment-uniform overflow: baseline 45, best project-level result 44 at max_lights_per_object=7.",
+    "R1 confirmed Mobile RENDER_PIPELINE_STALL: render-disabled control frame 300, baseline frame 90.",
+    "Four isolated Mobile corrections ended at frames 80, 90, 70, and 90 and were reverted.",
+    "Render-scale run 30313623186 and artifact 8671766622 are adjudicative evidence.",
+    "User authorized diagnostic continuation; production fixes, renderer selection, renderer-default changes, and G1 remain unauthorized.",
+    "The active single-variable experiment changes only the QA-clone filmic tonemapper to linear."
   ],
   "defects": [
     {
@@ -38,15 +40,15 @@
     },
     {
       "classification": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
-      "evidence": "45 baseline SceneShaderGLES3 link failures; best project-level max_lights_per_object result 44",
+      "evidence": "45 baseline link failures; best project-level result 44",
       "id": "R1-GL-001",
       "state": "OPEN_ENGINE_BOUNDARY"
     },
     {
       "classification": "RENDER_PIPELINE_STALL",
-      "evidence": "Mobile baseline frame 90; render-disabled control frame 300; three focused corrections ended at frames 80, 90, and 70",
+      "evidence": "baseline frame 90; render-disabled control frame 300; four focused corrections ended at 80, 90, 70, 90",
       "id": "R1-MOBILE-001",
-      "state": "OPEN_ROOT_CAUSE_NOT_UNIQUELY_PROVEN"
+      "state": "IN_PROGRESS_DIAGNOSTIC_CONTINUATION"
     }
   ],
   "milestones": [
@@ -71,8 +73,8 @@
     }
   ],
   "next_action": {
-    "action": "Return Mobile to root-cause diagnosis at the renderer/engine boundary and obtain named physical-device evidence before authorizing another correction. Do not run the queued render-scale tweak, select a renderer, change renderer defaults, or begin G1.",
-    "stage": "R1 engineering stop"
+    "action": "Run the isolated Mobile QA tonemapper experiment and adjudicate frame progression against the frame-90 baseline.",
+    "stage": "R1 diagnostic continuation"
   },
   "project": {
     "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
@@ -156,18 +158,26 @@
           "experiment": "LateAfternoonSun shadow distance 150 to 100",
           "last_completed_frame": 70,
           "run_id": 30312058073
+        },
+        {
+          "artifact_id": 8671766622,
+          "decision": "reverted",
+          "experiment": "Mobile QA render scale 1.0 to 0.75",
+          "last_completed_frame": 90,
+          "run_id": 30313623186
         }
       ],
       "critical_runtime_errors": 0,
       "exit_criterion_met": false,
-      "failed_correction_count": 3,
+      "failed_correction_count": 4,
       "render_disabled_control_frame": 300,
-      "render_scale_experiment_executed": false
+      "render_scale_experiment_executed": true,
+      "active_experiment": "MOBILE_ENVIRONMENT_TONEMAPPER_FILMIC_TO_LINEAR"
     },
     "production_fix_authorized": false,
     "renderer_defaults_modified": false,
     "renderer_selected": null,
-    "state": "ENGINEERING_STOP",
+    "state": "DIAGNOSTIC_CONTINUATION",
     "title": "RENDERER RUNTIME DEBUGGING"
   },
   "verification": {
