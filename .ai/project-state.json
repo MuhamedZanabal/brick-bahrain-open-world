@@ -6,7 +6,8 @@
     "reports/graphics/g0/device_handoff/",
     "reports/graphics/r1/R1_ENGINEERING_LOG.md",
     "reports/graphics/r1/R1_ENGINEERING_STOP.json",
-    "reports/graphics/r1/R1_DIAGNOSTIC_CONTINUATION.json"
+    "reports/graphics/r1/R1_DIAGNOSTIC_CONTINUATION.json",
+    "reports/graphics/r1/R1_ENGINE_UPGRADE_EXPERIMENT.json"
   ],
   "decisions": [
     "PR #59 remains immutable.",
@@ -17,10 +18,10 @@
     "Unintended duplicate run 30087878937 is excluded from adjudication and automatic evidence triggers are archived.",
     "R1 confirmed GL Compatibility engine-generated fragment-uniform overflow: baseline 45, best project-level result 44 at max_lights_per_object=7.",
     "R1 confirmed Mobile RENDER_PIPELINE_STALL: render-disabled control frame 300, baseline frame 90.",
-    "Four isolated Mobile corrections ended at frames 80, 90, 70, and 90 and were reverted.",
-    "Render-scale run 30313623186 and artifact 8671766622 are adjudicative evidence.",
+    "Five isolated Mobile corrections ended at frames 80, 90, 70, 90, and 70 and were reverted.",
+    "Tonemapper run 30370527664 and artifact 8693475134 are adjudicative evidence.",
     "User authorized diagnostic continuation; production fixes, renderer selection, renderer-default changes, and G1 remain unauthorized.",
-    "The active single-variable experiment changes only the QA-clone filmic tonemapper to linear."
+    "The active experiment compares unmodified GL production and Mobile baseline on Godot 4.7.1-stable from one shared imported state."
   ],
   "defects": [
     {
@@ -42,13 +43,13 @@
       "classification": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
       "evidence": "45 baseline link failures; best project-level result 44",
       "id": "R1-GL-001",
-      "state": "OPEN_ENGINE_BOUNDARY"
+      "state": "IN_PROGRESS_ENGINE_COMPARISON"
     },
     {
       "classification": "RENDER_PIPELINE_STALL",
-      "evidence": "baseline frame 90; render-disabled control frame 300; four focused corrections ended at 80, 90, 70, 90",
+      "evidence": "baseline frame 90; render-disabled control frame 300; five focused corrections ended at 80, 90, 70, 90, 70",
       "id": "R1-MOBILE-001",
-      "state": "IN_PROGRESS_DIAGNOSTIC_CONTINUATION"
+      "state": "IN_PROGRESS_ENGINE_COMPARISON"
     }
   ],
   "milestones": [
@@ -73,8 +74,8 @@
     }
   ],
   "next_action": {
-    "action": "Run the isolated Mobile QA tonemapper experiment and adjudicate frame progression against the frame-90 baseline.",
-    "stage": "R1 diagnostic continuation"
+    "action": "Run the unstacked Godot 4.7.1-stable GL production and Mobile baseline comparison and adjudicate both unresolved tracks.",
+    "stage": "R1 engine-boundary comparison"
   },
   "project": {
     "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
@@ -165,19 +166,27 @@
           "experiment": "Mobile QA render scale 1.0 to 0.75",
           "last_completed_frame": 90,
           "run_id": 30313623186
+        },
+        {
+          "artifact_id": 8693475134,
+          "decision": "reverted",
+          "experiment": "SouqWorldEnvironment filmic to linear tonemapper",
+          "last_completed_frame": 70,
+          "run_id": 30370527664
         }
       ],
       "critical_runtime_errors": 0,
       "exit_criterion_met": false,
-      "failed_correction_count": 4,
+      "failed_correction_count": 5,
       "render_disabled_control_frame": 300,
       "render_scale_experiment_executed": true,
-      "active_experiment": "MOBILE_ENVIRONMENT_TONEMAPPER_FILMIC_TO_LINEAR"
+      "tonemapper_experiment_executed": true
     },
+    "active_experiment": "GODOT_ENGINE_4_3_TO_4_7_1_STABLE",
     "production_fix_authorized": false,
     "renderer_defaults_modified": false,
     "renderer_selected": null,
-    "state": "DIAGNOSTIC_CONTINUATION",
+    "state": "ENGINE_BOUNDARY_COMPARISON",
     "title": "RENDERER RUNTIME DEBUGGING"
   },
   "verification": {
