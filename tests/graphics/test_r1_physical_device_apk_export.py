@@ -17,7 +17,7 @@ class R1PhysicalDeviceApkExportTest(unittest.TestCase):
         self.assertIn('mobile_baseline', text)
         self.assertIn('--export-debug Android "$GL_APK"', text)
         self.assertIn('--export-debug Android "$MOBILE_APK"', text)
-        self.assertIn('apksigner" verify --verbose --print-certs', text)
+        self.assertIn('"$APKSIGNER" verify --verbose --print-certs', text)
         self.assertIn('R1_PHYSICAL_DEVICE_APK_MANIFEST.json', text)
         self.assertIn('"renderer_defaults_modified": False', text)
         self.assertIn('"production_fix_authorized": False', text)
