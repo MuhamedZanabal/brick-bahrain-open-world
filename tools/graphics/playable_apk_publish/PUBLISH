@@ -1,0 +1,3 @@
+publish corrected playable mobile APK
+source=retained-r1-mobile-artifact
+main_scene=res://scenes/splash_screen.tscn
