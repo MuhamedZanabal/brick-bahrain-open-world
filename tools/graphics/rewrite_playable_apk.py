@@ -195,7 +195,7 @@ def main() -> None:
     args = parser.parse_args()
     report = rewrite(args.source, args.output)
     for key, value in report.items():
-        print(f"{key}={value")
+        print(f"{key}={value}")
 
 
 if __name__ == "__main__":
