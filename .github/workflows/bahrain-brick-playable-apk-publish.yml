@@ -1,0 +1,98 @@
+name: Bahrain Brick Corrected Playable APK Publish
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-renderer-runtime-debugging-r1
+    paths:
+      - tools/graphics/playable_apk_patch/PUBLISH
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bahrain-brick-corrected-playable-apk-publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/r1-physical-apks-30385101264/bahrain-brick-r1-physical-mobile-arm64.apk
+      EXPECTED_SOURCE_SHA256: ec4ea74480cd36e25c2e146aac03abdfeb8ef0bb22b78a7b726b871fe8c4e787
+      EXPECTED_OUTPUT_SHA256: 9dcfa51610b1d8b2f9d03e0e853a6c6dc052c240d11b615b96040816d2c7c864
+      RELEASE_TAG: playable-mobile-corrected-r1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android verification tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager 'build-tools;34.0.0'
+
+      - name: Reconstruct corrected playable APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work release
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o work/source.apk
+          echo "$EXPECTED_SOURCE_SHA256  work/source.apk" | sha256sum -c -
+          cat tools/graphics/playable_apk_patch/patch-*.b64 | base64 --decode > work/playable-mobile.patch.gz
+          echo 'aafc27db0a5006ed4959098751e776eb7f0a24605c15b95d9503e62d10f3a6ec  work/playable-mobile.patch.gz' | sha256sum -c -
+          python3 -m py_compile tools/graphics/rebuild_playable_apk_from_patch.py
+          python3 tools/graphics/rebuild_playable_apk_from_patch.py \
+            --source work/source.apk \
+            --patch work/playable-mobile.patch.gz \
+            --output release/Bahrain-Brick-Playable-Mobile-Corrected.apk \
+            --handoff release/PLAYABLE_APK_HANDOFF.json
+          echo "$EXPECTED_OUTPUT_SHA256  release/Bahrain-Brick-Playable-Mobile-Corrected.apk" | sha256sum -c -
+          sha256sum release/Bahrain-Brick-Playable-Mobile-Corrected.apk > release/PLAYABLE_APK_SHA256SUMS.txt
+
+      - name: Verify package identity and Android signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/Bahrain-Brick-Playable-Mobile-Corrected.apk
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee release/PLAYABLE_APK_SIGNING.txt
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" | tee release/PLAYABLE_APK_BADGING.txt
+          grep -q "package: name='com.brickbahrain.r1physical.mobile'" release/PLAYABLE_APK_BADGING.txt
+          grep -q 'Verified using v1 scheme (JAR signing): true' release/PLAYABLE_APK_SIGNING.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' release/PLAYABLE_APK_SIGNING.txt
+          grep -q 'Signer #1 certificate SHA-256 digest: cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387' release/PLAYABLE_APK_SIGNING.txt
+
+      - name: Upload retained workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-playable-mobile-corrected-${{ github.run_id }}
+          path: release/
+          retention-days: 30
+
+      - name: Publish stable prerelease URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release/* \
+              --target "$GITHUB_SHA" \
+              --title 'Bahrain Brick Corrected Playable Mobile APK' \
+              --notes 'Corrected ARM64 QA build. Starts through the production splash/game scenes and does not select the R1 diagnostic evidence camera. Production renderer defaults remain unchanged; R1 physical-device qualification is still required.' \
+              --prerelease \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets | tee release/RELEASE.json
