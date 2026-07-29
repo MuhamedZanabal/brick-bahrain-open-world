@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "variants": [
+    {
+      "abi": [
+        "x86_64"
+      ],
+      "filename": "bahrain-brick-g0-gl-compatibility-x86_64.apk",
+      "import_state_authority": "e0360a68b2ac1d4ccfc0ced390a822950ac38a7f18509dfc585e98caea097197",
+      "key": "gl_compatibility",
+      "launcher_component": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+      "package_id": "com.brickbahrain.g0gl",
+      "renderer": "gl_compatibility",
+      "renderer_override_mechanism": {
+        "architectures": {
+          "arm64-v8a": false,
+          "armeabi-v7a": false,
+          "x86_64": true
+        },
+        "changed_keys": [
+          "application/run/main_scene",
+          "rendering/renderer/rendering_method",
+          "rendering/renderer/rendering_method.mobile",
+          "android/architectures/armeabi-v7a",
+          "android/architectures/arm64-v8a",
+          "android/architectures/x86_64",
+          "android/package/unique_name"
+        ],
+        "export_preset": {
+          "after_sha256": "bb8fab1128da290b2e42dc52621ea331af8efe939b33ee1335e7293764dada90",
+          "before_sha256": "db315e04903502e85ddb492f538a3656e81182da4771c8a934f02eec9f72918b",
+          "changed": true,
+          "path": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/g0-android/tier-b/android_gl_compatibility/export_presets.cfg"
+        },
+        "package_name": "com.brickbahrain.g0gl",
+        "project": {
+          "after_sha256": "a5a7f83e1bc61448677257d1a43be004f2e09bb7042712d89f2a9e081decf631",
+          "before_sha256": "6d69f4cb542225debfae546da688a9550b016ada323e01b687c47b2b2c94a422",
+          "changed": true,
+          "path": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/g0-android/tier-b/android_gl_compatibility/project.godot"
+        },
+        "qa_main_scene": "res://tests/graphics/android_renderer_evidence.tscn",
+        "qa_override_only": true,
+        "renderer": "gl_compatibility",
+        "schema_version": 1
+      },
+      "sha256": "8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb",
+      "signature_digest_sha256": "cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387",
+      "source_authority": "6ade72ed02084791128dcf4a91223e695d802c15",
+      "version": "1.4.0.4-premium-visual-qa",
+      "version_code": 1404
+    },
+    {
+      "abi": [
+        "x86_64"
+      ],
+      "filename": "bahrain-brick-g0-mobile-vulkan-x86_64.apk",
+      "import_state_authority": "e0360a68b2ac1d4ccfc0ced390a822950ac38a7f18509dfc585e98caea097197",
+      "key": "mobile_vulkan",
+      "launcher_component": "com.brickbahrain.g0mobile/com.godot.game.GodotApp",
+      "package_id": "com.brickbahrain.g0mobile",
+      "renderer": "mobile",
+      "renderer_override_mechanism": {
+        "architectures": {
+          "arm64-v8a": false,
+          "armeabi-v7a": false,
+          "x86_64": true
+        },
+        "changed_keys": [
+          "application/run/main_scene",
+          "rendering/renderer/rendering_method",
+          "rendering/renderer/rendering_method.mobile",
+          "android/architectures/armeabi-v7a",
+          "android/architectures/arm64-v8a",
+          "android/architectures/x86_64",
+          "android/package/unique_name"
+        ],
+        "export_preset": {
+          "after_sha256": "472d0992df20cf96a843036d9c1b6d3f0ac8992c65ae792959baa89a0c5a0591",
+          "before_sha256": "db315e04903502e85ddb492f538a3656e81182da4771c8a934f02eec9f72918b",
+          "changed": true,
+          "path": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/g0-android/tier-b/android_mobile_vulkan/export_presets.cfg"
+        },
+        "package_name": "com.brickbahrain.g0mobile",
+        "project": {
+          "after_sha256": "de3a1a33fe0c1120c9e643b6fb2469f7fb54394821e2c19411fa4ce7ee8bd61c",
+          "before_sha256": "6d69f4cb542225debfae546da688a9550b016ada323e01b687c47b2b2c94a422",
+          "changed": true,
+          "path": "/home/runner/work/brick-bahrain-open-world/brick-bahrain-open-world/build/g0-android/tier-b/android_mobile_vulkan/project.godot"
+        },
+        "qa_main_scene": "res://tests/graphics/android_renderer_evidence.tscn",
+        "qa_override_only": true,
+        "renderer": "mobile",
+        "schema_version": 1
+      },
+      "sha256": "0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02",
+      "signature_digest_sha256": "cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387",
+      "source_authority": "6ade72ed02084791128dcf4a91223e695d802c15",
+      "version": "1.4.0.4-premium-visual-qa",
+      "version_code": 1404
+    }
+  ]
+}

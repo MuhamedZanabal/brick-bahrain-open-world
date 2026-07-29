@@ -1,0 +1,14 @@
+name: Bahrain Brick G0.2 Terminal Evidence Packaging — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'G0.2 Android execution and terminal packaging are complete. Do not rerun.'

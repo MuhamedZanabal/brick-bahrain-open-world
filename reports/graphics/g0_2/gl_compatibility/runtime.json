@@ -1,0 +1,222 @@
+{
+  "apk_sha256": "8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb",
+  "classification": "ANDROID_CRITICAL_RUNTIME_FAILURE",
+  "critical_log_scan": {
+    "counts": {
+      "anr": 0,
+      "java_fatal": 0,
+      "linker_failure": 0,
+      "missing_resource": 0,
+      "native_fatal": 0,
+      "renderer_blocking_shader": 45
+    },
+    "passed": false,
+    "schema_version": 1,
+    "total": 45
+  },
+  "draw_calls": 4,
+  "emulator": {
+    "abi": "x86_64",
+    "abi_list": "x86_64",
+    "acceleration_mode": "auto/KVM when available",
+    "adb_version": "Android Debug Bridge version 1.0.41\nVersion 37.0.0-14910828\nInstalled as /usr/local/lib/android/sdk/platform-tools/adb\nRunning on Linux 6.17.0-1020-azure (x86_64)",
+    "android_version": "14",
+    "api_level": 34,
+    "avd_name": "bahrain_brick_g0_2_gl_compatibility",
+    "boot_completed": "1",
+    "build_fingerprint": "Android/sdk_phone64_x86_64/emu64x:14/UE1A.230829.036.A1/11228894:userdebug/test-keys",
+    "candidate": "gl_compatibility",
+    "cores": 4,
+    "density": "Physical density: 420",
+    "device": "emu64x",
+    "disk_space": "Filesystem       Size Used Avail Use% Mounted on\n/dev/block/dm-38 5.8G 226M  5.4G   4% /data/user/0",
+    "emulator_version": "",
+    "gles_version": "196608",
+    "gpu_mode": "swiftshader",
+    "host_platform": "Linux-6.17.0-1020-azure-x86_64-with-glibc2.39",
+    "host_runner_class": "ubuntu-24.04",
+    "manufacturer": "unknown",
+    "model": "Android SDK built for x86_64",
+    "package_install_user": 0,
+    "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+    "ram_mb": 4096,
+    "resolution": "Physical size: 1080x2400\nOverride size: 1920x1080",
+    "runner_image_version": "20260720.247.2",
+    "schema_version": 1,
+    "storage": "default AVD data partition",
+    "system_image": "system-images;android-34;default;x86_64",
+    "uname_m": "x86_64",
+    "vulkan_features": "feature:reqGlEsVersion=0x30000\nfeature:android.hardware.audio.output\nfeature:android.hardware.biometrics.face\nfeature:android.hardware.bluetooth\nfeature:android.hardware.bluetooth_le\nfeature:android.hardware.camera\nfeature:android.hardware.camera.any\nfeature:android.hardware.camera.autofocus\nfeature:android.hardware.camera.capability.manual_post_processing\nfeature:android.hardware.camera.capability.manual_sensor\nfeature:android.hardware.camera.capability.raw\nfeature:android.hardware.camera.concurrent\nfeature:android.hardware.camera.flash\nfeature:android.hardware.camera.front\nfeature:android.hardware.camera.level.full\nfeature:android.hardware.faketouch\nfeature:android.hardware.fingerprint\nfeature:android.hardware.hardware_keystore=300\nfeature:android.hardware.identity_credential=202301\nfeature:android.hardware.keystore.app_attest_key\nfeature:android.hardware.location\nfeature:android.hardware.location.gps\nfeature:android.hardware.location.network\nfeature:android.hardware.microphone\nfeature:android.hardware.ram.normal\nfeature:android.hardware.screen.landscape\nfeature:android.hardware.screen.portrait\nfeature:android.hardware.security.model.compatible\nfeature:android.hardware.sensor.accelerometer\nfeature:android.hardware.sensor.ambient_temperature\nfeature:android.hardware.sensor.barometer\nfeature:android.hardware.sensor.compass\nfeature:android.hardware.sensor.gyroscope\nfeature:android.hardware.sensor.hinge_angle\nfeature:android.hardware.sensor.light\nfeature:android.hardware.sensor.proximity\nfeature:android.hardware.sensor.relative_humidity\nfeature:android.hardware.telephony\nfeature:android.hardware.telephony.calling\nfeature:android.hardware.telephony.data\nfeature:android.hardware.telephony.gsm\nfeature:android.hardware.telephony.ims\nfeature:android.hardware.telephony.radio.access\nfeature:android.hardware.telephony.subscription\nfeature:android.hardware.touchscreen\nfeature:android.hardware.touchscreen.multitouch\nfeature:android.hardware.touchscreen.multitouch.distinct\nfeature:android.hardware.touchscreen.multitouch.jazzhand\nfeature:android.hardware.vulkan.compute\nfeature:android.hardware.vulkan.level=1\nfeature:android.hardware.vulkan.version=4206592\nfeature:android.hardware.wifi\nfeature:android.hardware.wifi.direct\nfeature:android.hardware.wifi.passpoint\nfeature:android.software.activities_on_secondary_displays\nfeature:android.software.adoptable_storage\nfeature:android.software.app_enumeration\nfeature:android.software.app_widgets\nfeature:android.software.autofill\nfeature:android.software.backup\nfeature:android.software.cant_save_state\nfeature:android.software.companion_device_setup\nfeature:android.software.controls\nfeature:android.software.credentials\nfeature:android.software.cts\nfeature:android.software.device_admin\nfeature:android.software.device_lock\nfeature:android.software.erofs\nfeature:android.software.file_based_encryption\nfeature:android.software.home_screen\nfeature:android.software.incremental_delivery=2\nfeature:android.software.input_methods\nfeature:android.software.ipsec_tunnel_migration\nfeature:android.software.ipsec_tunnels\nfeature:android.software.live_wallpaper\nfeature:android.software.managed_users\nfeature:android.software.midi\nfeature:android.software.opengles.deqp.level=132580097\nfeature:android.software.picture_in_picture\nfeature:android.software.print\nfeature:android.software.sdksandbox.sdk_install_work_profile\nfeature:android.software.secure_lock_screen\nfeature:android.software.securely_removes_users\nfeature:android.software.telecom\nfeature:android.software.verified_boot\nfeature:android.software.voice_recognizers\nfeature:android.software.vulkan.deqp.level=132580097\nfeature:android.software.webview\nfeature:android.software.window_magnification"
+  },
+  "evidence_class": "API_34_ANDROID_EMULATOR_FUNCTIONAL",
+  "evidence_complete": false,
+  "expected_renderer": "gl_compatibility",
+  "first_visible_window_time_ms": 1950,
+  "frame_metrics": {
+    "average_fps": 7.514858342218657,
+    "mean_frame_time_ms": 133.0697073,
+    "median_frame_time_ms": 125.620213,
+    "one_percent_low_fps": 3.494584908294701,
+    "p95_frame_time_ms": 286.157019,
+    "p99_frame_time_ms": 286.157019,
+    "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+    "row_count": 10
+  },
+  "launch": {
+    "activity": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+    "complete": true,
+    "final_pid": "2627",
+    "first_visible_window_time_ms": 1950,
+    "initial_pid": "2627",
+    "process_created": true,
+    "process_remained_alive_60s": true,
+    "resolved_component": "com.brickbahrain.g0gl/com.godot.game.GodotApp",
+    "status": "ok",
+    "this_time_ms": null,
+    "total_time_ms": 903,
+    "wait_time_ms": 914,
+    "window_became_visible": true
+  },
+  "lifecycle": {
+    "pause_observed": true,
+    "resume_observed": true
+  },
+  "markers": {
+    "capture_frame_reached": true,
+    "draw_calls": 4,
+    "evidence_live": true,
+    "godot_started": true,
+    "gpu": "Android Emulator OpenGL ES Translator (Google SwiftShader)",
+    "mission_started": true,
+    "renderer": "gl_compatibility",
+    "renderer_identity": "G0_ANDROID_RENDERER_READY renderer=gl_compatibility driver=opengl3 gpu=Android Emulator OpenGL ES Translator (Google SwiftShader)",
+    "rendering_driver": "opengl3",
+    "reported_frames": 360,
+    "scene_ready": true,
+    "startup_identity": "OpenGL API OpenGL ES 3.0 (OpenGL ES 3.0 SwiftShader 4.0.0.1) - Compatibility - Using Device: Google (Google Inc.) - Android Emulator OpenGL ES Translator (Google SwiftShader)",
+    "static_memory_bytes": 50210902,
+    "visible_objects": 2211,
+    "visible_triangles": 643324,
+    "warmup_complete": true
+  },
+  "memory": {
+    "peak_java_heap_kb": 7024,
+    "peak_native_heap_kb": 96736,
+    "peak_pss_kb": 172943,
+    "peak_rss_kb": 283604,
+    "samples": [
+      {
+        "java_heap_kb": 7024,
+        "native_heap_kb": 96736,
+        "pss_kb": 172943,
+        "rss_kb": 283604,
+        "sample": "01.txt"
+      },
+      {
+        "java_heap_kb": 6696,
+        "native_heap_kb": 96260,
+        "pss_kb": 172178,
+        "rss_kb": 283020,
+        "sample": "02.txt"
+      },
+      {
+        "java_heap_kb": 6696,
+        "native_heap_kb": 96264,
+        "pss_kb": 172182,
+        "rss_kb": 283024,
+        "sample": "03.txt"
+      },
+      {
+        "java_heap_kb": 6696,
+        "native_heap_kb": 96264,
+        "pss_kb": 172182,
+        "rss_kb": 283024,
+        "sample": "04.txt"
+      },
+      {
+        "java_heap_kb": 6708,
+        "native_heap_kb": 96264,
+        "pss_kb": 172202,
+        "rss_kb": 283040,
+        "sample": "05.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96264,
+        "pss_kb": 172198,
+        "rss_kb": 283036,
+        "sample": "06.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96264,
+        "pss_kb": 172202,
+        "rss_kb": 283044,
+        "sample": "07.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96264,
+        "pss_kb": 172214,
+        "rss_kb": 283056,
+        "sample": "08.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96264,
+        "pss_kb": 172214,
+        "rss_kb": 283056,
+        "sample": "09.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96268,
+        "pss_kb": 172218,
+        "rss_kb": 283060,
+        "sample": "10.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96272,
+        "pss_kb": 172222,
+        "rss_kb": 283064,
+        "sample": "11.txt"
+      },
+      {
+        "java_heap_kb": 6704,
+        "native_heap_kb": 96276,
+        "pss_kb": 172226,
+        "rss_kb": 283068,
+        "sample": "12.txt"
+      }
+    ]
+  },
+  "package_id": "com.brickbahrain.g0gl",
+  "performance_acceptance": false,
+  "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+  "process_created": true,
+  "process_remained_alive_60s": true,
+  "renderer": "gl_compatibility",
+  "renderer_identity": "G0_ANDROID_RENDERER_READY renderer=gl_compatibility driver=opengl3 gpu=Android Emulator OpenGL ES Translator (Google SwiftShader)",
+  "rendering_driver": "opengl3",
+  "scene_readiness_time": "2026-07-25T21:14:34.556Z",
+  "schema_version": 1,
+  "screenshot": {
+    "average_luminance": 0.435074900523481,
+    "black_pixel_ratio": 0.0,
+    "exists": true,
+    "height": 1080,
+    "output_file_present": true,
+    "perceptual_hash": "d8c0c3c3c3ffffff",
+    "placeholder": false,
+    "sha256": "9b5ea707fe53efd6c117fec73bb057db3cd915fa522d8d6b13b6260b83ceac82",
+    "source_evidence_present": true,
+    "valid_non_black": true,
+    "width": 1920
+  },
+  "startup_identity": "OpenGL API OpenGL ES 3.0 (OpenGL ES 3.0 SwiftShader 4.0.0.1) - Compatibility - Using Device: Google (Google Inc.) - Android Emulator OpenGL ES Translator (Google SwiftShader)",
+  "startup_time_ms": 903,
+  "visible_objects": 2211,
+  "visible_triangles": 643324,
+  "window_became_visible": true
+}

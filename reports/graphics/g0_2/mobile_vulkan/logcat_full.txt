@@ -1,0 +1,549 @@
+--------- beginning of kernel
+07-25 21:17:11.565     0     0 I logd    : logdr: UID=2000 GID=2000 PID=2579 b tail=0 logMask=99 pid=0 start=0ns deadline=0ns
+--------- beginning of main
+07-25 21:17:11.386  1077  1077 D AvrcpBrowsablePlayerConnector: Received a message: msg.what=2
+07-25 21:17:11.386  1077  1077 V AvrcpBrowsablePlayerConnector: Timed out waiting for players
+07-25 21:17:11.386  1077  1077 I AvrcpBrowsablePlayerConnector: Successfully connected to 0 browsable players.
+07-25 21:17:11.386  1077  1077 I MediaPlayerList: init: Browsable Player list size is 0
+07-25 21:17:11.614   878   878 D ControlsListingControllerImpl: ServiceConfig reloaded, count: 0
+07-25 21:17:11.615   878   878 D ControlsListingControllerImpl: ServiceConfig reloaded, count: 0
+--------- beginning of system
+07-25 21:17:12.385   536   625 D ActivityManager: freezing 1623 com.android.music
+07-25 21:17:12.503   536   625 D ActivityManager: freezing 1454 com.android.carrierconfig
+07-25 21:17:12.568  1690  1690 D CompatibilityChangeReporter: Compat change id reported: 150939131; UID 10073; state: ENABLED
+07-25 21:17:12.568  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents
+07-25 21:17:13.365   536   625 D ActivityManager: freezing 1722 com.android.sdksetup
+07-25 21:17:13.384   536   959 I ActivityManager: Force stopping com.brickbahrain.g0mobile appid=10141 user=0: from pid 2595
+07-25 21:17:13.384   536   959 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_10141/cgroup.freeze
+07-25 21:17:13.384   536   959 W libprocessgroup: Failed to apply Frozen process profile: No such file or directory
+07-25 21:17:13.384   536   959 D OomAdjuster: Not killing cached processes
+07-25 21:17:13.384   536   959 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_10141/cgroup.freeze
+07-25 21:17:13.384   536   959 W libprocessgroup: Failed to apply Unfrozen process profile: No such file or directory
+07-25 21:17:13.387  1106  1106 D CarrierSvcBindHelper: onHandleForceStop: [com.brickbahrain.g0mobile]
+07-25 21:17:13.387  1106  1106 D CarrierSvcBindHelper: No carrier app for: 0
+07-25 21:17:13.405   536  1673 I ActivityManager: Force stopping com.brickbahrain.g0mobile appid=10141 user=0: clear data
+07-25 21:17:13.405   536  1673 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_10141/cgroup.freeze
+07-25 21:17:13.405   536  1673 W libprocessgroup: Failed to apply Frozen process profile: No such file or directory
+07-25 21:17:13.405   536  1673 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_10141/cgroup.freeze
+07-25 21:17:13.405   536  1673 W libprocessgroup: Failed to apply Unfrozen process profile: No such file or directory
+07-25 21:17:13.406   536   567 I ActivityManager: Force stopping com.brickbahrain.g0mobile appid=10141 user=-1: clearApplicationUserData
+07-25 21:17:13.406   536   567 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_4294877437/cgroup.freeze
+07-25 21:17:13.406   536   567 W libprocessgroup: Failed to apply Frozen process profile: No such file or directory
+07-25 21:17:13.407   536   567 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_4294877437/cgroup.freeze
+07-25 21:17:13.407   536   567 W libprocessgroup: Failed to apply Unfrozen process profile: No such file or directory
+07-25 21:17:13.410  2567  2568 I AidlLazyServiceRegistrar: Process has 1 (of 1 available) client(s) in use after notification artd has clients: 1
+07-25 21:17:13.627     0     0 I servicemanager: Notifying artd they do (previously: don't) have clients when service is guaranteed to be in use
+07-25 21:17:13.416  1106  1106 D CarrierSvcBindHelper: onHandleForceStop: [com.brickbahrain.g0mobile]
+07-25 21:17:13.416  1106  1106 D CarrierSvcBindHelper: No carrier app for: 0
+07-25 21:17:13.420  1077  1077 V MediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_DATA_CLEARED
+07-25 21:17:13.420  1077  1077 V MediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_DATA_CLEARED
+07-25 21:17:13.421   536   567 W ProcessStats: Tracking association SourceState{6c6b273 com.android.documentsui/10073 Receivr #544} whose proc state 10 is better than process ProcessState{c39b36 com.android.externalstorage/10070 pkg=com.android.externalstorage} proc state 14 (55 skipped)
+07-25 21:17:13.425   536  1673 D CompatibilityChangeReporter: Compat change id reported: 261072174; UID 1000; state: ENABLED
+07-25 21:17:13.428  1599  2089 I MediaProvider: Begin Intent { act=android.intent.action.PACKAGE_DATA_CLEARED dat=package: flg=0x5000010 cmp=com.android.providers.media.module/com.android.providers.media.MediaService (has extras) }
+07-25 21:17:13.428  1599  2089 D MediaProvider: Deleted 0 Android/media items belonging to com.brickbahrain.g0mobile on /data/user/0/com.android.providers.media.module/databases/external.db
+07-25 21:17:13.429  1599  2089 D MediaGrants: Removed 0 media_grants for 0 user for com.brickbahrain.g0mobile. Reason: Package orphaned
+07-25 21:17:13.429  1599  2089 I MediaProvider: End Intent { act=android.intent.action.PACKAGE_DATA_CLEARED dat=package: flg=0x5000010 cmp=com.android.providers.media.module/com.android.providers.media.MediaService (has extras) }
+07-25 21:17:13.435   536  1673 D SafetySourceDataValidator: No cert check requested for package com.android.permissioncontroller
+07-25 21:17:13.444   885   885 D PersistedStoragePackageUninstalledReceiver: Received android.intent.action.PACKAGE_DATA_CLEARED for com.brickbahrain.g0mobile for u0
+07-25 21:17:13.444   536  1652 D ActivityManager: freezer override set to true
+07-25 21:17:13.444   536  1652 D ActivityManager: sync unfroze 1623 com.android.music for 19
+07-25 21:17:13.444   536  1652 D ActivityManager: sync unfroze 1454 com.android.carrierconfig for 19
+07-25 21:17:13.444   536  1652 D ActivityManager: sync unfroze 1722 com.android.sdksetup for 19
+07-25 21:17:13.445   536  1652 D ActivityManager: freezer override set to false
+07-25 21:17:13.467   536  1673 I ActivityManager: Force stopping com.brickbahrain.g0mobile appid=10141 user=0: from pid 2615
+07-25 21:17:13.467   536  1673 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_10141/cgroup.freeze
+07-25 21:17:13.467   536  1673 W libprocessgroup: Failed to apply Frozen process profile: No such file or directory
+07-25 21:17:13.467   536  1673 E libprocessgroup: No such cgroup attribute: /sys/fs/cgroup/uid_10141/cgroup.freeze
+07-25 21:17:13.467   536  1673 W libprocessgroup: Failed to apply Unfrozen process profile: No such file or directory
+07-25 21:17:13.472  1106  1106 D CarrierSvcBindHelper: onHandleForceStop: [com.brickbahrain.g0mobile]
+07-25 21:17:13.472  1106  1106 D CarrierSvcBindHelper: No carrier app for: 0
+07-25 21:17:13.723   536  1673 D CompatibilityChangeReporter: Compat change id reported: 161252188; UID 10141; state: DISABLED
+07-25 21:17:13.723   536  1673 W ActivityTaskManager: callingPackage for (uid=2000, pid=2615) has no WPC
+07-25 21:17:13.723   536  1673 D CompatibilityChangeReporter: Compat change id reported: 244637991; UID 2000; state: ENABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 265464455; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 265452344; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 266124927; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 265451093; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 265456536; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 255940284; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 236283604; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 263959004; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 264304459; UID 10141; state: DISABLED
+07-25 21:17:13.724   536  1673 D CompatibilityChangeReporter: Compat change id reported: 264301586; UID 10141; state: DISABLED
+07-25 21:17:13.725   536  1673 D CompatibilityChangeReporter: Compat change id reported: 254631730; UID 10141; state: DISABLED
+07-25 21:17:13.725   536  1673 D CompatibilityChangeReporter: Compat change id reported: 273509367; UID 10141; state: DISABLED
+07-25 21:17:13.725   536  1673 D CompatibilityChangeReporter: Compat change id reported: 263259275; UID 10141; state: DISABLED
+07-25 21:17:13.725   536  1673 D CompatibilityChangeReporter: Compat change id reported: 174042980; UID 10141; state: DISABLED
+07-25 21:17:13.725   536  1673 D CompatibilityChangeReporter: Compat change id reported: 174042936; UID 10141; state: DISABLED
+07-25 21:17:13.725   536  1673 D CompatibilityChangeReporter: Compat change id reported: 181136395; UID 10141; state: DISABLED
+07-25 21:17:13.726   536  1673 D CompatibilityChangeReporter: Compat change id reported: 194480991; UID 10141; state: ENABLED
+07-25 21:17:13.728   536  1673 D CompatibilityChangeReporter: Compat change id reported: 184838306; UID 10141; state: DISABLED
+07-25 21:17:13.728   536  1673 D CompatibilityChangeReporter: Compat change id reported: 185004937; UID 10141; state: DISABLED
+07-25 21:17:13.729   536  1673 D CompatibilityChangeReporter: Compat change id reported: 197654537; UID 10141; state: ENABLED
+07-25 21:17:13.730   536  1673 V SplashScreenExceptionList: SplashScreen checking exception for package com.brickbahrain.g0mobile (target sdk:34) -> false
+07-25 21:17:13.730   536  1673 D CompatibilityChangeReporter: Compat change id reported: 205907456; UID 10141; state: ENABLED
+07-25 21:17:13.731   536  1673 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.brickbahrain.g0mobile/com.godot.game.GodotApp} with LAUNCH_SINGLE_INSTANCE_PER_TASK from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+07-25 21:17:13.731   878   919 V WindowManagerShell: Transition requested: android.os.BinderProxy@2a03d94 TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.brickbahrain.g0mobile/com.godot.game.GodotApp } baseActivity=ComponentInfo{com.brickbahrain.g0mobile/com.godot.game.GodotApp} topActivity=ComponentInfo{com.brickbahrain.g0mobile/com.godot.game.GodotApp} origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0mobile/com.godot.game.GodotApp} numActivities=1 lastActiveTime=39468 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@575803d} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{c486032 com.godot.game.GodotApp} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-25 21:17:13.732   536   558 D CompatibilityChangeReporter: Compat change id reported: 135634846; UID 10141; state: DISABLED
+07-25 21:17:13.732   536   568 D CompatibilityChangeReporter: Compat change id reported: 143937733; UID 10141; state: ENABLED
+07-25 21:17:13.733   878   929 W ShellStartingWindow: Get attribute fail, return default: File res/mipmap-xxhdpi-v4/icon_background.png from drawable resource ID #0x7f0a0001: .xml extension required
+07-25 21:17:13.736   536   617 D CompatibilityChangeReporter: Compat change id reported: 265195908; UID 10141; state: ENABLED
+07-25 21:17:13.737   411   411 I BpBinder: onLastStrongRef automatically unlinking death recipients: 
+07-25 21:17:13.738   878   929 D SplashScreenView: Build android.window.SplashScreenView{b6992df V.E...... ......ID 0,0-0,0}
+07-25 21:17:13.738   878   929 D SplashScreenView: Icon: view: android.widget.ImageView{e2dab2c V.ED..... ......I. 0,0-0,0 #10204f0 android:id/splashscreen_icon_view} drawable: com.android.wm.shell.startingsurface.SplashscreenIconDrawableFactory$ImmobileIconDrawable@3a179f5 size: 504
+07-25 21:17:13.738   878   929 D SplashScreenView: Branding: view: android.view.View{767c38a G.ED..... ......I. 0,0-0,0 #10204ef android:id/splashscreen_branding_view} drawable: null size w: 0 h: 0
+07-25 21:17:13.738   349   349 D Zygote  : Forked child process 2618
+07-25 21:17:13.739   536   568 I ActivityManager: Start proc 2618:com.brickbahrain.g0mobile/u0a141 for next-top-activity {com.brickbahrain.g0mobile/com.godot.game.GodotApp}
+07-25 21:17:13.743   536  1652 D CoreBackPreview: Window{e35dd25 u0 Splash Screen com.brickbahrain.g0mobile}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@c91af08, mPriority=0, mIsAnimationCallback=false}
+07-25 21:17:13.785  2618  2618 I ahrain.g0mobile: Late-enabling -Xcheck:jni
+07-25 21:17:13.857  1149  1838 D EGL_emulation: app_time_stats: avg=940.00ms min=34.31ms max=4956.74ms count=6
+07-25 21:17:13.863   536   555 V WindowManager: Sent Transition #8 createdAt=07-25 21:17:13.727 via request=TransitionRequestInfo { type = OPEN, triggerTask = TaskInfo{userId=0 taskId=8 displayId=0 isRunning=true baseIntent=Intent { flg=0x10000000 cmp=com.brickbahrain.g0mobile/com.godot.game.GodotApp } baseActivity=ComponentInfo{com.brickbahrain.g0mobile/com.godot.game.GodotApp} topActivity=ComponentInfo{com.brickbahrain.g0mobile/com.godot.game.GodotApp} origActivity=null realActivity=ComponentInfo{com.brickbahrain.g0mobile/com.godot.game.GodotApp} numActivities=1 lastActiveTime=39468 supportsMultiWindow=true resizeMode=2 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{c16b3b4 Task{f258a43 #8 type=standard A=10141:com.brickbahrain.g0mobile}}} topActivityType=1 pictureInPictureParams=null shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=null topActivityInfo=ActivityInfo{1a38bdd com.godot.game.GodotApp} launchCookies=[] positionInParent=Point(0, 0) parentTaskId=-1 isFocused=false isVisible=false isVisibleRequested=false isSleeping=false topActivityInSizeCompat=false topActivityEligibleForLetterboxEducation= false topActivityLetterboxed= false isFromDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 locusId=null displayAreaFeatureId=1 cameraCompatControlState=hidden}, remoteTransition = null, displayChange = null }
+07-25 21:17:13.863   536   555 V WindowManager:     startWCT=WindowContainerTransaction { changes = {} hops = [] errorCallbackToken=null taskFragmentOrganizer=null }
+07-25 21:17:13.863   536   555 V WindowManager:     info={id=8 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{RemoteToken{c16b3b4 Task{f258a43 #8 type=standard A=10141:com.brickbahrain.g0mobile}}} m=OPEN f=NONE leash=Surface(name=Task=8)/@0x1f7b0c6 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{RemoteToken{89966fb Task{e6d8964 #1 type=home}}} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xdde8de6 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0}]}
+07-25 21:17:13.863   878   919 V WindowManagerShell: onTransitionReady android.os.BinderProxy@2a03d94: {id=8 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@6420ca9} m=OPEN f=NONE leash=Surface(name=Task=8)/@0x8f539e2 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@db1122e} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xed8b173 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0}]}
+07-25 21:17:13.863   878   919 V WindowManagerShell: Playing animation for (#8)android.os.BinderProxy@2a03d94@0
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultMixedHandler@9ebb8b4
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.keyguard.KeyguardTransitionHandler@adcacdd
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.activityembedding.ActivityEmbeddingController@c8f2052
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.recents.RecentsTransitionHandler@635ef23
+07-25 21:17:13.863   878   919 V ShellRecents: RecentsTransitionHandler.startAnimation: no controller found
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.pip.PipTransition@be5ac20
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.splitscreen.StageCoordinator@bfc39d9
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.transition.RemoteTransitionHandler@adaef9e
+07-25 21:17:13.863   878   919 V WindowManagerShell: Transition doesn't have explicit remote, search filters for match for {id=8 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@6420ca9} m=OPEN f=NONE leash=Surface(name=Task=8)/@0x8f539e2 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@db1122e} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xed8b173 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0}]}
+07-25 21:17:13.863   878   919 V WindowManagerShell:  Checking filter Pair{{types=[] flags=0x0] notFlags=0x100 checks=[{atype=home independent=true modes=[OPEN,TO_FRONT] flags=NONE mustBeTask=false order=TOP topActivity=ComponentInfo{com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}},{atype=standard independent=true modes=[CLOSE,TO_BACK] flags=NONE mustBeTask=false order=ANY topActivity=null}]} RemoteTransition { remoteTransition = android.window.IRemoteTransition$Stub$Proxy@582f1cf, appThread = android.app.IApplicationThread$Stub$Proxy@388375c, debugName = QuickstepLaunchHome }}
+07-25 21:17:13.863   878   919 V WindowManagerShell:  Delegate animation for #8 to null
+07-25 21:17:13.863   878   919 V WindowManagerShell:  try handler com.android.wm.shell.transition.DefaultTransitionHandler@66e5a7f
+07-25 21:17:13.863   878   919 V WindowManagerShell: start default transition animation, info = {id=8 t=OPEN f=0x0 trk=0 r=[0@Point(0, 0)] c=[{WCT{android.window.IWindowContainerToken$Stub$Proxy@6420ca9} m=OPEN f=NONE leash=Surface(name=Task=8)/@0x8f539e2 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0},{WCT{android.window.IWindowContainerToken$Stub$Proxy@db1122e} m=TO_BACK f=SHOW_WALLPAPER leash=Surface(name=Task=1)/@0xed8b173 sb=Rect(0, 0 - 1920, 1080) eb=Rect(0, 0 - 1920, 1080) d=0}]}
+07-25 21:17:13.864   878   919 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@840233a animAttr=0x13 type=OPEN isEntrance=false
+07-25 21:17:13.865   878   919 V WindowManagerShell: loadAnimation: anim=android.view.animation.AnimationSet@37d3906 animAttr=0x12 type=OPEN isEntrance=true
+07-25 21:17:13.866   878   919 V WindowManagerShell:  animated by com.android.wm.shell.transition.DefaultTransitionHandler@66e5a7f
+07-25 21:17:13.869  2618  2618 I ahrain.g0mobile: Using CollectorTypeCC GC.
+07-25 21:17:13.870  2618  2618 W ahrain.g0mobile: Unexpected CPU variant for x86: x86_64.
+07-25 21:17:13.870  2618  2618 W ahrain.g0mobile: Known variants: atom, sandybridge, silvermont, goldmont, goldmont-plus, tremont, kabylake, default
+07-25 21:17:13.891  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents
+07-25 21:17:13.892   878   949 D EGL_emulation: app_time_stats: avg=246.34ms min=2.72ms max=3208.69ms count=14
+07-25 21:17:13.896   423   441 I adbd    : jdwp connection from 2618
+07-25 21:17:13.900   878   949 D EGL_emulation: app_time_stats: avg=3151.70ms min=406.97ms max=5896.43ms count=2
+07-25 21:17:13.903  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents
+07-25 21:17:13.937  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.providers.media.documents/root
+07-25 21:17:13.956  2618  2618 D CompatibilityChangeReporter: Compat change id reported: 171979766; UID 10141; state: ENABLED
+07-25 21:17:13.960  2618  2618 D CompatibilityChangeReporter: Compat change id reported: 242716250; UID 10141; state: ENABLED
+07-25 21:17:13.975   536   551 D CompatibilityChangeReporter: Compat change id reported: 170503758; UID 10141; state: ENABLED
+07-25 21:17:13.978  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents
+07-25 21:17:13.979  2618  2618 W ziparchive: Unable to open '/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.dm': No such file or directory
+07-25 21:17:13.982  2618  2618 W ziparchive: Unable to open '/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.dm': No such file or directory
+07-25 21:17:14.050  2618  2618 D nativeloader: Configuring clns-6 for other apk /data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/lib/x86_64:/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.apk!/lib/x86_64, permitted_path=/data:/mnt/expand:/data/user/0/com.brickbahrain.g0mobile
+07-25 21:17:14.065  2618  2618 V GraphicsEnvironment: Currently set values for:
+07-25 21:17:14.065  2618  2618 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+07-25 21:17:14.065  2618  2618 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+07-25 21:17:14.065  2618  2618 V GraphicsEnvironment: ANGLE GameManagerService for com.brickbahrain.g0mobile: false
+07-25 21:17:14.065  2618  2618 V GraphicsEnvironment: com.brickbahrain.g0mobile is not listed in per-application setting
+07-25 21:17:14.065  2618  2618 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+07-25 21:17:14.098   536   947 I ActivityManager: Flag disabled. Ignoring finishAttachApplication from uid: 10141. pid: 2618
+07-25 21:17:14.104  2618  2650 D libEGL  : loaded /vendor/lib64/egl/libEGL_emulation.so
+07-25 21:17:14.106  2618  2650 D libEGL  : loaded /vendor/lib64/egl/libGLESv1_CM_emulation.so
+07-25 21:17:14.110  2618  2650 D libEGL  : loaded /vendor/lib64/egl/libGLESv2_emulation.so
+07-25 21:17:14.162   878   919 V WindowManagerShell: Transition animation finished (aborted=false), notifying core (#8)android.os.BinderProxy@2a03d94@0
+07-25 21:17:14.163   536   555 V WindowManager: Finish Transition #8: created at 07-25 21:17:13.727 collect-started=0.042ms request-sent=4.134ms started=5.977ms ready=133.711ms sent=135.328ms finished=435.147ms
+07-25 21:17:14.167   878   919 V WindowManagerShell: Track 0 became idle
+07-25 21:17:14.167   878   919 V WindowManagerShell: All active transition animations finished
+07-25 21:17:14.185  2618  2618 V GodotActivity: Creating new Godot fragment instance.
+07-25 21:17:14.220  2618  2618 V Godot   : OnCreate: GodotFragment{630b403} (a9f708e8-22d7-476c-bdb2-5efd4a2f5c07 id=0x7f070033)
+07-25 21:17:14.220  2618  2618 V Godot   : Initializing Godot plugin registry
+07-25 21:17:14.225  2618  2618 V Godot   : OnInitNativeLayer: GodotFragment{630b403} (a9f708e8-22d7-476c-bdb2-5efd4a2f5c07 id=0x7f070033)
+07-25 21:17:14.230  2618  2618 V Godot   : Godot native layer initialization completed: true
+07-25 21:17:14.246  2618  2618 V Godot   : Godot native layer setup completed
+07-25 21:17:14.247  2618  2618 V Godot   : OnInitRenderView: GodotFragment{630b403} (a9f708e8-22d7-476c-bdb2-5efd4a2f5c07 id=0x7f070033)
+07-25 21:17:14.252  2618  2618 D CompatibilityChangeReporter: Compat change id reported: 210923482; UID 10141; state: ENABLED
+07-25 21:17:14.277  2618  2618 V Godot   : OnStart: GodotFragment{630b403} (a9f708e8-22d7-476c-bdb2-5efd4a2f5c07 id=0x7f070033)
+07-25 21:17:14.280  2618  2618 V Godot   : OnResume: GodotFragment{630b403} (a9f708e8-22d7-476c-bdb2-5efd4a2f5c07 id=0x7f070033)
+07-25 21:17:14.284  2618  2618 D CompatibilityChangeReporter: Compat change id reported: 237531167; UID 10141; state: DISABLED
+07-25 21:17:14.286  2618  2618 W OpenGLRenderer: Unknown dataspace 0
+07-25 21:17:14.287   536   947 W WindowManager: Failed looking up window session=Session{4c1225a 2618:u0a10141} callers=com.android.server.wm.WindowManagerService.windowForClientLocked:6034 com.android.server.wm.Session.updateRequestedVisibleTypes:690 android.view.IWindowSession$Stub.onTransact:1034 
+07-25 21:17:14.298   536   625 D ActivityManager: freezing 1611 com.android.carrierdefaultapp
+07-25 21:17:14.315   536   947 D CoreBackPreview: Window{ebd8981 u0 com.brickbahrain.g0mobile/com.godot.game.GodotApp}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.IOnBackInvokedCallback$Stub$Proxy@9f31667, mPriority=0, mIsAnimationCallback=false}
+07-25 21:17:14.319   411   501 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10141 pid=0
+07-25 21:17:14.319   411   424 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10141 pid=2618
+07-25 21:17:14.319   411   424 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10141 => denied (155 us)
+07-25 21:17:14.319   411   501 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10141 => denied (312 us)
+07-25 21:17:14.320   411   424 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10141 pid=2618
+07-25 21:17:14.320   411   424 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10141 => denied (50 us)
+07-25 21:17:14.320   411   501 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10141 pid=0
+07-25 21:17:14.320   411   501 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10141 => denied (85 us)
+07-25 21:17:14.320   411   424 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10141 pid=2618
+07-25 21:17:14.320   411   424 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10141 => denied (133 us)
+07-25 21:17:14.320   411   501 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10141 pid=0
+07-25 21:17:14.320   411   501 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10141 => denied (121 us)
+07-25 21:17:14.328  2618  2618 D AutofillManager: notifyViewEnteredForFillDialog:1073741824
+07-25 21:17:14.331  2618  2648 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-25 21:17:14.335  2618  2656 I godot   : Godot Engine v4.3.stable.official.77dcf97d8 - https://godotengine.org
+07-25 21:17:14.361   154   154 I hwservicemanager: getTransport: Cannot find entry android.hardware.graphics.mapper@4.0::IMapper/default in either framework or device VINTF manifest.
+07-25 21:17:14.361  2618  2648 I Gralloc4: mapper 4.x is not supported
+07-25 21:17:14.578     0     0 I servicemanager: Could not find android.hardware.graphics.allocator.IAllocator/default in the VINTF manifest.
+07-25 21:17:14.561  2618  2656 E platform: Failed to open rendernode: No such file or directory
+07-25 21:17:14.561  2618  2656 I androidemu: HealthMonitor enabled. Returning monitor.
+07-25 21:17:14.577   536   947 W ServiceManagerCppClient: Permission failure: android.permission.ROTATE_SURFACE_FLINGER from uid=10141 pid=0
+07-25 21:17:14.577   536   947 D PermissionCache: checking android.permission.ROTATE_SURFACE_FLINGER for uid=10141 => denied (170 us)
+07-25 21:17:14.577   536   947 W ServiceManagerCppClient: Permission failure: android.permission.INTERNAL_SYSTEM_WINDOW from uid=10141 pid=0
+07-25 21:17:14.577   536   947 D PermissionCache: checking android.permission.INTERNAL_SYSTEM_WINDOW for uid=10141 => denied (37 us)
+07-25 21:17:14.577   536   947 W ServiceManagerCppClient: Permission failure: android.permission.ACCESS_SURFACE_FLINGER from uid=10141 pid=0
+07-25 21:17:14.577   536   947 D PermissionCache: checking android.permission.ACCESS_SURFACE_FLINGER for uid=10141 => denied (29 us)
+07-25 21:17:14.580  2618  2656 D vulkan  : searching for layers in '/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/lib/x86_64'
+07-25 21:17:14.586  2618  2656 D vulkan  : searching for layers in '/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.apk!/lib/x86_64'
+07-25 21:17:14.590   536   555 W ziparchive: Unable to open '/data/app/~~CaYpsd6LOpKPv5ciq6STHw==/com.brickbahrain.g0mobile-yp8vuOxAIkwJEiD56mpAgQ==/base.dm': No such file or directory
+07-25 21:17:14.592   536   555 I ActivityTaskManager: Displayed com.brickbahrain.g0mobile/com.godot.game.GodotApp for user 0: +866ms
+07-25 21:17:14.631   536   947 D CompatibilityChangeReporter: Compat change id reported: 214016041; UID 10141; state: ENABLED
+07-25 21:17:14.631   536   947 I ImeTracker: com.brickbahrain.g0mobile:fead245d: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+07-25 21:17:14.632   536   947 I ImeTracker: com.brickbahrain.g0mobile:fead245d: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-25 21:17:14.654  1149  1188 I ImeTracker: com.android.launcher3:591dec6b: onRequestHide at ORIGIN_CLIENT_HIDE_SOFT_INPUT reason HIDE_SOFT_INPUT
+07-25 21:17:14.654  1149  1188 I ImeTracker: com.android.launcher3:591dec6b: onFailed at PHASE_CLIENT_VIEW_SERVED
+07-25 21:17:14.816   410   419 W GpuWork : Failed to attach bpf program to power/gpu_work_period tracepoint [2(No such file or directory)]
+07-25 21:17:14.942  2618  2656 I godot   : Vulkan 1.3.0 - Forward Mobile - Using Device #0: Unknown - SwiftShader Device (Subzero)
+07-25 21:17:14.952   878   949 D EGL_emulation: app_time_stats: avg=264.22ms min=16.78ms max=855.04ms count=4
+07-25 21:17:15.094   536   556 D CompatibilityChangeReporter: Compat change id reported: 168419799; UID 1000; state: DISABLED
+07-25 21:17:15.095   536   556 D CompatibilityChangeReporter: Compat change id reported: 273564678; UID 1000; state: DISABLED
+07-25 21:17:15.106   536   556 D CompatibilityChangeReporter: Compat change id reported: 210923482; UID 1000; state: ENABLED
+07-25 21:17:15.107   536   556 D CompatibilityChangeReporter: Compat change id reported: 161145287; UID 1000; state: ENABLED
+07-25 21:17:15.107   536   556 D CoreBackPreview: Window{99c6d75 u0 ImmersiveModeConfirmation}: Setting back callback OnBackInvokedCallbackInfo{mCallback=android.window.WindowOnBackInvokedDispatcher$OnBackInvokedCallbackWrapper@a069b6b, mPriority=0, mIsAnimationCallback=false}
+07-25 21:17:15.146   536  2683 W OpenGLRenderer: Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-25 21:17:15.364   536   556 W Looper  : Slow dispatch took 260ms android.ui h=android.view.Choreographer$FrameHandler c=android.view.Choreographer$FrameDisplayEventReceiver@9b90ce3 m=0
+07-25 21:17:15.364   536   556 W Looper  : Slow delivery took 267ms android.ui h=android.view.ViewRootImpl$ViewRootHandler c=null m=17
+07-25 21:17:15.392   878   928 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda17@15cc071
+07-25 21:17:15.393   536  1652 W InputManager-JNI: Input channel object 'e35dd25 Splash Screen com.brickbahrain.g0mobile (client)' was disposed without first being removed with the input manager!
+07-25 21:17:15.394   536  1673 D CoreBackPreview: Window{e35dd25 u0 Splash Screen com.brickbahrain.g0mobile EXITING}: Setting back callback null
+07-25 21:17:15.443   878   928 W FrameTracker: Missed App frame:UNKNOWN: 10, 4456, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.444   878   928 W FrameTracker: Missed SF frame:UNKNOWN: 10, 4456, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.444   878   928 W FrameTracker: Missing HWUI jank callback for vsyncId: 4456, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.444   878   928 W FrameTracker: Missed App frame:UNKNOWN: 74, 4471, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.444   878   928 W FrameTracker: Missed SF frame:UNKNOWN: 74, 4471, 0, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.444   878   928 W FrameTracker: Missing HWUI jank callback for vsyncId: 4471, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.444   878   928 W FrameTracker: Missing SF jank callback for vsyncId: 4507, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+07-25 21:17:15.446   878   922 V PerfettoTrigger: Not triggering com.android.telemetry.interaction-jank-monitor-39 - not enough time since last trigger
+07-25 21:17:15.687   536   556 W Looper  : Slow dispatch took 322ms android.ui h=android.view.Choreographer$FrameHandler c=android.view.Choreographer$FrameDisplayEventReceiver@9b90ce3 m=0
+07-25 21:17:15.722  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents
+07-25 21:17:15.727  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents
+07-25 21:17:15.792   536   556 D CompatibilityChangeReporter: Compat change id reported: 214016041; UID 1000; state: ENABLED
+07-25 21:17:15.792   536   556 I ImeTracker: android:961f2d0d: onRequestHide at ORIGIN_SERVER_HIDE_INPUT reason HIDE_UNSPECIFIED_WINDOW
+07-25 21:17:15.793   536   556 I ImeTracker: android:961f2d0d: onCancelled at PHASE_SERVER_SHOULD_HIDE
+07-25 21:17:15.795   536   625 D ActivityManager: freezing 1731 com.android.printspooler
+07-25 21:17:15.913   536   556 W Looper  : Slow dispatch took 114ms android.ui h=android.view.Choreographer$FrameHandler c=android.view.Choreographer$FrameDisplayEventReceiver@9b90ce3 m=0
+07-25 21:17:16.067   536   556 W Looper  : Drained
+07-25 21:17:16.175   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:16.735   536  2007 E TaskPersister: File error accessing recents directory (directory doesn't exist?).
+07-25 21:17:17.506  1106  1106 D CarrierSvcBindHelper: onPackageModified: com.android.statementservice
+07-25 21:17:17.507  1106  1106 D CarrierSvcBindHelper: No carrier app for: 0
+07-25 21:17:17.510   885   975 I PermissionControllerServiceImpl: Updating user sensitive for uid 10058
+07-25 21:17:17.511  1077  1077 V MediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+07-25 21:17:17.511  1077  1077 V MediaPlayerList: mPackageChangedBroadcastReceiver: action: android.intent.action.PACKAGE_CHANGED
+07-25 21:17:17.515   878   878 D ControlsListingControllerImpl: ServiceConfig reloaded, count: 0
+07-25 21:17:17.517   536   637 I InputReader: Reconfiguring input devices, changes=KEYBOARD_LAYOUTS
+07-25 21:17:17.523   536   566 W VoiceInteractionManager: no available voice recognition services found for user 0
+07-25 21:17:17.526  1106  1369 D ImsResolver: maybeAddedImsService, packageName: com.android.statementservice
+07-25 21:17:17.531   878   945 D StylusManager: Stylus InputDevice changed: 14 virtio_input_multi_touch_11
+07-25 21:17:17.534   878   945 D StylusManager: Stylus InputDevice changed: 13 virtio_input_multi_touch_10
+07-25 21:17:17.535   878   945 D StylusManager: Stylus InputDevice changed: 12 virtio_input_multi_touch_9
+07-25 21:17:17.535   878   945 D StylusManager: Stylus InputDevice changed: 8 virtio_input_multi_touch_5
+07-25 21:17:17.535   878   945 D StylusManager: Stylus InputDevice changed: 9 virtio_input_multi_touch_6
+07-25 21:17:17.535   878   945 D StylusManager: Stylus InputDevice changed: 11 virtio_input_multi_touch_8
+07-25 21:17:17.536   878   945 D StylusManager: Stylus InputDevice changed: 10 virtio_input_multi_touch_7
+07-25 21:17:17.536   878   945 D StylusManager: Stylus InputDevice changed: 7 virtio_input_multi_touch_4
+07-25 21:17:17.536   878   945 D StylusManager: Stylus InputDevice changed: 6 virtio_input_multi_touch_3
+07-25 21:17:17.537   878   945 D StylusManager: Stylus InputDevice changed: 4 virtio_input_multi_touch_1
+07-25 21:17:17.537   878   945 D StylusManager: Stylus InputDevice changed: 5 virtio_input_multi_touch_2
+07-25 21:17:17.775   536   557 I DropBoxManagerService: add tag=system_app_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:17.814   536   870 W OverlayManager: service 'idmap' died
+07-25 21:17:18.031     0     0 I init    : Sending signal 9 to service 'idmap2d' (pid 452) process group...
+07-25 21:17:18.037     0     0 I libprocessgroup: Successfully killed process cgroup uid 1000 pid 452 in 5ms
+07-25 21:17:18.039     0     0 I init    : Control message: Processed ctl.stop for 'idmap2d' from pid: 536 (system_server)
+07-25 21:17:18.041     0     0 I init    : Service 'idmap2d' (pid 452) received signal 9
+07-25 21:17:17.833  2618  2656 D ahrain.g0mobile: PlayerBase::PlayerBase()
+07-25 21:17:17.833  2618  2656 D ahrain.g0mobile: TrackPlayerBase::TrackPlayerBase()
+07-25 21:17:17.834  2618  2656 I libOpenSLES: Emulating old channel mask behavior (ignoring positional mask 0x3, using default mask 0x3 based on channel count of 2)
+07-25 21:17:17.835   404   404 W AudioFlinger: createTrack_l(): mismatch between requested flags (00000104) and output flags (00000002)
+07-25 21:17:17.835   404   404 D AudioFlinger: Client defaulted notificationFrames to 882 for frameCount 4012
+07-25 21:17:17.837   404   404 D AF::TrackHandle: OpPlayAudio: track:55 usage:1 not muted
+07-25 21:17:17.840   536   820 D CompatibilityChangeReporter: Compat change id reported: 218533173; UID 1000; state: ENABLED
+07-25 21:17:17.841   404   404 D audioserver: FGS Logger Transaction failed
+07-25 21:17:17.841   404   404 D audioserver: -129
+07-25 21:17:17.841  2618  2656 I godot   : 
+07-25 21:17:17.937   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(34)
+07-25 21:17:18.002   536   625 D ActivityManager: freezing 1989 com.android.quicksearchbox
+07-25 21:17:18.221  2618  2656 D goldfish_vulkan: ensureSyncDeviceFd: created sync device for current Vulkan process: 122
+07-25 21:17:19.100  2618  2656 V Godot   : OnGodotSetupCompleted
+07-25 21:17:19.176   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:19.318   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:17:19.455  2618  2656 I godot   : [AssetLoader] Loaded 14 buildings, 4 skyscrapers, 10 cars, 6 palms, 4 trees, 4 nature, 3 roads
+07-25 21:17:19.460  2618  2656 I godot   : AuthoritativeServer: server
+07-25 21:17:19.469  2618  2656 V Godot   : OnGodotMainLoopStarted
+07-25 21:17:19.616  1112  1131 W ndroid.settings: Cleared Reference was only reachable from finalizer (only reported once)
+07-25 21:17:20.130  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.providers.media.documents/root
+07-25 21:17:20.672   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:17:20.839   536   617 D OomAdjuster: Not killing cached processes
+07-25 21:17:20.974   536   552 D WifiNl80211Manager: Scan result ready event
+07-25 21:17:20.974   536   552 D WifiNative: Scan result ready event
+07-25 21:17:21.342   536   848 I SdkSandboxManager: Reconciling sdk data package directories for 0
+07-25 21:17:21.723  1482  1495 D StrictMode: StrictMode policy violation: android.os.strictmode.SqliteObjectLeakedViolation: Finalizing a Cursor that has not been deactivated or closed. database = /data/user/0/com.android.providers.contacts/databases/contacts2.db, table = raw_contacts, query = SELECT contacts_view._id AS _id, contacts_view.display_name AS display_name, contacts_view.photo_thumb_uri AS photo_thumb_uri, data1 AS number, data2 AS type, data3 AS label, contacts_view.lookup AS lookup FROM raw_contacts JOIN view_contacts as contacts_view ON (contacts_view._id = raw_contacts.contact_id) JOIN (SELECT data_id,normalized_number FROM phone_lookup WHERE (phone_lookup.min_match = '7654321')) AS lookup ON lookup.data_id=data._id JOIN data ON data.raw_contact_id=raw_contacts._id WHERE (PHONE_NUMBERS_EQUAL(data.data1, '+15551234567', 0, 7)) ORDER BY  length(lookup.normalized_number) DESC
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at android.os.StrictMode.onSqliteObjectLeaked(StrictMode.java:2222)
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at android.database.sqlite.SQLiteCursor.finalize(SQLiteCursor.java:282)
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at java.lang.Daemons$FinalizerDaemon.doFinalize(Daemons.java:339)
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at java.lang.Daemons$FinalizerDaemon.processReference(Daemons.java:324)
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:300)
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at java.lang.Daemons$Daemon.run(Daemons.java:145)
+07-25 21:17:21.723  1482  1495 D StrictMode: 	at java.lang.Thread.run(Thread.java:1012)
+07-25 21:17:21.724  1482  1495 D StrictMode: StrictMode policy violation: android.os.strictmode.LeakedClosableViolation: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.os.StrictMode$AndroidCloseGuardReporter.report(StrictMode.java:1994)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at dalvik.system.CloseGuard.warnIfOpen(CloseGuard.java:336)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.AbstractCursor.finalize(AbstractCursor.java:531)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.sqlite.SQLiteCursor.finalize(SQLiteCursor.java:291)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at java.lang.Daemons$FinalizerDaemon.doFinalize(Daemons.java:339)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at java.lang.Daemons$FinalizerDaemon.processReference(Daemons.java:324)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:300)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at java.lang.Daemons$Daemon.run(Daemons.java:145)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at java.lang.Thread.run(Thread.java:1012)
+07-25 21:17:21.724  1482  1495 D StrictMode: Caused by: java.lang.Throwable: Explicit termination method 'AbstractCursor.close' not called
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java:288)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at dalvik.system.CloseGuard.open(CloseGuard.java:257)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.AbstractCursor.<init>(AbstractCursor.java:227)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.AbstractWindowedCursor.<init>(AbstractWindowedCursor.java:39)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.sqlite.SQLiteCursor.<init>(SQLiteCursor.java:98)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.sqlite.SQLiteDirectCursorDriver.query(SQLiteDirectCursorDriver.java:52)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.sqlite.SQLiteDatabase.rawQueryWithFactory(SQLiteDatabase.java:1714)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.database.sqlite.SQLiteQueryBuilder.query(SQLiteQueryBuilder.java:592)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.doQuery(ContactsProvider2.java:7543)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryLocal(ContactsProvider2.java:7249)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryCorpLookupIfNecessary(ContactsProvider2.java:7728)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryLookupEnterprise(ContactsProvider2.java:7867)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryPhoneLookupEnterprise(ContactsProvider2.java:7838)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryLocal(ContactsProvider2.java:7172)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryDirectoryIfNecessary(ContactsProvider2.java:5883)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.queryInternal(ContactsProvider2.java:5728)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at com.android.providers.contacts.ContactsProvider2.query(ContactsProvider2.java:5673)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.content.ContentProvider.query(ContentProvider.java:1692)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.content.ContentProvider$Transport.query(ContentProvider.java:292)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.content.ContentProviderNative.onTransact(ContentProviderNative.java:107)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.os.Binder.execTransactInternal(Binder.java:1344)
+07-25 21:17:21.724  1482  1495 D StrictMode: 	at android.os.Binder.execTransact(Binder.java:1275)
+07-25 21:17:22.178   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:23.222  2618  2656 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-25 21:17:23.222  2618  2656 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-25 21:17:23.232  2618  2656 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-25 21:17:23.232  2618  2656 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-25 21:17:23.240  2618  2656 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-25 21:17:23.240  2618  2656 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-25 21:17:23.249  2618  2656 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-25 21:17:23.249  2618  2656 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-25 21:17:23.256  2618  2656 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-25 21:17:23.256  2618  2656 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-25 21:17:23.264  2618  2656 E godot   : USER WARNING: Godot 3.x SpatialMaterial remapped parameter not found: metalness
+07-25 21:17:23.264  2618  2656 E godot   :    at: _set (scene/resources/material.cpp:3541)
+07-25 21:17:23.283  2618  2656 I godot   : BAHRAIN_BRICK_KARAK_MISSION_STARTED
+07-25 21:17:23.283  2618  2656 I godot   : BAHRAIN_BRICK_SOUQ_SLICE_READY assets=35 pedestrians=12 traffic=6
+07-25 21:17:23.284  2618  2656 I godot   : G0_ANDROID_RENDERER_READY renderer=mobile driver=vulkan gpu=SwiftShader Device (Subzero)
+07-25 21:17:23.421   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.421   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.422   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.422   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.422   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.422   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.423   536   557 I DropBoxManagerService: add tag=system_server_strictmode isTagEnabled=true flags=0x2
+07-25 21:17:23.446   536   625 D ActivityManager: freezing 1623 com.android.music
+07-25 21:17:23.446   536   625 D ActivityManager: freezing 1454 com.android.carrierconfig
+07-25 21:17:23.446   536   625 D ActivityManager: freezing 1722 com.android.sdksetup
+07-25 21:17:23.913   175  1010 I keystore2: system/security/keystore2/src/watchdog.rs:319 - Watchdog thread idle -> terminating. Have a great day.
+07-25 21:17:25.895   536   617 D OomAdjuster: Not killing cached processes
+07-25 21:17:26.608  1527  1542 W putmethod.latin: Cleared Reference was only reachable from finalizer (only reported once)
+07-25 21:17:28.591   536   625 D ActivityManager: freezing 1817 com.android.externalstorage
+07-25 21:17:29.298   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:17:30.678   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:17:30.891  1690  1690 I ProvidersCache: Updating roots due to change on user 0at content://com.android.externalstorage.documents/
+07-25 21:17:30.904  1690  2715 E IPCThreadState: Binder transaction failure: 123259/29202/0
+07-25 21:17:30.904  1690  2715 E JavaBinder: !!! FAILED BINDER TRANSACTION !!!  (parcel size = 316)
+07-25 21:17:30.904  1690  2715 I ActivityThread: Removing dead content provider:android.content.ContentProviderProxy@65d2fe0
+07-25 21:17:31.118     0     0 I binder  : 2715:1690 dead process or thread
+07-25 21:17:31.120     0     0 I binder  : 1690:2715 transaction call to 1817:0 failed 123259/29202/0, size 316-16 line 3830
+07-25 21:17:30.910   536  2711 E IPCThreadState: Binder transaction failure: 123264/29202/0
+07-25 21:17:30.910   536  2711 I ActivityManager: Process com.android.externalstorage (pid 1817) early provider death
+07-25 21:17:30.911   536  2711 I ActivityManager: Process com.android.externalstorage (pid 1817) has died: cch+5 CEM 
+07-25 21:17:30.912   536  2711 D OomAdjuster: Not killing cached processes
+07-25 21:17:30.913  1690  2715 W ProvidersCache: Failed to load some roots from com.android.externalstorage.documents
+07-25 21:17:30.913  1690  2715 W ProvidersCache: android.os.DeadObjectException: Transaction failed on small parcel; remote process probably died, but this could also be caused by running out of binder buffer space
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at android.os.BinderProxy.transactNative(Native Method)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at android.os.BinderProxy.transact(BinderProxy.java:584)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at android.content.ContentProviderProxy.query(ContentProviderNative.java:493)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at android.content.ContentProviderClient.query(ContentProviderClient.java:196)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at android.content.ContentProviderClient.query(ContentProviderClient.java:178)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at android.content.ContentProviderClient.query(ContentProviderClient.java:168)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache.loadRootsForAuthority(ProvidersCache.java:365)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache.-$$Nest$mloadRootsForAuthority(ProvidersCache.java:0)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache$MultiProviderUpdateTask.handleDocumentsProvider(ProvidersCache.java:644)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache$MultiProviderUpdateTask.startSingleProviderUpdateTask(ProvidersCache.java:620)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache$MultiProviderUpdateTask.lambda$doInBackground$0(ProvidersCache.java:566)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache$MultiProviderUpdateTask.$r8$lambda$JoZYG_i4kbsZkEOv7jFikTYLS9c(ProvidersCache.java:0)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at com.android.documentsui.roots.ProvidersCache$MultiProviderUpdateTask$$ExternalSyntheticLambda0.run(R8$$SyntheticClass:0)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:487)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at java.util.concurrent.FutureTask.run(FutureTask.java:264)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1145)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:644)
+07-25 21:17:30.913  1690  2715 W ProvidersCache: 	at java.lang.Thread.run(Thread.java:1012)
+07-25 21:17:31.124     0     0 I binder  : 2711:536 dead process or thread
+07-25 21:17:31.125     0     0 I binder  : 536:2711 transaction call to 1817:0 failed 123264/29202/0, size 0-0 line 3830
+07-25 21:17:30.919   536   556 D DisplayManagerService: Drop pending events for gone uid 10070
+07-25 21:17:30.922   536   569 I libprocessgroup: Successfully killed process cgroup uid 10070 pid 1817 in 10ms
+07-25 21:17:30.940   536  1927 V ActivityManager: Got obituary of 1817:com.android.externalstorage
+07-25 21:17:30.941   349   349 I Zygote  : Process 1817 exited due to signal 9 (Killed)
+07-25 21:17:31.187   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:31.874   536   625 D ActivityManager: freezing 1690 com.android.documentsui
+07-25 21:17:31.924   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(5)
+07-25 21:17:33.770   536   625 D ActivityManager: freezing 2013 com.android.traceur
+07-25 21:17:34.045   536   625 D ActivityManager: freezing 1300 com.android.cellbroadcastreceiver.module
+07-25 21:17:34.089   536   625 D ActivityManager: freezing 1907 com.android.imsserviceentitlement
+07-25 21:17:34.194   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:34.266  1112  1112 D BatteryUsageBroadcastReceiver: onReceive:android.intent.action.BATTERY_LEVEL_CHANGED
+07-25 21:17:34.267  1112  1112 D BatteryUsageBroadcastReceiver: fetch data because of event: ACTION_BATTERY_LEVEL_CHANGED
+07-25 21:17:34.269  1112  1112 D BatteryUsageBroadcastReceiver: cancel sendBroadcastToFetchUsageData when broadcastDelay is 2339994ms.
+07-25 21:17:34.380   536   625 D ActivityManager: freezing 2060 com.android.calendar
+07-25 21:17:34.439   536   625 D ActivityManager: freezing 2092 com.android.camera2
+07-25 21:17:34.691   536   625 D ActivityManager: freezing 1939 com.android.providers.calendar
+07-25 21:17:34.732   536   625 D ActivityManager: freezing 2140 com.android.contacts
+07-25 21:17:35.519   536   625 D ActivityManager: freezing 2264 com.android.dynsystem:dynsystem
+07-25 21:17:35.519   536   625 D ActivityManager: freezing 2178 com.android.dynsystem
+07-25 21:17:35.521   536   625 D ActivityManager: freezing 2120 com.android.localtransport
+07-25 21:17:35.521   536   625 D ActivityManager: freezing 1342 com.android.cellbroadcastreceiver
+07-25 21:17:35.521   536   625 D ActivityManager: freezing 1774 com.android.keychain
+07-25 21:17:35.751   536   625 D ActivityManager: freezing 2282 com.android.messaging
+07-25 21:17:36.083   536   625 D ActivityManager: freezing 2348 com.android.rkpdapp
+07-25 21:17:37.238   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:17:37.259   536   625 D ActivityManager: freezing 2418 com.android.statementservice
+07-25 21:17:40.204   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:40.353   536   809 D ConnectivityService: handleLingerComplete for [100 CELLULAR]
+07-25 21:17:40.353   536   809 I ConnectivityService: Update capabilities for net 100 : -FOREGROUND
+07-25 21:17:40.355   348   382 I Netd    : Destroyed 1 sockets for netId 100 permission=1 in 2046us
+07-25 21:17:40.364   348   382 I netd    : networkSetPermissionForNetwork(100, 1) <10.58ms>
+07-25 21:17:40.584   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(6)
+07-25 21:17:40.682   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:17:40.792   536   625 D ActivityManager: freezing 885 com.android.permissioncontroller
+07-25 21:17:40.915   536   625 D ActivityManager: freezing 1482 android.process.acore
+07-25 21:17:40.916   536   625 D ActivityManager: freezing 1879 android.process.media
+07-25 21:17:40.986   536   795 D WifiNl80211Manager: Scan result ready event
+07-25 21:17:40.986   536   795 D WifiNative: Scan result ready event
+07-25 21:17:43.214   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:44.277   536   625 D ActivityManager: freezing 1112 com.android.settings
+07-25 21:17:44.674     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+07-25 21:17:44.540   536   802 E WifiHealthMonitor:  Hit PackageManager exception
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: android.content.pm.PackageManager$NameNotFoundException: No module info for package: com.android.wifi
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.app.ApplicationPackageManager.getModuleInfo(ApplicationPackageManager.java:1190)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.getWifiStackVersion(WifiHealthMonitor.java:367)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.extractCurrentSoftwareBuildInfo(WifiHealthMonitor.java:588)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.postBootSwBuildCheck(WifiHealthMonitor.java:523)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.postBootDetectionHandler(WifiHealthMonitor.java:514)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor.-$$Nest$mpostBootDetectionHandler(WifiHealthMonitor.java:0)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.WifiHealthMonitor$2.onAlarm(WifiHealthMonitor.java:190)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.app.AlarmManager$ListenerWrapper.run(AlarmManager.java:375)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.os.Handler.handleCallback(Handler.java:958)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.os.Handler.dispatchMessage(Handler.java:99)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at com.android.server.wifi.RunnerHandler.dispatchMessage(RunnerHandler.java:122)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.os.Looper.loopOnce(Looper.java:205)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.os.Looper.loop(Looper.java:294)
+07-25 21:17:44.540   536   802 E WifiHealthMonitor: 	at android.os.HandlerThread.run(HandlerThread.java:67)
+07-25 21:17:46.217   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:46.883   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(7)
+07-25 21:17:47.517   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:17:49.218   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:17:49.270   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:17:50.680   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:17:50.694   878   949 D EGL_emulation: app_time_stats: avg=11910.03ms min=2.67ms max=35307.66ms count=3
+07-25 21:17:56.176   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:17:56.583   536   862 D ActivityManager: sync unfroze 885 com.android.permissioncontroller for 6
+07-25 21:17:56.583   536   862 D OomAdjuster: Not killing cached processes
+07-25 21:17:56.595   885   908 I PermissionControllerServiceImpl: Updating user sensitive for user 0
+07-25 21:17:57.205   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:18:00.057   878   949 D EGL_emulation: app_time_stats: avg=9363.25ms min=9363.25ms max=9363.25ms count=1
+07-25 21:18:00.677   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:18:00.687   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(2)
+07-25 21:18:01.356   536  1652 W BatteryExternalStatsWorker: error reading Bluetooth stats: 11
+07-25 21:18:05.143   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:18:06.650   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(3)
+07-25 21:18:06.801   536   862 D OomAdjuster: Not killing cached processes
+07-25 21:18:10.676   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:18:12.451   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:13.077   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:18:16.288   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:18:16.869   536   625 D ActivityManager: freezing 885 com.android.permissioncontroller
+07-25 21:18:17.841   536   567 D OomAdjuster: Not killing cached processes
+07-25 21:18:17.841   536   567 D ActivityManager: sync unfroze 1112 com.android.settings for 10
+07-25 21:18:17.841   536   567 D ActivityManager: sync unfroze 2264 com.android.dynsystem:dynsystem for 10
+07-25 21:18:17.841   536   567 D ActivityManager: sync unfroze 2178 com.android.dynsystem for 10
+07-25 21:18:17.841   536   567 D ActivityManager: sync unfroze 2120 com.android.localtransport for 10
+07-25 21:18:17.845   536   567 D ActivityManager: sync unfroze 1774 com.android.keychain for 10
+07-25 21:18:17.894   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:18.603   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:19.302   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:18:20.680   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:18:20.690   878   949 D EGL_emulation: app_time_stats: avg=20632.38ms min=20632.38ms max=20632.38ms count=1
+07-25 21:18:20.998   536  1682 D WifiNl80211Manager: Scan result ready event
+07-25 21:18:20.998   536  1682 D WifiNative: Scan result ready event
+07-25 21:18:21.223   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:22.308   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:18:23.306   348  2492 W resolv  : SSL_connect ssl error =5, mark 0xf0065: Connection refused
+07-25 21:18:23.306   348  2492 W resolv  : TLS Handshake failed
+07-25 21:18:23.307   348  2492 W resolv  : query failed
+07-25 21:18:23.307   348  2492 W resolv  : validateDnsTlsServer returned 0 for 10.0.2.3
+07-25 21:18:23.307   348  2492 W resolv  : Validation failed
+07-25 21:18:25.322   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:18:26.119   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(5)
+07-25 21:18:27.850   536   617 D OomAdjuster: Not killing cached processes
+07-25 21:18:28.326   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:18:29.206   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:18:29.225   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(2)
+07-25 21:18:30.680   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:18:32.103   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(6)
+07-25 21:18:36.568   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(2)
+07-25 21:18:36.908   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:37.145   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:18:37.899   536   625 D ActivityManager: freezing 1112 com.android.settings
+07-25 21:18:37.899   536   625 D ActivityManager: freezing 2264 com.android.dynsystem:dynsystem
+07-25 21:18:37.900   536   625 D ActivityManager: freezing 2178 com.android.dynsystem
+07-25 21:18:37.900   536   625 D ActivityManager: freezing 2120 com.android.localtransport
+07-25 21:18:37.900   536   625 D ActivityManager: freezing 1774 com.android.keychain
+07-25 21:18:40.040   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:40.690   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:18:44.676     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+07-25 21:18:45.333   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:18:50.678   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:18:51.781   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:18:53.268   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:00.039   878   949 D EGL_emulation: app_time_stats: avg=39349.39ms min=39349.39ms max=39349.39ms count=1
+07-25 21:19:00.684   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:19:01.209   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:01.524   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(14)
+07-25 21:19:05.151   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:19:08.709   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:19:09.138   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:10.684   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:19:17.330   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:20.678   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:19:22.443   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:19:24.825   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(4)
+07-25 21:19:25.267   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:25.451   878   878 D StatusBarIconController: ignoring old pipeline callback because the new wifi icon is enabled
+07-25 21:19:30.682   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:19:33.211   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:35.773   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(2)
+07-25 21:19:40.684   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:19:41.002   536  1652 D WifiNl80211Manager: Scan result ready event
+07-25 21:19:41.002   536  1652 D WifiNative: Scan result ready event
+07-25 21:19:44.675     0     0 W healthd : battery l=100 v=5000 t=25.0 h=2 st=2 c=900000 fc=3000000 cc=10 chg=a
+07-25 21:19:44.523   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(2)
+07-25 21:19:49.334   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:19:50.684   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:19:57.271   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:20:00.064   878   949 D EGL_emulation: app_time_stats: avg=60024.59ms min=60024.59ms max=60024.59ms count=1
+07-25 21:20:00.683   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:20:02.975   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(12)
+07-25 21:20:05.205   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:20:10.679   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:20:13.142   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 
+07-25 21:20:16.460   404   508 D AudioFlinger: mixer(0x718ad8d18930) throttle end: throttle time(1)
+07-25 21:20:20.685   878   878 D StatusBarIconController: ignoring old pipeline callbacks, because the new mobile icons are enabled
+07-25 21:20:21.331   866   866 I wpa_supplicant: wlan0: CTRL-EVENT-BEACON-LOSS 

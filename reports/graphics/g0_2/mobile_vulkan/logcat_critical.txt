@@ -1,0 +1,1 @@
+NOT_CAPTURED: candidate stopped before the critical-log-scan state; no absence-of-errors claim is made.

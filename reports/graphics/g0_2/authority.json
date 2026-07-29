@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "stage": "BAHRAIN BRICK — STAGE G0.2",
+  "title": "ANDROID PAIRED-RENDERER FUNCTIONAL QUALIFICATION",
+  "repository": "MuhamedZanabal/brick-bahrain-open-world",
+  "branch": "work/bahrain-brick-graphics-g0-2-android-renderer-qualification",
+  "parent_g0_1_head": "d89d3e22e25bba8c266219dcca3cfd223e658b7b",
+  "renderer_evidence_source_commit": "6ade72ed02084791128dcf4a91223e695d802c15",
+  "frozen_pr": 59,
+  "frozen_head": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+  "source_artifact_id": 8586122615,
+  "source_artifact_digest": "sha256:4d4d3a696f4a326c3ddd63d1f51c278263fc25e6f2e00f68c0c3b64fb3c2e9ee",
+  "apk_variants": [
+    {
+      "key": "gl_compatibility",
+      "renderer": "gl_compatibility",
+      "package_id": "com.brickbahrain.g0gl",
+      "filename": "bahrain-brick-g0-gl-compatibility-x86_64.apk",
+      "artifact_member": "tier-b/apks/bahrain-brick-g0-gl-compatibility-x86_64.apk",
+      "sha256": "8461e9916b5636a35dd921d674529013b7b4623b3504f2332a9d7b4ac064b7eb"
+    },
+    {
+      "key": "mobile_vulkan",
+      "renderer": "mobile",
+      "package_id": "com.brickbahrain.g0mobile",
+      "filename": "bahrain-brick-g0-mobile-vulkan-x86_64.apk",
+      "artifact_member": "tier-b/apks/bahrain-brick-g0-mobile-vulkan-x86_64.apk",
+      "sha256": "0b33ba62c48ac14f1d5c331c98d1a318de427ad0b6c2dd247af327f5f1bd3a02"
+    }
+  ],
+  "state_order": [
+    "PACKAGE_VERIFIED",
+    "LAUNCHER_RESOLVED",
+    "LOG_CAPTURE_STARTED",
+    "ACTIVITY_START_REQUESTED",
+    "PROCESS_CREATED",
+    "WINDOW_VISIBLE",
+    "GODOT_STARTED",
+    "RENDERER_IDENTIFIED",
+    "MISSION_STARTED",
+    "SCENE_READY",
+    "CAPTURE_FRAME_REACHED",
+    "SCREENSHOT_CAPTURED",
+    "PAUSE_RESUME_PASSED",
+    "CRITICAL_LOG_SCAN_PASSED",
+    "EVIDENCE_FINALIZED"
+  ],
+  "emulator": {
+    "api_level": 34,
+    "system_image": "system-images;android-34;default;x86_64",
+    "abi": "x86_64",
+    "device_profile": "pixel_6",
+    "ram_mb": 4096,
+    "cores": 4,
+    "gpu_mode": "swiftshader",
+    "resolution": "1920x1080",
+    "density": 420
+  },
+  "performance_label": "DIAGNOSTIC_ONLY_NOT_PHYSICAL_DEVICE_ACCEPTANCE",
+  "renderer_defaults_may_change": false,
+  "g1_authorized": false
+}

@@ -1,0 +1,14 @@
+name: Cancel Duplicate G0.2 Android Run — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'Duplicate cancellation completed in run 30175548334. No further cancellation is required.'

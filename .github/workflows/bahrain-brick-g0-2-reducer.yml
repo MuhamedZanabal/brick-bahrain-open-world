@@ -1,0 +1,14 @@
+name: Bahrain Brick G0.2 Evidence Reducer and Finalizer Replay — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    if: false
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'Reduction completed in run 30175596770. Do not rerun Android or reduction.'

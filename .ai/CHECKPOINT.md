@@ -1,32 +1,33 @@
-# Bahrain Brick Graphics — G0.1 Checkpoint
+# Bahrain Brick Graphics — G0.2 Checkpoint
 
-Recorded: 2026-07-24
+Recorded: 2026-07-25
 
 ## Terminal state
 
-- Stage: **BAHRAIN BRICK — STAGE G0.1**
-- Classification: `G0_1_CAUSE_NOT_PROVEN`
-- Exact APK reused without rebuild: yes
-- Package installation: passed
-- Launcher resolution: passed
-- Explicit `am start -W -S`: `Status: ok`
-- Process remained alive: yes
-- Window became visible: yes
-- Java/native/linker crash: not detected
-- Corrective implementation: not performed
-- Renderer defaults: unchanged
+- Stage: **BAHRAIN BRICK — STAGE G0.2**
+- Outcome: `G0_2_ANDROID_NEITHER_RENDERER_FUNCTIONAL`
+- GL Compatibility: `ANDROID_CRITICAL_RUNTIME_FAILURE`
+- Mobile Vulkan: `ANDROID_SCENE_READINESS_FAILURE`
+- Shared imported-state equivalence: passed
+- Renderer selected: no
+- Renderer defaults changed: no
+- Physical-device tests: not executed
+- Graphics gate: `G0_EVIDENCE_INSUFFICIENT`
 - G1: unauthorized
+
+## Decisive evidence
+
+GL completed launch, rendering, scene, capture, screenshot, liveness, and lifecycle, but emitted 45 renderer-blocking GLES3 program-link failures. Mobile completed launch, process, visible window, Vulkan identity, mission, and scene readiness, but did not reach warm-up frame 180 or capture frame 300 before the bounded timeout.
 
 ## Evidence authority
 
-- Android run: `30126561161`
-- Raw artifact: `8609540209`
-- Reducer run: `30126886903`
-- Reduced artifact: `8609597152`
-- Required reports: `reports/graphics/g0_1/`
+- Android run `30175169997`, job `89722664363`
+- Raw artifact `8624075667`
+- Reducer run `30175596770`, job `89723763711`
+- Reduced artifact `8624118896`
+- Reports: `reports/graphics/g0_2/`
+- Dual-device handoff: `reports/graphics/g0/device_handoff/` — generated, not executed
 
 ## Boundary
 
-The exact accepted APK starts and reaches the Godot renderer, mission, scene-readiness, capture, and live-evidence markers on the API 34 x86_64 emulator. The earlier Tier B no-process condition was not reproduced, so its transient cause is not proven.
-
-The smallest proposal is harness-only: resolve the launcher component, start logcat before launch, use `am start -W -S`, preserve ActivityManager process-start evidence, and poll PID plus visible-window state. Await separate authorization before implementing it.
+No renderer is selected. Renderer defaults and production paths remain unchanged. Named physical-device evidence is still required. Do not begin G1.
