@@ -1,6 +1,9 @@
 name: Temporary Bahrain Brick Playable Mobile Build
 
 on:
+  pull_request:
+    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
+    types: [synchronize]
   pull_request_target:
     types: [edited]
   workflow_dispatch:
