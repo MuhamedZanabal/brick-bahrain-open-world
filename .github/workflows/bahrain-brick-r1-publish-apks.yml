@@ -1,17 +1,173 @@
-name: Bahrain Brick R1 Publish Physical APKs — Archived
+name: Bahrain Brick Corrected Playable Mobile APK
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
+    types: [synchronize]
+    paths:
+      - .github/workflows/bahrain-brick-r1-publish-apks.yml
 
 permissions:
-  contents: read
+  contents: write
+  actions: read
+  issues: write
+
+concurrency:
+  group: bahrain-brick-corrected-playable-mobile-apk
+  cancel-in-progress: true
+
+env:
+  SOURCE_SHA: bf4502807d84388750db30aab6996a91a96fbd15
+  RELEASE_TAG: playable-mobile-corrected-r1-20260729
+  OUTPUT_ROOT: ${{ runner.temp }}/bahrain-brick-playable-mobile
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
-  archived:
+  build-and-publish:
+    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
     steps:
-      - name: Report archived publication
+      - name: Check whether corrected release already exists
+        id: release_gate
+        shell: bash
         run: |
-          echo 'R1 physical diagnostic APKs were already published from retained run 30385101264.'
-          echo 'Automatic republishing is archived to prevent diagnostic packages being mistaken for playable builds.'
-          exit 64
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish start or existing-release receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ '${{ steps.release_gate.outputs.exists }}' == 'true' ]]; then
+            BODY="PLAYABLE_BUILD_RESULT::${GITHUB_RUN_ID}::https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}::https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bahrain-brick-playable-mobile-arm64.apk"
+          else
+            BODY="PLAYABLE_BUILD_STARTED::${GITHUB_RUN_ID}::${SOURCE_SHA}"
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/issues/63/comments" -f body="$BODY" >/dev/null
+
+      - name: Check out exact corrected source
+        if: steps.release_gate.outputs.exists != 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Set up Java
+        if: steps.release_gate.outputs.exists != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        if: steps.release_gate.outputs.exists != 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Install export dependencies
+        if: steps.release_gate.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip
+          sdkmanager 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0'
+          test -f debug.keystore
+
+      - name: Prove corrected export contract
+        if: steps.release_gate.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/graphics/test_r1_playable_apk_export.py -v
+          python3 -m py_compile tools/graphics/patch_r1_playable_export.py
+          bash -n tools/graphics/export_r1_playable_mobile_apk.sh
+
+      - name: Export production-scene Mobile APK
+        if: steps.release_gate.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/graphics/export_r1_playable_mobile_apk.sh "$GITHUB_WORKSPACE" "$OUTPUT_ROOT"
+
+      - name: Verify package, production entry scene, signing, and checksum
+        if: steps.release_gate.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          APK="$OUTPUT_ROOT/bahrain-brick-playable-mobile-arm64.apk"
+          test -s "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee release/playable-apk-signing.txt
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" | tee release/playable-apk-badging.txt
+          grep -q "package: name='com.brickbahrain.playable.mobile'" release/playable-apk-badging.txt
+          unzip -p "$APK" assets/project.binary > release/project.binary
+          grep -a -q 'res://scenes/splash_screen.tscn' release/project.binary
+          if grep -a -q 'run/main_scene.*r1_renderer_runtime_debug' release/project.binary; then
+            echo 'Diagnostic main scene remains selected in corrected package.' >&2
+            exit 1
+          fi
+          cp "$APK" release/
+          sha256sum release/bahrain-brick-playable-mobile-arm64.apk | tee release/PLAYABLE_APK_SHA256SUMS.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os
+          apk = Path('release/bahrain-brick-playable-mobile-arm64.apk')
+          h = hashlib.sha256()
+          with apk.open('rb') as stream:
+              for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+                  h.update(chunk)
+          payload = {
+              'schema_version': 1,
+              'purpose': 'Playable Android package using the production splash and game scenes',
+              'source_commit': os.environ['SOURCE_SHA'],
+              'workflow_run_id': int(os.environ['GITHUB_RUN_ID']),
+              'engine': '4.3-stable',
+              'renderer': 'mobile',
+              'architecture': 'arm64-v8a',
+              'package': 'com.brickbahrain.playable.mobile',
+              'filename': apk.name,
+              'size_bytes': apk.stat().st_size,
+              'sha256': h.hexdigest(),
+              'production_main_scene': 'res://scenes/splash_screen.tscn',
+              'production_main_scene_preserved': True,
+              'diagnostic_main_scene_selected': False,
+              'diagnostic_evidence_camera_selected': False,
+              'debug_signed': True,
+          }
+          Path('release/PLAYABLE_APK_HANDOFF.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
+          PY
+
+      - name: Upload corrected APK artifact
+        if: steps.release_gate.outputs.exists != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-playable-mobile-arm64-${{ github.run_id }}
+          path: release/
+          retention-days: 30
+
+      - name: Publish corrected prerelease
+        if: steps.release_gate.outputs.exists != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            release/bahrain-brick-playable-mobile-arm64.apk \
+            release/PLAYABLE_APK_HANDOFF.json \
+            release/PLAYABLE_APK_SHA256SUMS.txt \
+            --target "$SOURCE_SHA" \
+            --title 'Bahrain Brick Corrected Playable Mobile APK' \
+            --notes 'Corrected ARM64 debug build. Uses the production splash/game scene and excludes the R1 diagnostic evidence camera.' \
+            --prerelease --repo "$GITHUB_REPOSITORY"
+          BODY="PLAYABLE_BUILD_RESULT::${GITHUB_RUN_ID}::https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}::https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bahrain-brick-playable-mobile-arm64.apk"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/63/comments" -f body="$BODY" >/dev/null
+
+      - name: Report sanitized build failure
+        if: failure()
+        shell: bash
+        run: |
+          BODY="PLAYABLE_BUILD_FAILED::${GITHUB_RUN_ID}::https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/63/comments" -f body="$BODY" >/dev/null || true
