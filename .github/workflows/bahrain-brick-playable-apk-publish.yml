@@ -1,9 +1,10 @@
 name: Bahrain Brick Corrected Playable APK Publish
 
 on:
-  push:
+  pull_request:
     branches:
-      - work/bahrain-brick-renderer-runtime-debugging-r1
+      - work/bahrain-brick-graphics-g0-2-android-renderer-qualification
+    types: [synchronize]
     paths:
       - tools/graphics/playable_apk_publish/PUBLISH
 
@@ -17,6 +18,7 @@ concurrency:
 
 jobs:
   publish:
+    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     env:
@@ -28,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
 
       - uses: actions/setup-java@v4
@@ -144,7 +146,7 @@ jobs:
             gh release upload "$RELEASE_TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
           else
             gh release create "$RELEASE_TAG" release/* \
-              --target "$GITHUB_SHA" \
+              --target "${{ github.event.pull_request.head.sha }}" \
               --title 'Bahrain Brick Corrected Playable Mobile APK' \
               --notes 'Corrected ARM64 QA build. Starts through the production splash/game scenes and does not select the R1 diagnostic evidence camera. Production renderer defaults remain unchanged; R1 physical-device qualification is still required.' \
               --prerelease \
