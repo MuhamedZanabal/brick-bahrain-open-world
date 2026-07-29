@@ -12,6 +12,7 @@ on:
 permissions:
   contents: write
   actions: read
+  issues: write
 
 concurrency:
   group: temporary-bahrain-brick-playable-mobile-build
@@ -34,10 +35,20 @@ jobs:
         run: |
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo 'exists=true' >> "$GITHUB_OUTPUT"
-            echo "Release $RELEASE_TAG already exists; this scheduled run is a no-op."
           else
             echo 'exists=false' >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Publish observable start or existing-release receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ '${{ steps.release_gate.outputs.exists }}' == 'true' ]]; then
+            BODY="PLAYABLE_BUILD_RESULT::${GITHUB_RUN_ID}::https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}::https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bahrain-brick-playable-mobile-arm64.apk"
+          else
+            BODY="PLAYABLE_BUILD_STARTED::${GITHUB_RUN_ID}::${SOURCE_SHA}"
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/issues/63/comments" -f body="$BODY" >/dev/null
 
       - name: Check out exact corrected source
         if: steps.release_gate.outputs.exists != 'true'
@@ -152,4 +163,12 @@ jobs:
             --title 'Bahrain Brick Corrected Playable Mobile APK' \
             --notes 'Corrected ARM64 debug build. Uses the production splash/game scene and excludes the R1 diagnostic evidence camera.' \
             --prerelease --repo "$GITHUB_REPOSITORY"
-          gh release view "$RELEASE_TAG" --json url,assets --repo "$GITHUB_REPOSITORY" | tee release/RELEASE.json
+          BODY="PLAYABLE_BUILD_RESULT::${GITHUB_RUN_ID}::https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}::https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/bahrain-brick-playable-mobile-arm64.apk"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/63/comments" -f body="$BODY" >/dev/null
+
+      - name: Report sanitized build failure
+        if: failure()
+        shell: bash
+        run: |
+          BODY="PLAYABLE_BUILD_FAILED::${GITHUB_RUN_ID}::https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/issues/63/comments" -f body="$BODY" >/dev/null || true
