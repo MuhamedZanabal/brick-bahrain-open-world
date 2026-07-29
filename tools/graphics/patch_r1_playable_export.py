@@ -13,6 +13,8 @@ OLD_MOBILE_APK = 'MOBILE_APK="$OUTPUT_ROOT/bahrain-brick-r1-physical-mobile-arm6
 NEW_MOBILE_APK = 'MOBILE_APK="$OUTPUT_ROOT/bahrain-brick-playable-mobile-arm64.apk"'
 OLD_PACKAGE = 'com.brickbahrain.r1physical.mobile'
 NEW_PACKAGE = 'com.brickbahrain.playable.mobile'
+OLD_GODOT_DISCOVERY = 'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' | head -1)"'
+NEW_GODOT_DISCOVERY = 'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' ! -name \'*.zip\' | head -1)"'
 
 
 def patch_exporter_text(text: str) -> str:
@@ -23,6 +25,8 @@ def patch_exporter_text(text: str) -> str:
         )
     if text.count(OLD_MOBILE_APK) != 1:
         raise ValueError("expected exactly one retained Mobile APK output declaration")
+    if text.count(OLD_GODOT_DISCOVERY) != 1:
+        raise ValueError("expected exactly one Godot binary discovery line")
     package_count = text.count(OLD_PACKAGE)
     if package_count < 2:
         raise ValueError(
@@ -32,6 +36,7 @@ def patch_exporter_text(text: str) -> str:
     patched = text.replace(DIAGNOSTIC_MAIN_SCENE_OVERRIDE, PRODUCTION_MAIN_SCENE_MARKER)
     patched = patched.replace(OLD_MOBILE_APK, NEW_MOBILE_APK)
     patched = patched.replace(OLD_PACKAGE, NEW_PACKAGE)
+    patched = patched.replace(OLD_GODOT_DISCOVERY, NEW_GODOT_DISCOVERY)
 
     if "r1_renderer_runtime_debug.tscn" in patched:
         raise ValueError("diagnostic main-scene override remains after playable patch")
@@ -39,6 +44,8 @@ def patch_exporter_text(text: str) -> str:
         raise ValueError("production-main-scene preservation marker count is incorrect")
     if OLD_PACKAGE in patched:
         raise ValueError("diagnostic Mobile package identity remains after playable patch")
+    if OLD_GODOT_DISCOVERY in patched or NEW_GODOT_DISCOVERY not in patched:
+        raise ValueError("Godot binary discovery was not hardened against ZIP selection")
     return patched
 
 
