@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import importlib.util
+import tempfile
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+MODULE_PATH = ROOT / "tools/graphics/apply_r1_gl_compatibility_fix.py"
+
+
+def load_module():
+    spec = importlib.util.spec_from_file_location("apply_r1_gl_compatibility_fix", MODULE_PATH)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("module unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class R1GLCompatibilityFixTest(unittest.TestCase):
+    def test_retains_least_restrictive_proven_cap_without_renderer_default_change(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            project = root / "project.godot"
+            report = root / "report.json"
+            project.write_text('[application]\nrun/main_scene="res://main.tscn"\n\n[rendering]\nrenderer/rendering_method="gl_compatibility"\n')
+            result = module.apply(project, report)
+            text = project.read_text()
+            self.assertEqual(text.count("limits/opengl/max_lights_per_object=7"), 1)
+            self.assertIn('renderer/rendering_method="gl_compatibility"', text)
+            self.assertEqual(result["before_value"], 8)
+            self.assertEqual(result["after_value"], 7)
+            self.assertEqual(result["defect"], "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW")
+            self.assertTrue(result["observed_in_unshaded_one_box_control"])
+            self.assertFalse(result["user_authored_shader_responsible"])
+            self.assertFalse(result["production_material_complexity_required"])
+            self.assertFalse(result["renderer_default_modified"])
+            self.assertEqual(result["android_before_link_failures"], 45)
+            self.assertEqual(result["android_after_link_failures"], 44)
+
+
+if __name__ == "__main__":
+    unittest.main()

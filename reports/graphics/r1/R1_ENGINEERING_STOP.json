@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "stage": "BAHRAIN BRICK — STAGE R1",
+  "title": "RENDERER RUNTIME DEBUGGING",
+  "state": "ENGINEERING_STOP",
+  "recorded_date": "2026-07-28",
+  "governing_gate": "G0_EVIDENCE_INSUFFICIENT",
+  "r1_exit_criteria_met": false,
+  "production_fix_authorized": false,
+  "renderer_selected": null,
+  "renderer_defaults_modified": false,
+  "g1_authorized": false,
+  "track_a_gl": {
+    "defect": "GL_COMPATIBILITY_ENGINE_GENERATED_FRAGMENT_UNIFORM_OVERFLOW",
+    "baseline_link_failures": 45,
+    "best_link_failures": 44,
+    "best_project_setting": "rendering/limits/opengl/max_lights_per_object=7",
+    "caps_6_5_4_link_failures": 44,
+    "engine_4_7_1_link_failures": 44,
+    "engine_4_7_1_uniform_overflow_count": 46,
+    "critical_runtime_error_count": 0,
+    "project_level_cap_range_exhausted": true,
+    "engine_upgrade_exit_criterion_met": false,
+    "exit_criterion_met": false,
+    "primary_evidence_run_id": 30208525378,
+    "primary_evidence_artifact_id": 8633929596
+  },
+  "track_b_mobile": {
+    "defect": "RENDER_PIPELINE_STALL",
+    "baseline_last_completed_frame": 90,
+    "render_disabled_control_last_completed_frame": 300,
+    "failed_correction_count": 5,
+    "corrections": [
+      {"experiment": "disable LateAfternoonSun shadow", "last_completed_frame": 80, "decision": "reverted"},
+      {"experiment": "directional shadow size 2048 to 1024", "last_completed_frame": 90, "decision": "reverted", "run_id": 30310393343, "artifact_id": 8670646110},
+      {"experiment": "LateAfternoonSun shadow distance 150 to 100", "last_completed_frame": 70, "decision": "reverted", "run_id": 30312058073, "artifact_id": 8671241285},
+      {"experiment": "Mobile QA render scale 1.0 to 0.75", "last_completed_frame": 90, "decision": "reverted", "run_id": 30313623186, "artifact_id": 8671766622},
+      {"experiment": "SouqWorldEnvironment filmic to linear tonemapper", "last_completed_frame": 70, "decision": "reverted", "run_id": 30370527664, "artifact_id": 8693475134}
+    ],
+    "engine_4_7_1_last_completed_frame": 0,
+    "engine_4_7_1_vulkan_queue_present_failure_count": 6,
+    "engine_4_7_1_classification": "ENGINE_4_7_1_VULKAN_QUEUE_PRESENT_STALL",
+    "engine_upgrade_exit_criterion_met": false,
+    "exit_criterion_met": false
+  },
+  "engine_comparison": {
+    "first_attempt": {"run_id": 30373598142, "artifact_id": 8694707194, "classification": "HARNESS_IMPORT_TIMEOUT", "adjudicative": false},
+    "adjudicative_attempt": {
+      "run_id": 30376596221,
+      "artifact_id": 8696886506,
+      "artifact_digest": "sha256:2398209b65bb8a38fa809b9d70b3ace95c362b522bdfdb87fc364c17243f33be",
+      "harness_complete": true,
+      "gl_link_failures": 44,
+      "mobile_last_completed_frame": 0,
+      "decision": "RETAIN_DIAGNOSTIC_EVIDENCE_REJECT_PRODUCTION_ENGINE_ADOPTION"
+    }
+  },
+  "stop_reason": "Five isolated Mobile corrections did not improve the frame-90 baseline. Godot 4.7.1 retained only a one-count GL diagnostic improvement while regressing Mobile to frame 0 with repeated Vulkan queue-present failures. Neither renderer meets R1 exit criteria.",
+  "emulator_side_experiment_boundary_exhausted": true,
+  "next_action": "Obtain named physical-device evidence and/or investigate the Godot/driver boundary upstream. Do not execute another emulator parameter tweak or engine-version experiment, select a renderer, change renderer defaults, apply a production engine upgrade, or begin G1."
+}

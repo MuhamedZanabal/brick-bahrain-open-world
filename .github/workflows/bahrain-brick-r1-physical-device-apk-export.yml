@@ -1,0 +1,17 @@
+name: Bahrain Brick R1 Physical Device APK Export — Archived
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  archived:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Report archived handoff
+        run: |
+          echo 'Physical-device APK export completed in run 30385101264.'
+          echo 'Artifacts 8699173399 (GL) and 8699178791 (Mobile) are the retained handoff.'
+          exit 64

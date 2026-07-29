@@ -1,0 +1,161 @@
+name: Bahrain Brick Corrected Playable APK Publish
+
+on:
+  pull_request:
+    branches:
+      - work/bahrain-brick-graphics-g0-2-android-renderer-qualification
+    types: [synchronize]
+    paths:
+      - tools/graphics/playable_apk_publish/PUBLISH
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: bahrain-brick-corrected-playable-apk-publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_URL: https://github.com/MuhamedZanabal/brick-bahrain-open-world/releases/download/r1-physical-apks-30385101264/bahrain-brick-r1-physical-mobile-arm64.apk
+      EXPECTED_SOURCE_SHA256: ec4ea74480cd36e25c2e146aac03abdfeb8ef0bb22b78a7b726b871fe8c4e787
+      EXPECTED_SIGNER_SHA256: cc4ee38aa6a7fc117a41a4550203bd8899864f42cb067a8780ad3638c05e6387
+      RELEASE_TAG: playable-mobile-corrected-r1
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android packaging tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager 'build-tools;34.0.0'
+          test -s debug.keystore
+
+      - name: Rewrite only the startup scene and remove stale signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work release
+          curl --fail --location --retry 5 --retry-all-errors "$SOURCE_URL" -o work/source.apk
+          echo "$EXPECTED_SOURCE_SHA256  work/source.apk" | sha256sum -c -
+          python3 -m py_compile tools/graphics/rewrite_playable_apk.py
+          python3 tools/graphics/rewrite_playable_apk.py work/source.apk work/unsigned.apk | tee release/PLAYABLE_APK_REWRITE.txt
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign" -f -p 4 work/unsigned.apk work/aligned.apk
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign" -c -p 4 work/aligned.apk
+
+      - name: Sign corrected APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" sign \
+            --ks debug.keystore \
+            --ks-key-alias androiddebugkey \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --v1-signing-enabled true \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out release/Bahrain-Brick-Playable-Mobile-Corrected.apk \
+            work/aligned.apk
+
+      - name: Verify scene, package identity, ZIP, and Android signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=release/Bahrain-Brick-Playable-Mobile-Corrected.apk
+          test -s "$APK"
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee release/PLAYABLE_APK_SIGNING.txt
+          set +e
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" 2>&1 | tee release/PLAYABLE_APK_BADGING.txt
+          aapt_status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$aapt_status" -ne 0 ]]; then
+            grep -q "failed to read attribute 'android:required': attribute is not an integer value" release/PLAYABLE_APK_BADGING.txt
+          fi
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign" -c -p 4 "$APK"
+          grep -q "package: name='com.brickbahrain.r1physical.mobile'" release/PLAYABLE_APK_BADGING.txt
+          grep -q 'Verified using v1 scheme (JAR signing): true' release/PLAYABLE_APK_SIGNING.txt
+          grep -q 'Verified using v2 scheme (APK Signature Scheme v2): true' release/PLAYABLE_APK_SIGNING.txt
+          grep -q "Signer #1 certificate SHA-256 digest: $EXPECTED_SIGNER_SHA256" release/PLAYABLE_APK_SIGNING.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, zipfile
+          apk = Path('release/Bahrain-Brick-Playable-Mobile-Corrected.apk')
+          with zipfile.ZipFile(apk) as archive:
+              bad = archive.testzip()
+              if bad is not None:
+                  raise SystemExit(f'ZIP integrity failed at {bad}')
+              project = archive.read('assets/project.binary')
+          production = b'res://scenes/splash_screen.tscn'
+          diagnostic = b'res://tests/graphics/r1_renderer_runtime_debug.tscn'
+          if project.count(production) != 1:
+              raise SystemExit('production splash scene is not selected exactly once')
+          if diagnostic in project:
+              raise SystemExit('diagnostic renderer scene remains selected')
+          digest = hashlib.sha256(apk.read_bytes()).hexdigest()
+          handoff = {
+              'schema_version': 1,
+              'purpose': 'Corrected playable Android QA package using the production splash and game scenes',
+              'source_commit': os.environ['GITHUB_SHA'],
+              'engine': 'Godot 4.3 stable retained base artifact',
+              'renderer': 'mobile',
+              'architecture': 'arm64-v8a',
+              'package': 'com.brickbahrain.r1physical.mobile',
+              'filename': apk.name,
+              'size_bytes': apk.stat().st_size,
+              'sha256': digest,
+              'signer_certificate_sha256': os.environ['EXPECTED_SIGNER_SHA256'],
+              'production_main_scene': 'res://scenes/splash_screen.tscn',
+              'production_main_scene_selected': True,
+              'diagnostic_main_scene_selected': False,
+              'diagnostic_evidence_camera_selected': False,
+              'v1_jar_signature_verified': True,
+              'v2_apk_signature_verified': True,
+              'zip_integrity': True,
+              'production_renderer_defaults_modified': False,
+              'production_fix_authorized': False,
+              'runtime_qualification_pending': True,
+          }
+          Path('release/PLAYABLE_APK_HANDOFF.json').write_text(json.dumps(handoff, indent=2, sort_keys=True) + '\n')
+          Path('release/PLAYABLE_APK_SHA256SUMS.txt').write_text(f'{digest}  {apk.name}\n')
+          print(json.dumps(handoff, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload retained workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-playable-mobile-corrected-${{ github.run_id }}
+          path: release/
+          retention-days: 30
+
+      - name: Publish stable prerelease URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release/* \
+              --target "${{ github.event.pull_request.head.sha }}" \
+              --title 'Bahrain Brick Corrected Playable Mobile APK' \
+              --notes 'Corrected ARM64 QA build. Starts through the production splash/game scenes and does not select the R1 diagnostic evidence camera. Production renderer defaults remain unchanged; R1 physical-device qualification is still required.' \
+              --prerelease \
+              --repo "$GITHUB_REPOSITORY"
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets | tee release/RELEASE.json
