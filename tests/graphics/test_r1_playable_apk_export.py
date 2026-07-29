@@ -30,6 +30,7 @@ class R1PlayableApkExportTest(unittest.TestCase):
             [
                 'MOBILE_APK="$OUTPUT_ROOT/bahrain-brick-r1-physical-mobile-arm64.apk"',
                 'MOBILE_PACKAGE="com.brickbahrain.r1physical.mobile"',
+                'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' | head -1)"',
                 diagnostic_override,
                 'project_text = replace_line(project_text, "renderer/rendering_method=", f\'renderer/rendering_method="{renderer}"\')',
                 diagnostic_override,
@@ -43,6 +44,7 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertNotIn("com.brickbahrain.r1physical.mobile", patched)
         self.assertIn("com.brickbahrain.playable.mobile", patched)
         self.assertIn("renderer/rendering_method=", patched)
+        self.assertIn("! -name '*.zip'", patched)
 
     def test_patch_rejects_unexpected_diagnostic_override_count(self) -> None:
         module = load_module()
