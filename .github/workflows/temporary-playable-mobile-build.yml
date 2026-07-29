@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - .github/workflows/temporary-playable-mobile-build.yml
+  pull_request:
+    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
+    types: [synchronize]
   pull_request_target:
     types: [edited]
   workflow_dispatch:
@@ -28,7 +31,6 @@ env:
 
 jobs:
   build-and-publish:
-    if: github.event_name != 'pull_request_target' || github.event.pull_request.number == 63
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
