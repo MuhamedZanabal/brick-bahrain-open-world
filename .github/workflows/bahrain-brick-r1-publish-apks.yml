@@ -1,79 +1,17 @@
-name: Bahrain Brick R1 Publish Physical APKs
+name: Bahrain Brick R1 Publish Physical APKs — Archived
 
 on:
-  pull_request:
-    branches: [work/bahrain-brick-graphics-g0-2-android-renderer-qualification]
-    types: [synchronize]
-    paths:
-      - .github/workflows/bahrain-brick-r1-publish-apks.yml
+  workflow_dispatch:
 
 permissions:
-  actions: read
-  contents: write
-
-concurrency:
-  group: bahrain-brick-r1-publish-physical-apks
-  cancel-in-progress: true
+  contents: read
 
 jobs:
-  publish:
-    if: github.head_ref == 'work/bahrain-brick-renderer-runtime-debugging-r1'
+  archived:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    env:
-      GH_TOKEN: ${{ github.token }}
-      SOURCE_RUN: '30385101264'
-      TAG: r1-physical-apks-30385101264
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-
-      - name: Download verified APK artifacts
-        shell: bash
+      - name: Report archived publication
         run: |
-          set -euo pipefail
-          mkdir -p release/mobile release/gl
-          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "bahrain-brick-r1-physical-mobile-arm64-$SOURCE_RUN" --dir release/mobile
-          gh run download "$SOURCE_RUN" --repo "$GITHUB_REPOSITORY" --name "bahrain-brick-r1-physical-gl-arm64-$SOURCE_RUN" --dir release/gl
-          test -s release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk
-          test -s release/gl/bahrain-brick-r1-physical-gl-arm64.apk
-          sha256sum release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk release/gl/bahrain-brick-r1-physical-gl-arm64.apk | tee release/APK_SHA256SUMS.txt
-
-      - name: Publish prerelease assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" \
-              release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk \
-              release/gl/bahrain-brick-r1-physical-gl-arm64.apk \
-              release/APK_SHA256SUMS.txt \
-              --clobber --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$TAG" \
-              release/mobile/bahrain-brick-r1-physical-mobile-arm64.apk \
-              release/gl/bahrain-brick-r1-physical-gl-arm64.apk \
-              release/APK_SHA256SUMS.txt \
-              --target "${{ github.event.pull_request.head.sha }}" \
-              --title 'Bahrain Brick R1 Physical Device APKs' \
-              --notes 'Diagnostic ARM64 builds for named physical-device and hosted renderer comparison. Production renderer defaults are unchanged.' \
-              --prerelease --repo "$GITHUB_REPOSITORY"
-          fi
-
-      - name: Verify public assets
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url,assets > release/release.json
-          python3 - <<'PY'
-          import json
-          data=json.load(open('release/release.json'))
-          names={a['name'] for a in data['assets']}
-          required={'bahrain-brick-r1-physical-mobile-arm64.apk','bahrain-brick-r1-physical-gl-arm64.apk','APK_SHA256SUMS.txt'}
-          missing=required-names
-          if missing:
-              raise SystemExit(f'missing release assets: {sorted(missing)}')
-          print(data['url'])
-          PY
+          echo 'R1 physical diagnostic APKs were already published from retained run 30385101264.'
+          echo 'Automatic republishing is archived to prevent diagnostic packages being mistaken for playable builds.'
+          exit 64
