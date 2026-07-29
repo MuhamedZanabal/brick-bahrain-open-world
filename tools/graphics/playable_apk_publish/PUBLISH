@@ -1,3 +1,4 @@
 publish corrected playable mobile APK
 source=retained-r1-mobile-artifact
 main_scene=res://scenes/splash_screen.tscn
+trigger=2026-07-29T14:38:00+03:00
