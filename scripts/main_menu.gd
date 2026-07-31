@@ -1,189 +1,317 @@
 extends Control
-## MainMenu - Title screen with game mode selection
-## Mobile-responsive: scales UI based on viewport size
-## Background now uses the official Zanabal Gaming splash artwork for visual consistency
-## with the splash screen and app icon, instead of a flat color.
+## Reference-matched Bahrain Brick main menu built from native responsive controls.
+
+var _dialog: AcceptDialog
 
 func _ready() -> void:
 	GameManager.current_state = GameManager.GameState.MENU
 	_build_ui()
 
-func _get_scale() -> float:
-	var vp := get_viewport().get_visible_rect().size
-	return clamp(min(vp.x / 1280.0, vp.y / 720.0) * 1.3, 0.6, 2.0)
-
 func _build_ui() -> void:
-	var vp := get_viewport().get_visible_rect().size
-	var s := _get_scale()
+	var background := TextureRect.new()
+	background.name = "WaterfrontBackground"
+	background.texture = load("res://assets/splash_screen.png")
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
+	move_child(background, 0)
 
-	# Full screen background — the actual Zanabal Gaming artwork, covering the whole screen
-	var bg_tex := TextureRect.new()
-	var tex := load("res://assets/splash_screen.png")
-	if tex:
-		bg_tex.texture = tex
-		bg_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		bg_tex.stretch_mode = TextureRect.STRETCH_SCALE
-	bg_tex.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg_tex)
+	var right_gradient := Gradient.new()
+	right_gradient.set_color(0, Color(0.01, 0.015, 0.025, 0.08))
+	right_gradient.set_color(1, Color(0.008, 0.012, 0.02, 0.9))
+	var right_texture := GradientTexture2D.new()
+	right_texture.gradient = right_gradient
+	right_texture.fill_from = Vector2(0.38, 0.5)
+	right_texture.fill_to = Vector2(1.0, 0.5)
+	var right_shade := TextureRect.new()
+	right_shade.texture = right_texture
+	right_shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	right_shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	right_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(right_shade)
 
-	# Dark gradient overlay (top lighter, bottom darker) so text/buttons stay readable
-	# over busy artwork — built from two stacked ColorRects for a cheap vertical gradient feel.
-	var overlay_top := ColorRect.new()
-	overlay_top.color = Color(0.05, 0.04, 0.03, 0.35)
-	overlay_top.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(overlay_top)
+	var bottom_gradient := Gradient.new()
+	bottom_gradient.set_color(0, Color(0.01, 0.015, 0.025, 0.0))
+	bottom_gradient.set_color(1, Color(0.005, 0.008, 0.014, 0.82))
+	var bottom_texture := GradientTexture2D.new()
+	bottom_texture.gradient = bottom_gradient
+	bottom_texture.fill_from = Vector2(0.5, 0.46)
+	bottom_texture.fill_to = Vector2(0.5, 1.0)
+	var bottom_shade := TextureRect.new()
+	bottom_shade.texture = bottom_texture
+	bottom_shade.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bottom_shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bottom_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bottom_shade)
 
-	var overlay_bottom := ColorRect.new()
-	overlay_bottom.color = Color(0.02, 0.02, 0.02, 0.55)
-	overlay_bottom.position = Vector2(0, vp.y * 0.42)
-	overlay_bottom.size = Vector2(vp.x, vp.y * 0.58)
-	add_child(overlay_bottom)
+	var safe_area := get_node_or_null("SafeArea") as MarginContainer
+	if safe_area == null:
+		safe_area = SafeAreaRoot.new()
+		safe_area.name = "SafeArea"
+		safe_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(safe_area)
 
-	# Small dragon crest logo (cropped app icon) above the title for brand consistency
-	var logo_tex := load("res://assets/app_icon.png")
-	if logo_tex:
-		var logo := TextureRect.new()
-		logo.texture = logo_tex
-		logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		var logo_size := 64 * s
-		logo.position = Vector2(vp.x / 2 - logo_size / 2, 10 * s)
-		logo.size = Vector2(logo_size, logo_size)
-		add_child(logo)
+	_build_hero_region(safe_area)
+	_build_menu_region(safe_area)
+	_build_profile_region(safe_area)
+	_build_footer_region(safe_area)
 
-	# Title
-	var title := Label.new()
-	title.text = "BRICK BAHRAIN"
-	title.add_theme_font_size_override("font_size", int(56 * s))
-	title.add_theme_color_override("font_color", Color(1.0, 0.8, 0.0))
-	title.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	title.add_theme_constant_override("outline_size", int(6 * s))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.position = Vector2(0, 78 * s)
-	title.size = Vector2(vp.x, 70 * s)
-	add_child(title)
+func _build_hero_region(parent: Control) -> void:
+	var hero := VBoxContainer.new()
+	hero.name = "HeroRegion"
+	hero.anchor_left = 0.045
+	hero.anchor_top = 0.08
+	hero.anchor_right = 0.58
+	hero.anchor_bottom = 0.62
+	hero.offset_left = 0
+	hero.offset_top = 0
+	hero.offset_right = 0
+	hero.offset_bottom = 0
+	hero.alignment = BoxContainer.ALIGNMENT_CENTER
+	hero.add_theme_constant_override("separation", 0)
+	parent.add_child(hero)
 
-	# Subtitle
+	var crest := TextureRect.new()
+	crest.texture = load("res://assets/app_icon.png")
+	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	crest.custom_minimum_size = Vector2(110, 110)
+	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hero.add_child(crest)
+
+	var bahrain := Label.new()
+	bahrain.text = "BAHRAIN"
+	bahrain.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	bahrain.add_theme_font_size_override("font_size", BahrainTheme.title_size(get_viewport_rect().size))
+	bahrain.add_theme_color_override("font_color", BahrainTheme.TEXT)
+	bahrain.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.96))
+	bahrain.add_theme_constant_override("outline_size", 11)
+	hero.add_child(bahrain)
+
+	var brick := Label.new()
+	brick.text = "BRICK"
+	brick.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	brick.add_theme_font_size_override("font_size", int(BahrainTheme.title_size(get_viewport_rect().size) * 0.9))
+	brick.add_theme_color_override("font_color", BahrainTheme.RED)
+	brick.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.96))
+	brick.add_theme_constant_override("outline_size", 11)
+	hero.add_child(brick)
+
+	var plaque := PanelContainer.new()
+	plaque.custom_minimum_size = Vector2(390, 54)
+	plaque.add_theme_stylebox_override("panel", BahrainTheme.panel_style(Color(0.018, 0.025, 0.036, 0.92), BahrainTheme.GOLD, 10))
+	hero.add_child(plaque)
 	var subtitle := Label.new()
-	subtitle.text = "Open World Sandbox"
-	subtitle.add_theme_font_size_override("font_size", int(22 * s))
-	subtitle.add_theme_color_override("font_color", Color(0.85, 0.85, 0.85))
-	subtitle.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	subtitle.add_theme_constant_override("outline_size", int(4 * s))
+	subtitle.text = "OPEN WORLD SANDBOX"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	subtitle.position = Vector2(0, 148 * s)
-	subtitle.size = Vector2(vp.x, 30 * s)
-	add_child(subtitle)
+	subtitle.add_theme_font_size_override("font_size", 20)
+	subtitle.add_theme_color_override("font_color", BahrainTheme.GOLD_LIGHT)
+	plaque.add_child(subtitle)
 
-	# Version / brand tag
-	var ver := Label.new()
-	ver.text = "Zanabal Gaming — Legends Are Brick — v1.0.0 Mobile Edition"
-	ver.add_theme_font_size_override("font_size", int(13 * s))
-	ver.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
-	ver.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	ver.add_theme_constant_override("outline_size", int(3 * s))
-	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ver.position = Vector2(0, 180 * s)
-	ver.size = Vector2(vp.x, 20 * s)
-	add_child(ver)
+	var location := Label.new()
+	location.text = "MANAMA  •  KINGDOM OF BAHRAIN"
+	location.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	location.add_theme_font_size_override("font_size", 15)
+	location.add_theme_color_override("font_color", Color(1, 1, 1, 0.78))
+	location.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	location.add_theme_constant_override("outline_size", 4)
+	hero.add_child(location)
 
-	# Button container — centered, scaled
-	var container := VBoxContainer.new()
-	var btn_w := 300 * s
-	container.position = Vector2(vp.x / 2 - btn_w / 2, 236 * s)
-	container.size = Vector2(btn_w, 380 * s)
-	container.add_theme_constant_override("separation", int(12 * s))
-	add_child(container)
+func _build_menu_region(parent: Control) -> void:
+	var panel := PanelContainer.new()
+	panel.name = "ActionMenu"
+	panel.anchor_left = 0.72
+	panel.anchor_top = 0.055
+	panel.anchor_right = 0.975
+	panel.anchor_bottom = 0.87
+	panel.add_theme_stylebox_override("panel", BahrainTheme.panel_style(Color(0.015, 0.022, 0.034, 0.9), Color(1, 1, 1, 0.16), 20))
+	parent.add_child(panel)
 
-	# Buttons
-	var btn_single := _create_button("Single Player", Color(0.2, 0.6, 0.3), s)
-	btn_single.pressed.connect(func(): GameManager.start_singleplayer())
-	container.add_child(btn_single)
+	var stack := VBoxContainer.new()
+	stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_theme_constant_override("separation", 8)
+	panel.add_child(stack)
 
-	var btn_host := _create_button("Host Multiplayer", Color(0.2, 0.4, 0.7), s)
-	btn_host.pressed.connect(func(): GameManager.start_multiplayer_host())
-	container.add_child(btn_host)
+	var play_button := _create_menu_button("Play", BahrainTheme.GREEN, ">")
+	var character_button := _create_menu_button("Character Select", BahrainTheme.ORANGE, "◆")
+	var multiplayer_button := _create_menu_button("Multiplayer", BahrainTheme.BLUE, "◎")
+	var missions_button := _create_menu_button("Missions", BahrainTheme.PURPLE, "+")
+	var settings_button := _create_menu_button("Settings", BahrainTheme.GOLD, "⚙")
+	var credits_button := _create_menu_button("Credits", BahrainTheme.CYAN, "★")
+	var exit_button := _create_menu_button("Exit", BahrainTheme.RED, "←")
 
-	var btn_join := _create_button("Join Multiplayer", Color(0.5, 0.3, 0.6), s)
-	btn_join.pressed.connect(func(): GameManager.start_multiplayer_client())
-	container.add_child(btn_join)
+	for button in [play_button, character_button, multiplayer_button, missions_button, settings_button, credits_button, exit_button]:
+		stack.add_child(button)
 
-	var btn_missions := _create_button("Mission List Preview", Color(0.6, 0.5, 0.2), s)
-	btn_missions.pressed.connect(_show_mission_preview)
-	container.add_child(btn_missions)
+	play_button.pressed.connect(func(): GameManager.start_singleplayer())
+	character_button.pressed.connect(func(): GameManager.show_character_select())
+	multiplayer_button.pressed.connect(_show_multiplayer_dialog)
+	missions_button.pressed.connect(_show_mission_preview)
+	settings_button.pressed.connect(_show_settings_preview)
+	credits_button.pressed.connect(_show_credits)
+	exit_button.pressed.connect(func(): get_tree().quit())
 
-	var btn_exit := _create_button("Exit", Color(0.6, 0.2, 0.2), s)
-	btn_exit.pressed.connect(func(): get_tree().quit())
-	container.add_child(btn_exit)
+func _build_profile_region(parent: Control) -> void:
+	var profile := PanelContainer.new()
+	profile.name = "PlayerProfile"
+	profile.anchor_left = 0.035
+	profile.anchor_top = 0.765
+	profile.anchor_right = 0.38
+	profile.anchor_bottom = 0.955
+	profile.add_theme_stylebox_override("panel", BahrainTheme.panel_style(Color(0.012, 0.02, 0.032, 0.9), Color(1, 1, 1, 0.18), 16))
+	parent.add_child(profile)
 
-	# Info text at bottom
-	var info := Label.new()
-	info.text = "Explore Bahrain — from Manama skyline to F1 circuit\nBuilt entirely from bricks. Drive. Race. Discover. Play together."
-	info.add_theme_font_size_override("font_size", int(14 * s))
-	info.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
-	info.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
-	info.add_theme_constant_override("outline_size", int(3 * s))
-	info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	info.position = Vector2(0, vp.y - 70 * s)
-	info.size = Vector2(vp.x, 50 * s)
-	add_child(info)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 16)
+	profile.add_child(row)
 
-func _create_button(text: String, color: Color, s: float) -> Button:
-	var btn := Button.new()
-	btn.text = text
-	btn.custom_minimum_size = Vector2(300 * s, 50 * s)
-	btn.add_theme_font_size_override("font_size", int(18 * s))
+	var crest := TextureRect.new()
+	crest.texture = load("res://assets/app_icon.png")
+	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	crest.custom_minimum_size = Vector2(88, 88)
+	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(crest)
 
-	var style_normal := StyleBoxFlat.new()
-	style_normal.bg_color = color
-	style_normal.corner_radius_top_left = 8
-	style_normal.corner_radius_top_right = 8
-	style_normal.corner_radius_bottom_left = 8
-	style_normal.corner_radius_bottom_right = 8
-	style_normal.content_margin_left = 20
-	style_normal.content_margin_right = 20
-	style_normal.content_margin_top = 10
-	style_normal.content_margin_bottom = 10
-	style_normal.shadow_size = 4
-	style_normal.shadow_color = Color(0, 0, 0, 0.5)
-	btn.add_theme_stylebox_override("normal", style_normal)
+	var details := VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 4)
+	row.add_child(details)
 
-	var style_hover := StyleBoxFlat.new()
-	style_hover.bg_color = color.lightened(0.15)
-	style_hover.corner_radius_top_left = 8
-	style_hover.corner_radius_top_right = 8
-	style_hover.corner_radius_bottom_left = 8
-	style_hover.corner_radius_bottom_right = 8
-	style_hover.content_margin_left = 20
-	style_hover.content_margin_right = 20
-	style_hover.content_margin_top = 10
-	style_hover.content_margin_bottom = 10
-	style_hover.shadow_size = 6
-	style_hover.shadow_color = Color(0, 0, 0, 0.6)
-	btn.add_theme_stylebox_override("hover", style_hover)
+	var player_name := Label.new()
+	player_name.text = "BRICK BAHRAIN"
+	player_name.add_theme_font_size_override("font_size", 21)
+	player_name.add_theme_color_override("font_color", BahrainTheme.TEXT)
+	details.add_child(player_name)
 
-	var style_pressed := StyleBoxFlat.new()
-	style_pressed.bg_color = color.darkened(0.2)
-	style_pressed.corner_radius_top_left = 8
-	style_pressed.corner_radius_top_right = 8
-	style_pressed.corner_radius_bottom_left = 8
-	style_pressed.corner_radius_bottom_right = 8
-	btn.add_theme_stylebox_override("pressed", style_pressed)
+	var level_row := HBoxContainer.new()
+	details.add_child(level_row)
+	var level := Label.new()
+	level.text = "LEVEL 12"
+	level.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level.add_theme_font_size_override("font_size", 15)
+	level.add_theme_color_override("font_color", BahrainTheme.GOLD_LIGHT)
+	level_row.add_child(level)
+	var coins := Label.new()
+	coins.text = "GOLD  %s" % _format_number(SaveManager.get_coins())
+	coins.add_theme_font_size_override("font_size", 15)
+	coins.add_theme_color_override("font_color", BahrainTheme.GOLD_LIGHT)
+	level_row.add_child(coins)
 
-	return btn
+	var progress := ProgressBar.new()
+	progress.min_value = 0
+	progress.max_value = 100
+	progress.value = 64
+	progress.show_percentage = false
+	progress.custom_minimum_size = Vector2(0, 16)
+	var background_style := StyleBoxFlat.new()
+	background_style.bg_color = Color(0.08, 0.09, 0.11, 0.95)
+	background_style.set_corner_radius_all(8)
+	progress.add_theme_stylebox_override("background", background_style)
+	var fill_style := StyleBoxFlat.new()
+	fill_style.bg_color = BahrainTheme.GOLD
+	fill_style.set_corner_radius_all(8)
+	progress.add_theme_stylebox_override("fill", fill_style)
+	details.add_child(progress)
+
+func _build_footer_region(parent: Control) -> void:
+	var footer := HBoxContainer.new()
+	footer.name = "FooterActions"
+	footer.anchor_left = 0.735
+	footer.anchor_top = 0.89
+	footer.anchor_right = 0.97
+	footer.anchor_bottom = 0.97
+	footer.alignment = BoxContainer.ALIGNMENT_END
+	footer.add_theme_constant_override("separation", 10)
+	parent.add_child(footer)
+	for item in [["D", "Community"], ["IG", "Instagram"], ["TT", "TikTok"], ["YT", "YouTube"], ["X", "Updates"]]:
+		var button := _create_footer_button(String(item[0]), String(item[1]))
+		footer.add_child(button)
+
+func _create_menu_button(label: String, color: Color, icon_text: String) -> Button:
+	var button := Button.new()
+	button.text = "%s  %s" % [icon_text, label]
+	button.custom_minimum_size = Vector2(330, 58)
+	button.add_theme_font_size_override("font_size", 23)
+	button.add_theme_color_override("font_color", BahrainTheme.TEXT)
+	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_stylebox_override("normal", BahrainTheme.button_style(color))
+	button.add_theme_stylebox_override("hover", BahrainTheme.button_style(color.lightened(0.08)))
+	button.add_theme_stylebox_override("pressed", BahrainTheme.button_style(color, true))
+	return button
+
+func _create_footer_button(label: String, tooltip: String) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.tooltip_text = tooltip
+	button.custom_minimum_size = Vector2(48, 48)
+	button.add_theme_font_size_override("font_size", 14)
+	var normal := StyleBoxFlat.new()
+	normal.bg_color = Color(0.035, 0.045, 0.065, 0.9)
+	normal.border_color = Color(1, 1, 1, 0.28)
+	normal.set_border_width_all(2)
+	normal.set_corner_radius_all(24)
+	button.add_theme_stylebox_override("normal", normal)
+	var hover := normal.duplicate() as StyleBoxFlat
+	hover.bg_color = BahrainTheme.GOLD.darkened(0.35)
+	hover.border_color = BahrainTheme.GOLD_LIGHT
+	button.add_theme_stylebox_override("hover", hover)
+	button.pressed.connect(func(): _show_info_dialog(tooltip, "%s channels will be linked in a later production integration." % tooltip))
+	return button
+
+func _show_multiplayer_dialog() -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "Multiplayer"
+	dialog.dialog_text = "Choose how you want to enter Bahrain."
+	dialog.ok_button_text = "Cancel"
+	dialog.add_button("Host Game", true, "host")
+	dialog.add_button("Join Game", true, "join")
+	dialog.custom_action.connect(func(action: StringName):
+		dialog.hide()
+		if action == &"host":
+			GameManager.start_multiplayer_host()
+		elif action == &"join":
+			GameManager.start_multiplayer_client()
+	)
+	add_child(dialog)
+	dialog.popup_centered(Vector2i(640, 320))
 
 func _show_mission_preview() -> void:
-	# Simple popup with mission list
-	var popup := AcceptDialog.new()
-	popup.title = "Available Missions"
-	var text := "Race: Grand Prix Circuit — Lap the F1 track (500 coins)\n"
-	text += "Collection: Souk Treasure Hunt — Find hidden gems (300 coins)\n"
-	text += "Exploration: Fort Expedition — Explore Bahrain Fort (400 coins)\n"
-	text += "Time Trial: Causeway Sprint — Race the King Fahd Causeway (350 coins)\n"
-	text += "Exploration: Skyline Explorer — Visit Manama landmarks (250 coins)\n"
-	text += "Collection: Desert Run — Reach Tree of Life (200 coins)\n"
-	text += "Time Trial: Marina Drift — Sprint to Amwaj Islands (300 coins)"
-	popup.dialog_text = text
-	popup.size = Vector2(500, 300)
-	add_child(popup)
-	popup.popup_centered()
+	var text := "GRAND PRIX CIRCUIT\nRace the Bahrain International Circuit.\n\n"
+	text += "SOUQ TREASURE HUNT\nFind hidden gems in Manama Souq.\n\n"
+	text += "FORT EXPEDITION\nExplore Bahrain Fort and recover lost bricks.\n\n"
+	text += "CAUSEWAY SPRINT\nRace toward the King Fahd Causeway."
+	_show_info_dialog("Missions", text)
+
+func _show_settings_preview() -> void:
+	var settings := SaveManager.get_settings()
+	var text := "Quality: %s\nBrightness: %d%%\nField of View: %d°\n\n" % [
+		String(settings.get("quality", "medium")).capitalize(),
+		int(float(settings.get("brightness", 0.8)) * 100.0),
+		int(float(settings.get("field_of_view", 75.0))),
+	]
+	text += "The full interactive graphics, controls, audio, and gameplay settings panel is delivered in the pause/settings slice."
+	_show_info_dialog("Settings", text)
+
+func _show_credits() -> void:
+	_show_info_dialog("Credits", "BAHRAIN BRICK\nAn open-world brick sandbox by Zanabal Gaming.\n\nBuilt with Godot Engine.\nLegends are brick.")
+
+func _show_info_dialog(title: String, text: String) -> void:
+	if is_instance_valid(_dialog):
+		_dialog.queue_free()
+	_dialog = AcceptDialog.new()
+	_dialog.title = title
+	_dialog.dialog_text = text
+	_dialog.ok_button_text = "Close"
+	add_child(_dialog)
+	_dialog.popup_centered(Vector2i(720, 480))
+
+func _format_number(value: int) -> String:
+	var text := str(max(value, 0))
+	var output := ""
+	while text.length() > 3:
+		output = "," + text.right(3) + output
+		text = text.left(text.length() - 3)
+	return text + output
