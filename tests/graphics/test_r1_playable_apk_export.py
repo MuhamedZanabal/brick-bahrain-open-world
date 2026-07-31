@@ -64,6 +64,12 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn("bahrain-brick-playable-mobile-arm64.apk", text)
         self.assertIn("test -s", text)
 
+    def test_wrapper_checks_only_the_diagnostic_main_scene_assignment(self) -> None:
+        text = WRAPPER.read_text(encoding="utf-8")
+        self.assertNotIn("grep -q 'r1_renderer_runtime_debug.tscn'", text)
+        self.assertIn("run/main_scene", text)
+        self.assertIn("r1_renderer_runtime_debug.tscn", text)
+
 
 if __name__ == "__main__":
     unittest.main()
