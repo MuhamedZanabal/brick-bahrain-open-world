@@ -67,8 +67,8 @@ class R1PlayableApkExportTest(unittest.TestCase):
     def test_wrapper_checks_only_the_diagnostic_main_scene_assignment(self) -> None:
         text = WRAPPER.read_text(encoding="utf-8")
         self.assertNotIn("grep -q 'r1_renderer_runtime_debug.tscn'", text)
-        self.assertIn("run/main_scene", text)
-        self.assertIn("r1_renderer_runtime_debug.tscn", text)
+        self.assertIn("run/main_scene=.*r1_renderer_runtime_debug", text)
+        self.assertIn("diagnostic main-scene override remains", text)
 
 
 if __name__ == "__main__":
