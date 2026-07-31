@@ -4,17 +4,32 @@ on:
   push:
     branches:
       - work/bahrain-brick-renderer-runtime-debugging-r1
+      - work/bahrain-brick-reference-visual-upgrade
     paths:
       - .github/workflows/bahrain-brick-playable-mobile-apk-export.yml
+      - project.godot
+      - scenes/splash_screen.tscn
+      - scenes/loading_screen.tscn
+      - scenes/main_menu.tscn
+      - scenes/character_select.tscn
+      - scripts/splash_screen.gd
+      - scripts/loading_screen.gd
+      - scripts/main_menu.gd
+      - scripts/character_select.gd
+      - scripts/game_manager.gd
+      - scripts/save_manager.gd
+      - scripts/ui/**
       - tools/graphics/patch_r1_playable_export.py
       - tools/graphics/export_r1_playable_mobile_apk.sh
+      - tools/graphics/verify_visual_upgrade_slice_a.py
       - tests/graphics/test_r1_playable_apk_export.py
+      - tests/visual/test_visual_upgrade_slice_a.py
 
 permissions:
   contents: read
 
 concurrency:
-  group: bahrain-brick-playable-mobile-apk-export
+  group: bahrain-brick-playable-mobile-apk-export-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,6 +38,7 @@ jobs:
     timeout-minutes: 75
     env:
       OUTPUT_ROOT: ${{ runner.temp }}/bahrain-brick-playable-mobile
+      OUTPUT_APK: ${{ runner.temp }}/bahrain-brick-playable-mobile/bahrain-brick-playable-mobile-arm64.apk
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -63,17 +79,33 @@ jobs:
           python3 -m py_compile tools/graphics/patch_r1_playable_export.py
           bash -n tools/graphics/export_r1_playable_mobile_apk.sh
 
+      - name: Verify visual upgrade source contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/visual/test_visual_upgrade_slice_a.py -v
+          python3 -m py_compile tools/graphics/verify_visual_upgrade_slice_a.py
+          python3 tools/graphics/verify_visual_upgrade_slice_a.py --root .
+
       - name: Export production-scene APK
         shell: bash
         run: |
           set -euo pipefail
           bash tools/graphics/export_r1_playable_mobile_apk.sh "$GITHUB_WORKSPACE" "$OUTPUT_ROOT"
 
+      - name: Verify visual upgrade APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/verify_visual_upgrade_slice_a.py \
+            --root . \
+            --apk "$OUTPUT_APK"
+
       - name: Verify APK identity and handoff
         shell: bash
         run: |
           set -euo pipefail
-          APK="$OUTPUT_ROOT/bahrain-brick-playable-mobile-arm64.apk"
+          APK="$OUTPUT_APK"
           test -s "$APK"
           "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$OUTPUT_ROOT/playable-apk-signing.txt"
           "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" | tee "$OUTPUT_ROOT/playable-apk-badging.txt"
