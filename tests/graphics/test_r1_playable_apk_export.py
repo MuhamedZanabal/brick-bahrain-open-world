@@ -30,12 +30,20 @@ class R1PlayableApkExportTest(unittest.TestCase):
             'cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" '
             '"$GAME/tests/graphics/"'
         )
+        gpu_import = "\n".join(
+            [
+                "timeout --signal=TERM --kill-after=30s 1800s xvfb-run -a -s '-screen 0 1920x1080x24' \\",
+                ' "$GODOT" --path "$GAME" --editor --import --quit --verbose \\',
+                ' --rendering-method mobile --rendering-driver vulkan 2>&1 | tee "$OUTPUT_ROOT/import.log"',
+            ]
+        )
         source = "\n".join(
             [
                 'MOBILE_APK="$OUTPUT_ROOT/bahrain-brick-r1-physical-mobile-arm64.apk"',
                 'MOBILE_PACKAGE="com.brickbahrain.r1physical.mobile"',
                 'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' | head -1)"',
                 diagnostic_asset_copy,
+                gpu_import,
                 diagnostic_override,
                 'project_text = replace_line(project_text, "renderer/rendering_method=", f\'renderer/rendering_method="{renderer}"\')',
                 diagnostic_override,
@@ -51,6 +59,9 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn("com.brickbahrain.playable.mobile", patched)
         self.assertIn("renderer/rendering_method=", patched)
         self.assertIn("! -name '*.zip'", patched)
+        self.assertIn('"$GODOT" --headless --path "$GAME" --editor --import --quit --verbose', patched)
+        self.assertNotIn("xvfb-run", patched)
+        self.assertNotIn("--rendering-driver vulkan", patched)
 
     def test_patch_rejects_unexpected_diagnostic_override_count(self) -> None:
         module = load_module()
