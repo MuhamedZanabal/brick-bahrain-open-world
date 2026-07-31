@@ -13,6 +13,7 @@ const MAIN_MENU_SCENE := "res://scenes/main_menu.tscn"
 const CHARACTER_SELECT_SCENE := "res://scenes/character_select.tscn"
 const LOADING_SCENE := "res://scenes/loading_screen.tscn"
 const WORLD_SCENE := "res://scenes/world.tscn"
+const APPROVED_CHARACTER_INDICES := [3, 5, 4]
 
 var current_state: GameState = GameState.MENU
 var current_mode: GameMode = GameMode.SINGLE_PLAYER
@@ -111,6 +112,12 @@ func get_character(index: int) -> Dictionary:
 
 func get_selected_character() -> Dictionary:
 	return get_character(selected_character_index)
+
+func get_approved_characters() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for index in APPROVED_CHARACTER_INDICES:
+		result.append(characters[index])
+	return result
 
 func add_coins(amount: int) -> void:
 	coins += amount
