@@ -26,11 +26,16 @@ class R1PlayableApkExportTest(unittest.TestCase):
             'project_text = replace_line(project_text, "run/main_scene=", '
             "'run/main_scene=\"res://tests/graphics/r1_renderer_runtime_debug.tscn\"')"
         )
+        diagnostic_asset_copy = (
+            'cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn" '
+            '"$GAME/tests/graphics/"'
+        )
         source = "\n".join(
             [
                 'MOBILE_APK="$OUTPUT_ROOT/bahrain-brick-r1-physical-mobile-arm64.apk"',
                 'MOBILE_PACKAGE="com.brickbahrain.r1physical.mobile"',
                 'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' | head -1)"',
+                diagnostic_asset_copy,
                 diagnostic_override,
                 'project_text = replace_line(project_text, "renderer/rendering_method=", f\'renderer/rendering_method="{renderer}"\')',
                 diagnostic_override,
@@ -38,7 +43,8 @@ class R1PlayableApkExportTest(unittest.TestCase):
             ]
         )
         patched = module.patch_exporter_text(source)
-        self.assertNotIn("r1_renderer_runtime_debug.tscn", patched)
+        self.assertNotIn(diagnostic_override, patched)
+        self.assertIn(diagnostic_asset_copy, patched)
         self.assertEqual(patched.count("Production main scene intentionally preserved"), 2)
         self.assertIn("bahrain-brick-playable-mobile-arm64.apk", patched)
         self.assertNotIn("com.brickbahrain.r1physical.mobile", patched)
