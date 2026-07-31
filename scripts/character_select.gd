@@ -210,11 +210,12 @@ func _build_role_cards(parent: Control) -> void:
 		button.text = "%s\n%s\n%s" % [ROLE_MARKERS[role_index], ROLE_NAMES[role_index], ROLE_DESCRIPTIONS[role_index]]
 		button.custom_minimum_size = Vector2(360, 165)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", 17)
 		button.add_theme_color_override("font_color", BahrainTheme.TEXT)
 		button.add_theme_color_override("font_hover_color", Color.WHITE)
 		button.tooltip_text = String(role.get("description", ROLE_DESCRIPTIONS[role_index]))
-		button.pressed.connect(func(index := role_index): _select_role(index))
+		button.pressed.connect(_select_role.bind(role_index))
 		cards.add_child(button)
 		_role_cards.append(button)
 
@@ -266,7 +267,7 @@ func _refresh_selection_state() -> void:
 		button.add_theme_stylebox_override("normal", normal)
 		button.add_theme_stylebox_override("hover", hover)
 		button.add_theme_stylebox_override("pressed", BahrainTheme.button_style(color, true))
-		button.pivot_offset = button.size * 0.5
+		button.pivot_offset = button.custom_minimum_size * 0.5
 		var target_scale := Vector2(1.04, 1.04) if index == selected_role else Vector2.ONE
 		create_tween().set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT).tween_property(button, "scale", target_scale, 0.16)
 
@@ -281,11 +282,16 @@ func _update_preview() -> void:
 	var figure: Node3D = BrickFactory.load_character_model(model_path)
 	if figure == null:
 		figure = BrickFactory.create_minifigure(character_data)
-	else:
-		var animation_player: AnimationPlayer = figure.get_meta("anim_player", null)
-		var animation_prefix := String(figure.get_meta("anim_prefix", ""))
-		if animation_player and animation_player.has_animation(animation_prefix + "Idle"):
-			animation_player.play(animation_prefix + "Idle")
+	if figure == null:
+		push_error("CharacterSelect: unable to create preview for %s" % ROLE_NAMES[selected_role])
+		_preview_name.text = ROLE_NAMES[selected_role]
+		_preview_description.text = ROLE_DESCRIPTIONS[selected_role]
+		return
+
+	var animation_player: AnimationPlayer = figure.get_meta("anim_player", null)
+	var animation_prefix := String(figure.get_meta("anim_prefix", ""))
+	if animation_player and animation_player.has_animation(animation_prefix + "Idle"):
+		animation_player.play(animation_prefix + "Idle")
 	figure.position = Vector3(0, 0.17, 0)
 	figure.rotation.y = PI
 	_preview_world.add_child(figure)
