@@ -1,0 +1,98 @@
+name: Android Toolchain Transfer
+
+on:
+  push:
+    branches:
+      - tmp/android-toolchain-transfer-20260801
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/android-toolchain-transfer.yml
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Download and verify Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/toolchain/opt/gradle"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "$RUNNER_TEMP/gradle.zip" \
+            https://downloads.gradle.org/distributions/gradle-8.14.3-bin.zip
+          echo 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531  '"$RUNNER_TEMP/gradle.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/gradle.zip" -d "$RUNNER_TEMP/toolchain/opt/gradle"
+
+      - name: Download and verify Android command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$RUNNER_TEMP/toolchain/opt/android-sdk"
+          mkdir -p "$SDK/cmdline-tools"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "$RUNNER_TEMP/cmdline-tools.zip" \
+            https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip
+          echo '4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  '"$RUNNER_TEMP/cmdline-tools.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/cmdline-tools.zip" -d "$RUNNER_TEMP/cmdline-unpacked"
+          mv "$RUNNER_TEMP/cmdline-unpacked/cmdline-tools" "$SDK/cmdline-tools/latest"
+
+      - name: Install minimum Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$RUNNER_TEMP/toolchain/opt/android-sdk"
+          export ANDROID_HOME="$SDK"
+          export ANDROID_SDK_ROOT="$SDK"
+          export PATH="$SDK/cmdline-tools/latest/bin:$SDK/platform-tools:$SDK/build-tools/35.0.0:$PATH"
+          set +o pipefail
+          yes | sdkmanager --licenses >/dev/null
+          set -o pipefail
+          sdkmanager --install \
+            'platform-tools' \
+            'platforms;android-35' \
+            'build-tools;35.0.0'
+
+      - name: Verify and package toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/toolchain"
+          SDK="$ROOT/opt/android-sdk"
+          GRADLE="$ROOT/opt/gradle/gradle-8.14.3/bin/gradle"
+          test -x "$GRADLE"
+          test -x "$SDK/cmdline-tools/latest/bin/sdkmanager"
+          test -f "$SDK/platforms/android-35/android.jar"
+          test -x "$SDK/platform-tools/adb"
+          test -x "$SDK/build-tools/35.0.0/aapt"
+          test -x "$SDK/build-tools/35.0.0/aapt2"
+          test -x "$SDK/build-tools/35.0.0/d8"
+          test -x "$SDK/build-tools/35.0.0/zipalign"
+          test -x "$SDK/build-tools/35.0.0/apksigner"
+          rm -rf "$SDK/.temp" "$SDK/.knownPackages" || true
+          mkdir -p "$RUNNER_TEMP/out"
+          cat > "$RUNNER_TEMP/out/manifest.txt" <<'EOF'
+          Gradle: 8.14.3
+          Gradle target: /opt/gradle/gradle-8.14.3
+          Android SDK target: /opt/android-sdk
+          Android command-line tools: /opt/android-sdk/cmdline-tools/latest
+          Packages: platform-tools, platforms;android-35, build-tools;35.0.0
+          EOF
+          tar -C "$ROOT" -czf "$RUNNER_TEMP/out/android-apk-toolchain.tar.gz" opt
+          sha256sum "$RUNNER_TEMP/out/android-apk-toolchain.tar.gz" > "$RUNNER_TEMP/out/android-apk-toolchain.tar.gz.sha256"
+          du -h "$RUNNER_TEMP/out/android-apk-toolchain.tar.gz"
+          cat "$RUNNER_TEMP/out/android-apk-toolchain.tar.gz.sha256"
+
+      - name: Upload one-day toolchain artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-toolchain
+          path: ${{ runner.temp }}/out/*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
