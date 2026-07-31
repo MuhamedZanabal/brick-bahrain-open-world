@@ -288,7 +288,7 @@ func _update_preview() -> void:
 		_preview_description.text = ROLE_DESCRIPTIONS[selected_role]
 		return
 
-	var animation_player: AnimationPlayer = figure.get_meta("anim_player", null)
+	var animation_player := figure.get_meta("anim_player", null) as AnimationPlayer
 	var animation_prefix := String(figure.get_meta("anim_prefix", ""))
 	if animation_player and animation_player.has_animation(animation_prefix + "Idle"):
 		animation_player.play(animation_prefix + "Idle")
