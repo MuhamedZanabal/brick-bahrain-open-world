@@ -37,8 +37,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     env:
-      OUTPUT_ROOT: ${{ runner.temp }}/bahrain-brick-playable-mobile
-      OUTPUT_APK: ${{ runner.temp }}/bahrain-brick-playable-mobile/bahrain-brick-playable-mobile-arm64.apk
+      OUTPUT_ROOT: /tmp/bahrain-brick-playable-mobile
+      OUTPUT_APK: /tmp/bahrain-brick-playable-mobile/bahrain-brick-playable-mobile-arm64.apk
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -145,10 +145,10 @@ jobs:
         with:
           name: bahrain-brick-playable-mobile-arm64-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/bahrain-brick-playable-mobile/bahrain-brick-playable-mobile-arm64.apk
-            ${{ runner.temp }}/bahrain-brick-playable-mobile/PLAYABLE_APK_HANDOFF.json
-            ${{ runner.temp }}/bahrain-brick-playable-mobile/PLAYABLE_APK_SHA256SUMS.txt
-            ${{ runner.temp }}/bahrain-brick-playable-mobile/playable-apk-signing.txt
-            ${{ runner.temp }}/bahrain-brick-playable-mobile/playable-apk-badging.txt
-            ${{ runner.temp }}/bahrain-brick-playable-mobile/export-mobile.log
+            /tmp/bahrain-brick-playable-mobile/bahrain-brick-playable-mobile-arm64.apk
+            /tmp/bahrain-brick-playable-mobile/PLAYABLE_APK_HANDOFF.json
+            /tmp/bahrain-brick-playable-mobile/PLAYABLE_APK_SHA256SUMS.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-signing.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-badging.txt
+            /tmp/bahrain-brick-playable-mobile/export-mobile.log
           retention-days: 30
