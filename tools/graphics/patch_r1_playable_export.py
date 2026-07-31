@@ -15,6 +15,19 @@ OLD_PACKAGE = 'com.brickbahrain.r1physical.mobile'
 NEW_PACKAGE = 'com.brickbahrain.playable.mobile'
 OLD_GODOT_DISCOVERY = 'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' | head -1)"'
 NEW_GODOT_DISCOVERY = 'GODOT="$(find "$GODOT_DIR" -maxdepth 1 -type f -name \'Godot*\' ! -name \'*.zip\' | head -1)"'
+OLD_IMPORT_COMMAND = "\n".join(
+    [
+        "timeout --signal=TERM --kill-after=30s 1800s xvfb-run -a -s '-screen 0 1920x1080x24' \\",
+        ' "$GODOT" --path "$GAME" --editor --import --quit --verbose \\',
+        ' --rendering-method mobile --rendering-driver vulkan 2>&1 | tee "$OUTPUT_ROOT/import.log"',
+    ]
+)
+NEW_IMPORT_COMMAND = "\n".join(
+    [
+        "timeout --signal=TERM --kill-after=30s 1800s \\",
+        ' "$GODOT" --headless --path "$GAME" --editor --import --quit --verbose 2>&1 | tee "$OUTPUT_ROOT/import.log"',
+    ]
+)
 
 
 def patch_exporter_text(text: str) -> str:
@@ -27,6 +40,8 @@ def patch_exporter_text(text: str) -> str:
         raise ValueError("expected exactly one retained Mobile APK output declaration")
     if text.count(OLD_GODOT_DISCOVERY) != 1:
         raise ValueError("expected exactly one Godot binary discovery line")
+    if text.count(OLD_IMPORT_COMMAND) != 1:
+        raise ValueError("expected exactly one GPU-dependent Godot import command")
     package_count = text.count(OLD_PACKAGE)
     if package_count < 2:
         raise ValueError(
@@ -37,6 +52,7 @@ def patch_exporter_text(text: str) -> str:
     patched = patched.replace(OLD_MOBILE_APK, NEW_MOBILE_APK)
     patched = patched.replace(OLD_PACKAGE, NEW_PACKAGE)
     patched = patched.replace(OLD_GODOT_DISCOVERY, NEW_GODOT_DISCOVERY)
+    patched = patched.replace(OLD_IMPORT_COMMAND, NEW_IMPORT_COMMAND)
 
     if DIAGNOSTIC_MAIN_SCENE_OVERRIDE in patched:
         raise ValueError("diagnostic main-scene override remains after playable patch")
@@ -46,6 +62,8 @@ def patch_exporter_text(text: str) -> str:
         raise ValueError("diagnostic Mobile package identity remains after playable patch")
     if OLD_GODOT_DISCOVERY in patched or NEW_GODOT_DISCOVERY not in patched:
         raise ValueError("Godot binary discovery was not hardened against ZIP selection")
+    if OLD_IMPORT_COMMAND in patched or NEW_IMPORT_COMMAND not in patched:
+        raise ValueError("Godot import command was not made headless and GPU-independent")
     return patched
 
 
