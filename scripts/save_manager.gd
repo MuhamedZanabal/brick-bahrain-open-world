@@ -27,12 +27,12 @@ func _ensure_schema() -> void:
 	for key in defaults:
 		if not save_data.has(key):
 			save_data[key] = defaults[key]
-	if not save_data["player"] is Dictionary:
+	if not (save_data["player"] is Dictionary):
 		save_data["player"] = defaults["player"].duplicate(true)
 	for key in defaults["player"]:
 		if not save_data["player"].has(key):
 			save_data["player"][key] = defaults["player"][key]
-	if not save_data["settings"] is Dictionary:
+	if not (save_data["settings"] is Dictionary):
 		save_data["settings"] = defaults["settings"].duplicate(true)
 	for key in defaults["settings"]:
 		if not save_data["settings"].has(key):
@@ -97,7 +97,7 @@ func load_game() -> bool:
 
 	var json: JSON = JSON.new()
 	var err: int = json.parse(content)
-	if err != OK or not json.data is Dictionary:
+	if err != OK or not (json.data is Dictionary):
 		push_error("SaveManager: Failed to parse save file: %s" % json.get_error_message())
 		save_data = _default_save()
 		save_loaded.emit(save_data)
