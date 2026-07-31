@@ -53,10 +53,18 @@ func _build_ui() -> void:
 		safe_area.set_anchors_preset(Control.PRESET_FULL_RECT)
 		add_child(safe_area)
 
-	_build_hero_region(safe_area)
-	_build_menu_region(safe_area)
-	_build_profile_region(safe_area)
-	_build_footer_region(safe_area)
+	var content := safe_area.get_node_or_null("Content") as Control
+	if content == null:
+		content = Control.new()
+		content.name = "Content"
+		content.set_anchors_preset(Control.PRESET_FULL_RECT)
+		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		safe_area.add_child(content)
+
+	_build_hero_region(content)
+	_build_menu_region(content)
+	_build_profile_region(content)
+	_build_footer_region(content)
 
 func _build_hero_region(parent: Control) -> void:
 	var hero := VBoxContainer.new()
