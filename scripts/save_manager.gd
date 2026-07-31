@@ -19,30 +19,32 @@ func _process(delta: float) -> void:
 		autosave_timer = 0.0
 		save_game()
 
+func _ensure_schema() -> void:
+	var defaults := _default_save()
+	if save_data.is_empty():
+		save_data = defaults
+		return
+	for key in defaults:
+		if not save_data.has(key):
+			save_data[key] = defaults[key]
+	if not save_data["player"] is Dictionary:
+		save_data["player"] = defaults["player"].duplicate(true)
+	for key in defaults["player"]:
+		if not save_data["player"].has(key):
+			save_data["player"][key] = defaults["player"][key]
+	if not save_data["settings"] is Dictionary:
+		save_data["settings"] = defaults["settings"].duplicate(true)
+	for key in defaults["settings"]:
+		if not save_data["settings"].has(key):
+			save_data["settings"][key] = defaults["settings"][key]
+
 func save_game() -> void:
-	# Collect current game state
+	_ensure_schema()
+	save_data["version"] = 3
+	save_data["timestamp"] = Time.get_unix_time_from_system()
+
 	var game_mgr: Node = get_tree().get_first_node_in_group("game_manager")
 	var player: CharacterBody3D = get_tree().get_first_node_in_group("player")
-
-	save_data = {
-		"version": 2,
-		"timestamp": Time.get_unix_time_from_system(),
-		"player": {
-			"position": {
-				"x": 0.0,
-				"y": 1.0,
-				"z": 0.0
-			},
-			"coins": 0,
-			"selected_character": 0,
-		},
-		"unlocked_characters": [0],
-		"completed_missions": [],
-		"owned_properties": [],
-		"owned_vehicles": [],
-		"wanted_level": 0,
-		"playtime": 0.0,
-	}
 
 	if player and player.has_meta("coin_count"):
 		save_data["player"]["coins"] = int(player.get_meta("coin_count"))
@@ -55,8 +57,9 @@ func save_game() -> void:
 		}
 
 	if game_mgr:
-		if game_mgr.has_meta("selected_character"):
-			save_data["player"]["selected_character"] = int(game_mgr.get_meta("selected_character"))
+		var selected: Variant = game_mgr.get("selected_character_index")
+		if selected != null:
+			save_data["player"]["selected_character"] = int(selected)
 		if game_mgr.has_meta("unlocked_characters"):
 			save_data["unlocked_characters"] = game_mgr.get_meta("unlocked_characters")
 		if game_mgr.has_meta("completed_missions"):
@@ -66,7 +69,6 @@ func save_game() -> void:
 		if game_mgr.has_meta("owned_vehicles"):
 			save_data["owned_vehicles"] = game_mgr.get_meta("owned_vehicles")
 
-	# Write to file
 	var file: FileAccess = FileAccess.open(save_path, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(save_data, "\t"))
@@ -95,25 +97,34 @@ func load_game() -> bool:
 
 	var json: JSON = JSON.new()
 	var err: int = json.parse(content)
-	if err != OK:
+	if err != OK or not json.data is Dictionary:
 		push_error("SaveManager: Failed to parse save file: %s" % json.get_error_message())
 		save_data = _default_save()
 		save_loaded.emit(save_data)
 		return false
 
 	save_data = json.data as Dictionary
+	_ensure_schema()
 	print("SaveManager: Game loaded successfully")
 	save_loaded.emit(save_data)
 	return true
 
 func _default_save() -> Dictionary:
 	return {
-		"version": 2,
+		"version": 3,
 		"timestamp": Time.get_unix_time_from_system(),
 		"player": {
 			"position": {"x": 0.0, "y": 1.0, "z": 0.0},
 			"coins": 0,
 			"selected_character": 0,
+		},
+		"settings": {
+			"quality": "medium",
+			"brightness": 0.8,
+			"field_of_view": 75.0,
+			"camera_shake": true,
+			"auto_jump": true,
+			"tutorial_hints": true,
 		},
 		"unlocked_characters": [0],
 		"completed_missions": [],
@@ -124,46 +135,55 @@ func _default_save() -> Dictionary:
 	}
 
 func get_coins() -> int:
-	if save_data.has("player") and save_data["player"].has("coins"):
-		return int(save_data["player"]["coins"])
-	return 0
+	_ensure_schema()
+	return int(save_data["player"]["coins"])
 
 func get_position() -> Vector3:
-	if save_data.has("player") and save_data["player"].has("position"):
-		var p: Dictionary = save_data["player"]["position"]
-		return Vector3(float(p["x"]), float(p["y"]), float(p["z"]))
-	return Vector3.ZERO
+	_ensure_schema()
+	var p: Dictionary = save_data["player"]["position"]
+	return Vector3(float(p.get("x", 0.0)), float(p.get("y", 1.0)), float(p.get("z", 0.0)))
 
 func get_selected_character() -> int:
-	if save_data.has("player") and save_data["player"].has("selected_character"):
-		return int(save_data["player"]["selected_character"])
-	return 0
+	_ensure_schema()
+	return int(save_data["player"]["selected_character"])
+
+func set_selected_character(index: int, flush: bool = true) -> void:
+	_ensure_schema()
+	save_data["player"]["selected_character"] = max(index, 0)
+	if flush:
+		save_game()
+
+func get_settings() -> Dictionary:
+	_ensure_schema()
+	return save_data["settings"].duplicate(true)
+
+func set_setting(key: String, value: Variant, flush: bool = true) -> void:
+	_ensure_schema()
+	if not save_data["settings"].has(key):
+		push_warning("SaveManager: registering new setting key %s" % key)
+	save_data["settings"][key] = value
+	if flush:
+		save_game()
 
 func get_completed_missions() -> Array:
-	if save_data.has("completed_missions"):
-		return save_data["completed_missions"] as Array
-	return []
+	_ensure_schema()
+	return save_data["completed_missions"] as Array
 
 func get_unlocked_characters() -> Array:
-	if save_data.has("unlocked_characters"):
-		return save_data["unlocked_characters"] as Array
-	return [0]
+	_ensure_schema()
+	return save_data["unlocked_characters"] as Array
 
 func get_owned_properties() -> Array:
-	if save_data.has("owned_properties"):
-		return save_data["owned_properties"] as Array
-	return []
+	_ensure_schema()
+	return save_data["owned_properties"] as Array
 
 func get_owned_vehicles() -> Array:
-	if save_data.has("owned_vehicles"):
-		return save_data["owned_vehicles"] as Array
-	return []
+	_ensure_schema()
+	return save_data["owned_vehicles"] as Array
 
 func add_coins(amount: int) -> void:
-	if not save_data.has("player"):
-		save_data["player"] = {}
-	var current: int = get_coins()
-	save_data["player"]["coins"] = current + amount
+	_ensure_schema()
+	save_data["player"]["coins"] = get_coins() + amount
 
 func spend_coins(amount: int) -> bool:
 	var current: int = get_coins()
@@ -177,7 +197,6 @@ func complete_mission(mission_id: String) -> void:
 	if not completed.has(mission_id):
 		completed.append(mission_id)
 		save_data["completed_missions"] = completed
-	# Auto-save on mission complete
 	save_game()
 
 func unlock_character(char_id: int) -> void:
