@@ -33,8 +33,8 @@ class R1PlayableApkExportTest(unittest.TestCase):
         gpu_import = "\n".join(
             [
                 "timeout --signal=TERM --kill-after=30s 1800s xvfb-run -a -s '-screen 0 1920x1080x24' \\",
-                ' "$GODOT" --path "$GAME" --editor --import --quit --verbose \\',
-                ' --rendering-method mobile --rendering-driver vulkan 2>&1 | tee "$OUTPUT_ROOT/import.log"',
+                '  "$GODOT" --path "$GAME" --editor --import --quit --verbose \\',
+                '  --rendering-method mobile --rendering-driver vulkan 2>&1 | tee "$OUTPUT_ROOT/import.log"',
             ]
         )
         source = "\n".join(
