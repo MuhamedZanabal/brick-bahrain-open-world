@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "tools/graphics/patch_r1_playable_export.py"
 WRAPPER = ROOT / "tools/graphics/export_r1_playable_mobile_apk.sh"
+WORKFLOW = ROOT / ".github/workflows/bahrain-brick-playable-mobile-apk-export.yml"
 
 
 def load_module():
@@ -80,6 +81,37 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertNotIn("grep -q 'r1_renderer_runtime_debug.tscn'", text)
         self.assertIn("run/main_scene=.*r1_renderer_runtime_debug", text)
         self.assertIn("diagnostic main-scene override remains", text)
+
+    def test_workflow_allows_only_the_known_aapt_warning_and_preserves_handoff_diagnostics(self) -> None:
+        text = WORKFLOW.read_text(encoding="utf-8")
+        identity_start = text.index("- name: Verify APK identity and handoff")
+        diagnostics_start = text.index("- name: Print handoff diagnostics on failure")
+        diagnostics_upload_start = text.index("- name: Upload handoff diagnostics")
+        playable_upload_start = text.index("- name: Upload playable APK")
+        self.assertLess(identity_start, diagnostics_start)
+        self.assertLess(diagnostics_start, diagnostics_upload_start)
+        self.assertLess(diagnostics_upload_start, playable_upload_start)
+
+        identity = text[identity_start:diagnostics_start]
+        self.assertIn("set +e", identity)
+        self.assertIn("AAPT_STATUS=$?", identity)
+        self.assertIn("set -e", identity)
+        self.assertIn("if (( AAPT_STATUS != 0 )); then", identity)
+        self.assertIn(
+            "AndroidManifest.xml:0: error: failed to read attribute 'android:required': "
+            "attribute is not an integer value.",
+            identity,
+        )
+        self.assertIn("aapt dump badging failed unexpectedly", identity)
+        self.assertIn("package: name='com.brickbahrain.playable.mobile'", identity)
+        self.assertIn("application-label:'Bahrain Brick Open World'", identity)
+
+        diagnostics = text[diagnostics_start:playable_upload_start]
+        self.assertIn("if: failure()", diagnostics)
+        self.assertIn("playable-apk-badging.txt", diagnostics)
+        self.assertIn("playable-apk-signing.txt", diagnostics)
+        self.assertIn("PLAYABLE_APK_SHA256SUMS.txt", diagnostics)
+        self.assertIn("SOURCE_TREE_EQUIVALENCE.json", diagnostics)
 
 
 if __name__ == "__main__":
