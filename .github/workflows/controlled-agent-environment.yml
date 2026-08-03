@@ -231,7 +231,23 @@ jobs:
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: bahrain-brick-controlled-codex-android-${{ github.run_id }}
-          path: build/controlled-codex/android
+          path: |
+            build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk
+            build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk
+            build/controlled-codex/android/evidence/**
+            build/controlled-codex/android/export.log
+            build/controlled-codex/android/import.log
+            build/controlled-codex/android/export-gl.log
+            build/controlled-codex/android/export-mobile.log
+            build/controlled-codex/android/R1_PHYSICAL_DEVICE_APK_MANIFEST.json
+            build/controlled-codex/android/APK_SHA256SUMS.txt
+            build/controlled-codex/android/apk-signing.txt
+            build/controlled-codex/android/SOURCE_TREE_EQUIVALENCE.json
+            build/controlled-codex/android/GL_VARIANT_OVERRIDE.json
+            build/controlled-codex/android/MOBILE_VARIANT_OVERRIDE.json
+            build/controlled-codex/android/GODOT_VERSION.txt
+            build/controlled-codex/android/IMPORT_COMPLETE.txt
+            build/controlled-codex/android/export_r1_playable_mobile_apk.patched.sh
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
