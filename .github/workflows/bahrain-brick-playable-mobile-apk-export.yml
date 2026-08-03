@@ -107,44 +107,98 @@ jobs:
           set -euo pipefail
           APK="$OUTPUT_APK"
           test -s "$APK"
-          "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$OUTPUT_ROOT/playable-apk-signing.txt"
+          APKSIGNER="$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner"
+          AAPT="$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt"
+          APKANALYZER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name apkanalyzer -perm -u+x | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          test -x "$AAPT"
+          test -n "$APKANALYZER"
+          test -x "$APKANALYZER"
+
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$OUTPUT_ROOT/playable-apk-signing.txt"
+          "$APKANALYZER" apk summary "$APK" | tee "$OUTPUT_ROOT/playable-apk-summary.txt"
+          "$APKANALYZER" manifest print "$APK" | tee "$OUTPUT_ROOT/playable-apk-manifest.xml"
+          "$APKANALYZER" manifest application-id "$APK" | tee "$OUTPUT_ROOT/playable-apk-application-id.txt"
+          "$APKANALYZER" manifest version-name "$APK" | tee "$OUTPUT_ROOT/playable-apk-version-name.txt"
+          "$APKANALYZER" manifest version-code "$APK" | tee "$OUTPUT_ROOT/playable-apk-version-code.txt"
+          "$APKANALYZER" manifest min-sdk "$APK" | tee "$OUTPUT_ROOT/playable-apk-min-sdk.txt"
+          "$APKANALYZER" manifest target-sdk "$APK" | tee "$OUTPUT_ROOT/playable-apk-target-sdk.txt"
+          "$APKANALYZER" manifest permissions "$APK" | tee "$OUTPUT_ROOT/playable-apk-permissions.txt"
+          "$APKANALYZER" resources value --config default --name godot_project_name_string --type string "$APK" | tee "$OUTPUT_ROOT/playable-apk-app-label.txt"
+          unzip -l "$APK" | tee "$OUTPUT_ROOT/playable-apk-inventory.txt"
+
           set +e
-          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" > "$OUTPUT_ROOT/playable-apk-badging.txt" 2>&1
+          "$AAPT" dump badging "$APK" > "$OUTPUT_ROOT/playable-apk-badging.txt" 2>&1
           AAPT_STATUS=$?
           set -e
           cat "$OUTPUT_ROOT/playable-apk-badging.txt"
           if (( AAPT_STATUS != 0 )); then
             if grep -Fq "AndroidManifest.xml:0: error: failed to read attribute 'android:required': attribute is not an integer value." "$OUTPUT_ROOT/playable-apk-badging.txt"; then
-              printf '%s\n' 'Known aapt AndroidManifest android:required warning accepted; continuing with explicit identity checks.'
+              printf '%s\n' 'Known aapt AndroidManifest android:required warning accepted; apkanalyzer remains the identity authority.'
             else
               printf '%s\n' 'aapt dump badging failed unexpectedly' >&2
               exit "$AAPT_STATUS"
             fi
           fi
-          grep -q "package: name='com.brickbahrain.playable.mobile'" "$OUTPUT_ROOT/playable-apk-badging.txt"
-          grep -q "application-label:'Bahrain Brick Open World'" "$OUTPUT_ROOT/playable-apk-badging.txt"
+
+          APPLICATION_ID="$(tr -d '\r\n' < "$OUTPUT_ROOT/playable-apk-application-id.txt")"
+          APP_LABEL="$(tr -d '\r\n' < "$OUTPUT_ROOT/playable-apk-app-label.txt")"
+          VERSION_NAME="$(tr -d '\r\n' < "$OUTPUT_ROOT/playable-apk-version-name.txt")"
+          VERSION_CODE="$(tr -d '\r\n' < "$OUTPUT_ROOT/playable-apk-version-code.txt")"
+          MIN_SDK="$(tr -d '\r\n' < "$OUTPUT_ROOT/playable-apk-min-sdk.txt")"
+          TARGET_SDK="$(tr -d '\r\n' < "$OUTPUT_ROOT/playable-apk-target-sdk.txt")"
+          SIGNING_CERT_SHA256="$(awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' "$OUTPUT_ROOT/playable-apk-signing.txt")"
+
+          test "$APPLICATION_ID" = "com.brickbahrain.playable.mobile"
+          test "$APP_LABEL" = "Bahrain Brick Open World"
+          test "$VERSION_CODE" = "1404"
+          test "$VERSION_NAME" = "1.4.0.4-premium-visual-qa"
+          test "$MIN_SDK" = "21"
+          test "$TARGET_SDK" = "34"
+          test -n "$SIGNING_CERT_SHA256"
+          grep -Fxq 'android.permission.INTERNET' "$OUTPUT_ROOT/playable-apk-permissions.txt"
+          grep -Fxq 'android.permission.ACCESS_NETWORK_STATE' "$OUTPUT_ROOT/playable-apk-permissions.txt"
+          grep -Fq 'android:label="@string/godot_project_name_string"' "$OUTPUT_ROOT/playable-apk-manifest.xml"
+          grep -Fq 'android:screenOrientation="landscape"' "$OUTPUT_ROOT/playable-apk-manifest.xml"
+          grep -Eq 'lib/arm64-v8a/libgodot_android\.so' "$OUTPUT_ROOT/playable-apk-inventory.txt"
+          if grep -Eq 'lib/(armeabi-v7a|x86|x86_64)/' "$OUTPUT_ROOT/playable-apk-inventory.txt"; then
+            printf '%s\n' 'unexpected non-arm64 native library found in playable APK' >&2
+            exit 1
+          fi
+
           sha256sum "$APK" | tee "$OUTPUT_ROOT/PLAYABLE_APK_SHA256SUMS.txt"
-          python3 - "$APK" "$OUTPUT_ROOT/PLAYABLE_APK_HANDOFF.json" "$GITHUB_SHA" <<'PY'
+          python3 - "$APK" "$OUTPUT_ROOT/PLAYABLE_APK_HANDOFF.json" "$GITHUB_SHA" \
+            "$APPLICATION_ID" "$APP_LABEL" "$VERSION_CODE" "$VERSION_NAME" \
+            "$MIN_SDK" "$TARGET_SDK" "$SIGNING_CERT_SHA256" <<'PY'
           from pathlib import Path
           import hashlib, json, sys
           apk = Path(sys.argv[1])
           output = Path(sys.argv[2])
           source_commit = sys.argv[3]
+          application_id, app_label = sys.argv[4:6]
+          version_code, version_name = sys.argv[6:8]
+          min_sdk, target_sdk, signing_certificate_sha256 = sys.argv[8:11]
           h = hashlib.sha256()
           with apk.open('rb') as stream:
               for chunk in iter(lambda: stream.read(1024 * 1024), b''):
                   h.update(chunk)
           payload = {
-              'schema_version': 1,
+              'schema_version': 2,
               'purpose': 'Playable Android package using the production project main scene',
               'source_commit': source_commit,
               'engine': '4.3-stable',
               'renderer': 'mobile',
               'architecture': 'arm64-v8a',
-              'package': 'com.brickbahrain.playable.mobile',
+              'package': application_id,
+              'app_label': app_label,
+              'version_code': int(version_code),
+              'version_name': version_name,
+              'min_sdk': int(min_sdk),
+              'target_sdk': int(target_sdk),
               'filename': apk.name,
               'size_bytes': apk.stat().st_size,
               'sha256': h.hexdigest(),
+              'signing_certificate_sha256': signing_certificate_sha256,
               'production_main_scene_preserved': True,
               'diagnostic_main_scene_selected': False,
               'diagnostic_evidence_camera_selected': False,
@@ -166,6 +220,16 @@ jobs:
             "$OUTPUT_ROOT/export-mobile.log" \
             "$OUTPUT_ROOT/playable-apk-signing.txt" \
             "$OUTPUT_ROOT/playable-apk-badging.txt" \
+            "$OUTPUT_ROOT/playable-apk-summary.txt" \
+            "$OUTPUT_ROOT/playable-apk-manifest.xml" \
+            "$OUTPUT_ROOT/playable-apk-application-id.txt" \
+            "$OUTPUT_ROOT/playable-apk-app-label.txt" \
+            "$OUTPUT_ROOT/playable-apk-version-name.txt" \
+            "$OUTPUT_ROOT/playable-apk-version-code.txt" \
+            "$OUTPUT_ROOT/playable-apk-min-sdk.txt" \
+            "$OUTPUT_ROOT/playable-apk-target-sdk.txt" \
+            "$OUTPUT_ROOT/playable-apk-permissions.txt" \
+            "$OUTPUT_ROOT/playable-apk-inventory.txt" \
             "$OUTPUT_ROOT/PLAYABLE_APK_SHA256SUMS.txt" \
             "$OUTPUT_ROOT/SOURCE_TREE_EQUIVALENCE.json"; do
             if [[ -f "$log" ]]; then
@@ -194,6 +258,16 @@ jobs:
             /tmp/bahrain-brick-playable-mobile/PLAYABLE_APK_SHA256SUMS.txt
             /tmp/bahrain-brick-playable-mobile/playable-apk-signing.txt
             /tmp/bahrain-brick-playable-mobile/playable-apk-badging.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-summary.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-manifest.xml
+            /tmp/bahrain-brick-playable-mobile/playable-apk-application-id.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-app-label.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-version-name.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-version-code.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-min-sdk.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-target-sdk.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-permissions.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-inventory.txt
           if-no-files-found: ignore
           retention-days: 14
 
@@ -207,5 +281,15 @@ jobs:
             /tmp/bahrain-brick-playable-mobile/PLAYABLE_APK_SHA256SUMS.txt
             /tmp/bahrain-brick-playable-mobile/playable-apk-signing.txt
             /tmp/bahrain-brick-playable-mobile/playable-apk-badging.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-summary.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-manifest.xml
+            /tmp/bahrain-brick-playable-mobile/playable-apk-application-id.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-app-label.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-version-name.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-version-code.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-min-sdk.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-target-sdk.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-permissions.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-inventory.txt
             /tmp/bahrain-brick-playable-mobile/export-mobile.log
           retention-days: 30
