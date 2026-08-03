@@ -103,7 +103,8 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn('manifest target-sdk "$APK"', identity)
         self.assertIn('manifest permissions "$APK"', identity)
         self.assertIn(
-            'resources value --config default --name godot_project_name_string --type string "$APK"',
+            'resources value --config default --name godot_project_name_string '
+            '--type string --package com.brickbahrain.playable.mobile "$APK"',
             identity,
         )
         self.assertIn("Bahrain Brick Open World", identity)
