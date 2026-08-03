@@ -226,14 +226,32 @@ jobs:
             printf '%s\n' '{"status":"failed","reason":"APK was not produced"}' > build/controlled-codex/android/evidence/APK_EVIDENCE.json
           fi
 
-      - name: Upload Android attempt and evidence
+      - name: Upload GL APK
+        if: always() && hashFiles('build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk') != ''
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-r1-physical-gl-apk-${{ github.run_id }}
+          path: build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Mobile APK
+        if: always() && hashFiles('build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk') != ''
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-playable-mobile-apk-${{ github.run_id }}
+          path: build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Android evidence
         if: always()
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
-          name: bahrain-brick-controlled-codex-android-${{ github.run_id }}
+          name: bahrain-brick-controlled-codex-android-evidence-${{ github.run_id }}
           path: |
-            build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk
-            build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk
             build/controlled-codex/android/evidence/**
             build/controlled-codex/android/export.log
             build/controlled-codex/android/import.log
