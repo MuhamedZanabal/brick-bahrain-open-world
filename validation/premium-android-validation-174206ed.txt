@@ -1,0 +1,3 @@
+Validation-only trigger for corrected premium authority 174206ed399ca4aac8412a48aee1d1fb0b3a79f6.
+The runtime correction matcher now compares complete source lines, preventing canonical guarded code from being mistaken for its unsafe substring variant.
+Do not merge this validation marker.
