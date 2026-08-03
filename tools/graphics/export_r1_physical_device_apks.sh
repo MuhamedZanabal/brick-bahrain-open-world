@@ -74,7 +74,7 @@ cp -a "$TEMPLATE_DIR/unpacked/templates/." "$XDG_DATA_HOME/godot/export_template
 rm -rf "$GAME/.godot" "$GL_PROJECT" "$MOBILE_PROJECT"
 timeout --signal=TERM --kill-after=30s 1800s xvfb-run -a -s '-screen 0 1920x1080x24' \
   "$GODOT" --path "$GAME" --editor --import --quit --verbose \
-  --rendering-method mobile --rendering-driver vulkan 2>&1 | tee "$OUTPUT_ROOT/import.log"
+  --rendering-method gl_compatibility --rendering-driver opengl3 2>&1 | tee "$OUTPUT_ROOT/import.log"
 printf 'complete\n' > "$OUTPUT_ROOT/IMPORT_COMPLETE.txt"
 cp -a "$GAME" "$GL_PROJECT"
 cp -a "$GAME" "$MOBILE_PROJECT"
