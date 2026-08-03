@@ -58,10 +58,13 @@ class VisualUpgradeSliceATest(unittest.TestCase):
         self.assertIn("SaveManager.set_selected_character", selection)
         self.assertIn("func set_selected_character", save_manager)
 
-    def test_apk_identity_check_uses_manifest_analyzer(self) -> None:
+    def test_apk_identity_check_uses_manifest_analyzer_authority(self) -> None:
         workflow = read(".github/workflows/bahrain-brick-playable-mobile-apk-export.yml")
-        self.assertIn('apkanalyzer manifest application-id "$APK"', workflow)
-        self.assertNotIn('aapt" dump badging "$APK"', workflow)
+        self.assertIn('"$APKANALYZER" manifest application-id "$APK"', workflow)
+        self.assertIn('test "$APPLICATION_ID" = "com.brickbahrain.playable.mobile"', workflow)
+        self.assertIn("AAPT_STATUS=$?", workflow)
+        self.assertIn("Known aapt AndroidManifest android:required warning accepted", workflow)
+        self.assertIn("aapt dump badging failed unexpectedly", workflow)
 
 
 if __name__ == "__main__":
