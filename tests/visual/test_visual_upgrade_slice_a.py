@@ -66,6 +66,14 @@ class VisualUpgradeSliceATest(unittest.TestCase):
         self.assertIn("Known aapt AndroidManifest android:required warning accepted", workflow)
         self.assertIn("aapt dump badging failed unexpectedly", workflow)
 
+    def test_app_label_lookup_supplies_package_without_badging_discovery(self) -> None:
+        workflow = read(".github/workflows/bahrain-brick-playable-mobile-apk-export.yml")
+        self.assertIn(
+            'resources value --config default --name godot_project_name_string '
+            '--type string --package com.brickbahrain.playable.mobile "$APK"',
+            workflow,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
