@@ -1,0 +1,3 @@
+Validation-only trigger for corrected premium authority 425161e3f964683d12f62992c6b9c70a8f2e51a3.
+Required: clean recovery, frozen controls, all runtime suites including premium presentation, critical-error scan, official Godot 4.3 templates, Android export, APK inspection, packaging, and artifact upload.
+Do not merge this validation marker.
