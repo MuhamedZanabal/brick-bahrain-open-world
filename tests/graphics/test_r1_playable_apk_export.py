@@ -67,6 +67,25 @@ class R1PlayableApkExportTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly two diagnostic main-scene overrides"):
             module.patch_exporter_text('MOBILE_PACKAGE="com.brickbahrain.r1physical.mobile"')
 
+    def test_editor_import_uses_ci_safe_opengl3_without_changing_variant_targets(self) -> None:
+        text = BASE_EXPORTER.read_text(encoding="utf-8")
+        self.assertIn(
+            '--rendering-method gl_compatibility --rendering-driver opengl3',
+            text,
+        )
+        self.assertNotIn(
+            '--rendering-method mobile --rendering-driver vulkan',
+            text,
+        )
+        self.assertIn(
+            'python3 - "$GL_PROJECT" gl_compatibility "$GL_PACKAGE" gl_production',
+            text,
+        )
+        self.assertIn(
+            'python3 - "$MOBILE_PROJECT" mobile "$MOBILE_PACKAGE" mobile_baseline',
+            text,
+        )
+
     def test_wrapper_invokes_patcher_and_requires_playable_apk(self) -> None:
         text = WRAPPER.read_text(encoding="utf-8")
         self.assertIn("patch_r1_playable_export.py", text)
