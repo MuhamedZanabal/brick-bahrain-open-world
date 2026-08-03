@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tomllib
 import unittest
 import zipfile
 
@@ -32,6 +33,7 @@ EXPECTED_TOOLS = [
     "blender_validate_asset",
     "collect_build_evidence",
 ]
+LEGACY_TERMS = ("cl" + "aude", "." + "cl" + "aude", "cl" + "aude_project_dir", ".mcp" + ".json")
 
 
 def load_module(path: Path, name: str):
@@ -43,13 +45,13 @@ def load_module(path: Path, name: str):
     return module
 
 
-class ControlledAgentEnvironmentTests(unittest.TestCase):
-    def test_required_files_and_json(self) -> None:
+class ControlledCodexEnvironmentTests(unittest.TestCase):
+    def test_required_files_parse_and_legacy_paths_are_absent(self) -> None:
         required = [
-            "CLAUDE.md",
-            ".claude/settings.json",
-            ".mcp.json",
-            ".claude/hooks/bahrain_brick_hook.py",
+            "AGENTS.md",
+            ".codex/config.toml",
+            ".codex/hooks.json",
+            ".codex/hooks/bahrain_brick_hook.py",
             "tools/agent_env/bahrain_brick_mcp.py",
             "tools/agent_env/blender_asset_validator.py",
             "tools/agent_env/verify_environment.py",
@@ -57,46 +59,73 @@ class ControlledAgentEnvironmentTests(unittest.TestCase):
         ]
         for relative in required:
             self.assertTrue((ROOT / relative).is_file(), relative)
-        json.loads((ROOT / ".claude/settings.json").read_text())
-        json.loads((ROOT / ".mcp.json").read_text())
+        tomllib.loads((ROOT / ".codex/config.toml").read_text())
+        json.loads((ROOT / ".codex/hooks.json").read_text())
+        yaml_check = subprocess.run(
+            ["ruby", "-e", 'require "yaml"; value=YAML.load_file(ARGV.fetch(0)); abort "workflow must be a mapping" unless value.is_a?(Hash)', ".github/workflows/controlled-agent-environment.yml"],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
+        )
+        self.assertEqual(0, yaml_check.returncode, yaml_check.stderr)
+        self.assertFalse((ROOT / ("CL" + "AUDE.md")).exists())
+        self.assertFalse((ROOT / ("." + "cl" + "aude")).exists())
+        self.assertFalse((ROOT / (".mcp" + ".json")).exists())
 
-    def test_skill_and_agent_inventory(self) -> None:
-        skills = {path.parent.name for path in (ROOT / ".claude/skills").glob("*/SKILL.md")}
-        agents = {path.stem for path in (ROOT / ".claude/agents").glob("*.md")}
-        self.assertEqual(EXPECTED_SKILLS, skills)
-        self.assertEqual(EXPECTED_AGENTS, agents)
-        for path in (ROOT / ".claude/agents").glob("*.md"):
+    def test_skill_inventory_uses_codex_frontmatter(self) -> None:
+        paths = list((ROOT / ".agents/skills").glob("*/SKILL.md"))
+        self.assertEqual(EXPECTED_SKILLS, {path.parent.name for path in paths})
+        for path in paths:
             text = path.read_text()
-            self.assertIn("isolation: worktree", text)
-            self.assertIn("tools:", text)
+            self.assertTrue(text.startswith("---\n"))
+            frontmatter = text[4:text.index("\n---\n", 4)]
+            keys = {line.split(":", 1)[0] for line in frontmatter.splitlines() if line.strip()}
+            self.assertEqual({"name", "description"}, keys, path)
 
-    def test_permissions_and_hooks_are_least_privilege(self) -> None:
-        settings = json.loads((ROOT / ".claude/settings.json").read_text())
-        self.assertEqual({}, settings["enabledPlugins"])
-        self.assertEqual({"SessionStart", "PreToolUse", "PostToolUse", "Stop"}, set(settings["hooks"]))
-        deny = settings["permissions"]["deny"]
-        for rule in (
-            "Bash(git push --force*)",
-            "Bash(git reset --hard*)",
-            "Bash(git clean -f*)",
-            "Bash(rm -rf *)",
-            "Read(./**/*.keystore)",
-        ):
-            self.assertIn(rule, deny)
-        self.assertEqual([], settings["allowedHttpHookUrls"])
+    def test_agent_inventory_uses_codex_toml_and_parent_model(self) -> None:
+        paths = list((ROOT / ".codex/agents").glob("*.toml"))
+        self.assertEqual(EXPECTED_AGENTS, {path.stem for path in paths})
+        for path in paths:
+            data = tomllib.loads( path.read_text())
+            self.assertEqual(path.stem, data["name"])
+            self.assertTrue(data["description"])
+            self.assertTrue(data["developer_instructions"])
+            self.assertIn(data["sandbox_mode"], {"read-only", "workspace-write"})
+            self.assertNotIn("model", data)
 
-    def test_exact_single_local_mcp(self) -> None:
-        config = json.loads((ROOT / ".mcp.json").read_text())
-        self.assertEqual({"bahrain-brick-local"}, set(config["mcpServers"]))
-        server = config["mcpServers"]["bahrain-brick-local"]
-        self.assertEqual("python3", server["command"])
+    def test_codex_config_is_least_privilege(self) -> None:
+        config = tomllib.loads((ROOT / ".codex/config.toml").read_text())
+        self.assertEqual("on-request", config["approval_policy"])
+        self.assertEqual("workspace-write", config["sandbox_mode"])
+        self.assertFalse(config["sandbox_workspace_write"]["network_access"])
+        self.assertTrue(config["features"]["hooks"])
+        self.assertTrue(config["agents"]["enabled"])
+        self.assertEqual({"bahrain-brick-local"}, set(config["mcp_servers"]))
+        server = config["mcp_servers"]["bahrain-brick-local"]
+        self.assertEqual("bash", server["command"])
+        self.assertEqual(
+            ["-lc", 'ROOT=$(git rev-parse --show-toplevel) && exec python3 "$ROOT/tools/agent_env/bahrain_brick_mcp.py" --root "$ROOT"'],
+            server["args"],
+        )
+        self.assertEqual(EXPECTED_TOOLS, server["enabled_tools"])
+        self.assertFalse(server["supports_parallel_tool_calls"])
+        self.assertEqual("prompt", server["default_tools_approval_mode"])
+        self.assertEqual("auto", server["tools"]["godot_validate_project"]["approval_mode"])
+        self.assertEqual("auto", server["tools"]["collect_build_evidence"]["approval_mode"])
+        for name in ("godot_export_android_debug", "android_adb_smoke_test", "blender_validate_asset"):
+            self.assertEqual("prompt", server["tools"][name]["approval_mode"])
         serialized = json.dumps(server).lower()
         for forbidden in ("http://", "https://", "token", "password", "keystore"):
             self.assertNotIn(forbidden, serialized)
 
+    def test_hooks_cover_security_verification_and_completion(self) -> None:
+        config = json.loads((ROOT / ".codex/hooks.json").read_text())
+        self.assertEqual({"SessionStart", "PreToolUse", "PostToolUse", "Stop"}, set(config["hooks"]))
+        hook_text = (ROOT / ".codex/hooks/bahrain_brick_hook.py").read_text()
+        for token in ("git\\s+push", "git\\s+reset", "DROP", "TRUNCATE", "evidence-newest", "completion"):
+            self.assertIn(token, hook_text)
+
     def test_mcp_exposes_only_typed_tools_and_confines_paths(self) -> None:
         module = load_module(ROOT / "tools/agent_env/bahrain_brick_mcp.py", "bahrain_brick_mcp_test")
-        server = module.BahrainBrickMCP(ROOT)
+        server = module.BahrainBrickTools(ROOT)
         self.assertEqual(EXPECTED_TOOLS, [tool["name"] for tool in server.list_tools()])
         with self.assertRaises(module.ValidationError):
             server._resolve("../outside", must_exist=False)
@@ -105,56 +134,52 @@ class ControlledAgentEnvironmentTests(unittest.TestCase):
         with self.assertRaises(module.ValidationError):
             server._resolve("debug.keystore", must_exist=False)
 
-    def test_evidence_collection_does_not_require_signing_keys(self) -> None:
-        module = load_module(ROOT / "tools/agent_env/bahrain_brick_mcp.py", "bahrain_brick_mcp_evidence_test")
-        server = module.BahrainBrickMCP(ROOT)
-        build = ROOT / "build/controlled-agent-test"
+    def test_direct_typed_cli_and_evidence_collection(self) -> None:
+        build = ROOT / "build/controlled-codex-test"
         build.mkdir(parents=True, exist_ok=True)
         artifact = build / "fixture.apk"
         with zipfile.ZipFile(artifact, "w") as archive:
             archive.writestr("assets/project.binary", b"res://scenes/splash_screen.tscn")
-        result = server.collect_build_evidence(
-            {
-                "artifact_path": str(artifact.relative_to(ROOT)),
-                "output_path": "build/controlled-agent-test/evidence.json",
-            }
+        result = subprocess.run(
+            [sys.executable, "tools/agent_env/bahrain_brick_mcp.py", "--root", ".", "--invoke", "collect_build_evidence", "--arguments-json", json.dumps({"artifact_path": str(artifact.relative_to(ROOT)), "output_path": "build/controlled-codex-test/evidence.json"})],
+            cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False,
         )
-        self.assertTrue(result["passed"])
-        self.assertFalse(result["evidence"]["signing_material_accessed"])
-        self.assertTrue(result["evidence"]["zip_integrity"])
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["passed"])
+        self.assertFalse(payload["evidence"]["signing_material_accessed"])
+        self.assertTrue(payload["evidence"]["zip_integrity"])
+
+    def test_apply_patch_paths_are_discovered_for_post_edit_verification(self) -> None:
+        hook_module = load_module(ROOT / ".codex/hooks/bahrain_brick_hook.py", "bahrain_brick_hook_test")
+        patch = "*** Begin Patch\n*** Update File: scripts/example.gd\n*** Add File: tests/example_test.py\n*** End Patch\n"
+        self.assertEqual(
+            ["scripts/example.gd", "tests/example_test.py"],
+            hook_module.extract_edited_paths("apply_patch", {"command": patch}, {}),
+        )
 
     def test_hook_blocks_destructive_git_and_external_mcp_writes(self) -> None:
-        hook = ROOT / ".claude/hooks/bahrain_brick_hook.py"
+        hook = ROOT / ".codex/hooks/bahrain_brick_hook.py"
         cases = [
-            {
-                "hook_event_name": "PreToolUse",
-                "tool_name": "Bash",
-                "tool_input": {"command": "git push --force origin main"},
-            },
-            {
-                "hook_event_name": "PreToolUse",
-                "tool_name": "mcp__community__delete_database",
-                "tool_input": {"database": "prod"},
-            },
+            {"hook_event_name": "PreToolUse", "tool_name": "Bash", "tool_input": {"command": "git push --force origin main"}},
+            {"hook_event_name": "PreToolUse", "tool_name": "mcp__community__delete_database", "tool_input": {"database": "prod"}},
         ]
         for payload in cases:
-            result = subprocess.run(
-                [sys.executable, str(hook)],
-                input=json.dumps(payload),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                cwd=ROOT,
-                check=False,
-            )
+            result = subprocess.run([sys.executable, str(hook)], input=json.dumps(payload), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=ROOT, check=False)
             self.assertEqual(0, result.returncode, result.stderr)
             response = json.loads(result.stdout)
             self.assertEqual("deny", response["hookSpecificOutput"]["permissionDecision"])
 
-    def test_no_embedded_strong_secret_patterns(self) -> None:
-        verifier = load_module(ROOT / "tools/agent_env/verify_environment.py", "bahrain_brick_verifier_secret_test")
+    def test_no_embedded_secrets_or_legacy_provider_references(self) -> None:
+        verifier = load_module(ROOT / "tools/agent_env/verify_environment.py", "bahrain_brick_verifier_test")
         paths = verifier.control_file_paths()
         self.assertEqual([], verifier.scan_secrets(paths))
+        self.assertEqual([], verifier.provider_reference_findings(paths))
+        for path in paths:
+            if path.is_file():
+                lowered = path.read_text(errors="replace").lower()
+                for term in LEGACY_TERMS:
+                    self.assertNotIn(term, lowered, path)
 
 
 if __name__ == "__main__":

@@ -1,54 +1,34 @@
-# Bahrain Brick Controlled Agent Environment Design
+# Bahrain Brick Controlled Codex Environment Design
 
-## Decision
+## Objective
 
-Create an isolated project-scoped Claude Code control plane on top of the current R1 authority branch. The control plane wraps existing Godot, Android, asset, and CI authorities; it does not alter gameplay, renderer defaults, protected branches, package authority, or release state.
+Provide a project-scoped Codex operating environment for Godot gameplay, Android qualification, Blender asset validation, authoritative multiplayer, persistence, CI evidence, and release auditing without changing existing gameplay or renderer authority.
 
-## Authority
+## Native Codex layout
 
-- Repository: `MuhamedZanabal/brick-bahrain-open-world`
-- Base branch: `work/bahrain-brick-renderer-runtime-debugging-r1`
-- Base commit: `ac8edaef8853fb7e344b2e347f5de36a008c6ba7`
-- New branch: `work/bahrain-brick-controlled-agent-os-v1`
-- Godot authority: `4.3.stable.official.77dcf97d8`
-- Android CI authority: JDK 17, Android platform 34, build-tools 34.0.0
-- Renderer authority remains unresolved; production renderer changes are out of scope.
+- `AGENTS.md` is repository-wide instruction authority.
+- `.agents/skills/*/SKILL.md` contains six domain skills.
+- `.codex/agents/*.toml` contains five custom subagents that inherit the parent model.
+- `.codex/config.toml` sets on-request approval, workspace-write sandboxing, disabled sandbox network access, agent limits, and one local typed MCP server.
+- `.codex/hooks.json` and `.codex/hooks/bahrain_brick_hook.py` enforce security, post-edit verification, APK evidence, and completion checks.
 
-## Components
+## Platform compatibility
 
-1. Root `CLAUDE.md` records immutable project facts, authority resolution, architecture, security, tests, and release evidence.
-2. Six project skills provide domain procedures without loading all procedural detail into every session.
-3. Five project subagents use worktree isolation and least-privilege tool sets.
-4. One Python hook dispatcher blocks destructive operations, scans secrets, validates edits, runs relevant tests, and enforces completion evidence.
-5. One local stdio MCP server exposes exactly five typed tools: Godot validation, debug export, ADB smoke testing, Blender asset validation, and artifact evidence collection.
-6. One verifier validates configuration, agent/skill contracts, MCP behavior, tests, Godot availability, and evidence.
-7. One CI workflow exercises configuration, baseline contracts, Godot headless validation, and a non-publishing Android debug build attempt.
+Trusted Codex CLI or desktop sessions can load the local configuration and stdio MCP. Hosted sessions that cannot start repository-local processes use the same typed handlers through `python3 tools/agent_env/bahrain_brick_mcp.py --invoke ...` or GitHub Actions. No hosted fallback introduces arbitrary shell execution.
 
 ## Security model
 
-- No project community plugins.
-- No remote MCP servers.
-- Project MCP approval remains subject to workspace trust.
-- The MCP server resolves and confines every path to the repository root and approved `build/` or `release/` output roots.
-- MCP tools use fixed executable/argument templates; there is no arbitrary command or shell tool.
-- Keystores and credential files are denied to project file tools and are never MCP inputs or outputs.
-- Remote writes, releases, deployments, infrastructure mutation, database destruction, and high-impact Git actions require explicit permission or are denied.
-- Hooks inspect all Bash and MCP calls, including user-scoped MCP tools, and deny write/delete/deploy patterns outside the local allowlisted server.
+- Repository-root path confinement.
+- Build outputs only under `build/` or `release/`.
+- No signing key, token, password, or private-key inputs.
+- No community or remote MCP mutation tools.
+- Destructive Git, database, release, and device-data operations are blocked.
+- APK export, ADB writes, and Blender execution require approval.
 
-## Verification strategy
+## Verification
 
-- Static contract tests validate JSON, frontmatter, required files, exact MCP tool names, permissions, and absence of embedded secrets.
-- MCP smoke initializes the server, lists tools, invokes every non-destructive tool, and distinguishes pass, unavailable dependency, and execution failure.
-- Baseline tests execute representative existing vertical-slice and APK-export contracts.
-- Godot validation imports/parses the project headlessly using the pinned engine.
-- Android CI reuses the repository's existing debug-export script and uploads evidence only; it never publishes a release.
+The environment must parse all TOML, JSON, YAML, frontmatter, and agent definitions; expose exactly five typed tools; pass 10 static/security tests; run direct and MCP protocol smoke checks; run representative repository tests; validate the pinned Godot version; attempt a non-publishing Android debug export; and retain evidence even when the existing exporter remains blocked.
 
-## Acceptance criteria
+## Non-goals
 
-- All configuration files parse.
-- Exactly six skills, five agents, one project MCP server, and the required hooks are discoverable.
-- Destructive Git and secret-access contracts are denied.
-- MCP exposes no arbitrary shell, signing, remote write, release, infrastructure, or database mutation tool.
-- Static tests and MCP protocol smoke pass.
-- Godot and Android outcomes are reported as pass, fail, or unavailable with retained logs.
-- Existing protected authority files remain unchanged.
+This migration does not select a renderer, upgrade Godot, normalize package identities, alter production scenes, fix the R1 exporter, merge protected PRs, publish releases, or perform infrastructure/database mutation.

@@ -1,15 +1,6 @@
 ---
 name: bahrain-world-fidelity
 description: Review or design Bahrain Brick districts, landmarks, roads, coastline, culture, signage, missions, and environmental composition for recognizable Bahrain fidelity without false 1:1 claims.
-paths:
-  - "asset_lab/runtime/**/*layout*.json"
-  - "scenes/**/*district*.tscn"
-  - "docs/world/**"
-  - "assets/environment/**"
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
 ---
 
 ## Fidelity rules
@@ -25,7 +16,7 @@ allowed-tools:
 
 - Source evidence and date.
 - Recognizable relationships preserved.
-- Compression/deviation ledger.
-- Cultural and language review findings.
+- Compression and deviation ledger.
+- Cultural and language findings.
 - Gameplay readability and mobile-streaming implications.
-- Required asset/provenance updates.
+- Required asset and provenance updates.

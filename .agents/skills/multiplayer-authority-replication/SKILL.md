@@ -1,24 +1,11 @@
 ---
 name: multiplayer-authority-replication
 description: Design, implement, or audit Bahrain Brick dedicated-server authority, ENet replication, RPC validation, prediction, reconciliation, interest management, reconnect, anti-cheat, or load qualification.
-paths:
-  - "scripts/*multiplayer*.gd"
-  - "scripts/*server*.gd"
-  - "server/**"
-  - "backend/**"
-  - "tests/**/*network*"
-allowed-tools:
-  - Read
-  - Glob
-  - Grep
-  - Bash(python3 tools/agent_env/verify_environment.py *)
-disallowed-tools:
-  - mcp__bahrain-brick-local__android_adb_smoke_test
 ---
 
 ## Non-negotiable authority
 
-- The existing listen-server code is scaffolding, not evidence of a dedicated authoritative service.
+- Existing listen-server code is scaffolding, not evidence of a dedicated authoritative service.
 - Server owns durable state, movement acceptance, rewards, mission completion, inventory, property, and economy.
 - Never trust client-reported reward amounts, completion facts, timestamps, or ownership.
 
@@ -36,8 +23,8 @@ disallowed-tools:
 
 - Serialization round trips and malformed payload rejection.
 - Unauthorized peer and spoofed identity rejection.
-- Duplicate/replayed transaction rejection.
-- Movement speed/teleport validation with latency tolerance.
+- Duplicate or replayed transaction rejection.
+- Movement speed and teleport validation with latency tolerance.
 - Interest-management visibility boundaries.
-- Join/leave/reconnect/server-restart behavior.
+- Join, leave, reconnect, and server-restart behavior.
 - Tick duration, CPU, RAM, bandwidth, packet loss, divergence, and crash evidence.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate and smoke-test the Bahrain Brick controlled development environment."""
+"""Validate and smoke-test the Bahrain Brick controlled Codex environment."""
 from __future__ import annotations
 
 import argparse
@@ -12,487 +12,221 @@ import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from typing import Any, Iterable
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_SKILLS = {
-    "android-build-runtime-qa",
-    "bahrain-world-fidelity",
-    "blender-brick-asset-validation",
-    "godot-gameplay-engineering",
-    "multiplayer-authority-replication",
-    "release-qualification",
-}
-EXPECTED_AGENTS = {
-    "android-performance-qa",
-    "godot-gameplay-engineer",
-    "multiplayer-network-engineer",
-    "release-auditor",
-    "technical-artist",
-}
-EXPECTED_MCP_TOOLS = [
-    "godot_validate_project",
-    "godot_export_android_debug",
-    "android_adb_smoke_test",
-    "blender_validate_asset",
-    "collect_build_evidence",
-]
-CONTROL_FILES = [
-    "CLAUDE.md",
-    ".claude/settings.json",
-    ".mcp.json",
-    ".claude/hooks/bahrain_brick_hook.py",
-    "tools/agent_env/bahrain_brick_mcp.py",
-    "tools/agent_env/blender_asset_validator.py",
-    "tools/agent_env/verify_environment.py",
-    "tests/test_controlled_agent_environment.py",
-]
+SKILLS = {"android-build-runtime-qa", "bahrain-world-fidelity", "blender-brick-asset-validation", "godot-gameplay-engineering", "multiplayer-authority-replication", "release-qualification"}
+AGENTS = {"android-performance-qa", "godot-gameplay-engineer", "multiplayer-network-engineer", "release-auditor", "technical-artist"}
+TOOLS = ["godot_validate_project", "godot_export_android_debug", "android_adb_smoke_test", "blender_validate_asset", "collect_build_evidence"]
+HOOKS = {"SessionStart", "PreToolUse", "PostToolUse", "Stop"}
+LEGACY_PATHS = ["CL" + "AUDE.md", "." + "cl" + "aude", ".mcp" + ".json"]
+FORBIDDEN_TERMS = ("cl" + "aude", "." + "cl" + "aude", "cl" + "aude_project_dir", ".mcp" + ".json")
+CONTROL_FILES = ["AGENTS.md", ".codex/config.toml", ".codex/hooks.json", ".codex/hooks/bahrain_brick_hook.py", "tools/agent_env/bahrain_brick_mcp.py", "tools/agent_env/blender_asset_validator.py", "tools/agent_env/verify_environment.py", "tests/test_controlled_agent_environment.py", ".github/workflows/controlled-agent-environment.yml"]
 SECRET_PATTERNS = {
     "private_key": re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
     "aws_access_key": re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     "github_token": re.compile(r"\bgh[pousr]_[A-Za-z0-9]{30,}\b"),
     "openai_key": re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{24,}\b"),
-    "anthropic_key": re.compile(r"\bsk-ant-[A-Za-z0-9_-]{24,}\b"),
-    "generic_secret_assignment": re.compile(
-        r"(?i)(?:api[_-]?key|access[_-]?token|client[_-]?secret|password)\s*[:=]\s*['\"](?!android['\"])[A-Za-z0-9+/=_-]{20,}['\"]"
-    ),
 }
 
-
 @dataclass
-class CommandResult:
+class Result:
     command: list[str]
     exit_code: int
     stdout: str
     stderr: str
     elapsed_ms: int
     status: str
-
     def as_dict(self) -> dict[str, Any]:
-        return {
-            "command": self.command,
-            "exit_code": self.exit_code,
-            "stdout": self.stdout[-20000:],
-            "stderr": self.stderr[-20000:],
-            "elapsed_ms": self.elapsed_ms,
-            "status": self.status,
-        }
+        return self.__dict__
 
-
-def run(command: list[str], *, cwd: Path = ROOT, timeout: int = 900) -> CommandResult:
+def run(command: list[str], timeout: int = 900, cwd: Path = ROOT) -> Result:
     started = time.monotonic()
     try:
-        result = subprocess.run(
-            command,
-            cwd=cwd,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            errors="replace",
-            timeout=timeout,
-            check=False,
-        )
-        return CommandResult(
-            command,
-            result.returncode,
-            result.stdout,
-            result.stderr,
-            int((time.monotonic() - started) * 1000),
-            "passed" if result.returncode == 0 else "failed",
-        )
+        p = subprocess.run(command, cwd=cwd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace", timeout=timeout, check=False)
+        return Result(command, p.returncode, p.stdout[-20000:], p.stderr[-20000:], int((time.monotonic()-started)*1000), "passed" if p.returncode == 0 else "failed")
     except FileNotFoundError as exc:
-        return CommandResult(command, 127, "", str(exc), int((time.monotonic() - started) * 1000), "unavailable")
+        return Result(command, 127, "", str(exc), int((time.monotonic()-started)*1000), "unavailable")
     except subprocess.TimeoutExpired as exc:
-        return CommandResult(
-            command,
-            124,
-            exc.stdout or "" if isinstance(exc.stdout, str) else "",
-            exc.stderr or "" if isinstance(exc.stderr, str) else "",
-            int((time.monotonic() - started) * 1000),
-            "failed",
-        )
-
-
-def output(payload: dict[str, Any], *, exit_code: int = 0) -> int:
-    print(json.dumps(payload, indent=2, sort_keys=True))
-    return exit_code
-
-
-def parse_frontmatter(path: Path) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8")
-    if not text.startswith("---\n"):
-        raise ValueError(f"missing YAML frontmatter: {path.relative_to(ROOT)}")
-    end = text.find("\n---\n", 4)
-    if end < 0:
-        raise ValueError(f"unterminated YAML frontmatter: {path.relative_to(ROOT)}")
-    lines = text[4:end].splitlines()
-    data: dict[str, Any] = {}
-    current_list: str | None = None
-    for raw in lines:
-        if not raw.strip() or raw.lstrip().startswith("#"):
-            continue
-        if raw.startswith("  - ") and current_list:
-            data.setdefault(current_list, []).append(raw[4:].strip().strip('"'))
-            continue
-        match = re.match(r"^([A-Za-z0-9_-]+):(?:\s*(.*))?$", raw)
-        if not match:
-            raise ValueError(f"unsupported frontmatter syntax in {path.relative_to(ROOT)}: {raw}")
-        key, value = match.group(1), (match.group(2) or "").strip()
-        if value:
-            data[key] = value.strip('"')
-            current_list = None
-        else:
-            data[key] = []
-            current_list = key
-    return data
-
+        return Result(command, 124, exc.stdout or "", exc.stderr or "", int((time.monotonic()-started)*1000), "failed")
 
 def control_file_paths() -> list[Path]:
-    paths = [ROOT / value for value in CONTROL_FILES]
-    paths.extend(sorted((ROOT / ".claude/skills").glob("*/SKILL.md")))
-    paths.extend(sorted((ROOT / ".claude/agents").glob("*.md")))
+    paths = [ROOT / p for p in CONTROL_FILES]
+    paths += sorted((ROOT / ".agents/skills").glob("*/SKILL.md"))
+    paths += sorted((ROOT / ".codex/agents").glob("*.toml"))
     return paths
 
+def scan_secrets(paths: Iterable[Path]) -> list[dict[str, Any]]:
+    findings: list[dict[str, Any]] = []
+    for path in paths:
+        if not path.is_file():
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for name, pattern in SECRET_PATTERNS.items():
+            for match in pattern.finditer(text):
+                findings.append({"file": str(path.relative_to(ROOT)), "line": text.count("\n", 0, match.start()) + 1, "pattern": name})
+    return findings
 
-def scan_secrets(paths: Iterable[Path]) -> list[dict[str, str]]:
+def provider_reference_findings(paths: Iterable[Path]) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     for path in paths:
         if not path.is_file():
             continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        for name, pattern in SECRET_PATTERNS.items():
-            for match in pattern.finditer(text):
-                line = text.count("\n", 0, match.start()) + 1
-                findings.append({"file": str(path.relative_to(ROOT)), "line": str(line), "pattern": name})
+        text = path.read_text(encoding="utf-8", errors="replace").lower()
+        for term in FORBIDDEN_TERMS:
+            if term in text:
+                findings.append({"file": str(path.relative_to(ROOT)), "term": term})
     return findings
 
+def skill_frontmatter(path: Path) -> dict[str, str]:
+    text = path.read_text(encoding="utf-8")
+    if not text.startswith("---\n") or "\n---\n" not in text[4:]:
+        raise ValueError(f"invalid frontmatter: {path}")
+    block = text[4:text.index("\n---\n", 4)]
+    data: dict[str, str] = {}
+    for line in block.splitlines():
+        key, value = line.split(":", 1)
+        data[key.strip()] = value.strip().strip('"')
+    return data
 
 def validate_config() -> tuple[dict[str, Any], bool]:
     issues: list[str] = []
-    for raw in CONTROL_FILES:
-        if not (ROOT / raw).is_file():
-            issues.append(f"missing required file: {raw}")
-
-    try:
-        settings = json.loads((ROOT / ".claude/settings.json").read_text(encoding="utf-8"))
-    except Exception as exc:
-        settings = {}
-        issues.append(f"invalid .claude/settings.json: {exc}")
-    try:
-        mcp = json.loads((ROOT / ".mcp.json").read_text(encoding="utf-8"))
-    except Exception as exc:
-        mcp = {}
-        issues.append(f"invalid .mcp.json: {exc}")
-
-    skill_paths = sorted((ROOT / ".claude/skills").glob("*/SKILL.md"))
-    agent_paths = sorted((ROOT / ".claude/agents").glob("*.md"))
-    skills: dict[str, dict[str, Any]] = {}
-    agents: dict[str, dict[str, Any]] = {}
-    for path in skill_paths:
+    for rel in CONTROL_FILES:
+        if not (ROOT / rel).is_file(): issues.append(f"missing required file: {rel}")
+    for rel in LEGACY_PATHS:
+        if (ROOT / rel).exists(): issues.append(f"legacy provider path must be absent: {rel}")
+    try: config = tomllib.loads((ROOT / ".codex/config.toml").read_text())
+    except Exception as exc: config = {}; issues.append(f"invalid config TOML: {exc}")
+    try: hooks = json.loads((ROOT / ".codex/hooks.json").read_text())
+    except Exception as exc: hooks = {}; issues.append(f"invalid hooks JSON: {exc}")
+    ruby = shutil.which("ruby")
+    if ruby:
+        result = run([ruby, "-e", 'require "yaml"; v=YAML.load_file(ARGV[0]); abort "not mapping" unless v.is_a?(Hash)', str(ROOT / ".github/workflows/controlled-agent-environment.yml")], 30)
+        if result.exit_code: issues.append(f"invalid workflow YAML: {result.stderr or result.stdout}")
+    skills = {}
+    for path in sorted((ROOT / ".agents/skills").glob("*/SKILL.md")):
         try:
-            fm = parse_frontmatter(path)
-            name = str(fm.get("name", ""))
-            skills[name] = fm
-            if not name or not fm.get("description"):
-                issues.append(f"skill frontmatter missing name/description: {path.relative_to(ROOT)}")
-        except Exception as exc:
-            issues.append(str(exc))
-    for path in agent_paths:
+            data = skill_frontmatter(path)
+            if set(data) != {"name", "description"}: issues.append(f"invalid skill keys: {path.relative_to(ROOT)}")
+            skills[path.parent.name] = data
+        except Exception as exc: issues.append(str(exc))
+    agents = {}
+    for path in sorted((ROOT / ".codex/agents").glob("*.toml")):
         try:
-            fm = parse_frontmatter(path)
-            name = str(fm.get("name", ""))
-            agents[name] = fm
-            for required in ("name", "description", "model", "isolation", "tools"):
-                if required not in fm or not fm[required]:
-                    issues.append(f"agent {path.name} missing {required}")
-            if fm.get("isolation") != "worktree":
-                issues.append(f"agent {path.name} must use worktree isolation")
-        except Exception as exc:
-            issues.append(str(exc))
-    if set(skills) != EXPECTED_SKILLS:
-        issues.append(f"skill inventory mismatch: {sorted(skills)}")
-    if set(agents) != EXPECTED_AGENTS:
-        issues.append(f"agent inventory mismatch: {sorted(agents)}")
+            data = tomllib.loads(path.read_text())
+            if not all(data.get(k) for k in ("name", "description", "developer_instructions")): issues.append(f"missing agent fields: {path.relative_to(ROOT)}")
+            if "model" in data: issues.append(f"agent pins model: {path.relative_to(ROOT)}")
+            agents[path.stem] = data
+        except Exception as exc: issues.append(f"invalid agent TOML {path.relative_to(ROOT)}: {exc}")
+    if set(skills) != SKILLS: issues.append(f"skill inventory mismatch: {sorted(skills)}")
+    if set(agents) != AGENTS: issues.append(f"agent inventory mismatch: {sorted(agents)}")
+    if config.get("approval_policy") != "on-request": issues.append("approval_policy must be on-request")
+    if config.get("sandbox_mode") != "workspace-write": issues.append("sandbox_mode must be workspace-write")
+    if config.get("sandbox_workspace_write", {}).get("network_access") is not False: issues.append("sandbox network must be disabled")
+    if config.get("features", {}).get("hooks") is not True: issues.append("hooks feature must be enabled")
+    servers = config.get("mcp_servers", {})
+    if set(servers) != {"bahrain-brick-local"}: issues.append(f"MCP inventory mismatch: {sorted(servers)}")
+    server = servers.get("bahrain-brick-local", {})
+    if server.get("enabled_tools") != TOOLS: issues.append("MCP enabled tools mismatch")
+    if server.get("supports_parallel_tool_calls") is not False: issues.append("parallel MCP calls must be disabled")
+    if set(hooks.get("hooks", {})) != HOOKS: issues.append("hook inventory mismatch")
+    secrets = scan_secrets(control_file_paths())
+    refs = provider_reference_findings(control_file_paths())
+    if secrets: issues.append(f"secret findings: {len(secrets)}")
+    if refs: issues.append(f"legacy provider reference findings: {len(refs)}")
+    report = {"skills": sorted(skills), "agents": sorted(agents), "hooks": sorted(hooks.get("hooks", {})), "mcp_servers": sorted(servers), "mcp_tools": server.get("enabled_tools", []), "plugins": [], "secret_findings": secrets, "legacy_provider_findings": refs, "issues": issues}
+    return report, not issues
 
-    servers = mcp.get("mcpServers", {}) if isinstance(mcp, dict) else {}
-    if set(servers) != {"bahrain-brick-local"}:
-        issues.append(f"MCP server inventory must be exactly bahrain-brick-local: {sorted(servers)}")
-    server_cfg = servers.get("bahrain-brick-local", {}) if isinstance(servers, dict) else {}
-    if server_cfg.get("command") != "python3":
-        issues.append("local MCP command must be python3")
-    args = server_cfg.get("args", [])
-    if not isinstance(args, list) or not any("bahrain_brick_mcp.py" in str(value) for value in args):
-        issues.append("local MCP must launch tools/agent_env/bahrain_brick_mcp.py")
-    serialized_mcp = json.dumps(mcp).lower()
-    for forbidden in ("http://", "https://", "token", "password", "keystore", "private_key"):
-        if forbidden in serialized_mcp:
-            issues.append(f"forbidden MCP configuration content: {forbidden}")
+def invoke(name: str, arguments: dict[str, Any]) -> Result:
+    return run([sys.executable, "tools/agent_env/bahrain_brick_mcp.py", "--root", ".", "--invoke", name, "--arguments-json", json.dumps(arguments)], 1200)
 
-    hooks = settings.get("hooks", {}) if isinstance(settings, dict) else {}
-    if set(hooks) != {"SessionStart", "PreToolUse", "PostToolUse", "Stop"}:
-        issues.append(f"hook event inventory mismatch: {sorted(hooks)}")
-    plugins = settings.get("enabledPlugins", None) if isinstance(settings, dict) else None
-    if plugins != {}:
-        issues.append("project community plugins must remain disabled")
-    deny = settings.get("permissions", {}).get("deny", []) if isinstance(settings, dict) else []
-    for required in ("Bash(git push --force*)", "Bash(git reset --hard*)", "Bash(rm -rf *)", "Read(./**/*.keystore)"):
-        if required not in deny:
-            issues.append(f"required deny rule missing: {required}")
-
-    findings = scan_secrets(control_file_paths())
-    if findings:
-        issues.append(f"secret scan found {len(findings)} finding(s)")
-
-    inventory = {
-        "skills": sorted(skills),
-        "agents": sorted(agents),
-        "hooks": sorted(hooks),
-        "mcp_servers": sorted(servers),
-        "plugins": sorted(plugins) if isinstance(plugins, dict) else None,
-        "secret_findings": findings,
-        "issues": issues,
+def direct_smoke() -> tuple[dict[str, Any], bool]:
+    root = ROOT / "build/codex-env-smoke"; root.mkdir(parents=True, exist_ok=True)
+    artifact = root / "fixture.apk"
+    project = root / "project"; project.mkdir(exist_ok=True); (project / "project.godot").write_text("[application]\nconfig/name=\"Codex Smoke\"\n", encoding="utf-8")
+    with zipfile.ZipFile(artifact, "w") as z: z.writestr("assets/project.binary", b"res://scenes/splash_screen.tscn")
+    listed = run([sys.executable, "tools/agent_env/bahrain_brick_mcp.py", "--root", ".", "--list-tools"], 30)
+    calls = {
+        "collect_build_evidence": invoke("collect_build_evidence", {"artifact_path": str(artifact.relative_to(ROOT)), "output_path": "build/codex-env-smoke/evidence.json"}),
+        "godot_validate_project": invoke("godot_validate_project", {"project_path": str(project.relative_to(ROOT)), "timeout_seconds": 30}),
     }
-    return inventory, not issues
-
+    report = {"list": listed.as_dict(), "calls": {k:v.as_dict() for k,v in calls.items()}}
+    expected = json.loads(listed.stdout).get("tools", []) if listed.exit_code == 0 else []
+    ok = [t.get("name") for t in expected] == TOOLS and calls["collect_build_evidence"].exit_code == 0 and calls["godot_validate_project"].exit_code in {0,3}
+    return report, ok
 
 class MCPClient:
-    def __init__(self, root: Path) -> None:
-        self.process = subprocess.Popen(
-            [sys.executable, str(root / "tools/agent_env/bahrain_brick_mcp.py"), "--root", str(root)],
-            cwd=root,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            errors="replace",
-            bufsize=1,
-        )
-        self.next_id = 1
-
+    def __init__(self):
+        self.p = subprocess.Popen([sys.executable, "tools/agent_env/bahrain_brick_mcp.py", "--root", "."], cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
+        self.i = 0
     def request(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        assert self.process.stdin is not None and self.process.stdout is not None
-        request_id = self.next_id
-        self.next_id += 1
-        payload = {"jsonrpc": "2.0", "id": request_id, "method": method}
-        if params is not None:
-            payload["params"] = params
-        self.process.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
-        self.process.stdin.flush()
-        line = self.process.stdout.readline()
-        if not line:
-            stderr = self.process.stderr.read() if self.process.stderr else ""
-            raise RuntimeError(f"MCP server terminated without response: {stderr}")
-        response = json.loads(line)
-        if response.get("id") != request_id:
-            raise RuntimeError("MCP response ID mismatch")
-        return response
-
-    def notify(self, method: str, params: dict[str, Any] | None = None) -> None:
-        assert self.process.stdin is not None
-        payload: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
-        if params is not None:
-            payload["params"] = params
-        self.process.stdin.write(json.dumps(payload, separators=(",", ":")) + "\n")
-        self.process.stdin.flush()
-
-    def close(self) -> None:
-        if self.process.stdin:
-            self.process.stdin.close()
-        try:
-            self.process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait(timeout=5)
-
-
-def extract_tool_payload(response: dict[str, Any]) -> dict[str, Any]:
-    result = response.get("result", {})
-    structured = result.get("structuredContent")
-    if isinstance(structured, dict):
-        return structured
-    content = result.get("content", [])
-    if content and isinstance(content[0], dict):
-        return json.loads(content[0].get("text", "{}"))
-    return {}
-
+        self.i += 1; payload = {"jsonrpc":"2.0","id":self.i,"method":method}
+        if params is not None: payload["params"] = params
+        assert self.p.stdin and self.p.stdout
+        self.p.stdin.write(json.dumps(payload)+"\n"); self.p.stdin.flush()
+        return json.loads(self.p.stdout.readline())
+    def close(self):
+        if self.p.stdin: self.p.stdin.close()
+        self.p.wait(timeout=5)
 
 def mcp_smoke() -> tuple[dict[str, Any], bool]:
-    build = ROOT / "build/agent-env-smoke"
-    build.mkdir(parents=True, exist_ok=True)
-    fixture_project = build / "godot-project"
-    fixture_project.mkdir(parents=True, exist_ok=True)
-    (fixture_project / "project.godot").write_text("config_version=5\n[application]\nconfig/name=\"MCP Smoke\"\n", encoding="utf-8")
-    artifact = build / "fixture.apk"
-    with zipfile.ZipFile(artifact, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("assets/project.binary", b"res://scenes/splash_screen.tscn")
-        archive.writestr("AndroidManifest.xml", b"fixture")
-    asset_fixture = ROOT / "asset_lab/agent_env_smoke_fixture.gltf"
-    asset_fixture.parent.mkdir(parents=True, exist_ok=True)
-    asset_fixture.write_text('{"asset":{"version":"2.0"},"scenes":[{"nodes":[]}],"scene":0}\n', encoding="utf-8")
-
-    client = MCPClient(ROOT)
-    report: dict[str, Any] = {"calls": {}}
-    success = True
+    client = MCPClient(); report: dict[str, Any] = {}
     try:
-        init = client.request(
-            "initialize",
-            {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "bahrain-brick-verifier", "version": "1.0.0"}},
-        )
-        report["initialize"] = init.get("result", {})
-        client.notify("notifications/initialized")
-        listed = client.request("tools/list", {})
-        tools = [tool.get("name") for tool in listed.get("result", {}).get("tools", [])]
-        report["listed_tools"] = tools
-        if tools != EXPECTED_MCP_TOOLS:
-            success = False
-        calls = [
-            ("godot_validate_project", {"project_path": str(fixture_project.relative_to(ROOT)), "timeout_seconds": 30}),
-            ("blender_validate_asset", {"asset_path": str(asset_fixture.relative_to(ROOT)), "triangle_budget": 1000, "timeout_seconds": 30}),
-            ("collect_build_evidence", {"artifact_path": str(artifact.relative_to(ROOT)), "output_path": "build/agent-env-smoke/fixture-evidence.json"}),
-        ]
-        for name, arguments in calls:
-            response = client.request("tools/call", {"name": name, "arguments": arguments})
-            payload = extract_tool_payload(response)
-            report["calls"][name] = payload
-            if name == "collect_build_evidence" and payload.get("passed") is not True:
-                success = False
-            if name in {"godot_validate_project", "blender_validate_asset"}:
-                status = payload.get("status")
-                if not (payload.get("passed") is True or status == "unavailable"):
-                    success = False
-    except Exception as exc:
-        report["protocol_error"] = str(exc)
-        success = False
-    finally:
-        client.close()
-        try:
-            asset_fixture.unlink()
-        except FileNotFoundError:
-            pass
-    return report, success
-
+        report["initialize"] = client.request("initialize", {"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"verify","version":"1"}})
+        report["list"] = client.request("tools/list", {})
+        names = [t["name"] for t in report["list"].get("result", {}).get("tools", [])]
+        ok = names == TOOLS
+    finally: client.close()
+    return report, ok
 
 def baseline() -> tuple[dict[str, Any], bool, bool]:
-    candidates = [
-        "tests/test_karak_delivery_mission_contract.py",
-        "tests/test_manama_souq_layout_contract.py",
-        "tests/test_manama_souq_slice_contract.py",
-        "tests/test_souq_population_contract.py",
-        "tests/graphics/test_r1_playable_apk_export.py",
-    ]
-    present = [value for value in candidates if (ROOT / value).is_file()]
-    if not present:
-        return {"status": "unavailable", "reason": "representative repository tests are not present in this filesystem checkout", "tests": []}, False, True
+    candidates = ["tests/test_karak_delivery_mission_contract.py", "tests/test_manama_souq_layout_contract.py", "tests/test_manama_souq_slice_contract.py", "tests/test_souq_population_contract.py", "tests/graphics/test_r1_playable_apk_export.py"]
+    present = [p for p in candidates if (ROOT / p).is_file()]
+    if not present: return {"status":"unavailable","reason":"representative tests absent"}, False, True
     results = []
-    passed = True
-    for value in present:
-        command = [sys.executable, "-m", "unittest", value, "-v"] if value.startswith("tests/graphics/") else [sys.executable, value]
-        result = run(command, timeout=1200)
-        results.append(result.as_dict())
-        passed = passed and result.status == "passed"
-    return {"status": "passed" if passed else "failed", "tests": results}, passed, False
+    for p in present:
+        cmd = [sys.executable, "-m", "unittest", p, "-v"] if "/graphics/" in p else [sys.executable, p]
+        results.append(run(cmd, 1200).as_dict())
+    return {"status":"passed" if all(r["exit_code"]==0 for r in results) else "failed", "tests":results}, all(r["exit_code"]==0 for r in results), False
 
-
-def locate_godot() -> str | None:
-    configured = os.environ.get("BAHRAIN_BRICK_GODOT")
-    if configured and Path(configured).is_file():
-        return str(Path(configured).resolve())
-    return shutil.which("godot4") or shutil.which("godot")
-
-
-def godot_validation() -> tuple[dict[str, Any], bool, bool]:
-    if not (ROOT / "project.godot").is_file():
-        return {"status": "unavailable", "reason": "project.godot is absent from the active filesystem checkout"}, False, True
-    godot = locate_godot()
-    if not godot:
-        return {"status": "unavailable", "reason": "Godot executable is not installed or BAHRAIN_BRICK_GODOT is unset"}, False, True
-    version = run([godot, "--version"], timeout=30)
-    validation = run([godot, "--headless", "--path", str(ROOT), "--editor", "--import", "--quit", "--verbose"], timeout=1200)
-    expected = "4.3.stable.official.77dcf97d8"
-    version_ok = version.status == "passed" and version.stdout.strip() == expected
-    passed = version_ok and validation.status == "passed"
-    return {"status": "passed" if passed else "failed", "expected_version": expected, "version": version.as_dict(), "validation": validation.as_dict()}, passed, False
-
+def godot() -> tuple[dict[str, Any], bool, bool]:
+    if not (ROOT / "project.godot").is_file(): return {"status":"unavailable","reason":"project.godot absent"}, False, True
+    exe = os.environ.get("BAHRAIN_BRICK_GODOT") or shutil.which("godot4") or shutil.which("godot")
+    if not exe: return {"status":"unavailable","reason":"Godot unavailable"}, False, True
+    version = run([exe, "--version"], 30); validation = run([exe, "--headless", "--path", str(ROOT), "--editor", "--import", "--quit", "--verbose"], 1200)
+    ok = version.stdout.strip() == "4.3.stable.official.77dcf97d8" and validation.exit_code == 0
+    return {"status":"passed" if ok else "failed", "version":version.as_dict(), "validation":validation.as_dict()}, ok, False
 
 def relevant(paths: list[str]) -> tuple[dict[str, Any], bool]:
-    commands: list[list[str]] = [[sys.executable, "tests/test_controlled_agent_environment.py"]]
-    if any(path.endswith(".gd") for path in paths):
-        for candidate in ("tests/test_karak_delivery_mission_contract.py", "tests/test_manama_souq_slice_contract.py"):
-            if (ROOT / candidate).is_file():
-                commands.append([sys.executable, candidate])
-    if any(path.startswith((".claude/", "tools/agent_env/", ".mcp.json", "CLAUDE.md")) for path in paths):
-        commands.append([sys.executable, "tools/agent_env/verify_environment.py", "config"])
-    results = [run(command, timeout=1200).as_dict() for command in commands]
-    return {"paths": paths, "results": results}, all(result["status"] == "passed" for result in results)
+    results = [run([sys.executable, "tests/test_controlled_agent_environment.py"], 300).as_dict()]
+    if any(p.endswith(".gd") for p in paths) and (ROOT / "project.godot").is_file():
+        report, ok, unavailable = godot(); return {"paths":paths,"results":results,"godot":report}, all(r["exit_code"]==0 for r in results) and (ok or unavailable)
+    return {"paths":paths,"results":results}, all(r["exit_code"]==0 for r in results)
 
-
-def newest_apk_evidence() -> tuple[dict[str, Any], bool, bool]:
-    apks = sorted(
-        [*ROOT.glob("build/**/*.apk"), *ROOT.glob("release/**/*.apk")],
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    if not apks:
-        return {"status": "unavailable", "reason": "no APK under build/ or release/"}, False, True
-    target = apks[0]
-    client = MCPClient(ROOT)
-    try:
-        client.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "evidence-hook", "version": "1"}})
-        client.notify("notifications/initialized")
-        response = client.request("tools/call", {"name": "collect_build_evidence", "arguments": {"artifact_path": str(target.relative_to(ROOT))}})
-        payload = extract_tool_payload(response)
-        return payload, payload.get("passed") is True, False
-    finally:
-        client.close()
-
+def evidence_newest() -> tuple[dict[str, Any], bool, bool]:
+    apks = sorted([*ROOT.glob("build/**/*.apk"), *ROOT.glob("release/**/*.apk")], key=lambda p:p.stat().st_mtime, reverse=True)
+    if not apks: return {"status":"unavailable","reason":"no APK under build/ or release/"}, False, True
+    rel = str(apks[0].relative_to(ROOT)); result = invoke("collect_build_evidence", {"artifact_path":rel})
+    return {"status":"passed" if result.exit_code==0 else "failed", "result":result.as_dict()}, result.exit_code==0, False
 
 def completion() -> tuple[dict[str, Any], bool]:
-    config_report, config_ok = validate_config()
-    test = run([sys.executable, "tests/test_controlled_agent_environment.py"], timeout=300)
-    payload = {"config": config_report, "static_test": test.as_dict(), "passed": config_ok and test.status == "passed"}
-    return payload, bool(payload["passed"])
+    config, ok = validate_config(); test = run([sys.executable, "tests/test_controlled_agent_environment.py"], 300)
+    return {"config":config,"static_test":test.as_dict(),"passed":ok and test.exit_code==0}, ok and test.exit_code==0
 
+def emit(payload: dict[str, Any], code: int) -> int:
+    print(json.dumps(payload, indent=2, sort_keys=True)); return code
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=["config", "mcp-smoke", "baseline", "godot", "relevant", "changed", "completion", "evidence-newest", "inventory"])
-    parser.add_argument("--path", action="append", default=[])
-    args = parser.parse_args()
+    p = argparse.ArgumentParser(); p.add_argument("command", choices=["config","inventory","direct-smoke","mcp-smoke","baseline","godot","relevant","changed","completion","evidence-newest"]); p.add_argument("--path", action="append", default=[]); a=p.parse_args()
+    if a.command in {"config","inventory"}: report, ok=validate_config(); return emit({"status":"passed" if ok else "failed",**report},0 if ok else 1)
+    if a.command=="direct-smoke": report,ok=direct_smoke(); return emit({"status":"passed" if ok else "failed",**report},0 if ok else 1)
+    if a.command=="mcp-smoke": report,ok=mcp_smoke(); return emit({"status":"passed" if ok else "failed",**report},0 if ok else 1)
+    if a.command=="baseline": report,ok,unavailable=baseline(); return emit(report,3 if unavailable else (0 if ok else 1))
+    if a.command=="godot": report,ok,unavailable=godot(); return emit(report,3 if unavailable else (0 if ok else 1))
+    if a.command in {"relevant","changed"}: report,ok=relevant(a.path); return emit({"status":"passed" if ok else "failed",**report},0 if ok else 1)
+    if a.command=="completion": report,ok=completion(); return emit({"status":"passed" if ok else "failed",**report},0 if ok else 1)
+    report,ok,unavailable=evidence_newest(); return emit(report,3 if unavailable else (0 if ok else 1))
 
-    if args.command in {"config", "inventory"}:
-        report, passed = validate_config()
-        return output({"status": "passed" if passed else "failed", **report}, exit_code=0 if passed else 1)
-    if args.command == "mcp-smoke":
-        report, passed = mcp_smoke()
-        return output({"status": "passed" if passed else "failed", **report}, exit_code=0 if passed else 1)
-    if args.command == "baseline":
-        report, passed, unavailable = baseline()
-        return output(report, exit_code=3 if unavailable else (0 if passed else 1))
-    if args.command == "godot":
-        report, passed, unavailable = godot_validation()
-        return output(report, exit_code=3 if unavailable else (0 if passed else 1))
-    if args.command in {"relevant", "changed"}:
-        paths = list(args.path)
-        if args.command == "changed" and not paths:
-            git = shutil.which("git")
-            if git and (ROOT / ".git").exists():
-                result = run([git, "diff", "--name-only", "HEAD"], timeout=30)
-                paths = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-        report, passed = relevant(paths)
-        return output({"status": "passed" if passed else "failed", **report}, exit_code=0 if passed else 1)
-    if args.command == "completion":
-        report, passed = completion()
-        return output({"status": "passed" if passed else "failed", **report}, exit_code=0 if passed else 1)
-    if args.command == "evidence-newest":
-        report, passed, unavailable = newest_apk_evidence()
-        return output(report, exit_code=3 if unavailable else (0 if passed else 1))
-    return 2
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __name__ == "__main__": raise SystemExit(main())

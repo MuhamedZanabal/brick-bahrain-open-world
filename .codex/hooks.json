@@ -1,0 +1,55 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/bahrain_brick_hook.py\"",
+            "timeout": 30,
+            "statusMessage": "Loading Bahrain Brick authority"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/bahrain_brick_hook.py\"",
+            "timeout": 30,
+            "statusMessage": "Checking Bahrain Brick security policy"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__bahrain-brick-local__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/bahrain_brick_hook.py\"",
+            "timeout": 1200,
+            "statusMessage": "Verifying Bahrain Brick changes"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/bahrain_brick_hook.py\"",
+            "timeout": 1200,
+            "statusMessage": "Running completion verification"
+          }
+        ]
+      }
+    ]
+  }
+}
