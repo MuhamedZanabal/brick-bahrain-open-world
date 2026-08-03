@@ -1,0 +1,3 @@
+Validation-only trigger for integrated premium visual upgrade v3.
+Base premium commit: 998106cce3485f711cff1e9ef2f59c4133349e21
+Required: import, runtime smoke, controls 28/28, presentation 10/10, premium world 12/12, premium presentation acceptance, matched runtime evidence, frozen controls, Android export/signature/alignment.
