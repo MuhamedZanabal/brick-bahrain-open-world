@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "default",
+    "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch --show-current)",
+      "Bash(python3 tools/agent_env/verify_environment.py *)",
+      "Bash(python3 tests/test_controlled_agent_environment.py)",
+      "mcp__bahrain-brick-local__godot_validate_project",
+      "mcp__bahrain-brick-local__blender_validate_asset",
+      "mcp__bahrain-brick-local__collect_build_evidence"
+    ],
+    "ask": [
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gh pr create *)",
+      "Bash(gh release *)",
+      "Bash(terraform *)",
+      "Bash(kubectl *)",
+      "Bash(aws *)",
+      "Bash(gcloud *)",
+      "mcp__bahrain-brick-local__godot_export_android_debug",
+      "mcp__bahrain-brick-local__android_adb_smoke_test"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./**/*.p12)",
+      "Read(./**/*.pfx)",
+      "Read(./**/*.jks)",
+      "Read(./**/*.keystore)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -f*)",
+      "Bash(git branch -D *)",
+      "Bash(git tag -d *)",
+      "Bash(rm -rf *)",
+      "Bash(gh release delete *)",
+      "Bash(adb uninstall *)",
+      "Bash(adb shell pm clear *)",
+      "Bash(dropdb *)",
+      "Bash(psql *DROP *)",
+      "Bash(psql *TRUNCATE *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": false,
+    "filesystem": {
+      "denyRead": [
+        ".env",
+        ".env.*",
+        "secrets/**",
+        "**/*.pem",
+        "**/*.key",
+        "**/*.p12",
+        "**/*.pfx",
+        "**/*.jks",
+        "**/*.keystore"
+      ],
+      "allowWrite": [
+        "."
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "github.com",
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "objects.githubusercontent.com"
+      ],
+      "allowLocalBinding": false,
+      "allowAllUnixSockets": false
+    }
+  },
+  "allowedHttpHookUrls": [],
+  "httpHookAllowedEnvVars": [],
+  "enabledPlugins": {},
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/bahrain_brick_hook.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/bahrain_brick_hook.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/bahrain_brick_hook.py\"",
+            "timeout": 900
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|mcp__bahrain-brick-local__godot_export_android_debug",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/bahrain_brick_hook.py\"",
+            "timeout": 180
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/bahrain_brick_hook.py\"",
+            "timeout": 1200
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "bahrain-brick-local": {
+      "command": "python3",
+      "args": [
+        "${CLAUDE_PROJECT_DIR:-.}/tools/agent_env/bahrain_brick_mcp.py",
+        "--root",
+        "${CLAUDE_PROJECT_DIR:-.}"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      },
+      "timeout": 1200000
+    }
+  }
+}
