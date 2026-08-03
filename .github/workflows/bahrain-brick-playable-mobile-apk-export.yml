@@ -93,42 +93,6 @@ jobs:
           set -euo pipefail
           bash tools/graphics/export_r1_playable_mobile_apk.sh "$GITHUB_WORKSPACE" "$OUTPUT_ROOT"
 
-      - name: Print export diagnostics on failure
-        if: failure()
-        shell: bash
-        run: |
-          set +e
-          printf '%s\n' '===== output inventory ====='
-          find "$OUTPUT_ROOT" -maxdepth 3 -type f -printf '%p %s bytes\n' | sort
-          for log in \
-            "$OUTPUT_ROOT/import.log" \
-            "$OUTPUT_ROOT/export-gl.log" \
-            "$OUTPUT_ROOT/export-mobile.log"; do
-            if [[ -f "$log" ]]; then
-              printf '\n===== tail: %s =====\n' "$log"
-              tail -n 500 "$log"
-            fi
-          done
-          printf '\n===== crash traces =====\n'
-          find "$OUTPUT_ROOT" "$GITHUB_WORKSPACE" -type f \
-            \( -name 'core*' -o -name '*.crash' -o -name '*.stacktrace' \) \
-            -print 2>/dev/null
-
-      - name: Upload export diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: bahrain-brick-playable-export-diagnostics-${{ github.run_id }}
-          path: |
-            /tmp/bahrain-brick-playable-mobile/import.log
-            /tmp/bahrain-brick-playable-mobile/export-gl.log
-            /tmp/bahrain-brick-playable-mobile/export-mobile.log
-            /tmp/bahrain-brick-playable-mobile/GODOT_VERSION.txt
-            /tmp/bahrain-brick-playable-mobile/SOURCE_TREE_EQUIVALENCE.json
-            /tmp/bahrain-brick-playable-mobile/reconstruction/evidence/FINAL_TREE_MANIFEST.json
-          if-no-files-found: ignore
-          retention-days: 14
-
       - name: Verify visual upgrade APK
         shell: bash
         run: |
@@ -144,8 +108,21 @@ jobs:
           APK="$OUTPUT_APK"
           test -s "$APK"
           "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK" | tee "$OUTPUT_ROOT/playable-apk-signing.txt"
-          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" | tee "$OUTPUT_ROOT/playable-apk-badging.txt"
+          set +e
+          "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt" dump badging "$APK" > "$OUTPUT_ROOT/playable-apk-badging.txt" 2>&1
+          AAPT_STATUS=$?
+          set -e
+          cat "$OUTPUT_ROOT/playable-apk-badging.txt"
+          if (( AAPT_STATUS != 0 )); then
+            if grep -Fq "AndroidManifest.xml:0: error: failed to read attribute 'android:required': attribute is not an integer value." "$OUTPUT_ROOT/playable-apk-badging.txt"; then
+              printf '%s\n' 'Known aapt AndroidManifest android:required warning accepted; continuing with explicit identity checks.'
+            else
+              printf '%s\n' 'aapt dump badging failed unexpectedly' >&2
+              exit "$AAPT_STATUS"
+            fi
+          fi
           grep -q "package: name='com.brickbahrain.playable.mobile'" "$OUTPUT_ROOT/playable-apk-badging.txt"
+          grep -q "application-label:'Bahrain Brick Open World'" "$OUTPUT_ROOT/playable-apk-badging.txt"
           sha256sum "$APK" | tee "$OUTPUT_ROOT/PLAYABLE_APK_SHA256SUMS.txt"
           python3 - "$APK" "$OUTPUT_ROOT/PLAYABLE_APK_HANDOFF.json" "$GITHUB_SHA" <<'PY'
           from pathlib import Path
@@ -175,6 +152,50 @@ jobs:
           }
           output.write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
           PY
+
+      - name: Print handoff diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          printf '%s\n' '===== output inventory ====='
+          find "$OUTPUT_ROOT" -maxdepth 3 -type f -printf '%p %s bytes\n' | sort
+          for log in \
+            "$OUTPUT_ROOT/import.log" \
+            "$OUTPUT_ROOT/export-gl.log" \
+            "$OUTPUT_ROOT/export-mobile.log" \
+            "$OUTPUT_ROOT/playable-apk-signing.txt" \
+            "$OUTPUT_ROOT/playable-apk-badging.txt" \
+            "$OUTPUT_ROOT/PLAYABLE_APK_SHA256SUMS.txt" \
+            "$OUTPUT_ROOT/SOURCE_TREE_EQUIVALENCE.json"; do
+            if [[ -f "$log" ]]; then
+              printf '\n===== tail: %s =====\n' "$log"
+              tail -n 500 "$log"
+            fi
+          done
+          printf '\n===== crash traces =====\n'
+          find "$OUTPUT_ROOT" "$GITHUB_WORKSPACE" -type f \
+            \( -name 'core*' -o -name '*.crash' -o -name '*.stacktrace' \) \
+            -print 2>/dev/null
+
+      - name: Upload handoff diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-playable-handoff-diagnostics-${{ github.run_id }}
+          path: |
+            /tmp/bahrain-brick-playable-mobile/import.log
+            /tmp/bahrain-brick-playable-mobile/export-gl.log
+            /tmp/bahrain-brick-playable-mobile/export-mobile.log
+            /tmp/bahrain-brick-playable-mobile/GODOT_VERSION.txt
+            /tmp/bahrain-brick-playable-mobile/SOURCE_TREE_EQUIVALENCE.json
+            /tmp/bahrain-brick-playable-mobile/reconstruction/evidence/FINAL_TREE_MANIFEST.json
+            /tmp/bahrain-brick-playable-mobile/PLAYABLE_APK_HANDOFF.json
+            /tmp/bahrain-brick-playable-mobile/PLAYABLE_APK_SHA256SUMS.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-signing.txt
+            /tmp/bahrain-brick-playable-mobile/playable-apk-badging.txt
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload playable APK
         uses: actions/upload-artifact@v4
