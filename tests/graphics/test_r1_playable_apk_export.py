@@ -82,7 +82,7 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn("run/main_scene=.*r1_renderer_runtime_debug", text)
         self.assertIn("diagnostic main-scene override remains", text)
 
-    def test_workflow_allows_only_the_known_aapt_warning_and_preserves_handoff_diagnostics(self) -> None:
+    def test_workflow_uses_apkanalyzer_identity_and_preserves_handoff_diagnostics(self) -> None:
         text = WORKFLOW.read_text(encoding="utf-8")
         identity_start = text.index("- name: Verify APK identity and handoff")
         diagnostics_start = text.index("- name: Print handoff diagnostics on failure")
@@ -93,9 +93,35 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertLess(diagnostics_upload_start, playable_upload_start)
 
         identity = text[identity_start:diagnostics_start]
+        self.assertIn("APKANALYZER=", identity)
+        self.assertIn('apk summary "$APK"', identity)
+        self.assertIn('manifest print "$APK"', identity)
+        self.assertIn('manifest application-id "$APK"', identity)
+        self.assertIn('manifest version-name "$APK"', identity)
+        self.assertIn('manifest version-code "$APK"', identity)
+        self.assertIn('manifest min-sdk "$APK"', identity)
+        self.assertIn('manifest target-sdk "$APK"', identity)
+        self.assertIn('manifest permissions "$APK"', identity)
+        self.assertIn(
+            'resources value --config default --name godot_project_name_string --type string "$APK"',
+            identity,
+        )
+        self.assertIn("Bahrain Brick Open World", identity)
+        self.assertIn("arm64-v8a", identity)
+        self.assertIn("armeabi-v7a|x86|x86_64", identity)
+        self.assertIn("app_label", identity)
+        self.assertIn("version_code", identity)
+        self.assertIn("version_name", identity)
+        self.assertIn("min_sdk", identity)
+        self.assertIn("target_sdk", identity)
+        self.assertIn("signing_certificate_sha256", identity)
+        self.assertNotIn(
+            "grep -q \"application-label:'Bahrain Brick Open World'\"",
+            identity,
+        )
+
         self.assertIn("set +e", identity)
         self.assertIn("AAPT_STATUS=$?", identity)
-        self.assertIn("set -e", identity)
         self.assertIn("if (( AAPT_STATUS != 0 )); then", identity)
         self.assertIn(
             "AndroidManifest.xml:0: error: failed to read attribute 'android:required': "
@@ -103,15 +129,26 @@ class R1PlayableApkExportTest(unittest.TestCase):
             identity,
         )
         self.assertIn("aapt dump badging failed unexpectedly", identity)
-        self.assertIn("package: name='com.brickbahrain.playable.mobile'", identity)
-        self.assertIn("application-label:'Bahrain Brick Open World'", identity)
 
         diagnostics = text[diagnostics_start:playable_upload_start]
         self.assertIn("if: failure()", diagnostics)
-        self.assertIn("playable-apk-badging.txt", diagnostics)
-        self.assertIn("playable-apk-signing.txt", diagnostics)
-        self.assertIn("PLAYABLE_APK_SHA256SUMS.txt", diagnostics)
-        self.assertIn("SOURCE_TREE_EQUIVALENCE.json", diagnostics)
+        for filename in (
+            "playable-apk-badging.txt",
+            "playable-apk-signing.txt",
+            "PLAYABLE_APK_SHA256SUMS.txt",
+            "SOURCE_TREE_EQUIVALENCE.json",
+            "playable-apk-summary.txt",
+            "playable-apk-manifest.xml",
+            "playable-apk-application-id.txt",
+            "playable-apk-app-label.txt",
+            "playable-apk-version-name.txt",
+            "playable-apk-version-code.txt",
+            "playable-apk-min-sdk.txt",
+            "playable-apk-target-sdk.txt",
+            "playable-apk-permissions.txt",
+            "playable-apk-inventory.txt",
+        ):
+            self.assertIn(filename, diagnostics)
 
 
 if __name__ == "__main__":
