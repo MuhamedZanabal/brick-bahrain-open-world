@@ -124,7 +124,7 @@ jobs:
           "$APKANALYZER" manifest min-sdk "$APK" | tee "$OUTPUT_ROOT/playable-apk-min-sdk.txt"
           "$APKANALYZER" manifest target-sdk "$APK" | tee "$OUTPUT_ROOT/playable-apk-target-sdk.txt"
           "$APKANALYZER" manifest permissions "$APK" | tee "$OUTPUT_ROOT/playable-apk-permissions.txt"
-          "$APKANALYZER" resources value --config default --name godot_project_name_string --type string "$APK" | tee "$OUTPUT_ROOT/playable-apk-app-label.txt"
+          "$APKANALYZER" resources value --config default --name godot_project_name_string --type string --package com.brickbahrain.playable.mobile "$APK" | tee "$OUTPUT_ROOT/playable-apk-app-label.txt"
           unzip -l "$APK" | tee "$OUTPUT_ROOT/playable-apk-inventory.txt"
 
           set +e
