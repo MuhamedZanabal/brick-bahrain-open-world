@@ -84,7 +84,7 @@ class ControlledCodexEnvironmentTests(unittest.TestCase):
         paths = list((ROOT / ".codex/agents").glob("*.toml"))
         self.assertEqual(EXPECTED_AGENTS, {path.stem for path in paths})
         for path in paths:
-            data = tomllib.loads( path.read_text())
+            data = tomllib.loads(path.read_text())
             self.assertEqual(path.stem, data["name"])
             self.assertTrue(data["description"])
             self.assertTrue(data["developer_instructions"])
@@ -149,6 +149,40 @@ class ControlledCodexEnvironmentTests(unittest.TestCase):
         self.assertTrue(payload["passed"])
         self.assertFalse(payload["evidence"]["signing_material_accessed"])
         self.assertTrue(payload["evidence"]["zip_integrity"])
+
+    def test_android_artifact_retention_is_compact_and_evidence_complete(self) -> None:
+        workflow = (ROOT / ".github/workflows/controlled-agent-environment.yml").read_text()
+        marker = "      - name: Upload Android attempt and evidence\n"
+        self.assertEqual(1, workflow.count(marker))
+        block = workflow.split(marker, 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("          path: |\n", block)
+        required = (
+            "build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk",
+            "build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk",
+            "build/controlled-codex/android/evidence/",
+            "build/controlled-codex/android/export.log",
+            "build/controlled-codex/android/import.log",
+            "build/controlled-codex/android/export-gl.log",
+            "build/controlled-codex/android/export-mobile.log",
+            "build/controlled-codex/android/R1_PHYSICAL_DEVICE_APK_MANIFEST.json",
+            "build/controlled-codex/android/APK_SHA256SUMS.txt",
+            "build/controlled-codex/android/apk-signing.txt",
+            "build/controlled-codex/android/SOURCE_TREE_EQUIVALENCE.json",
+            "build/controlled-codex/android/GL_VARIANT_OVERRIDE.json",
+            "build/controlled-codex/android/MOBILE_VARIANT_OVERRIDE.json",
+            "build/controlled-codex/android/GODOT_VERSION.txt",
+        )
+        for path in required:
+            self.assertIn(path, block)
+        for prohibited in (
+            "path: build/controlled-codex/android\n",
+            "build/controlled-codex/android/reconstruction",
+            "build/controlled-codex/android/gl-project",
+            "build/controlled-codex/android/mobile-project",
+            "build/controlled-codex/android/godot/",
+            "build/controlled-codex/android/templates/",
+        ):
+            self.assertNotIn(prohibited, block)
 
     def test_apply_patch_paths_are_discovered_for_post_edit_verification(self) -> None:
         hook_module = load_module(ROOT / ".codex/hooks/bahrain_brick_hook.py", "bahrain_brick_hook_test")
