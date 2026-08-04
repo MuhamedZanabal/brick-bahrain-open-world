@@ -320,8 +320,8 @@ adb shell input tap $((SCREEN_W * 50 / 100)) $((SCREEN_H * 82 / 100)) || true
 sleep 8
 
 adb shell input swipe $((SCREEN_W * 20 / 100)) $((SCREEN_H * 75 / 100)) $((SCREEN_W * 38 / 100)) $((SCREEN_H * 75 / 100)) 900 || true
-adb shell input swipe $((SCREEN_W * 22 / 100)) $((SCREEN_H * 78 / 100)) $((SCREEEN_W * 22 / 100)) $((SCREEN_H * 55 / 100)) 900 || true
-adb shell input tap $((SCREEN_W * 84 / 100)) $((SCREEEN_H * 74 / 100)) || true
+adb shell input swipe $((SCREEN_W * 22 / 100)) $((SCREEN_H * 78 / 100)) $((SCREEN_W * 22 / 100)) $((SCREEN_H * 55 / 100)) 900 || true
+adb shell input tap $((SCREEN_W * 84 / 100)) $((SCREEN_H * 74 / 100)) || true
 sleep 4
 capture_screenshot "$SCREENSHOTS_DIR/04-gameplay-probe.png" || PROBE_FAILURE=1
 
