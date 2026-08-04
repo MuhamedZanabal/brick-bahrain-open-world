@@ -34,7 +34,11 @@ find_android_tool() {
   local tool="$1"
   local root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
   [[ -n "$root" ]] || return 1
-  find "$root" -type f -name "$tool" -perm -u+x 2>/dev/null | sort -V | tail -n 1
+  if [[ "$tool" == "apkanalyzer" ]]; then
+    find "$root/cmdline-tools" -type f -name "$tool" -perm -u+x 2>/dev/null | sort -V | tail -n 1
+  else
+    find "$root/build-tools" -type f -name "$tool" -perm -u+x 2>/dev/null | sort -V | tail -n 1
+  fi
 }
 
 capture_runtime_evidence() {
@@ -43,8 +47,10 @@ capture_runtime_evidence() {
   adb shell dumpsys window windows > "$EVIDENCE_ROOT/window-state.txt" 2>&1
   if [[ -n "$PACKAGE_NAME" ]]; then
     adb shell pidof "$PACKAGE_NAME" > "$EVIDENCE_ROOT/process-state.txt" 2>&1
+    adb shell dumpsys package "$PACKAGE_NAME" > "$EVIDENCE_ROOT/package-state.txt" 2>&1
   else
     : > "$EVIDENCE_ROOT/process-state.txt"
+    : > "$EVIDENCE_ROOT/package-state.txt"
   fi
   adb logcat -d -v threadtime > "$LOGS_DIR/logcat.txt" 2>&1
   local logcat_code=$?
@@ -142,6 +148,12 @@ if [[ -n "$APKANALYZER" ]]; then
   [[ -n "$MIN_SDK" ]] || MIN_SDK="$("$APKANALYZER" manifest min-sdk "$APK_PATH" 2>/dev/null | tr -d '\r\n' || true)"
   [[ -n "$TARGET_SDK" ]] || TARGET_SDK="$("$APKANALYZER" manifest target-sdk "$APK_PATH" 2>/dev/null | tr -d '\r\n' || true)"
   ORIENTATION="$(grep -o 'android:screenOrientation="[^"]*"' "$EVIDENCE_ROOT/apk-manifest.xml" | head -n 1 | cut -d'"' -f2 || true)"
+  case "$ORIENTATION" in
+    0) ORIENTATION="landscape" ;;
+    6) ORIENTATION="sensorLandscape" ;;
+    8) ORIENTATION="reverseLandscape" ;;
+    11) ORIENTATION="userLandscape" ;;
+  esac
 else
   : > "$EVIDENCE_ROOT/apk-manifest.xml"
 fi
@@ -165,6 +177,7 @@ if [[ "$BOOT_STATUS" != "success" ]]; then
   exit 4
 fi
 adb shell input keyevent 82 || true
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb devices -l > "$EVIDENCE_ROOT/adb-devices.txt" 2>&1
 adb logcat -c || true
 
@@ -182,6 +195,7 @@ fi
 RESOLVED_COMPONENT="$(adb shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' | tail -n 1 || true)"
 if [[ "$RESOLVED_COMPONENT" == */* && "$RESOLVED_COMPONENT" != *"No activity found"* ]]; then
   LAUNCH_COMPONENT="$RESOLVED_COMPONENT"
+  LAUNCH_ACTIVITY="${RESOLVED_COMPONENT#*/}"
 elif [[ -n "$LAUNCH_ACTIVITY" ]]; then
   if [[ "$LAUNCH_ACTIVITY" == .* ]]; then
     LAUNCH_COMPONENT="$PACKAGE_NAME/$PACKAGE_NAME$LAUNCH_ACTIVITY"
@@ -206,13 +220,47 @@ fi
   fi
 } > "$EVIDENCE_ROOT/02-launch.txt" 2>&1 || LAUNCH_CODE=$?
 LAUNCH_CODE="${LAUNCH_CODE:-0}"
-sleep 12
+sleep 10
 if (( LAUNCH_CODE == 0 )) && adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
   LAUNCH_STATUS="success"
 else
   LAUNCH_STATUS="failed"
   PROBE_FAILURE=1
 fi
+
+dismiss_system_overlay() {
+  local xml="$EVIDENCE_ROOT/ui-system-overlay.xml"
+  set +e
+  adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
+  local coords
+  coords="$(python3 - "$xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+text = open(sys.argv[1], encoding='utf-8', errors='ignore').read()
+start = text.find('<?xml')
+if start < 0:
+    raise SystemExit(0)
+try:
+    root = ET.fromstring(text[start:])
+except ET.ParseError:
+    raise SystemExit(0)
+for node in root.iter('node'):
+    label = (node.attrib.get('text','') + ' ' + node.attrib.get('content-desc','')).strip().lower()
+    if label in {'got it', 'ok', 'continue'} or 'got it' in label:
+        m = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds',''))
+        if m:
+            x1,y1,x2,y2 = map(int,m.groups())
+            print((x1+x2)//2, (y1+y2)//2)
+            break
+PY
+)"
+  if [[ "$coords" =~ ^[0-9]+[[:space:]][0-9]+$ ]]; then
+    read -r x y <<< "$coords"
+    adb shell input tap "$x" "$y" || true
+    sleep 2
+  fi
+  set -e
+}
+dismiss_system_overlay
 
 capture_screenshot() {
   local output="$1"
@@ -244,6 +292,9 @@ with open(sys.argv[1], 'rb') as f:
 print(*struct.unpack('>II', data[16:24]))
 PY
 )
+if [[ -z "$ORIENTATION" ]]; then
+  if (( SCREEN_W > SCREEN_H )); then ORIENTATION="landscape-runtime"; else ORIENTATION="portrait-runtime"; fi
+fi
 
 adb shell rm -f /sdcard/gameplay-qa.mp4 || true
 set +e
@@ -252,12 +303,14 @@ SCREENRECORD_PID=$!
 set -e
 sleep 2
 
-adb shell input tap $((SCREEN_W / 2)) $((SCREEN_H * 72 / 100)) || true
-sleep 5
+# The native Godot action panel occupies the right side; target the first Play/Continue action.
+adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
+sleep 6
 capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
 
-adb shell input tap $((SCREEN_W / 2)) $((SCREEN_H * 58 / 100)) || true
-sleep 5
+# Continue through a character/loading prompt when present.
+adb shell input tap $((SCREEN_W * 50 / 100)) $((SCREEN_H * 82 / 100)) || true
+sleep 6
 capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
 
 adb shell input swipe $((SCREEN_W * 20 / 100)) $((SCREEN_H * 75 / 100)) $((SCREEN_W * 38 / 100)) $((SCREEN_H * 75 / 100)) 900 || true
