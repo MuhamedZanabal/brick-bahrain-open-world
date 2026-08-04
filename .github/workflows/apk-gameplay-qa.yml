@@ -1,0 +1,223 @@
+name: APK Gameplay QA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - work/bahrain-brick-reference-visual-upgrade
+    paths:
+      - .github/workflows/apk-gameplay-qa.yml
+      - ci/apk-gameplay-probe.sh
+      - tools/graphics/export_r1_playable_mobile_apk.sh
+      - tools/graphics/patch_r1_playable_export.py
+      - tools/graphics/export_r1_physical_device_apks.sh
+      - project.godot
+      - export_presets.cfg
+      - scenes/**
+      - scripts/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apk-gameplay-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_ROOT: /tmp/bahrain-brick-gameplay-qa
+  QA_APK: /tmp/bahrain-brick-gameplay-qa/bahrain-brick-gameplay-qa-x86_64.apk
+  QA_EVIDENCE_DIR: qa-evidence
+
+jobs:
+  gameplay-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Enable KVM acceleration
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -e /dev/kvm
+          ls -l /dev/kvm
+
+      - name: Install Android and export dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip python3-yaml
+          sdkmanager \
+            'platform-tools' \
+            'platforms;android-34' \
+            'platforms;android-35' \
+            'build-tools;34.0.0' \
+            'build-tools;35.0.0' \
+            'cmdline-tools;latest'
+          if [[ ! -f debug.keystore ]]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname 'CN=Android Debug,O=Android,C=US' \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+
+      - name: Validate QA workflow and probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ci/apk-gameplay-probe.sh
+          python3 -m unittest tests/ci/test_apk_gameplay_qa_contract.py -v
+          python3 - <<'PY'
+          from pathlib import Path
+          import yaml
+          workflow = Path('.github/workflows/apk-gameplay-qa.yml')
+          data = yaml.safe_load(workflow.read_text(encoding='utf-8'))
+          if not isinstance(data, dict) or 'jobs' not in data:
+              raise SystemExit('workflow YAML did not parse into a GitHub Actions document')
+          PY
+
+      - name: Initialize evidence bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-evidence/screenshots qa-evidence/video qa-evidence/logs "$BUILD_ROOT"
+          git rev-parse HEAD | tee qa-evidence/source-commit.txt
+          printf '%s\n' 'project_type=Godot 4.3 Android export' | tee qa-evidence/repository-inspection.txt
+          grep -E '^(run/main_scene|renderer/rendering_method|renderer/rendering_method.mobile)=' project.godot | tee -a qa-evidence/repository-inspection.txt
+          grep -E '^(export_path|architectures/|package/unique_name|package/name|version/code|version/name|screen/)' export_presets.cfg | tee -a qa-evidence/repository-inspection.txt
+
+      - name: Build x86_64 gameplay QA APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/graphics/export_r1_playable_mobile_apk.sh "$GITHUB_WORKSPACE" "$BUILD_ROOT" \
+            2>&1 | tee qa-evidence/build-playable-base.log
+
+          EMULATOR_PROJECT="$BUILD_ROOT/mobile-project"
+          test -f "$EMULATOR_PROJECT/export_presets.cfg"
+          python3 - "$EMULATOR_PROJECT/export_presets.cfg" <<'PY'
+          from pathlib import Path
+          import sys
+          path = Path(sys.argv[1])
+          text = path.read_text(encoding='utf-8')
+          replacements = {
+              'architectures/armeabi-v7a=true': 'architectures/armeabi-v7a=false',
+              'architectures/arm64-v8a=true': 'architectures/arm64-v8a=false',
+              'architectures/x86_64=false': 'architectures/x86_64=true',
+              'architectures/x86=false': 'architectures/x86=false',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  if new in text:
+                      continue
+                  raise SystemExit(f'missing architecture setting: {old}')
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          GODOT="$(find "$BUILD_ROOT/godot" -maxdepth 1 -type f -name 'Godot*' ! -name '*.zip' | head -n 1)"
+          test -x "$GODOT"
+          export XDG_DATA_HOME="$BUILD_ROOT/godot-user-data"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="$GITHUB_WORKSPACE/debug.keystore"
+          export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
+          export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
+          timeout --signal=TERM --kill-after=30s 1800s \
+            "$GODOT" --headless --path "$EMULATOR_PROJECT" --verbose \
+            --export-debug Android "$QA_APK" 2>&1 | tee qa-evidence/build-export-x86_64.log
+          test -s "$QA_APK"
+
+          unzip -Z1 "$QA_APK" | tee qa-evidence/apk-inventory.txt
+          grep -Eq '^lib/x86_64/libgodot_android\.so$' qa-evidence/apk-inventory.txt
+          if grep -Eq '^lib/(arm64-v8a|armeabi-v7a|x86)/' qa-evidence/apk-inventory.txt; then
+            printf '%s\n' 'Unexpected non-x86_64 native library in gameplay QA APK.' >&2
+            exit 1
+          fi
+          sha256sum "$QA_APK" | tee qa-evidence/apk-sha256.txt
+          "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$QA_APK" \
+            | tee qa-evidence/apk-signing.txt
+
+          APKANALYZER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name apkanalyzer -perm -u+x | sort -V | tail -n 1)"
+          test -x "$APKANALYZER"
+          {
+            printf 'apk_path=%s\n' "$QA_APK"
+            printf 'package='; "$APKANALYZER" manifest application-id "$QA_APK"
+            printf 'min_sdk='; "$APKANALYZER" manifest min-sdk "$QA_APK"
+            printf 'target_sdk='; "$APKANALYZER" manifest target-sdk "$QA_APK"
+            printf 'version_name='; "$APKANALYZER" manifest version-name "$QA_APK"
+            printf 'version_code='; "$APKANALYZER" manifest version-code "$QA_APK"
+          } | tee qa-evidence/apk-metadata.txt
+          "$APKANALYZER" manifest print "$QA_APK" > qa-evidence/apk-manifest.xml
+
+      - name: Run gameplay probe in Android emulator
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: bash ci/apk-gameplay-probe.sh "$QA_APK"
+
+      - name: Verify required gameplay evidence
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          required=(
+            qa-evidence/01-install.txt
+            qa-evidence/02-launch.txt
+            qa-evidence/adb-devices.txt
+            qa-evidence/report.md
+            qa-evidence/screenshots/01-after-launch.png
+            qa-evidence/screenshots/02-after-first-tap.png
+            qa-evidence/screenshots/03-after-second-tap.png
+            qa-evidence/screenshots/04-gameplay-probe.png
+            qa-evidence/screenshots/05-after-keyevents.png
+            qa-evidence/video/gameplay-qa.mp4
+            qa-evidence/logs/logcat.txt
+            qa-evidence/logs/crash-logcat.txt
+          )
+          missing=0
+          for path in "${required[@]}"; do
+            if [[ ! -e "$path" ]]; then
+              printf 'missing: %s\n' "$path" >&2
+              missing=1
+            else
+              printf '%s %s bytes\n' "$path" "$(stat -c '%s' "$path")"
+            fi
+          done
+          exit "$missing"
+
+      - name: Upload gameplay QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gameplay-qa-evidence
+          path: qa-evidence/
+          if-no-files-found: warn
+          retention-days: 30
