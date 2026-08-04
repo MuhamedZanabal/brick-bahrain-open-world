@@ -308,10 +308,14 @@ adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
 sleep 6
 capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
 
-# Continue through a character/loading prompt when present.
-adb shell input tap $((SCREEN_W * 50 / 100)) $((SCREEN_H * 82 / 100)) || true
-sleep 6
+# The first tap advances the branded splash; now target the visible Continue/Play action.
+adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
+sleep 8
 capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
+
+# Confirm the default character/loading prompt before movement probing.
+adb shell input tap $((SCREEN_W * 50 / 100)) $((SCREEN_H * 82 / 100)) || true
+sleep 8
 
 adb shell input swipe $((SCREEN_W * 20 / 100)) $((SCREEN_H * 75 / 100)) $((SCREEN_W * 38 / 100)) $((SCREEN_H * 75 / 100)) 900 || true
 adb shell input swipe $((SCREEN_W * 22 / 100)) $((SCREEN_H * 78 / 100)) $((SCREEN_W * 22 / 100)) $((SCREEN_H * 55 / 100)) 900 || true
