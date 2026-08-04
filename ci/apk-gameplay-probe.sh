@@ -296,6 +296,16 @@ if [[ -z "$ORIENTATION" ]]; then
   if (( SCREEN_W > SCREEN_H )); then ORIENTATION="landscape-runtime"; else ORIENTATION="portrait-runtime"; fi
 fi
 
+# Advance through the two branded splash panels while retaining the required tap evidence.
+adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
+sleep 6
+capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
+
+adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
+sleep 8
+capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
+
+# Begin the 30-second recording at the actionable menu so it captures real flow and input probing.
 adb shell rm -f /sdcard/gameplay-qa.mp4 || true
 set +e
 adb shell screenrecord --bit-rate 8000000 --time-limit 30 /sdcard/gameplay-qa.mp4 > "$EVIDENCE_ROOT/screenrecord.txt" 2>&1 &
@@ -303,24 +313,16 @@ SCREENRECORD_PID=$!
 set -e
 sleep 2
 
-# The native Godot action panel occupies the right side; target the first Play/Continue action.
+# Enter the single-player flow, confirm the default character, then probe movement/actions.
 adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
 sleep 6
-capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
-
-# The first tap advances the branded splash; now target the visible Continue/Play action.
-adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
-sleep 8
-capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
-
-# Confirm the default character/loading prompt before movement probing.
 adb shell input tap $((SCREEN_W * 50 / 100)) $((SCREEN_H * 82 / 100)) || true
 sleep 8
 
 adb shell input swipe $((SCREEN_W * 20 / 100)) $((SCREEN_H * 75 / 100)) $((SCREEN_W * 38 / 100)) $((SCREEN_H * 75 / 100)) 900 || true
-adb shell input swipe $((SCREEN_W * 22 / 100)) $((SCREEN_H * 78 / 100)) $((SCREEN_W * 22 / 100)) $((SCREEN_H * 55 / 100)) 900 || true
-adb shell input tap $((SCREEN_W * 84 / 100)) $((SCREEN_H * 74 / 100)) || true
-sleep 5
+adb shell input swipe $((SCREEN_W * 22 / 100)) $((SCREEN_H * 78 / 100)) $((SCREEEN_W * 22 / 100)) $((SCREEN_H * 55 / 100)) 900 || true
+adb shell input tap $((SCREEN_W * 84 / 100)) $((SCREEEN_H * 74 / 100)) || true
+sleep 4
 capture_screenshot "$SCREENSHOTS_DIR/04-gameplay-probe.png" || PROBE_FAILURE=1
 
 for key in KEYCODE_DPAD_UP KEYCODE_DPAD_RIGHT KEYCODE_BUTTON_A KEYCODE_SPACE KEYCODE_ENTER; do
