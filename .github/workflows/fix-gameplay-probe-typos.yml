@@ -1,0 +1,54 @@
+name: Fix Gameplay Probe Typos
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-reference-visual-upgrade
+    paths:
+      - .github/workflows/fix-gameplay-probe-typos.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: work/bahrain-brick-reference-visual-upgrade
+          fetch-depth: 0
+
+      - name: Repair and verify probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('ci/apk-gameplay-probe.sh')
+          text = path.read_text(encoding='utf-8')
+          expected = {'SCREEEN_W': 1, 'SCREEEN_H': 1}
+          for typo, count in expected.items():
+              actual = text.count(typo)
+              if actual != count:
+                  raise SystemExit(f'{typo}: expected {count}, found {actual}')
+          text = text.replace('SCREEEN_W', 'SCREEN_W').replace('SCREEEN_H', 'SCREEN_H')
+          path.write_text(text, encoding='utf-8')
+          PY
+          chmod +x ci/apk-gameplay-probe.sh
+          bash -n ci/apk-gameplay-probe.sh
+          python3 -m unittest tests/ci/test_apk_gameplay_qa_contract.py -v
+          ! grep -R 'SCREEEN_' ci/apk-gameplay-probe.sh
+
+      - name: Commit corrected probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ci/apk-gameplay-probe.sh
+          git diff --cached --check
+          git commit -m 'fix(android): correct gameplay probe coordinates'
+          git push origin HEAD:work/bahrain-brick-reference-visual-upgrade
