@@ -41,7 +41,7 @@ class ApkGameplayQaContractTest(unittest.TestCase):
             "pixel_launcher_anr",
             "android:id/aerr_close",
             "tap_fraction 50 82",
-            "tap_fraction 88 24",
+            "tap_fraction 88 34",
             "tap_fraction 50 93",
             "verify_perceptual_transition",
             "ImageChops.difference",
@@ -54,7 +54,7 @@ class ApkGameplayQaContractTest(unittest.TestCase):
             self.assertIn(required, script)
 
         splash_tap = script.index("tap_fraction 50 82")
-        character_tap = script.index("tap_fraction 88 24")
+        character_tap = script.index("tap_fraction 88 34")
         world_tap = script.index("tap_fraction 50 93")
         recording_start = script.index("screenrecord --bit-rate")
         self.assertLess(splash_tap, character_tap)
