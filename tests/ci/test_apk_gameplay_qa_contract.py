@@ -35,10 +35,13 @@ class ApkGameplayQaContractTest(unittest.TestCase):
         script = (ROOT / "ci/apk-gameplay-probe.sh").read_text(encoding="utf-8")
         for required in (
             "settings put secure immersive_mode_confirmations confirmed",
+            "am force-stop com.google.android.apps.nexuslauncher",
             "dismiss_system_overlays",
             "ui-tree-after-overlay-dismiss.xml",
+            "Pixel Launcher isn't responding",
+            "android:id/aerr_close",
             "tap_fraction 50 82",
-            "tap_fraction 88 31",
+            "tap_fraction 88 24",
             "tap_fraction 50 93",
             "verify_perceptual_transition",
             "ImageChops.difference",
@@ -51,7 +54,7 @@ class ApkGameplayQaContractTest(unittest.TestCase):
             self.assertIn(required, script)
 
         splash_tap = script.index("tap_fraction 50 82")
-        character_tap = script.index("tap_fraction 88 31")
+        character_tap = script.index("tap_fraction 88 24")
         world_tap = script.index("tap_fraction 50 93")
         recording_start = script.index("screenrecord --bit-rate")
         self.assertLess(splash_tap, character_tap)
