@@ -180,7 +180,7 @@ dismiss_system_overlays() {
   local attempt coords x y
   adb shell settings put secure immersive_mode_confirmations confirmed || true
 
-  for attempt in 1 2 3 4; do
+  for attempt in 1 2 3 4 5 6; do
     set +e
     adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
     set -e
@@ -197,14 +197,41 @@ try:
     root = ET.fromstring(text[start:])
 except ET.ParseError:
     raise SystemExit(0)
-for node in root.iter('node'):
-    label = ' '.join((node.attrib.get('text', ''), node.attrib.get('content-desc', ''))).strip().lower()
+
+nodes = list(root.iter('node'))
+labels = [
+    ' '.join((node.attrib.get('text', ''), node.attrib.get('content-desc', ''))).strip()
+    for node in nodes
+]
+normalized = [label.lower() for label in labels]
+pixel_launcher_anr = any(
+    "pixel launcher isn't responding" in label
+    or 'pixel launcher is not responding' in label
+    or 'pixel launcher keeps stopping' in label
+    for label in normalized
+)
+
+def center(node):
+    match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds', ''))
+    if not match:
+        return None
+    x1, y1, x2, y2 = map(int, match.groups())
+    return (x1 + x2) // 2, (y1 + y2) // 2
+
+if pixel_launcher_anr:
+    for node, label in zip(nodes, normalized):
+        if node.attrib.get('resource-id') == 'android:id/aerr_close' or label == 'close app':
+            point = center(node)
+            if point:
+                print(*point)
+                raise SystemExit(0)
+
+for node, label in zip(nodes, normalized):
     if label == 'got it' or 'got it' in label:
-        match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds', ''))
-        if match:
-            x1, y1, x2, y2 = map(int, match.groups())
-            print((x1 + x2) // 2, (y1 + y2) // 2)
-            break
+        point = center(node)
+        if point:
+            print(*point)
+            raise SystemExit(0)
 PY
 )"
     if [[ "$coords" =~ ^[0-9]+[[:space:]][0-9]+$ ]]; then
@@ -219,7 +246,7 @@ PY
   set +e
   adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
   set -e
-  if grep -Eiq 'got it|viewing (this app in )?full screen|viewing full screen' "$xml"; then
+  if grep -Eiq "got it|viewing (this app in )?full screen|viewing full screen|pixel launcher (isn't|is not) responding|pixel launcher keeps stopping|android:id/aerr_close" "$xml"; then
     OVERLAY_STATUS="failed"
     PROBE_FAILURE=1
   else
@@ -324,6 +351,7 @@ if [[ "$BOOT_STATUS" != "success" ]]; then
 fi
 adb shell input keyevent 82 || true
 adb shell settings put secure immersive_mode_confirmations confirmed || true
+adb shell am force-stop com.google.android.apps.nexuslauncher || true
 adb devices -l > "$EVIDENCE_ROOT/adb-devices.txt" 2>&1
 adb logcat -c || true
 
@@ -398,8 +426,8 @@ verify_perceptual_transition \
   "$SCREENSHOTS_DIR/02-after-first-tap.png" \
   "splash_to_main_menu" || PROBE_FAILURE=1
 
-# Main-menu source anchors Character Select in the right-side action stack.
-tap_fraction 88 31 || PROBE_FAILURE=1
+# Main-menu source anchors Character Select as the second action at 24% viewport height.
+tap_fraction 88 24 || PROBE_FAILURE=1
 sleep 12
 dismiss_system_overlays
 capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
