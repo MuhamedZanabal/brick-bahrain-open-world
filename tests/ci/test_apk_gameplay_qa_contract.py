@@ -31,22 +31,32 @@ class ApkGameplayQaContractTest(unittest.TestCase):
         ):
             self.assertIn(required, script)
 
-    def test_probe_dismisses_system_overlay_and_enters_world_before_recording(self) -> None:
+    def test_probe_dismisses_overlay_and_drives_splash_menu_character_world(self) -> None:
         script = (ROOT / "ci/apk-gameplay-probe.sh").read_text(encoding="utf-8")
         for required in (
             "settings put secure immersive_mode_confirmations confirmed",
             "dismiss_system_overlays",
             "ui-tree-after-overlay-dismiss.xml",
-            "tap_fraction 85 25",
+            "tap_fraction 50 82",
+            "tap_fraction 88 31",
             "tap_fraction 50 93",
+            "verify_perceptual_transition",
+            "ImageChops.difference",
+            "MIN_SCENE_MEAN_DIFFERENCE=5.0",
+            "world-entry.png",
             "gameplay-state.txt",
             "world-probe-attempted",
+            "world-transition-observed",
         ):
             self.assertIn(required, script)
 
-        first_world_tap = script.index("tap_fraction 50 93")
+        splash_tap = script.index("tap_fraction 50 82")
+        character_tap = script.index("tap_fraction 88 31")
+        world_tap = script.index("tap_fraction 50 93")
         recording_start = script.index("screenrecord --bit-rate")
-        self.assertLess(first_world_tap, recording_start)
+        self.assertLess(splash_tap, character_tap)
+        self.assertLess(character_tap, world_tap)
+        self.assertLess(world_tap, recording_start)
 
     def test_workflow_uses_accelerated_api_35_emulator_and_always_uploads(self) -> None:
         workflow = (ROOT / ".github/workflows/apk-gameplay-qa.yml").read_text(encoding="utf-8")
@@ -55,6 +65,7 @@ class ApkGameplayQaContractTest(unittest.TestCase):
             "ubuntu-24.04",
             "java-version: '17'",
             "Enable KVM acceleration",
+            "python3-pil",
             "ReactiveCircus/android-emulator-runner@v2",
             "api-level: 35",
             "target: google_apis",
