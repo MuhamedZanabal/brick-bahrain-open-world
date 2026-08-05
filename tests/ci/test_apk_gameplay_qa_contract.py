@@ -38,7 +38,7 @@ class ApkGameplayQaContractTest(unittest.TestCase):
             "am force-stop com.google.android.apps.nexuslauncher",
             "dismiss_system_overlays",
             "ui-tree-after-overlay-dismiss.xml",
-            "Pixel Launcher isn't responding",
+            "pixel_launcher_anr",
             "android:id/aerr_close",
             "tap_fraction 50 82",
             "tap_fraction 88 24",
