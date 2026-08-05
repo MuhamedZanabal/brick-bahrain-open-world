@@ -10,6 +10,22 @@ MODULE_PATH = ROOT / "tools/graphics/patch_r1_playable_export.py"
 WRAPPER = ROOT / "tools/graphics/export_r1_playable_mobile_apk.sh"
 WORKFLOW = ROOT / ".github/workflows/bahrain-brick-playable-mobile-apk-export.yml"
 
+VISUAL_UPGRADE_FILES = (
+    "project.godot",
+    "scenes/splash_screen.tscn",
+    "scenes/loading_screen.tscn",
+    "scenes/main_menu.tscn",
+    "scenes/character_select.tscn",
+    "scripts/ui/bahrain_theme.gd",
+    "scripts/ui/safe_area_root.gd",
+    "scripts/splash_screen.gd",
+    "scripts/loading_screen.gd",
+    "scripts/main_menu.gd",
+    "scripts/character_select.gd",
+    "scripts/game_manager.gd",
+    "scripts/save_manager.gd",
+)
+
 
 def load_module():
     spec = importlib.util.spec_from_file_location("patch_r1_playable_export", MODULE_PATH)
@@ -63,6 +79,16 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn('"$GODOT" --headless --path "$GAME" --editor --import --quit --verbose', patched)
         self.assertNotIn("xvfb-run", patched)
         self.assertNotIn("--rendering-driver vulkan", patched)
+
+        self.assertIn("Overlay candidate visual-upgrade runtime files", patched)
+        self.assertIn("VISUAL_UPGRADE_OVERLAY_SHA256SUMS.txt", patched)
+        self.assertIn(
+            'python3 "$REPO_ROOT/tools/graphics/verify_visual_upgrade_slice_a.py" --root "$GAME"',
+            patched,
+        )
+        for relative in VISUAL_UPGRADE_FILES:
+            self.assertIn(f'  "{relative}"', patched)
+        self.assertEqual(patched.count("Overlay candidate visual-upgrade runtime files"), 1)
 
     def test_patch_rejects_unexpected_diagnostic_override_count(self) -> None:
         module = load_module()
