@@ -18,6 +18,13 @@ class VisualUpgradeSliceATest(unittest.TestCase):
         self.assertIn('renderer/rendering_method="gl_compatibility"', project)
         self.assertIn('renderer/rendering_method.mobile="gl_compatibility"', project)
 
+    def test_android_orientation_is_landscape(self) -> None:
+        project = read("project.godot")
+        self.assertIn("window/size/viewport_width=1920", project)
+        self.assertIn("window/size/viewport_height=1080", project)
+        self.assertIn("window/handheld/orientation=0", project)
+        self.assertNotIn("window/handheld/orientation=1", project)
+
     def test_shared_theme_factory_exists(self) -> None:
         theme = read("scripts/ui/bahrain_theme.gd")
         for symbol in (
