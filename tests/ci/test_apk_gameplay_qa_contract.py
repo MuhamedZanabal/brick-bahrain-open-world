@@ -31,6 +31,23 @@ class ApkGameplayQaContractTest(unittest.TestCase):
         ):
             self.assertIn(required, script)
 
+    def test_probe_dismisses_system_overlay_and_enters_world_before_recording(self) -> None:
+        script = (ROOT / "ci/apk-gameplay-probe.sh").read_text(encoding="utf-8")
+        for required in (
+            "settings put secure immersive_mode_confirmations confirmed",
+            "dismiss_system_overlays",
+            "ui-tree-after-overlay-dismiss.xml",
+            "tap_fraction 85 25",
+            "tap_fraction 50 93",
+            "gameplay-state.txt",
+            "world-probe-attempted",
+        ):
+            self.assertIn(required, script)
+
+        first_world_tap = script.index("tap_fraction 50 93")
+        recording_start = script.index("screenrecord --bit-rate")
+        self.assertLess(first_world_tap, recording_start)
+
     def test_workflow_uses_accelerated_api_35_emulator_and_always_uploads(self) -> None:
         workflow = (ROOT / ".github/workflows/apk-gameplay-qa.yml").read_text(encoding="utf-8")
         for required in (
