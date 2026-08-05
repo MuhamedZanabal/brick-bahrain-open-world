@@ -6,11 +6,13 @@ EVIDENCE_ROOT="${QA_EVIDENCE_DIR:-qa-evidence}"
 SCREENSHOTS_DIR="$EVIDENCE_ROOT/screenshots"
 VIDEO_DIR="$EVIDENCE_ROOT/video"
 LOGS_DIR="$EVIDENCE_ROOT/logs"
+MIN_SCENE_MEAN_DIFFERENCE=5.0
 
 mkdir -p "$SCREENSHOTS_DIR" "$VIDEO_DIR" "$LOGS_DIR"
 : > "$EVIDENCE_ROOT/01-install.txt"
 : > "$EVIDENCE_ROOT/02-launch.txt"
 : > "$EVIDENCE_ROOT/adb-devices.txt"
+: > "$EVIDENCE_ROOT/screenshot-transitions.txt"
 : > "$LOGS_DIR/logcat.txt"
 : > "$LOGS_DIR/crash-logcat.txt"
 
@@ -71,8 +73,16 @@ capture_runtime_evidence() {
 
 write_report() {
   local exit_code="$1"
-  local screenshot_count video_bytes logcat_bytes crash_bytes
-  screenshot_count="$(find "$SCREENSHOTS_DIR" -maxdepth 1 -type f -name '*.png' -size +1024c 2>/dev/null | wc -l | tr -d ' ')"
+  local required_screenshot_count video_bytes logcat_bytes crash_bytes
+  required_screenshot_count=0
+  for screenshot in \
+    "$SCREENSHOTS_DIR/01-after-launch.png" \
+    "$SCREENSHOTS_DIR/02-after-first-tap.png" \
+    "$SCREENSHOTS_DIR/03-after-second-tap.png" \
+    "$SCREENSHOTS_DIR/04-gameplay-probe.png" \
+    "$SCREENSHOTS_DIR/05-after-keyevents.png"; do
+    [[ -s "$screenshot" ]] && required_screenshot_count=$((required_screenshot_count + 1))
+  done
   video_bytes="$(stat -c '%s' "$VIDEO_DIR/gameplay-qa.mp4" 2>/dev/null || printf '0')"
   logcat_bytes="$(stat -c '%s' "$LOGS_DIR/logcat.txt" 2>/dev/null || printf '0')"
   crash_bytes="$(stat -c '%s' "$LOGS_DIR/crash-logcat.txt" 2>/dev/null || printf '0')"
@@ -94,7 +104,7 @@ write_report() {
 - App launch: **$LAUNCH_STATUS**
 - Android system overlay: **$OVERLAY_STATUS**
 - Gameplay navigation: **$GAMEPLAY_STATE**
-- Screenshots: **$SCREENSHOT_STATUS** ($screenshot_count/5 valid files)
+- Screenshots: **$SCREENSHOT_STATUS** ($required_screenshot_count/5 required files; world-entry captured separately)
 - Gameplay video: **$VIDEO_STATUS** ($video_bytes bytes)
 - Logcat capture: **$LOGCAT_STATUS** ($logcat_bytes bytes; crash buffer $crash_bytes bytes)
 
@@ -104,11 +114,13 @@ write_report() {
 - \`02-launch.txt\`
 - \`adb-devices.txt\`
 - \`gameplay-state.txt\`
+- \`system-overlay-status.txt\`
 - \`ui-tree-after-overlay-dismiss.xml\`
 - \`screenshot-transitions.txt\`
 - \`screenshots/01-after-launch.png\`
 - \`screenshots/02-after-first-tap.png\`
 - \`screenshots/03-after-second-tap.png\`
+- \`screenshots/world-entry.png\`
 - \`screenshots/04-gameplay-probe.png\`
 - \`screenshots/05-after-keyevents.png\`
 - \`video/gameplay-qa.mp4\`
@@ -140,13 +152,15 @@ capture_screenshot() {
   fi
   python3 - "$output" <<'PY'
 from pathlib import Path
-import struct, sys
-p = Path(sys.argv[1])
-data = p.read_bytes()
+import struct
+import sys
+
+path = Path(sys.argv[1])
+data = path.read_bytes()
 if len(data) < 24 or data[:8] != b'\x89PNG\r\n\x1a\n':
     raise SystemExit(1)
-w, h = struct.unpack('>II', data[16:24])
-if w < 320 or h < 240:
+width, height = struct.unpack('>II', data[16:24])
+if width < 320 or height < 240:
     raise SystemExit(1)
 PY
 }
@@ -165,7 +179,8 @@ dismiss_system_overlays() {
   local xml="$EVIDENCE_ROOT/ui-tree-after-overlay-dismiss.xml"
   local attempt coords x y
   adb shell settings put secure immersive_mode_confirmations confirmed || true
-  for attempt in 1 2 3; do
+
+  for attempt in 1 2 3 4; do
     set +e
     adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
     set -e
@@ -183,8 +198,8 @@ try:
 except ET.ParseError:
     raise SystemExit(0)
 for node in root.iter('node'):
-    label = (node.attrib.get('text', '') + ' ' + node.attrib.get('content-desc', '')).strip().lower()
-    if label in {'got it', 'ok', 'continue'} or 'got it' in label:
+    label = ' '.join((node.attrib.get('text', ''), node.attrib.get('content-desc', ''))).strip().lower()
+    if label == 'got it' or 'got it' in label:
         match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds', ''))
         if match:
             x1, y1, x2, y2 = map(int, match.groups())
@@ -200,10 +215,11 @@ PY
     fi
     break
   done
+
   set +e
   adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
   set -e
-  if grep -Eiq 'got it|viewing this app in full screen' "$xml"; then
+  if grep -Eiq 'got it|viewing (this app in )?full screen|viewing full screen' "$xml"; then
     OVERLAY_STATUS="failed"
     PROBE_FAILURE=1
   else
@@ -212,24 +228,36 @@ PY
   printf 'overlay_status=%s\n' "$OVERLAY_STATUS" > "$EVIDENCE_ROOT/system-overlay-status.txt"
 }
 
-verify_screenshot_transitions() {
-  local first="$SCREENSHOTS_DIR/01-after-launch.png"
-  local second="$SCREENSHOTS_DIR/02-after-first-tap.png"
-  local third="$SCREENSHOTS_DIR/03-after-second-tap.png"
-  python3 - "$first" "$second" "$third" > "$EVIDENCE_ROOT/screenshot-transitions.txt" <<'PY'
+verify_perceptual_transition() {
+  local before="$1"
+  local after="$2"
+  local transition_name="$3"
+  python3 - "$before" "$after" "$transition_name" "$MIN_SCENE_MEAN_DIFFERENCE" \
+    >> "$EVIDENCE_ROOT/screenshot-transitions.txt" <<'PY'
 from pathlib import Path
-import hashlib
+from PIL import Image, ImageChops, ImageStat
 import sys
 
-paths = [Path(value) for value in sys.argv[1:]]
-digests = [hashlib.sha256(path.read_bytes()).hexdigest() for path in paths]
-for path, digest in zip(paths, digests):
-    print(f"{path.name}={digest}")
-if digests[0] == digests[1]:
-    raise SystemExit("main-menu and character-selection screenshots are byte-identical")
-if digests[1] == digests[2]:
-    raise SystemExit("character-selection and world screenshots are byte-identical")
-print("transition_status=success")
+before_path = Path(sys.argv[1])
+after_path = Path(sys.argv[2])
+transition_name = sys.argv[3]
+minimum = float(sys.argv[4])
+
+before = Image.open(before_path).convert('RGB')
+after = Image.open(after_path).convert('RGB')
+if before.size != after.size:
+    raise SystemExit(f'{transition_name}: screenshot dimensions differ: {before.size} vs {after.size}')
+
+difference = ImageChops.difference(before, after)
+mean_difference = sum(ImageStat.Stat(difference).mean) / 3.0
+changed_bbox = difference.getbbox()
+print(f'{transition_name}_mean_difference={mean_difference:.4f}')
+print(f'{transition_name}_changed_bbox={changed_bbox}')
+if changed_bbox is None or mean_difference < minimum:
+    raise SystemExit(
+        f'{transition_name}: perceptual difference {mean_difference:.4f} is below required {minimum:.4f}'
+    )
+print(f'{transition_name}=success')
 PY
 }
 
@@ -338,7 +366,7 @@ fi
   fi
 } > "$EVIDENCE_ROOT/02-launch.txt" 2>&1 || LAUNCH_CODE=$?
 LAUNCH_CODE="${LAUNCH_CODE:-0}"
-sleep 12
+sleep 8
 if (( LAUNCH_CODE == 0 )) && adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
   LAUNCH_STATUS="success"
 else
@@ -360,29 +388,47 @@ if [[ -z "$ORIENTATION" ]]; then
   if (( SCREEN_W > SCREEN_H )); then ORIENTATION="landscape-runtime"; else ORIENTATION="portrait-runtime"; fi
 fi
 
-# Main menu Play button: source anchors place it near 85% width and 25% height.
-tap_fraction 85 25 || PROBE_FAILURE=1
+# Splash screen source places "TAP TO CONTINUE" at the lower center.
+tap_fraction 50 82 || PROBE_FAILURE=1
 sleep 10
 dismiss_system_overlays
 capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
+verify_perceptual_transition \
+  "$SCREENSHOTS_DIR/01-after-launch.png" \
+  "$SCREENSHOTS_DIR/02-after-first-tap.png" \
+  "splash_to_main_menu" || PROBE_FAILURE=1
 
-# Character-selection Play button: source anchors place it at the lower center.
-tap_fraction 50 93 || PROBE_FAILURE=1
-GAMEPLAY_STATE="world-probe-attempted"
-printf 'state=world-probe-attempted\n' > "$EVIDENCE_ROOT/gameplay-state.txt"
-sleep 25
+# Main-menu source anchors Character Select in the right-side action stack.
+tap_fraction 88 31 || PROBE_FAILURE=1
+sleep 12
 dismiss_system_overlays
 capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
+verify_perceptual_transition \
+  "$SCREENSHOTS_DIR/02-after-first-tap.png" \
+  "$SCREENSHOTS_DIR/03-after-second-tap.png" \
+  "main_menu_to_character_select" || PROBE_FAILURE=1
 
-if verify_screenshot_transitions; then
+# Character-selection source anchors Play at the lower center.
+GAMEPLAY_STATE="world-probe-attempted"
+printf 'state=world-probe-attempted\n' > "$EVIDENCE_ROOT/gameplay-state.txt"
+tap_fraction 50 93 || PROBE_FAILURE=1
+sleep 35
+dismiss_system_overlays
+capture_screenshot "$SCREENSHOTS_DIR/world-entry.png" || PROBE_FAILURE=1
+if verify_perceptual_transition \
+  "$SCREENSHOTS_DIR/03-after-second-tap.png" \
+  "$SCREENSHOTS_DIR/world-entry.png" \
+  "character_select_to_world" \
+  && adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
   GAMEPLAY_STATE="world-transition-observed"
   printf 'state=world-transition-observed\n' >> "$EVIDENCE_ROOT/gameplay-state.txt"
 else
   GAMEPLAY_STATE="world-transition-not-observed"
+  printf 'state=world-transition-not-observed\n' >> "$EVIDENCE_ROOT/gameplay-state.txt"
   PROBE_FAILURE=1
 fi
 
-# Record only after the world transition has been attempted and observed.
+# Record only after the world transition is proven.
 adb shell rm -f /sdcard/gameplay-qa.mp4 || true
 set +e
 adb shell screenrecord --bit-rate 8000000 --time-limit 30 /sdcard/gameplay-qa.mp4 > "$EVIDENCE_ROOT/screenrecord.txt" 2>&1 &
@@ -417,13 +463,27 @@ else
   PROBE_FAILURE=1
 fi
 
-VALID_SCREENSHOTS="$(find "$SCREENSHOTS_DIR" -maxdepth 1 -type f -name '*.png' -size +1024c | wc -l | tr -d ' ')"
-if [[ "$VALID_SCREENSHOTS" == "5" ]] && grep -Fq 'transition_status=success' "$EVIDENCE_ROOT/screenshot-transitions.txt"; then
-  SCREENSHOT_STATUS="success"
-else
-  SCREENSHOT_STATUS="failed"
-  PROBE_FAILURE=1
-fi
+required_screenshots=(
+  "$SCREENSHOTS_DIR/01-after-launch.png"
+  "$SCREENSHOTS_DIR/02-after-first-tap.png"
+  "$SCREENSHOTS_DIR/03-after-second-tap.png"
+  "$SCREENSHOTS_DIR/04-gameplay-probe.png"
+  "$SCREENSHOTS_DIR/05-after-keyevents.png"
+  "$SCREENSHOTS_DIR/world-entry.png"
+)
+SCREENSHOT_STATUS="success"
+for screenshot in "${required_screenshots[@]}"; do
+  if [[ ! -s "$screenshot" ]] || (( $(stat -c '%s' "$screenshot") <= 1024 )); then
+    SCREENSHOT_STATUS="failed"
+    PROBE_FAILURE=1
+  fi
+done
+for transition in splash_to_main_menu main_menu_to_character_select character_select_to_world; do
+  if ! grep -Fq "${transition}=success" "$EVIDENCE_ROOT/screenshot-transitions.txt"; then
+    SCREENSHOT_STATUS="failed"
+    PROBE_FAILURE=1
+  fi
+done
 
 capture_runtime_evidence
 if [[ "$LOGCAT_STATUS" != "success" ]]; then
