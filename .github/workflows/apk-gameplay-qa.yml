@@ -1,4 +1,4 @@
-# corrected-coordinate rerun: 2026-08-05
+# gameplay-navigation regression contract
 name: APK Gameplay QA
 
 on:
@@ -9,6 +9,7 @@ on:
     paths:
       - .github/workflows/apk-gameplay-qa.yml
       - ci/apk-gameplay-probe.sh
+      - tests/ci/test_apk_gameplay_qa_contract.py
       - tools/graphics/export_r1_playable_mobile_apk.sh
       - tools/graphics/patch_r1_playable_export.py
       - tools/graphics/export_r1_physical_device_apks.sh
