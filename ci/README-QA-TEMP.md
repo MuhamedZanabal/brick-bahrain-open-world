@@ -1,1 +1,0 @@
-Temporary staging artifacts will be removed by the next atomic tree commit.

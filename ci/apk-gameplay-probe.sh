@@ -17,6 +17,8 @@ mkdir -p "$SCREENSHOTS_DIR" "$VIDEO_DIR" "$LOGS_DIR"
 BOOT_STATUS="not-run"
 INSTALL_STATUS="not-run"
 LAUNCH_STATUS="not-run"
+OVERLAY_STATUS="not-run"
+GAMEPLAY_STATE="not-run"
 SCREENSHOT_STATUS="not-run"
 VIDEO_STATUS="not-run"
 LOGCAT_STATUS="not-run"
@@ -28,7 +30,10 @@ TARGET_SDK=""
 ORIENTATION=""
 SUPPORTED_ABIS=""
 APK_SHA256=""
+SCREEN_W=0
+SCREEN_H=0
 PROBE_FAILURE=0
+SCREENRECORD_PID=""
 
 find_android_tool() {
   local tool="$1"
@@ -61,6 +66,7 @@ capture_runtime_evidence() {
   else
     LOGCAT_STATUS="failed"
   fi
+  set -e
 }
 
 write_report() {
@@ -86,6 +92,8 @@ write_report() {
 - Emulator boot: **$BOOT_STATUS**
 - APK install: **$INSTALL_STATUS**
 - App launch: **$LAUNCH_STATUS**
+- Android system overlay: **$OVERLAY_STATUS**
+- Gameplay navigation: **$GAMEPLAY_STATE**
 - Screenshots: **$SCREENSHOT_STATUS** ($screenshot_count/5 valid files)
 - Gameplay video: **$VIDEO_STATUS** ($video_bytes bytes)
 - Logcat capture: **$LOGCAT_STATUS** ($logcat_bytes bytes; crash buffer $crash_bytes bytes)
@@ -95,6 +103,9 @@ write_report() {
 - \`01-install.txt\`
 - \`02-launch.txt\`
 - \`adb-devices.txt\`
+- \`gameplay-state.txt\`
+- \`ui-tree-after-overlay-dismiss.xml\`
+- \`screenshot-transitions.txt\`
 - \`screenshots/01-after-launch.png\`
 - \`screenshots/02-after-first-tap.png\`
 - \`screenshots/03-after-second-tap.png\`
@@ -109,11 +120,118 @@ REPORT
 finalize() {
   local exit_code=$?
   trap - EXIT
+  if [[ -n "$SCREENRECORD_PID" ]]; then
+    kill "$SCREENRECORD_PID" >/dev/null 2>&1 || true
+  fi
   capture_runtime_evidence
   write_report "$exit_code"
   exit "$exit_code"
 }
 trap finalize EXIT
+
+capture_screenshot() {
+  local output="$1"
+  set +e
+  adb exec-out screencap -p > "$output"
+  local code=$?
+  set -e
+  if (( code != 0 )) || [[ ! -s "$output" ]]; then
+    return 1
+  fi
+  python3 - "$output" <<'PY'
+from pathlib import Path
+import struct, sys
+p = Path(sys.argv[1])
+data = p.read_bytes()
+if len(data) < 24 or data[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit(1)
+w, h = struct.unpack('>II', data[16:24])
+if w < 320 or h < 240:
+    raise SystemExit(1)
+PY
+}
+
+tap_fraction() {
+  local x_pct="$1"
+  local y_pct="$2"
+  if (( SCREEN_W <= 0 || SCREEN_H <= 0 )); then
+    printf '%s\n' 'Screen dimensions are unavailable for fractional tap.' >&2
+    return 1
+  fi
+  adb shell input tap $((SCREEN_W * x_pct / 100)) $((SCREEN_H * y_pct / 100))
+}
+
+dismiss_system_overlays() {
+  local xml="$EVIDENCE_ROOT/ui-tree-after-overlay-dismiss.xml"
+  local attempt coords x y
+  adb shell settings put secure immersive_mode_confirmations confirmed || true
+  for attempt in 1 2 3; do
+    set +e
+    adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
+    set -e
+    coords="$(python3 - "$xml" <<'PY'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+text = open(sys.argv[1], encoding='utf-8', errors='ignore').read()
+start = text.find('<?xml')
+if start < 0:
+    raise SystemExit(0)
+try:
+    root = ET.fromstring(text[start:])
+except ET.ParseError:
+    raise SystemExit(0)
+for node in root.iter('node'):
+    label = (node.attrib.get('text', '') + ' ' + node.attrib.get('content-desc', '')).strip().lower()
+    if label in {'got it', 'ok', 'continue'} or 'got it' in label:
+        match = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds', ''))
+        if match:
+            x1, y1, x2, y2 = map(int, match.groups())
+            print((x1 + x2) // 2, (y1 + y2) // 2)
+            break
+PY
+)"
+    if [[ "$coords" =~ ^[0-9]+[[:space:]][0-9]+$ ]]; then
+      read -r x y <<< "$coords"
+      adb shell input tap "$x" "$y" || true
+      sleep 2
+      continue
+    fi
+    break
+  done
+  set +e
+  adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
+  set -e
+  if grep -Eiq 'got it|viewing this app in full screen' "$xml"; then
+    OVERLAY_STATUS="failed"
+    PROBE_FAILURE=1
+  else
+    OVERLAY_STATUS="success"
+  fi
+  printf 'overlay_status=%s\n' "$OVERLAY_STATUS" > "$EVIDENCE_ROOT/system-overlay-status.txt"
+}
+
+verify_screenshot_transitions() {
+  local first="$SCREENSHOTS_DIR/01-after-launch.png"
+  local second="$SCREENSHOTS_DIR/02-after-first-tap.png"
+  local third="$SCREENSHOTS_DIR/03-after-second-tap.png"
+  python3 - "$first" "$second" "$third" > "$EVIDENCE_ROOT/screenshot-transitions.txt" <<'PY'
+from pathlib import Path
+import hashlib
+import sys
+
+paths = [Path(value) for value in sys.argv[1:]]
+digests = [hashlib.sha256(path.read_bytes()).hexdigest() for path in paths]
+for path, digest in zip(paths, digests):
+    print(f"{path.name}={digest}")
+if digests[0] == digests[1]:
+    raise SystemExit("main-menu and character-selection screenshots are byte-identical")
+if digests[1] == digests[2]:
+    raise SystemExit("character-selection and world screenshots are byte-identical")
+print("transition_status=success")
+PY
+}
 
 if [[ -z "$APK_PATH" ]]; then
   printf '%s\n' 'Usage: ci/apk-gameplay-probe.sh <apk-path>' >&2
@@ -220,7 +338,7 @@ fi
   fi
 } > "$EVIDENCE_ROOT/02-launch.txt" 2>&1 || LAUNCH_CODE=$?
 LAUNCH_CODE="${LAUNCH_CODE:-0}"
-sleep 10
+sleep 12
 if (( LAUNCH_CODE == 0 )) && adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
   LAUNCH_STATUS="success"
 else
@@ -228,67 +346,13 @@ else
   PROBE_FAILURE=1
 fi
 
-dismiss_system_overlay() {
-  local xml="$EVIDENCE_ROOT/ui-system-overlay.xml"
-  set +e
-  adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
-  local coords
-  coords="$(python3 - "$xml" <<'PY'
-import re, sys, xml.etree.ElementTree as ET
-text = open(sys.argv[1], encoding='utf-8', errors='ignore').read()
-start = text.find('<?xml')
-if start < 0:
-    raise SystemExit(0)
-try:
-    root = ET.fromstring(text[start:])
-except ET.ParseError:
-    raise SystemExit(0)
-for node in root.iter('node'):
-    label = (node.attrib.get('text','') + ' ' + node.attrib.get('content-desc','')).strip().lower()
-    if label in {'got it', 'ok', 'continue'} or 'got it' in label:
-        m = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds',''))
-        if m:
-            x1,y1,x2,y2 = map(int,m.groups())
-            print((x1+x2)//2, (y1+y2)//2)
-            break
-PY
-)"
-  if [[ "$coords" =~ ^[0-9]+[[:space:]][0-9]+$ ]]; then
-    read -r x y <<< "$coords"
-    adb shell input tap "$x" "$y" || true
-    sleep 2
-  fi
-  set -e
-}
-dismiss_system_overlay
-
-capture_screenshot() {
-  local output="$1"
-  set +e
-  adb exec-out screencap -p > "$output"
-  local code=$?
-  set -e
-  if (( code != 0 )) || [[ ! -s "$output" ]]; then
-    return 1
-  fi
-  python3 - "$output" <<'PY'
-from pathlib import Path
-import struct, sys
-p = Path(sys.argv[1])
-data = p.read_bytes()
-if len(data) < 24 or data[:8] != b'\x89PNG\r\n\x1a\n':
-    raise SystemExit(1)
-w, h = struct.unpack('>II', data[16:24])
-if w < 320 or h < 240:
-    raise SystemExit(1)
-PY
-}
-
+dismiss_system_overlays
 capture_screenshot "$SCREENSHOTS_DIR/01-after-launch.png" || PROBE_FAILURE=1
 read -r SCREEN_W SCREEN_H < <(python3 - "$SCREENSHOTS_DIR/01-after-launch.png" <<'PY'
-import struct, sys
-with open(sys.argv[1], 'rb') as f:
-    data = f.read(24)
+import struct
+import sys
+with open(sys.argv[1], 'rb') as stream:
+    data = stream.read(24)
 print(*struct.unpack('>II', data[16:24]))
 PY
 )
@@ -296,16 +360,29 @@ if [[ -z "$ORIENTATION" ]]; then
   if (( SCREEN_W > SCREEN_H )); then ORIENTATION="landscape-runtime"; else ORIENTATION="portrait-runtime"; fi
 fi
 
-# Advance through the two branded splash panels while retaining the required tap evidence.
-adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
-sleep 6
+# Main menu Play button: source anchors place it near 85% width and 25% height.
+tap_fraction 85 25 || PROBE_FAILURE=1
+sleep 10
+dismiss_system_overlays
 capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
 
-adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
-sleep 8
+# Character-selection Play button: source anchors place it at the lower center.
+tap_fraction 50 93 || PROBE_FAILURE=1
+GAMEPLAY_STATE="world-probe-attempted"
+printf 'state=world-probe-attempted\n' > "$EVIDENCE_ROOT/gameplay-state.txt"
+sleep 25
+dismiss_system_overlays
 capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
 
-# Begin the 30-second recording at the actionable menu so it captures real flow and input probing.
+if verify_screenshot_transitions; then
+  GAMEPLAY_STATE="world-transition-observed"
+  printf 'state=world-transition-observed\n' >> "$EVIDENCE_ROOT/gameplay-state.txt"
+else
+  GAMEPLAY_STATE="world-transition-not-observed"
+  PROBE_FAILURE=1
+fi
+
+# Record only after the world transition has been attempted and observed.
 adb shell rm -f /sdcard/gameplay-qa.mp4 || true
 set +e
 adb shell screenrecord --bit-rate 8000000 --time-limit 30 /sdcard/gameplay-qa.mp4 > "$EVIDENCE_ROOT/screenrecord.txt" 2>&1 &
@@ -313,27 +390,23 @@ SCREENRECORD_PID=$!
 set -e
 sleep 2
 
-# Enter the single-player flow, confirm the default character, then probe movement/actions.
-adb shell input tap $((SCREEN_W * 86 / 100)) $((SCREEN_H * 16 / 100)) || true
-sleep 6
-adb shell input tap $((SCREEN_W * 50 / 100)) $((SCREEN_H * 82 / 100)) || true
-sleep 8
-
 adb shell input swipe $((SCREEN_W * 20 / 100)) $((SCREEN_H * 75 / 100)) $((SCREEN_W * 38 / 100)) $((SCREEN_H * 75 / 100)) 900 || true
 adb shell input swipe $((SCREEN_W * 22 / 100)) $((SCREEN_H * 78 / 100)) $((SCREEN_W * 22 / 100)) $((SCREEN_H * 55 / 100)) 900 || true
 adb shell input tap $((SCREEN_W * 84 / 100)) $((SCREEN_H * 74 / 100)) || true
-sleep 4
+sleep 6
 capture_screenshot "$SCREENSHOTS_DIR/04-gameplay-probe.png" || PROBE_FAILURE=1
 
 for key in KEYCODE_DPAD_UP KEYCODE_DPAD_RIGHT KEYCODE_BUTTON_A KEYCODE_SPACE KEYCODE_ENTER; do
   adb shell input keyevent "$key" || true
   sleep 1
 done
+sleep 4
 capture_screenshot "$SCREENSHOTS_DIR/05-after-keyevents.png" || PROBE_FAILURE=1
 
 set +e
 wait "$SCREENRECORD_PID"
 SCREENRECORD_CODE=$?
+SCREENRECORD_PID=""
 adb pull /sdcard/gameplay-qa.mp4 "$VIDEO_DIR/gameplay-qa.mp4" >> "$EVIDENCE_ROOT/screenrecord.txt" 2>&1
 PULL_CODE=$?
 set -e
@@ -345,7 +418,7 @@ else
 fi
 
 VALID_SCREENSHOTS="$(find "$SCREENSHOTS_DIR" -maxdepth 1 -type f -name '*.png' -size +1024c | wc -l | tr -d ' ')"
-if [[ "$VALID_SCREENSHOTS" == "5" ]]; then
+if [[ "$VALID_SCREENSHOTS" == "5" ]] && grep -Fq 'transition_status=success' "$EVIDENCE_ROOT/screenshot-transitions.txt"; then
   SCREENSHOT_STATUS="success"
 else
   SCREENSHOT_STATUS="failed"
