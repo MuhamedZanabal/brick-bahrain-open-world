@@ -1,0 +1,470 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APK_PATH="${1:-}"
+EVIDENCE_ROOT="${QA_EVIDENCE_DIR:-qa-evidence}"
+SCREENSHOTS_DIR="$EVIDENCE_ROOT/screenshots"
+VIDEO_DIR="$EVIDENCE_ROOT/video"
+LOGS_DIR="$EVIDENCE_ROOT/logs"
+MIN_SCENE_MEAN_DIFFERENCE=5.0
+
+mkdir -p "$SCREENSHOTS_DIR" "$VIDEO_DIR" "$LOGS_DIR"
+for file in \
+  "$EVIDENCE_ROOT/01-install.txt" \
+  "$EVIDENCE_ROOT/02-launch.txt" \
+  "$EVIDENCE_ROOT/adb-devices.txt" \
+  "$EVIDENCE_ROOT/screenshot-transitions.txt" \
+  "$EVIDENCE_ROOT/gameplay-state.txt" \
+  "$EVIDENCE_ROOT/system-overlay-status.txt" \
+  "$LOGS_DIR/logcat.txt" \
+  "$LOGS_DIR/crash-logcat.txt"; do
+  : > "$file"
+done
+
+BOOT_STATUS="not-run"
+INSTALL_STATUS="not-run"
+LAUNCH_STATUS="not-run"
+OVERLAY_STATUS="not-run"
+GAMEPLAY_STATE="not-run"
+SCREENSHOT_STATUS="not-run"
+VIDEO_STATUS="not-run"
+LOGCAT_STATUS="not-run"
+PACKAGE_NAME=""
+LAUNCH_ACTIVITY=""
+LAUNCH_COMPONENT=""
+MIN_SDK=""
+TARGET_SDK=""
+ORIENTATION=""
+SUPPORTED_ABIS=""
+APK_SHA256=""
+SCREEN_W=0
+SCREEN_H=0
+PROBE_FAILURE=0
+SCREENRECORD_PID=""
+
+find_android_tool() {
+  local tool="$1"
+  local root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  [[ -n "$root" ]] || return 1
+  find "$root" -type f -name "$tool" -perm -u+x 2>/dev/null | sort -V | tail -n 1
+}
+
+capture_runtime_evidence() {
+  set +e
+  adb devices -l > "$EVIDENCE_ROOT/adb-devices.txt" 2>&1
+  adb shell wm size > "$EVIDENCE_ROOT/display-size.txt" 2>&1
+  adb shell dumpsys window windows > "$EVIDENCE_ROOT/window-state.txt" 2>&1
+  if [[ -n "$PACKAGE_NAME" ]]; then
+    adb shell pidof "$PACKAGE_NAME" > "$EVIDENCE_ROOT/process-state.txt" 2>&1
+    adb shell dumpsys package "$PACKAGE_NAME" > "$EVIDENCE_ROOT/package-state.txt" 2>&1
+  else
+    : > "$EVIDENCE_ROOT/process-state.txt"
+    : > "$EVIDENCE_ROOT/package-state.txt"
+  fi
+  adb logcat -d -v threadtime > "$LOGS_DIR/logcat.txt" 2>&1
+  local logcat_code=$?
+  adb logcat -b crash -d -v threadtime > "$LOGS_DIR/crash-logcat.txt" 2>&1
+  local crash_code=$?
+  if (( logcat_code == 0 && crash_code == 0 )); then
+    LOGCAT_STATUS="success"
+  else
+    LOGCAT_STATUS="failed"
+  fi
+  set -e
+}
+
+write_report() {
+  local exit_code="$1"
+  local count=0 video_bytes logcat_bytes crash_bytes
+  for screenshot in \
+    "$SCREENSHOTS_DIR/01-after-launch.png" \
+    "$SCREENSHOTS_DIR/02-after-first-tap.png" \
+    "$SCREENSHOTS_DIR/03-after-second-tap.png" \
+    "$SCREENSHOTS_DIR/04-gameplay-probe.png" \
+    "$SCREENSHOTS_DIR/05-after-keyevents.png"; do
+    [[ -s "$screenshot" ]] && count=$((count + 1))
+  done
+  video_bytes="$(stat -c '%s' "$VIDEO_DIR/gameplay-qa.mp4" 2>/dev/null || printf '0')"
+  logcat_bytes="$(stat -c '%s' "$LOGS_DIR/logcat.txt" 2>/dev/null || printf '0')"
+  crash_bytes="$(stat -c '%s' "$LOGS_DIR/crash-logcat.txt" 2>/dev/null || printf '0')"
+  cat > "$EVIDENCE_ROOT/report.md" <<REPORT
+# APK Gameplay QA Report
+
+- Exit code: \`$exit_code\`
+- APK path: \`$APK_PATH\`
+- APK SHA-256: \`$APK_SHA256\`
+- Package: \`$PACKAGE_NAME\`
+- Launch activity: \`$LAUNCH_ACTIVITY\`
+- Launch component: \`$LAUNCH_COMPONENT\`
+- Supported ABIs: \`$SUPPORTED_ABIS\`
+- Minimum SDK: \`$MIN_SDK\`
+- Target SDK: \`$TARGET_SDK\`
+- Orientation: \`$ORIENTATION\`
+- Emulator boot: **$BOOT_STATUS**
+- APK install: **$INSTALL_STATUS**
+- App launch: **$LAUNCH_STATUS**
+- Android system overlay: **$OVERLAY_STATUS**
+- Gameplay navigation: **$GAMEPLAY_STATE**
+- Screenshots: **$SCREENSHOT_STATUS** ($count/5 required files; world-entry captured separately)
+- Gameplay video: **$VIDEO_STATUS** ($video_bytes bytes)
+- Logcat capture: **$LOGCAT_STATUS** ($logcat_bytes bytes; crash buffer $crash_bytes bytes)
+
+## Evidence
+
+- \`01-install.txt\`
+- \`02-launch.txt\`
+- \`adb-devices.txt\`
+- \`gameplay-state.txt\`
+- \`system-overlay-status.txt\`
+- \`ui-tree-after-overlay-dismiss.xml\`
+- \`screenshot-transitions.txt\`
+- \`screenshots/01-after-launch.png\`
+- \`screenshots/02-after-first-tap.png\`
+- \`screenshots/03-after-second-tap.png\`
+- \`screenshots/world-entry.png\`
+- \`screenshots/04-gameplay-probe.png\`
+- \`screenshots/05-after-keyevents.png\`
+- \`video/gameplay-qa.mp4\`
+- \`logs/logcat.txt\`
+- \`logs/crash-logcat.txt\`
+REPORT
+}
+
+finalize() {
+  local exit_code=$?
+  trap - EXIT
+  if [[ -n "$SCREENRECORD_PID" ]]; then
+    kill "$SCREENRECORD_PID" >/dev/null 2>&1 || true
+  fi
+  capture_runtime_evidence
+  write_report "$exit_code"
+  exit "$exit_code"
+}
+trap finalize EXIT
+
+capture_screenshot() {
+  local output="$1"
+  set +e
+  adb exec-out screencap -p > "$output"
+  local code=$?
+  set -e
+  (( code == 0 )) && [[ -s "$output" ]] || return 1
+  python3 - "$output" <<'PY'
+from pathlib import Path
+import struct, sys
+p = Path(sys.argv[1])
+data = p.read_bytes()
+if len(data) < 24 or data[:8] != b'\x89PNG\r\n\x1a\n':
+    raise SystemExit(1)
+w, h = struct.unpack('>II', data[16:24])
+if w < 320 or h < 240:
+    raise SystemExit(1)
+PY
+}
+
+tap_fraction() {
+  local x_pct="$1" y_pct="$2"
+  (( SCREEN_W > 0 && SCREEN_H > 0 )) || return 1
+  adb shell input tap $((SCREEN_W * x_pct / 100)) $((SCREEN_H * y_pct / 100))
+}
+
+dismiss_system_overlays() {
+  local xml="$EVIDENCE_ROOT/ui-tree-after-overlay-dismiss.xml"
+  local coords x y
+  adb shell settings put secure immersive_mode_confirmations confirmed || true
+  for _ in 1 2 3 4 5 6; do
+    set +e
+    adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
+    set -e
+    coords="$(python3 - "$xml" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+text = open(sys.argv[1], encoding='utf-8', errors='ignore').read()
+start = text.find('<?xml')
+if start < 0:
+    raise SystemExit(0)
+try:
+    root = ET.fromstring(text[start:])
+except ET.ParseError:
+    raise SystemExit(0)
+nodes = list(root.iter('node'))
+labels = [' '.join((n.attrib.get('text',''), n.attrib.get('content-desc',''))).strip().lower() for n in nodes]
+pixel_launcher_anr = any(
+    "pixel launcher isn't responding" in label
+    or 'pixel launcher is not responding' in label
+    or 'pixel launcher keeps stopping' in label
+    for label in labels
+)
+def center(node):
+    m = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.attrib.get('bounds',''))
+    if not m:
+        return None
+    x1, y1, x2, y2 = map(int, m.groups())
+    return (x1+x2)//2, (y1+y2)//2
+if pixel_launcher_anr:
+    for node, label in zip(nodes, labels):
+        if node.attrib.get('resource-id') == 'android:id/aerr_close' or label == 'close app':
+            point = center(node)
+            if point:
+                print(*point)
+                raise SystemExit(0)
+for node, label in zip(nodes, labels):
+    if 'got it' in label:
+        point = center(node)
+        if point:
+            print(*point)
+            raise SystemExit(0)
+PY
+)"
+    if [[ "$coords" =~ ^[0-9]+[[:space:]][0-9]+$ ]]; then
+      read -r x y <<< "$coords"
+      adb shell input tap "$x" "$y" || true
+      sleep 2
+    else
+      break
+    fi
+  done
+  set +e
+  adb exec-out uiautomator dump /dev/tty > "$xml" 2>&1
+  set -e
+  if grep -Eiq "got it|viewing (this app in )?full screen|pixel launcher (isn't|is not) responding|pixel launcher keeps stopping|android:id/aerr_close" "$xml"; then
+    OVERLAY_STATUS="failed"
+    PROBE_FAILURE=1
+  else
+    OVERLAY_STATUS="success"
+  fi
+  printf 'overlay_status=%s\n' "$OVERLAY_STATUS" > "$EVIDENCE_ROOT/system-overlay-status.txt"
+}
+
+verify_perceptual_transition() {
+  local before="$1" after="$2" name="$3"
+  python3 - "$before" "$after" "$name" "$MIN_SCENE_MEAN_DIFFERENCE" >> "$EVIDENCE_ROOT/screenshot-transitions.txt" <<'PY'
+from PIL import Image, ImageChops, ImageStat
+import sys
+before = Image.open(sys.argv[1]).convert('RGB')
+after = Image.open(sys.argv[2]).convert('RGB')
+name, minimum = sys.argv[3], float(sys.argv[4])
+if before.size != after.size:
+    raise SystemExit(f'{name}: size mismatch')
+diff = ImageChops.difference(before, after)
+mean = sum(ImageStat.Stat(diff).mean) / 3.0
+bbox = diff.getbbox()
+print(f'{name}_mean_difference={mean:.4f}')
+print(f'{name}_changed_bbox={bbox}')
+if bbox is None or mean < minimum:
+    raise SystemExit(f'{name}: perceptual difference {mean:.4f} below {minimum:.4f}')
+print(f'{name}=success')
+PY
+}
+
+wait_for_world_frame() {
+  local before="$1" output="$2" timeout_seconds="$3"
+  local candidate="$SCREENSHOTS_DIR/.world-candidate.png"
+  local deadline=$((SECONDS + timeout_seconds))
+  while (( SECONDS < deadline )); do
+    sleep 5
+    dismiss_system_overlays
+    if capture_screenshot "$candidate" && python3 - "$before" "$candidate" >> "$EVIDENCE_ROOT/screenshot-transitions.txt" <<'PY'
+from PIL import Image, ImageChops, ImageStat
+import sys
+before = Image.open(sys.argv[1]).convert('RGB')
+after = Image.open(sys.argv[2]).convert('RGB')
+if before.size != after.size:
+    raise SystemExit(1)
+diff_mean = sum(ImageStat.Stat(ImageChops.difference(before, after)).mean) / 3.0
+gray = after.convert('L')
+stat = ImageStat.Stat(gray)
+mean = stat.mean[0]
+stdev = stat.stddev[0]
+pixels = list(gray.resize((160, 90)).getdata())
+dark_ratio = sum(value < 35 for value in pixels) / len(pixels)
+print(f'world_candidate_difference={diff_mean:.4f}')
+print(f'world_candidate_mean_luma={mean:.4f}')
+print(f'world_candidate_stdev={stdev:.4f}')
+print(f'world_candidate_dark_ratio={dark_ratio:.4f}')
+# The World loading overlay is nearly uniform Color(0.05, 0.05, 0.08).
+if diff_mean < 5.0 or stdev < 18.0 or dark_ratio > 0.82:
+    raise SystemExit(1)
+PY
+    then
+      mv "$candidate" "$output"
+      printf '%s\n' 'character_select_to_world=success' >> "$EVIDENCE_ROOT/screenshot-transitions.txt"
+      return 0
+    fi
+  done
+  return 1
+}
+
+[[ -n "$APK_PATH" && -s "$APK_PATH" ]] || { printf 'Usage: %s <apk-path>\n' "$0" >&2; exit 2; }
+APK_SHA256="$(sha256sum "$APK_PATH" | awk '{print $1}')"
+printf '%s  %s\n' "$APK_SHA256" "$APK_PATH" > "$EVIDENCE_ROOT/apk-sha256.txt"
+unzip -Z1 "$APK_PATH" > "$EVIDENCE_ROOT/apk-inventory.txt"
+SUPPORTED_ABIS="$(awk -F/ '/^lib\/[^/]+\/.*\.so$/ {print $2}' "$EVIDENCE_ROOT/apk-inventory.txt" | sort -u | paste -sd, -)"
+
+AAPT="$(find_android_tool aapt || true)"
+APKANALYZER="$(find_android_tool apkanalyzer || true)"
+if [[ -n "$AAPT" ]]; then
+  set +e
+  "$AAPT" dump badging "$APK_PATH" > "$EVIDENCE_ROOT/apk-badging.txt" 2>&1
+  set -e
+  PACKAGE_NAME="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" "$EVIDENCE_ROOT/apk-badging.txt" | head -1)"
+  LAUNCH_ACTIVITY="$(sed -n "s/^launchable-activity: name='\([^']*\)'.*/\1/p" "$EVIDENCE_ROOT/apk-badging.txt" | head -1)"
+fi
+if [[ -n "$APKANALYZER" ]]; then
+  "$APKANALYZER" manifest print "$APK_PATH" > "$EVIDENCE_ROOT/apk-manifest.xml" 2>&1 || true
+  [[ -n "$PACKAGE_NAME" ]] || PACKAGE_NAME="$("$APKANALYZER" manifest application-id "$APK_PATH" 2>/dev/null | tr -d '\r\n')"
+  MIN_SDK="$("$APKANALYZER" manifest min-sdk "$APK_PATH" 2>/dev/null | tr -d '\r\n')"
+  TARGET_SDK="$("$APKANALYZER" manifest target-sdk "$APK_PATH" 2>/dev/null | tr -d '\r\n')"
+  orientation_code="$(grep -o 'android:screenOrientation="[^"]*"' "$EVIDENCE_ROOT/apk-manifest.xml" | head -1 | cut -d'"' -f2 || true)"
+  case "$orientation_code" in
+    0) ORIENTATION="landscape" ;;
+    6) ORIENTATION="sensorLandscape" ;;
+    8) ORIENTATION="reverseLandscape" ;;
+    11) ORIENTATION="userLandscape" ;;
+    *) ORIENTATION="$orientation_code" ;;
+  esac
+fi
+[[ -n "$PACKAGE_NAME" ]] || { printf '%s\n' 'Unable to extract package name.' >&2; exit 3; }
+case "$ORIENTATION" in
+  landscape|sensorLandscape|reverseLandscape|userLandscape) ;;
+  *) printf 'APK is not landscape: %s\n' "$ORIENTATION" >&2; exit 3 ;;
+esac
+
+adb wait-for-device
+for _ in $(seq 1 180); do
+  [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]] && { BOOT_STATUS="success"; break; }
+  sleep 2
+done
+[[ "$BOOT_STATUS" == "success" ]] || { BOOT_STATUS="failed"; exit 4; }
+adb shell settings put secure immersive_mode_confirmations confirmed || true
+adb shell settings put system accelerometer_rotation 0 || true
+adb shell settings put system user_rotation 1 || true
+adb shell am force-stop com.google.android.apps.nexuslauncher || true
+adb logcat -c || true
+adb devices -l > "$EVIDENCE_ROOT/adb-devices.txt" 2>&1
+
+set +e
+adb install -r -g "$APK_PATH" > "$EVIDENCE_ROOT/01-install.txt" 2>&1
+install_code=$?
+set -e
+if (( install_code == 0 )) && grep -q Success "$EVIDENCE_ROOT/01-install.txt"; then
+  INSTALL_STATUS="success"
+else
+  INSTALL_STATUS="failed"
+  PROBE_FAILURE=1
+fi
+
+resolved="$(adb shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/dev/null | tr -d '\r' | tail -1 || true)"
+if [[ "$resolved" == */* && "$resolved" != *"No activity found"* ]]; then
+  LAUNCH_COMPONENT="$resolved"
+  LAUNCH_ACTIVITY="${resolved#*/}"
+elif [[ -n "$LAUNCH_ACTIVITY" ]]; then
+  [[ "$LAUNCH_ACTIVITY" == .* ]] && LAUNCH_ACTIVITY="$PACKAGE_NAME$LAUNCH_ACTIVITY"
+  LAUNCH_COMPONENT="$PACKAGE_NAME/$LAUNCH_ACTIVITY"
+fi
+{
+  printf 'package=%s\nresolved_component=%s\nselected_component=%s\n' "$PACKAGE_NAME" "$resolved" "$LAUNCH_COMPONENT"
+  adb shell am force-stop "$PACKAGE_NAME" || true
+  if [[ -n "$LAUNCH_COMPONENT" ]]; then
+    adb shell am start -W -S -n "$LAUNCH_COMPONENT"
+  else
+    adb shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1
+  fi
+} > "$EVIDENCE_ROOT/02-launch.txt" 2>&1 || launch_code=$?
+launch_code="${launch_code:-0}"
+sleep 3
+if (( launch_code == 0 )) && adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
+  LAUNCH_STATUS="success"
+else
+  LAUNCH_STATUS="failed"
+  PROBE_FAILURE=1
+fi
+
+dismiss_system_overlays
+capture_screenshot "$SCREENSHOTS_DIR/01-after-launch.png" || PROBE_FAILURE=1
+read -r SCREEN_W SCREEN_H < <(python3 - "$SCREENSHOTS_DIR/01-after-launch.png" <<'PY'
+import struct, sys
+with open(sys.argv[1], 'rb') as f: data=f.read(24)
+print(*struct.unpack('>II', data[16:24]))
+PY
+)
+if (( SCREEN_W <= SCREEN_H )); then
+  printf 'Runtime display is not landscape: %sx%s\n' "$SCREEN_W" "$SCREEN_H" >&2
+  PROBE_FAILURE=1
+fi
+
+# Splash screen source places TAP TO CONTINUE at the lower center.
+tap_fraction 50 82 || PROBE_FAILURE=1
+sleep 12
+dismiss_system_overlays
+capture_screenshot "$SCREENSHOTS_DIR/02-after-first-tap.png" || PROBE_FAILURE=1
+verify_perceptual_transition "$SCREENSHOTS_DIR/01-after-launch.png" "$SCREENSHOTS_DIR/02-after-first-tap.png" splash_to_main_menu || PROBE_FAILURE=1
+
+# Main-menu source anchors Character Select as the second action at 34% viewport height.
+tap_fraction 88 34 || PROBE_FAILURE=1
+sleep 8
+dismiss_system_overlays
+capture_screenshot "$SCREENSHOTS_DIR/03-after-second-tap.png" || PROBE_FAILURE=1
+verify_perceptual_transition "$SCREENSHOTS_DIR/02-after-first-tap.png" "$SCREENSHOTS_DIR/03-after-second-tap.png" main_menu_to_character_select || PROBE_FAILURE=1
+
+GAMEPLAY_STATE="world-probe-attempted"
+printf '%s\n' 'state=world-probe-attempted' > "$EVIDENCE_ROOT/gameplay-state.txt"
+tap_fraction 50 93 || PROBE_FAILURE=1
+if wait_for_world_frame "$SCREENSHOTS_DIR/03-after-second-tap.png" "$SCREENSHOTS_DIR/world-entry.png" 300 \
+  && adb shell pidof "$PACKAGE_NAME" >/dev/null 2>&1; then
+  GAMEPLAY_STATE="world-transition-observed"
+  printf '%s\n' 'state=world-transition-observed' >> "$EVIDENCE_ROOT/gameplay-state.txt"
+else
+  GAMEPLAY_STATE="world-transition-not-observed"
+  printf '%s\n' 'state=world-transition-not-observed' >> "$EVIDENCE_ROOT/gameplay-state.txt"
+  PROBE_FAILURE=1
+fi
+
+adb shell rm -f /sdcard/gameplay-qa.mp4 || true
+set +e
+adb shell screenrecord --bit-rate 8000000 --time-limit 30 /sdcard/gameplay-qa.mp4 > "$EVIDENCE_ROOT/screenrecord.txt" 2>&1 &
+SCREENRECORD_PID=$!
+set -e
+sleep 2
+adb shell input swipe $((SCREEN_W*20/100)) $((SCREEN_H*75/100)) $((SCREEN_W*38/100)) $((SCREEN_H*75/100)) 900 || true
+adb shell input swipe $((SCREEN_W*22/100)) $((SCREEN_H*78/100)) $((SCREEN_W*22/100)) $((SCREEN_H*55/100)) 900 || true
+adb shell input tap $((SCREEN_W*84/100)) $((SCREEN_H*74/100)) || true
+sleep 6
+capture_screenshot "$SCREENSHOTS_DIR/04-gameplay-probe.png" || PROBE_FAILURE=1
+for key in KEYCODE_DPAD_UP KEYCODE_DPAD_RIGHT KEYCODE_BUTTON_A KEYCODE_SPACE KEYCODE_ENTER; do
+  adb shell input keyevent "$key" || true
+  sleep 1
+done
+sleep 4
+capture_screenshot "$SCREENSHOTS_DIR/05-after-keyevents.png" || PROBE_FAILURE=1
+set +e
+wait "$SCREENRECORD_PID"; record_code=$?; SCREENRECORD_PID=""
+adb pull /sdcard/gameplay-qa.mp4 "$VIDEO_DIR/gameplay-qa.mp4" >> "$EVIDENCE_ROOT/screenrecord.txt" 2>&1; pull_code=$?
+set -e
+if (( record_code == 0 && pull_code == 0 )) && [[ -s "$VIDEO_DIR/gameplay-qa.mp4" ]]; then
+  VIDEO_STATUS="success"
+else
+  VIDEO_STATUS="failed"
+  PROBE_FAILURE=1
+fi
+
+required=(
+  "$SCREENSHOTS_DIR/01-after-launch.png"
+  "$SCREENSHOTS_DIR/02-after-first-tap.png"
+  "$SCREENSHOTS_DIR/03-after-second-tap.png"
+  "$SCREENSHOTS_DIR/world-entry.png"
+  "$SCREENSHOTS_DIR/04-gameplay-probe.png"
+  "$SCREENSHOTS_DIR/05-after-keyevents.png"
+)
+SCREENSHOT_STATUS="success"
+for screenshot in "${required[@]}"; do
+  if [[ ! -s "$screenshot" ]] || (( $(stat -c '%s' "$screenshot") <= 1024 )); then
+    SCREENSHOT_STATUS="failed"
+    PROBE_FAILURE=1
+  fi
+done
+for transition in splash_to_main_menu main_menu_to_character_select character_select_to_world; do
+  grep -Fq "${transition}=success" "$EVIDENCE_ROOT/screenshot-transitions.txt" || { SCREENSHOT_STATUS="failed"; PROBE_FAILURE=1; }
+done
+capture_runtime_evidence
+[[ "$LOGCAT_STATUS" == "success" ]] || PROBE_FAILURE=1
+exit "$PROBE_FAILURE"

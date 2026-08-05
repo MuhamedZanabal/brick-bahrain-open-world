@@ -1,107 +1,144 @@
 extends Control
-## SplashScreen - Zanabal Gaming splash/boot screen shown before the main menu
+## Branded studio splash shown before the staged Bahrain Brick loading screen.
 
-var progress_bar_fill: ColorRect
-var progress_pct: float = 0.0
-var status_label: Label
-var loading_messages: Array[String] = [
-	"PREPARING GROVE STREET",
-	"POLISHING BRICKS",
-	"LOADING MANAMA SKYLINE",
-	"FUELING VEHICLES",
-	"SPAWNING NPCS",
-	"TUNING RADIO STATIONS",
-	"ALMOST READY"
-]
-var message_idx: int = 0
-var min_display_time: float = 3.0
-var elapsed: float = 0.0
-var ready_to_advance: bool = false
+const NEXT_SCENE := "res://scenes/loading_screen.tscn"
+const MIN_DISPLAY_SECONDS := 2.2
+const AUTO_ADVANCE_SECONDS := 3.4
+
+var _elapsed := 0.0
+var _transitioned := false
+var _branding: Control
 
 func _ready() -> void:
 	_build_ui()
-	set_process(true)
+	_animate_branding()
 
 func _build_ui() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	var background := TextureRect.new()
+	background.name = "Background"
+	background.texture = load("res://assets/splash_screen.png")
+	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
+	move_child(background, 0)
 
-	# Background image (the splash artwork)
-	var bg := TextureRect.new()
-	bg.texture = load("res://assets/splash_screen.png")
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	var shade := ColorRect.new()
+	shade.name = "CinematicShade"
+	shade.color = Color(0.008, 0.018, 0.04, 0.58)
+	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shade)
+	move_child(shade, 1)
 
-	# Dark overlay for readability at the bottom
-	var overlay := ColorRect.new()
-	overlay.color = Color(0, 0, 0, 0.35)
-	overlay.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	overlay.position.y = -140
-	overlay.size = Vector2(get_viewport().get_visible_rect().size.x, 140)
-	add_child(overlay)
+	var vignette := ColorRect.new()
+	vignette.name = "LowerShade"
+	vignette.color = Color(0.005, 0.008, 0.015, 0.34)
+	vignette.anchor_left = 0.0
+	vignette.anchor_top = 0.48
+	vignette.anchor_right = 1.0
+	vignette.anchor_bottom = 1.0
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(vignette)
 
-	# Progress bar background
-	var bar_bg := ColorRect.new()
-	bar_bg.color = Color(0.1, 0.1, 0.1, 0.8)
-	bar_bg.position = Vector2(40, get_viewport().get_visible_rect().size.y - 90)
-	bar_bg.size = Vector2(get_viewport().get_visible_rect().size.x - 80, 24)
-	add_child(bar_bg)
+	var safe_area := get_node_or_null("SafeArea") as MarginContainer
+	if safe_area == null:
+		safe_area = SafeAreaRoot.new()
+		safe_area.name = "SafeArea"
+		safe_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+		add_child(safe_area)
 
-	# Progress bar fill
-	progress_bar_fill = ColorRect.new()
-	progress_bar_fill.color = Color(1.0, 0.75, 0.1)
-	progress_bar_fill.position = bar_bg.position + Vector2(2, 2)
-	progress_bar_fill.size = Vector2(0, 20)
-	add_child(progress_bar_fill)
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	safe_area.add_child(center)
 
-	# Status label
-	status_label = Label.new()
-	status_label.text = "LOADING... [0%%] | %s | POWERED BY BRICKS" % loading_messages[0]
-	status_label.add_theme_font_size_override("font_size", 16)
-	status_label.add_theme_color_override("font_color", Color(1, 1, 1))
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.position = Vector2(0, get_viewport().get_visible_rect().size.y - 55)
-	status_label.size = Vector2(get_viewport().get_visible_rect().size.x, 30)
-	add_child(status_label)
+	_branding = VBoxContainer.new()
+	_branding.name = "Branding"
+	_branding.custom_minimum_size = Vector2(700, 420)
+	_branding.alignment = BoxContainer.ALIGNMENT_CENTER
+	_branding.add_theme_constant_override("separation", 18)
+	_branding.modulate.a = 0.0
+	_branding.scale = Vector2(0.9, 0.9)
+	center.add_child(_branding)
 
-	# Studio credit
-	var credit := Label.new()
-	credit.text = "ZANABAL GAMING — LEGENDS ARE BRICK"
-	credit.add_theme_font_size_override("font_size", 13)
-	credit.add_theme_color_override("font_color", Color(0.85, 0.75, 0.4))
-	credit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	credit.position = Vector2(0, get_viewport().get_visible_rect().size.y - 25)
-	credit.size = Vector2(get_viewport().get_visible_rect().size.x, 20)
-	add_child(credit)
+	var crest := TextureRect.new()
+	crest.name = "StudioCrest"
+	crest.texture = load("res://assets/app_icon.png")
+	crest.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	crest.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	crest.custom_minimum_size = Vector2(170, 170)
+	crest.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_branding.add_child(crest)
+
+	var studio := Label.new()
+	studio.text = "ZANABAL GAMING"
+	studio.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	studio.add_theme_font_size_override("font_size", 58)
+	studio.add_theme_color_override("font_color", BahrainTheme.GOLD_LIGHT)
+	studio.add_theme_color_override("font_outline_color", Color(0.01, 0.01, 0.015, 0.95))
+	studio.add_theme_constant_override("outline_size", 9)
+	_branding.add_child(studio)
+
+	var divider := HSeparator.new()
+	divider.custom_minimum_size = Vector2(520, 2)
+	_branding.add_child(divider)
+
+	var motto := Label.new()
+	motto.text = "BUILDING LEGENDS, BRICK BY BRICK"
+	motto.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	motto.add_theme_font_size_override("font_size", 22)
+	motto.add_theme_color_override("font_color", BahrainTheme.TEXT)
+	motto.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	motto.add_theme_constant_override("outline_size", 5)
+	_branding.add_child(motto)
+
+	var hint := Label.new()
+	hint.name = "SkipHint"
+	hint.text = "TAP TO CONTINUE"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.add_theme_font_size_override("font_size", 15)
+	hint.add_theme_color_override("font_color", Color(1, 1, 1, 0.62))
+	hint.modulate.a = 0.0
+	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	hint.position = Vector2(-120, -56)
+	hint.size = Vector2(240, 30)
+	add_child(hint)
+
+func _animate_branding() -> void:
+	if _branding == null:
+		return
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_QUAD)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(_branding, "modulate:a", 1.0, 0.75)
+	tween.tween_property(_branding, "scale", Vector2.ONE, 0.9).set_trans(Tween.TRANS_BACK)
+	var hint := get_node_or_null("SkipHint") as Label
+	if hint:
+		var hint_tween := create_tween()
+		hint_tween.tween_interval(MIN_DISPLAY_SECONDS)
+		hint_tween.tween_property(hint, "modulate:a", 1.0, 0.35)
 
 func _process(delta: float) -> void:
-	elapsed += delta
-
-	# Animate progress bar over min_display_time seconds
-	progress_pct = clamp(elapsed / min_display_time, 0.0, 1.0)
-	var bar_width: float = get_viewport().get_visible_rect().size.x - 84
-	progress_bar_fill.size.x = bar_width * progress_pct
-
-	# Cycle loading messages
-	var new_idx: int = int(progress_pct * (loading_messages.size() - 1))
-	if new_idx != message_idx:
-		message_idx = new_idx
-
-	status_label.text = "LOADING... [%d%%] | %s | POWERED BY BRICKS" % [int(progress_pct * 100), loading_messages[message_idx]]
-
-	if elapsed >= min_display_time and not ready_to_advance:
-		ready_to_advance = true
-		_go_to_main_menu()
-
-func _go_to_main_menu() -> void:
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	if _transitioned:
+		return
+	_elapsed += delta
+	if _elapsed >= AUTO_ADVANCE_SECONDS:
+		_go_next()
 
 func _input(event: InputEvent) -> void:
-	# Allow tapping/clicking to skip once minimum time has passed
-	if ready_to_advance:
+	if _transitioned or _elapsed < MIN_DISPLAY_SECONDS:
 		return
 	if event is InputEventScreenTouch and event.pressed:
-		elapsed = min_display_time
+		_go_next()
 	elif event is InputEventMouseButton and event.pressed:
-		elapsed = min_display_time
+		_go_next()
+	elif event is InputEventKey and event.pressed:
+		_go_next()
+
+func _go_next() -> void:
+	if _transitioned:
+		return
+	_transitioned = true
+	GameManager.transition_to(NEXT_SCENE)

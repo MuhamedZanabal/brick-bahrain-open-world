@@ -1,0 +1,185 @@
+name: Bahrain Brick Playable Mobile APK Final v2
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-reference-visual-upgrade
+    paths:
+      - .github/workflows/bahrain-brick-playable-mobile-apk-final-v2.yml
+      - tools/android/verify_playable_apk.py
+      - tools/android/verify_playable_apk_v2.py
+      - tests/android/test_verify_playable_apk.py
+      - tests/android/test_verify_playable_apk_v2.py
+      - tools/graphics/patch_r1_playable_export.py
+      - tools/graphics/export_r1_playable_mobile_apk.sh
+      - tools/graphics/verify_visual_upgrade_slice_a.py
+      - tests/graphics/test_r1_playable_apk_export.py
+      - tests/visual/test_visual_upgrade_slice_a.py
+      - project.godot
+      - scenes/splash_screen.tscn
+      - scenes/loading_screen.tscn
+      - scenes/main_menu.tscn
+      - scenes/character_select.tscn
+      - scripts/splash_screen.gd
+      - scripts/loading_screen.gd
+      - scripts/main_menu.gd
+      - scripts/character_select.gd
+      - scripts/game_manager.gd
+      - scripts/save_manager.gd
+      - scripts/ui/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bahrain-brick-playable-mobile-apk-final-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify-playable-mobile-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      OUTPUT_ROOT: /tmp/bahrain-brick-playable-final-v2
+      OUTPUT_APK: /tmp/bahrain-brick-playable-final-v2/bahrain-brick-playable-mobile-arm64.apk
+    steps:
+      - name: Check out exact source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install deterministic Android dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip
+          sdkmanager 'platform-tools' 'platforms;android-34' 'build-tools;34.0.0' 'cmdline-tools;latest'
+          if [[ ! -f debug.keystore ]]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -dname 'CN=Android Debug,O=Android,C=US' \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000
+          fi
+
+      - name: Verify source and verifier contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/android/test_verify_playable_apk.py -v
+          python3 -m unittest tests/android/test_verify_playable_apk_v2.py -v
+          python3 -m unittest tests/graphics/test_r1_playable_apk_export.py -v
+          python3 -m unittest tests/visual/test_visual_upgrade_slice_a.py -v
+          python3 -m py_compile \
+            tools/android/verify_playable_apk.py \
+            tools/android/verify_playable_apk_v2.py \
+            tools/graphics/patch_r1_playable_export.py \
+            tools/graphics/verify_visual_upgrade_slice_a.py
+          bash -n tools/graphics/export_r1_playable_mobile_apk.sh
+          python3 tools/graphics/verify_visual_upgrade_slice_a.py --root .
+
+      - name: Export production-scene APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/graphics/export_r1_playable_mobile_apk.sh "$GITHUB_WORKSPACE" "$OUTPUT_ROOT"
+          test -s "$OUTPUT_APK"
+
+      - name: Verify visual upgrade inside APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/graphics/verify_visual_upgrade_slice_a.py \
+            --root . \
+            --apk "$OUTPUT_APK"
+
+      - name: Verify APK identity, signing, SDK, permissions and ABI
+        shell: bash
+        run: |
+          set -euo pipefail
+          APKANALYZER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name apkanalyzer -perm -u+x | sort -V | tail -n 1)"
+          test -n "$APKANALYZER"
+          python3 tools/android/verify_playable_apk_v2.py \
+            --apk "$OUTPUT_APK" \
+            --output-dir "$OUTPUT_ROOT" \
+            --source-commit "$GITHUB_SHA" \
+            --apkanalyzer "$APKANALYZER" \
+            --apksigner "$ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner" \
+            --aapt "$ANDROID_SDK_ROOT/build-tools/34.0.0/aapt"
+
+      - name: Print diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          set +e
+          printf '%s\n' '===== output inventory ====='
+          find "$OUTPUT_ROOT" -maxdepth 4 -type f -printf '%p %s bytes\n' | sort
+          for log in \
+            "$OUTPUT_ROOT/import.log" \
+            "$OUTPUT_ROOT/export-gl.log" \
+            "$OUTPUT_ROOT/export-mobile.log" \
+            "$OUTPUT_ROOT/playable-apk-signing.txt" \
+            "$OUTPUT_ROOT/playable-apk-summary.txt" \
+            "$OUTPUT_ROOT/playable-apk-manifest.xml" \
+            "$OUTPUT_ROOT/playable-apk-resource-packages.txt" \
+            "$OUTPUT_ROOT/playable-apk-resource-resolution.txt" \
+            "$OUTPUT_ROOT/playable-apk-app-label.txt" \
+            "$OUTPUT_ROOT/playable-apk-inventory.txt" \
+            "$OUTPUT_ROOT/playable-apk-badging.txt" \
+            "$OUTPUT_ROOT/PLAYABLE_APK_SHA256SUMS.txt" \
+            "$OUTPUT_ROOT/PLAYABLE_APK_HANDOFF.json"; do
+            if [[ -f "$log" ]]; then
+              printf '\n===== %s =====\n' "$log"
+              tail -n 500 "$log"
+            fi
+          done
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-playable-final-v2-evidence-${{ github.run_id }}
+          path: |
+            /tmp/bahrain-brick-playable-final-v2/import.log
+            /tmp/bahrain-brick-playable-final-v2/export-gl.log
+            /tmp/bahrain-brick-playable-final-v2/export-mobile.log
+            /tmp/bahrain-brick-playable-final-v2/GODOT_VERSION.txt
+            /tmp/bahrain-brick-playable-final-v2/SOURCE_TREE_EQUIVALENCE.json
+            /tmp/bahrain-brick-playable-final-v2/reconstruction/evidence/FINAL_TREE_MANIFEST.json
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-*.txt
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-manifest.xml
+            /tmp/bahrain-brick-playable-final-v2/PLAYABLE_APK_SHA256SUMS.txt
+            /tmp/bahrain-brick-playable-final-v2/PLAYABLE_APK_HANDOFF.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload verified playable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bahrain-brick-playable-mobile-arm64-final-v2-${{ github.run_id }}
+          path: |
+            /tmp/bahrain-brick-playable-final-v2/bahrain-brick-playable-mobile-arm64.apk
+            /tmp/bahrain-brick-playable-final-v2/PLAYABLE_APK_HANDOFF.json
+            /tmp/bahrain-brick-playable-final-v2/PLAYABLE_APK_SHA256SUMS.txt
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-signing.txt
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-summary.txt
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-manifest.xml
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-resource-resolution.txt
+            /tmp/bahrain-brick-playable-final-v2/playable-apk-inventory.txt
+          retention-days: 30
