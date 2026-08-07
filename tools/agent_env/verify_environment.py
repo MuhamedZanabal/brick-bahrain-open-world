@@ -144,7 +144,7 @@ def invoke(name: str, arguments: dict[str, Any]) -> Result:
 
 def direct_smoke() -> tuple[dict[str, Any], bool]:
     root = ROOT / "build/codex-env-smoke"; root.mkdir(parents=True, exist_ok=True)
-    artifact = root / "fixture.apk"
+    artifact = root / "fixture.zip"
     project = root / "project"; project.mkdir(exist_ok=True); (project / "project.godot").write_text("[application]\nconfig/name=\"Codex Smoke\"\n", encoding="utf-8")
     with zipfile.ZipFile(artifact, "w") as z: z.writestr("assets/project.binary", b"res://scenes/splash_screen.tscn")
     listed = run([sys.executable, "tools/agent_env/bahrain_brick_mcp.py", "--root", ".", "--list-tools"], 30)
