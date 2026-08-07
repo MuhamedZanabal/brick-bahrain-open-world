@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = ROOT / "tools/graphics/patch_r1_playable_export.py"
+BASE_EXPORTER = ROOT / "tools/graphics/export_r1_physical_device_apks.sh"
 WRAPPER = ROOT / "tools/graphics/export_r1_playable_mobile_apk.sh"
 
 
@@ -38,7 +39,7 @@ class R1PlayableApkExportTest(unittest.TestCase):
             ]
         )
         patched = module.patch_exporter_text(source)
-        self.assertNotIn("r1_renderer_runtime_debug.tscn", patched)
+        self.assertNotIn(diagnostic_override, patched)
         self.assertEqual(patched.count("Production main scene intentionally preserved"), 2)
         self.assertIn("bahrain-brick-playable-mobile-arm64.apk", patched)
         self.assertNotIn("com.brickbahrain.r1physical.mobile", patched)
@@ -46,10 +47,44 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn("renderer/rendering_method=", patched)
         self.assertIn("! -name '*.zip'", patched)
 
+    def test_patch_accepts_current_authoritative_exporter(self) -> None:
+        module = load_module()
+        source = BASE_EXPORTER.read_text(encoding="utf-8")
+
+        patched = module.patch_exporter_text(source)
+
+        self.assertNotIn(module.DIAGNOSTIC_MAIN_SCENE_OVERRIDE, patched)
+        self.assertEqual(patched.count(module.PRODUCTION_MAIN_SCENE_MARKER), 2)
+        self.assertIn(
+            'cp "$REPO_ROOT/tests/graphics/r1_renderer_runtime_debug.tscn"',
+            patched,
+        )
+        self.assertIn("bahrain-brick-playable-mobile-arm64.apk", patched)
+        self.assertIn("com.brickbahrain.playable.mobile", patched)
+
     def test_patch_rejects_unexpected_diagnostic_override_count(self) -> None:
         module = load_module()
         with self.assertRaisesRegex(ValueError, "exactly two diagnostic main-scene overrides"):
             module.patch_exporter_text('MOBILE_PACKAGE="com.brickbahrain.r1physical.mobile"')
+
+    def test_editor_import_uses_ci_safe_opengl3_without_changing_variant_targets(self) -> None:
+        text = BASE_EXPORTER.read_text(encoding="utf-8")
+        self.assertIn(
+            '--rendering-method gl_compatibility --rendering-driver opengl3',
+            text,
+        )
+        self.assertNotIn(
+            '--rendering-method mobile --rendering-driver vulkan',
+            text,
+        )
+        self.assertIn(
+            'python3 - "$GL_PROJECT" gl_compatibility "$GL_PACKAGE" gl_production',
+            text,
+        )
+        self.assertIn(
+            'python3 - "$MOBILE_PROJECT" mobile "$MOBILE_PACKAGE" mobile_baseline',
+            text,
+        )
 
     def test_wrapper_invokes_patcher_and_requires_playable_apk(self) -> None:
         text = WRAPPER.read_text(encoding="utf-8")
@@ -57,6 +92,11 @@ class R1PlayableApkExportTest(unittest.TestCase):
         self.assertIn("export_r1_physical_device_apks.sh", text)
         self.assertIn("bahrain-brick-playable-mobile-arm64.apk", text)
         self.assertIn("test -s", text)
+
+    def test_wrapper_rejects_only_a_diagnostic_main_scene_override(self) -> None:
+        text = WRAPPER.read_text(encoding="utf-8")
+        self.assertIn("run/main_scene=.*r1_renderer_runtime_debug.tscn", text)
+        self.assertNotIn("grep -q 'r1_renderer_runtime_debug.tscn'", text)
 
 
 if __name__ == "__main__":

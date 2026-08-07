@@ -38,7 +38,7 @@ def patch_exporter_text(text: str) -> str:
     patched = patched.replace(OLD_PACKAGE, NEW_PACKAGE)
     patched = patched.replace(OLD_GODOT_DISCOVERY, NEW_GODOT_DISCOVERY)
 
-    if "r1_renderer_runtime_debug.tscn" in patched:
+    if DIAGNOSTIC_MAIN_SCENE_OVERRIDE in patched:
         raise ValueError("diagnostic main-scene override remains after playable patch")
     if patched.count(PRODUCTION_MAIN_SCENE_MARKER) != 2:
         raise ValueError("production-main-scene preservation marker count is incorrect")

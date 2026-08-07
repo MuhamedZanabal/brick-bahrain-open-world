@@ -1,0 +1,51 @@
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+allow_login_shell = false
+
+[features]
+hooks = true
+
+[sandbox_workspace_write]
+network_access = false
+exclude_slash_tmp = true
+exclude_tmpdir_env_var = true
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 5
+
+[mcp_servers.bahrain-brick-local]
+command = "bash"
+args = ["-lc", "ROOT=$(git rev-parse --show-toplevel) && exec python3 \"$ROOT/tools/agent_env/bahrain_brick_mcp.py\" --root \"$ROOT\""]
+cwd = "."
+startup_timeout_sec = 30
+tool_timeout_sec = 1200
+enabled = true
+required = false
+supports_parallel_tool_calls = false
+enabled_tools = [
+  "godot_validate_project",
+  "godot_export_android_debug",
+  "android_adb_smoke_test",
+  "blender_validate_asset",
+  "collect_build_evidence",
+]
+default_tools_approval_mode = "prompt"
+
+[mcp_servers.bahrain-brick-local.env]
+PYTHONUNBUFFERED = "1"
+
+[mcp_servers.bahrain-brick-local.tools.godot_validate_project]
+approval_mode = "auto"
+
+[mcp_servers.bahrain-brick-local.tools.collect_build_evidence]
+approval_mode = "auto"
+
+[mcp_servers.bahrain-brick-local.tools.godot_export_android_debug]
+approval_mode = "prompt"
+
+[mcp_servers.bahrain-brick-local.tools.android_adb_smoke_test]
+approval_mode = "prompt"
+
+[mcp_servers.bahrain-brick-local.tools.blender_validate_asset]
+approval_mode = "prompt"

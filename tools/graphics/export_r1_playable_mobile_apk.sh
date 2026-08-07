@@ -13,7 +13,7 @@ python3 "$REPO_ROOT/tools/graphics/patch_r1_playable_export.py" \
   --output "$PATCHED_EXPORTER"
 
 grep -q 'Production main scene intentionally preserved for playable export' "$PATCHED_EXPORTER"
-if grep -q 'r1_renderer_runtime_debug.tscn' "$PATCHED_EXPORTER"; then
+if grep -Eq 'run/main_scene=.*r1_renderer_runtime_debug.tscn' "$PATCHED_EXPORTER"; then
   printf '%s\n' 'diagnostic main-scene override remains in playable exporter' >&2
   exit 1
 fi

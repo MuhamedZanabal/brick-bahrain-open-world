@@ -1,0 +1,280 @@
+name: Bahrain Brick Controlled Codex Environment
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-controlled-agent-os-v1
+    paths:
+      - AGENTS.md
+      - .agents/**
+      - .codex/**
+      - tools/agent_env/**
+      - tests/test_controlled_agent_environment.py
+      - docs/superpowers/specs/2026-08-03-bahrain-brick-controlled-agent-environment-design.md
+      - docs/superpowers/plans/2026-08-03-bahrain-brick-controlled-agent-environment.md
+      - .github/workflows/controlled-agent-environment.yml
+  pull_request:
+    branches:
+      - work/bahrain-brick-renderer-runtime-debugging-r1
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: bahrain-brick-controlled-codex-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.3.stable.official.77dcf97d8
+  GODOT_ARCHIVE: Godot_v4.3-stable_linux.x86_64.zip
+  GODOT_EDITOR_SHA512: fd52bb4ba8acc30ca5accd1c566d470ad7282f891ccc0995dfafabcf92bcf76280ce182bf9d80ebd885f3ed2165d01e1fc3f2928436b15498dfbd98656c2a45a
+  GODOT_ROOT_URL: https://github.com/godotengine/godot-builds/releases/download/4.3-stable
+
+jobs:
+  codex-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Compile controlled environment Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            .codex/hooks/bahrain_brick_hook.py \
+            tools/agent_env/bahrain_brick_mcp.py \
+            tools/agent_env/blender_asset_validator.py \
+            tools/agent_env/verify_environment.py \
+            tests/test_controlled_agent_environment.py
+
+      - name: Validate Codex configuration and static contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/controlled-codex/contracts
+          ruby -e 'require "yaml"; value=YAML.load_file(ARGV.fetch(0)); abort "workflow must be a mapping" unless value.is_a?(Hash)' .github/workflows/controlled-agent-environment.yml
+          python3 tools/agent_env/verify_environment.py config | tee build/controlled-codex/contracts/config.json
+          python3 tests/test_controlled_agent_environment.py 2>&1 | tee build/controlled-codex/contracts/tests.log
+
+      - name: Invoke direct typed tools for hosted environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/agent_env/verify_environment.py direct-smoke | tee build/controlled-codex/contracts/direct-smoke.json
+
+      - name: Invoke local MCP protocol
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/agent_env/verify_environment.py mcp-smoke | tee build/controlled-codex/contracts/mcp-smoke.json
+
+      - name: Upload Codex contract evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-controlled-codex-contracts-${{ github.run_id }}
+          path: build/controlled-codex
+          if-no-files-found: error
+          retention-days: 30
+
+  baseline-tests:
+    needs: codex-contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Run representative repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/controlled-codex/baseline
+          python3 tools/agent_env/verify_environment.py baseline | tee build/controlled-codex/baseline/results.json
+
+      - name: Upload baseline evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-controlled-codex-baseline-${{ github.run_id }}
+          path: build/controlled-codex/baseline
+          if-no-files-found: error
+          retention-days: 30
+
+  godot-headless:
+    needs: codex-contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Install pinned Godot authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/controlled-codex/godot/editor build/controlled-codex/godot/evidence
+          curl --fail --location --retry 5 --retry-all-errors \
+            "$GODOT_ROOT_URL/$GODOT_ARCHIVE" \
+            -o "build/controlled-codex/godot/$GODOT_ARCHIVE"
+          printf '%s  %s\n' "$GODOT_EDITOR_SHA512" "build/controlled-codex/godot/$GODOT_ARCHIVE" | sha512sum -c -
+          unzip -q "build/controlled-codex/godot/$GODOT_ARCHIVE" -d build/controlled-codex/godot/editor
+          GODOT_BIN="$(find build/controlled-codex/godot/editor -maxdepth 1 -type f -name 'Godot*' | head -1)"
+          test -n "$GODOT_BIN"
+          chmod +x "$GODOT_BIN"
+          test "$($GODOT_BIN --version)" = "$GODOT_VERSION"
+          printf '%s\n' "$GODOT_BIN" > build/controlled-codex/godot/GODOT_BIN.txt
+
+      - name: Run Godot headless validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          export BAHRAIN_BRICK_GODOT="$PWD/$(cat build/controlled-codex/godot/GODOT_BIN.txt)"
+          python3 tools/agent_env/verify_environment.py godot | tee build/controlled-codex/godot/evidence/headless-validation.json
+
+      - name: Upload Godot evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-controlled-codex-godot-${{ github.run_id }}
+          path: build/controlled-codex/godot/evidence
+          if-no-files-found: error
+          retention-days: 30
+
+  android-debug-attempt:
+    needs: [codex-contracts, baseline-tests, godot-headless]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    continue-on-error: true
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '17.0.12'
+          check-latest: false
+
+      - name: Set up Android SDK 34
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: '14742923'
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+
+      - name: Install export host dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y xvfb unzip
+
+      - name: Validate Android export contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tests/graphics/test_r1_playable_apk_export.py -v
+          python3 -m py_compile tools/graphics/patch_r1_playable_export.py
+          bash -n tools/graphics/export_r1_playable_mobile_apk.sh
+
+      - name: Build source-derived debug APK
+        id: export
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build/controlled-codex/android
+          bash tools/graphics/export_r1_playable_mobile_apk.sh \
+            "$PWD" "$PWD/build/controlled-codex/android" \
+            2>&1 | tee build/controlled-codex/android/export.log
+
+      - name: Collect Android outcome and APK evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/controlled-codex/android/evidence
+          APK=build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk
+          printf '%s\n' '${{ steps.export.outcome }}' > build/controlled-codex/android/evidence/EXPORT_STEP_OUTCOME.txt
+          if [[ -s "$APK" ]]; then
+            python3 tools/agent_env/bahrain_brick_mcp.py --root . \
+              --invoke collect_build_evidence \
+              --arguments-json '{"artifact_path":"build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk","output_path":"build/controlled-codex/android/evidence/APK_EVIDENCE.json"}' \
+              > build/controlled-codex/android/evidence/COLLECT_RESPONSE.json
+          else
+            printf '%s\n' '{"status":"failed","reason":"APK was not produced"}' > build/controlled-codex/android/evidence/APK_EVIDENCE.json
+          fi
+
+      - name: Upload GL APK
+        if: always() && hashFiles('build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk') != ''
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-r1-physical-gl-apk-${{ github.run_id }}
+          path: build/controlled-codex/android/bahrain-brick-r1-physical-gl-arm64.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Mobile APK
+        if: always() && hashFiles('build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk') != ''
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-playable-mobile-apk-${{ github.run_id }}
+          path: build/controlled-codex/android/bahrain-brick-playable-mobile-arm64.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload Android evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-controlled-codex-android-evidence-${{ github.run_id }}
+          path: |
+            build/controlled-codex/android/evidence/**
+            build/controlled-codex/android/export.log
+            build/controlled-codex/android/import.log
+            build/controlled-codex/android/export-gl.log
+            build/controlled-codex/android/export-mobile.log
+            build/controlled-codex/android/R1_PHYSICAL_DEVICE_APK_MANIFEST.json
+            build/controlled-codex/android/APK_SHA256SUMS.txt
+            build/controlled-codex/android/apk-signing.txt
+            build/controlled-codex/android/SOURCE_TREE_EQUIVALENCE.json
+            build/controlled-codex/android/GL_VARIANT_OVERRIDE.json
+            build/controlled-codex/android/MOBILE_VARIANT_OVERRIDE.json
+            build/controlled-codex/android/GODOT_VERSION.txt
+            build/controlled-codex/android/IMPORT_COMPLETE.txt
+            build/controlled-codex/android/export_r1_playable_mobile_apk.patched.sh
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Record Android exporter limitation
+        if: always()
+        shell: bash
+        run: |
+          if [[ '${{ steps.export.outcome }}' != success ]]; then
+            echo 'The Codex environment is qualified independently; the existing R1 source-derived Android exporter remains blocked and is not a release pass.' >&2
+            exit 1
+          fi
