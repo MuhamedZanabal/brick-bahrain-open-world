@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import tomllib
 import unittest
+from unittest import mock
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -134,10 +137,59 @@ class ControlledCodexEnvironmentTests(unittest.TestCase):
         with self.assertRaises(module.ValidationError):
             server._resolve("debug.keystore", must_exist=False)
 
+    def test_android_tool_authority_prefers_build_tools_34(self) -> None:
+        module = load_module(ROOT / "tools/agent_env/bahrain_brick_mcp.py", "bahrain_brick_mcp_android_tool_test")
+        with tempfile.TemporaryDirectory() as temporary:
+            sdk = Path(temporary)
+            for version in ("34.0.0", "37.0.0"):
+                tool = sdk / "build-tools" / version / "aapt"
+                tool.parent.mkdir(parents=True, exist_ok=True)
+                tool.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+                tool.chmod(0o755)
+            with mock.patch.dict(
+                os.environ,
+                {"ANDROID_SDK_ROOT": str(sdk), "ANDROID_HOME": "", "PATH": ""},
+                clear=False,
+            ), mock.patch.object(module.shutil, "which", return_value=None):
+                self.assertEqual(
+                    str(sdk / "build-tools" / "34.0.0" / "aapt"),
+                    module.BahrainBrickTools._optional_android_tool("aapt"),
+                )
+
+    def test_android_evidence_fails_closed_on_validator_failure(self) -> None:
+        module = load_module(ROOT / "tools/agent_env/bahrain_brick_mcp.py", "bahrain_brick_mcp_android_evidence_test")
+        server = module.BahrainBrickTools(ROOT)
+        build = ROOT / "build/controlled-codex-test"
+        build.mkdir(parents=True, exist_ok=True)
+        artifact = build / "validator-failure.apk"
+        with zipfile.ZipFile(artifact, "w") as archive:
+            archive.writestr("assets/project.binary", b"res://scenes/splash_screen.tscn")
+
+        def fake_run(command: list[str], *, cwd: Path, timeout: int):
+            if command[:2] == ["git", "rev-parse"]:
+                return {"command": command, "exit_code": 0, "elapsed_ms": 1, "stdout": "deadbeef\n", "stderr": "", "passed": True}
+            passed = command[0].endswith("apksigner")
+            return {"command": command, "exit_code": 0 if passed else 1, "elapsed_ms": 1, "stdout": "", "stderr": "validator failure" if not passed else "", "passed": passed}
+
+        with mock.patch.object(
+            module.BahrainBrickTools,
+            "_optional_android_tool",
+            side_effect=lambda name: f"/fake/{name}",
+        ), mock.patch.object(server, "_run", side_effect=fake_run):
+            payload = server.collect_build_evidence(
+                {
+                    "artifact_path": str(artifact.relative_to(ROOT)),
+                    "output_path": "build/controlled-codex-test/validator-failure-evidence.json",
+                }
+            )
+        self.assertFalse(payload["passed"])
+        self.assertFalse(payload["evidence"]["android"]["aapt"]["passed"])
+        self.assertTrue(payload["evidence"]["android"]["apksigner"]["passed"])
+
     def test_direct_typed_cli_and_evidence_collection(self) -> None:
         build = ROOT / "build/controlled-codex-test"
         build.mkdir(parents=True, exist_ok=True)
-        artifact = build / "fixture.apk"
+        artifact = build / "fixture.zip"
         with zipfile.ZipFile(artifact, "w") as archive:
             archive.writestr("assets/project.binary", b"res://scenes/splash_screen.tscn")
         result = subprocess.run(
