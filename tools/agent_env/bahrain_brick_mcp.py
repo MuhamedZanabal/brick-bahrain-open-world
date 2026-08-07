@@ -287,14 +287,26 @@ class BahrainBrickTools:
                 command = [tool, "dump", "badging", str(artifact)] if name == "aapt" else [tool, "verify", "--verbose", "--print-certs", str(artifact)]
                 evidence["android"][name] = self._run(command, cwd=self.root, timeout=60)
         output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        return {"tool": "collect_build_evidence", "passed": evidence["zip_integrity"] is not False, "evidence_path": str(output.relative_to(self.root)), "evidence": evidence}
+        android_validation_passed = all(
+            result.get("passed") is True for result in evidence["android"].values()
+        )
+        return {
+            "tool": "collect_build_evidence",
+            "passed": evidence["zip_integrity"] is not False and android_validation_passed,
+            "evidence_path": str(output.relative_to(self.root)),
+            "evidence": evidence,
+        }
 
     @staticmethod
     def _optional_android_tool(name: str) -> str | None:
+        sdk = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
+        if sdk:
+            authoritative = Path(sdk) / "build-tools" / "34.0.0" / name
+            if authoritative.is_file() and os.access(authoritative, os.X_OK):
+                return str(authoritative)
         found = shutil.which(name)
         if found:
             return found
-        sdk = os.environ.get("ANDROID_SDK_ROOT") or os.environ.get("ANDROID_HOME")
         if sdk:
             build_tools = Path(sdk) / "build-tools"
             if build_tools.is_dir():
