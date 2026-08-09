@@ -178,7 +178,9 @@ jobs:
           renderer/rendering_method="gl_compatibility"
           renderer/rendering_method.mobile="gl_compatibility"
           environment/defaults/default_clear_color=Color(0.18, 0.28, 0.42, 1)
+          textures/vram_compression/import_etc2_astc=true
           EOF
+          grep -qx 'textures/vram_compression/import_etc2_astc=true' "$PROJECT/project.godot"
 
           cat > "$PROJECT/main.gd" <<'EOF'
           extends Node3D
