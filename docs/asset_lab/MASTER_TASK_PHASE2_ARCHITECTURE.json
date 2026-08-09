@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-08-09",
+  "phase": "P2",
+  "status": "PASS",
+  "gate": "READY",
+  "entry": {
+    "phase1_closure_commit": "d676717561072631e3e5e7ddacc1fd69a69d4ee5"
+  },
+  "implementation": {
+    "commit": "40b3d1f22a5bd691c2140a7b80fe6df1133fbe1b",
+    "root_tree": "c94a8f97138ce3efca773742df2539db4c3ae237",
+    "branch": "work/bahrain-brick-master-asset-integration-v1"
+  },
+  "source_roots": [
+    "asset_lab/source",
+    "asset_lab/generators",
+    "asset_lab/references",
+    "asset_lab/materials",
+    "asset_lab/exports/glb",
+    "asset_lab/manifests",
+    "asset_lab/reports",
+    "asset_lab/evidence",
+    "asset_lab/quarantine"
+  ],
+  "runtime": {
+    "root": "game/assets/bahrain",
+    "categories": [
+      "architecture",
+      "roads",
+      "waterfront",
+      "props",
+      "vegetation",
+      "vehicles",
+      "characters",
+      "materials",
+      "decals"
+    ],
+    "manama_demo": "game/scenes/world/chunks/manama_demo"
+  },
+  "lfs": {
+    "policy_file": ".gitattributes",
+    "ci_version": "git-lfs/3.7.1",
+    "covers": [
+      "blend source masters",
+      "glb runtime exports",
+      "high-resolution reference/material sources",
+      "video and binary evidence",
+      "permitted quarantine binaries"
+    ]
+  },
+  "ignore_policy": {
+    "policy_file": ".gitignore",
+    "ignored_generated": [
+      ".godot cache trees",
+      ".import cache directories",
+      "Android build and Gradle output",
+      "Phase 2 transient build/tmp output",
+      "Blender recovery files",
+      "Python/tool caches"
+    ],
+    "explicitly_trackable": [
+      "source-side *.import import-setting sidecars"
+    ]
+  },
+  "checks": {
+    "standard_command": "python3 tools/asset_lab/run_repository_checks.py --root .",
+    "binary_policy": "tools/asset_lab/check_repository_binaries.py",
+    "manifest_schema": "tools/asset_lab/validate_manifest_schema.py",
+    "unit_tests": "tools/tests/test_asset_lab_phase2_checks.py",
+    "workflow": ".github/workflows/asset-repository-checks.yml",
+    "run_id": 31307181446,
+    "job_id": 93229269884,
+    "head_sha": "40b3d1f22a5bd691c2140a7b80fe6df1133fbe1b",
+    "unit_test_count": 6,
+    "unit_tests_passed": 6,
+    "repository_check": "PASS",
+    "oversized_binary_count": 0,
+    "duplicate_binary_count": 0,
+    "manifest_state": "EMPTY_BOOTSTRAP",
+    "manifest_count": 0
+  },
+  "protected_state": {
+    "baseline_commit": "5b4e2466ef84f3984f3bf336b31925d4d2e97a7f",
+    "baseline_root_tree": "d7aa9d9e13dfe0c7e11df47f1071f2cbc44eabb7",
+    "project_godot_blob": "39d2826f026a2f4897084a1efb61a47550019fc0",
+    "export_presets_blob": "b918b069b0bd46932c3ff00953ac1f0b1f17fa31",
+    "scripts_tree": "6eb39f718706d43c58f04da1d9f00802362405e3",
+    "unchanged": true
+  },
+  "tasks": {
+    "P2.001": "PASS",
+    "P2.002": "PASS",
+    "P2.003": "PASS",
+    "P2.004": "PASS",
+    "P2.005": "PASS",
+    "P2.006": "PASS",
+    "P2.007": "PASS",
+    "P2.008": "PASS",
+    "P2.009": "PASS",
+    "P2.010": "PASS",
+    "P2.011": "PASS",
+    "P2.012": "PASS",
+    "P2.013": "PASS",
+    "P2.014": "PASS",
+    "P2.015": "PASS",
+    "P2.016": "PASS",
+    "P2.017": "PASS"
+  },
+  "legacy_content_preserved": true,
+  "claims_not_made": [
+    "legacy asset migration complete",
+    "mass asset rename complete",
+    "merge",
+    "release",
+    "deployment"
+  ]
+}
