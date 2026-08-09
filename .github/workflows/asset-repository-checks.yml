@@ -12,8 +12,11 @@ on:
       - 'game/scenes/world/chunks/manama_demo/**'
       - 'tools/asset_lab/check_repository_binaries.py'
       - 'tools/asset_lab/validate_manifest_schema.py'
+      - 'tools/asset_lab/generate_asset_index.py'
       - 'tools/asset_lab/run_repository_checks.py'
+      - 'tools/asset_lab/requirements-manifest-validation.txt'
       - 'tools/tests/test_asset_lab_phase2_checks.py'
+      - 'tools/tests/test_asset_lab_phase3_manifests.py'
       - '.github/workflows/asset-repository-checks.yml'
   pull_request:
     paths:
@@ -24,8 +27,11 @@ on:
       - 'game/scenes/world/chunks/manama_demo/**'
       - 'tools/asset_lab/check_repository_binaries.py'
       - 'tools/asset_lab/validate_manifest_schema.py'
+      - 'tools/asset_lab/generate_asset_index.py'
       - 'tools/asset_lab/run_repository_checks.py'
+      - 'tools/asset_lab/requirements-manifest-validation.txt'
       - 'tools/tests/test_asset_lab_phase2_checks.py'
+      - 'tools/tests/test_asset_lab_phase3_manifests.py'
       - '.github/workflows/asset-repository-checks.yml'
   workflow_dispatch:
 
@@ -45,8 +51,17 @@ jobs:
       - name: Record Python
         run: python3 --version
 
-      - name: Run Phase 2 unit tests
-        run: python3 -m unittest discover -s tools/tests -p 'test_asset_lab_phase2_checks.py' -v
+      - name: Install pinned manifest validator
+        run: python3 -m pip install --disable-pip-version-check -r tools/asset_lab/requirements-manifest-validation.txt
 
-      - name: Run repository architecture checks
+      - name: Run Phase 2 and Phase 3 unit tests
+        run: python3 -m unittest discover -s tools/tests -p 'test_asset_lab_phase*_*.py' -v
+
+      - name: Run repository architecture and manifest checks
         run: python3 tools/asset_lab/run_repository_checks.py --root .
+
+      - name: Regenerate global asset index
+        run: python3 tools/asset_lab/generate_asset_index.py --root .
+
+      - name: Require committed global asset index to be current
+        run: git diff --exit-code -- asset_lab/manifests/asset-index.json

@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bahrain-brick.local/schema/asset-manifest.schema.json",
+  "title": "Bahrain Brick Asset Manifest",
+  "description": "Authoritative Phase 3 manifest for reusable Bahrain Brick 3D assets.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "asset_id", "display_name", "category", "family", "variant", "serial",
+    "version", "author", "creation_method", "source_path", "export_path", "license",
+    "geometry", "materials", "textures", "lods", "collision", "navigation", "sockets",
+    "cultural_review", "approvals"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "asset_id": {
+      "type": "string",
+      "pattern": "^bb_(architecture|roads|waterfront|props|vegetation|vehicles|characters|materials|decals)_[a-z0-9]+(?:_[a-z0-9]+)*_[a-z0-9]+(?:_[a-z0-9]+)*_[0-9]{3}$"
+    },
+    "display_name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "category": {
+      "enum": ["architecture", "roads", "waterfront", "props", "vegetation", "vehicles", "characters", "materials", "decals"]
+    },
+    "family": {"$ref": "#/$defs/snakeName"},
+    "variant": {"$ref": "#/$defs/snakeName"},
+    "serial": {"type": "integer", "minimum": 1, "maximum": 999},
+    "version": {"$ref": "#/$defs/semver"},
+    "author": {"type": "string", "minLength": 1, "maxLength": 160},
+    "creation_method": {
+      "enum": ["deterministic_generator", "manual_blender", "hybrid_blender", "approved_external_source"]
+    },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generator_id", "version", "entry_point"],
+      "properties": {
+        "generator_id": {"type": "string", "pattern": "^bb_gen_[a-z0-9]+(?:_[a-z0-9]+)*$"},
+        "version": {"$ref": "#/$defs/semver"},
+        "entry_point": {"$ref": "#/$defs/repoPath"}
+      }
+    },
+    "source_path": {"$ref": "#/$defs/repoPath"},
+    "export_path": {"$ref": "#/$defs/repoPath"},
+    "legacy_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^bh_[a-z0-9]+(?:_[a-z0-9]+)*$"}
+    },
+    "license": {"$ref": "#/$defs/license"},
+    "geometry": {"$ref": "#/$defs/geometry"},
+    "materials": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^bb_mat_[a-z0-9]+(?:_[a-z0-9]+)*_[a-z0-9]+(?:_[a-z0-9]+)*_[0-9]{3}$"}
+    },
+    "textures": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/texture"}
+    },
+    "lods": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"$ref": "#/$defs/lod"}
+    },
+    "collision": {"$ref": "#/$defs/collision"},
+    "navigation": {"$ref": "#/$defs/navigation"},
+    "sockets": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/socket"}
+    },
+    "cultural_review": {"$ref": "#/$defs/culturalReview"},
+    "approvals": {"$ref": "#/$defs/approvals"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"creation_method": {"const": "deterministic_generator"}}, "required": ["creation_method"]},
+      "then": {"required": ["generator"]}
+    }
+  ],
+  "$defs": {
+    "snakeName": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*$",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[a-zA-Z0-9._/-]+$"
+    },
+    "license": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["license_id", "status", "ownership", "source_url", "proof_path"],
+      "properties": {
+        "license_id": {"type": "string", "minLength": 1, "maxLength": 120},
+        "status": {"enum": ["approved", "pending", "rejected"]},
+        "ownership": {"enum": ["project_owned", "third_party", "public_domain"]},
+        "source_url": {"type": ["string", "null"], "maxLength": 1000},
+        "proof_path": {"type": "string", "minLength": 1, "maxLength": 500}
+      }
+    },
+    "vec3": {
+      "type": "array",
+      "prefixItems": [{"type": "number"}, {"type": "number"}, {"type": "number"}],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_scale_m", "up_axis", "forward_axis", "origin_rule", "bounding_box_m", "triangle_count_lod0"],
+      "properties": {
+        "unit_scale_m": {"const": 1.0},
+        "up_axis": {"const": "+Y"},
+        "forward_axis": {"enum": ["-Z", "+Z", "+X", "-X"]},
+        "origin_rule": {"enum": ["ground_center", "pivot_center", "custom_documented"]},
+        "bounding_box_m": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max", "dimensions"],
+          "properties": {
+            "min": {"$ref": "#/$defs/vec3"},
+            "max": {"$ref": "#/$defs/vec3"},
+            "dimensions": {
+              "type": "array",
+              "prefixItems": [
+                {"type": "number", "exclusiveMinimum": 0},
+                {"type": "number", "exclusiveMinimum": 0},
+                {"type": "number", "exclusiveMinimum": 0}
+              ],
+              "minItems": 3,
+              "maxItems": 3
+            }
+          }
+        },
+        "triangle_count_lod0": {"type": "integer", "minimum": 1}
+      }
+    },
+    "texture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["texture_id", "role", "path", "width", "height", "estimated_memory_bytes"],
+      "properties": {
+        "texture_id": {"type": "string", "pattern": "^bb_tex_[a-z0-9]+(?:_[a-z0-9]+)*_[a-z0-9]+(?:_[a-z0-9]+)*_[0-9]{3}$"},
+        "role": {"enum": ["albedo", "normal", "orm", "emissive", "opacity", "mask"]},
+        "path": {"$ref": "#/$defs/repoPath"},
+        "width": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "height": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "estimated_memory_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "lod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "path", "triangle_count", "distance_start_m", "distance_end_m"],
+      "properties": {
+        "level": {"type": "integer", "minimum": 0, "maximum": 2},
+        "path": {"$ref": "#/$defs/repoPath"},
+        "triangle_count": {"type": "integer", "minimum": 1},
+        "distance_start_m": {"type": "number", "minimum": 0},
+        "distance_end_m": {"type": ["number", "null"], "exclusiveMinimum": 0}
+      }
+    },
+    "collision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "path"],
+      "properties": {
+        "type": {"enum": ["none", "box", "capsule", "convex", "compound_convex", "trimesh_static"]},
+        "path": {"type": ["string", "null"], "maxLength": 500}
+      }
+    },
+    "navigation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["behavior", "path"],
+      "properties": {
+        "behavior": {"enum": ["none", "walkable", "obstacle", "carve", "custom"]},
+        "path": {"type": ["string", "null"], "maxLength": 500}
+      }
+    },
+    "socket": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "purpose", "position_m", "forward_axis"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[a-z0-9]+(?:_[a-z0-9]+)*_socket$"},
+        "purpose": {"type": "string", "minLength": 1, "maxLength": 160},
+        "position_m": {"$ref": "#/$defs/vec3"},
+        "forward_axis": {"enum": ["-Z", "+Z", "+X", "-X"]}
+      }
+    },
+    "culturalReview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bahrain_specific", "status", "reviewer_note"],
+      "properties": {
+        "bahrain_specific": {"type": "boolean"},
+        "status": {"enum": ["not_required", "pending", "approved", "changes_requested", "rejected"]},
+        "reviewer_note": {"type": "string", "minLength": 1, "maxLength": 1000}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"bahrain_specific": {"const": true}}, "required": ["bahrain_specific"]},
+          "then": {"properties": {"status": {"enum": ["pending", "approved", "changes_requested", "rejected"]}}}
+        },
+        {
+          "if": {"properties": {"bahrain_specific": {"const": false}}, "required": ["bahrain_specific"]},
+          "then": {"properties": {"status": {"const": "not_required"}}}
+        }
+      ]
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "note"],
+      "properties": {
+        "state": {"enum": ["not_run", "pending", "approved", "rejected"]},
+        "note": {"type": "string", "minLength": 1, "maxLength": 1000}
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["technical", "art", "android_runtime"],
+      "properties": {
+        "technical": {"$ref": "#/$defs/approval"},
+        "art": {"$ref": "#/$defs/approval"},
+        "android_runtime": {"$ref": "#/$defs/approval"}
+      }
+    }
+  }
+}

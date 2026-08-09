@@ -1,0 +1,2 @@
+# Deliberately pinned validator for reproducible Phase 3 JSON Schema checks.
+jsonschema==4.23.0

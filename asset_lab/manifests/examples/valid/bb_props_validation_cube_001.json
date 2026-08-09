@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "asset_id": "bb_props_validation_cube_001",
+  "display_name": "Phase 3 Validation Cube",
+  "category": "props",
+  "family": "validation",
+  "variant": "cube",
+  "serial": 1,
+  "version": "1.0.0",
+  "author": "Bahrain Brick Asset Production",
+  "creation_method": "deterministic_generator",
+  "generator": {
+    "generator_id": "bb_gen_validation_cube",
+    "version": "1.0.0",
+    "entry_point": "tools/asset_lab/generate_validation_cube.py"
+  },
+  "source_path": "asset_lab/source/bb_props_validation_cube_001.blend",
+  "export_path": "asset_lab/exports/glb/bb_props_validation_cube_001.glb",
+  "legacy_ids": ["bh_validation_cube_01"],
+  "license": {
+    "license_id": "project-owned-original",
+    "status": "approved",
+    "ownership": "project_owned",
+    "source_url": null,
+    "proof_path": "docs/asset_lab/MASTER_TASK_PHASE1_CAPABILITY.json"
+  },
+  "geometry": {
+    "unit_scale_m": 1.0,
+    "up_axis": "+Y",
+    "forward_axis": "-Z",
+    "origin_rule": "ground_center",
+    "bounding_box_m": {
+      "min": [-0.5, 0.0, -0.5],
+      "max": [0.5, 1.0, 0.5],
+      "dimensions": [1.0, 1.0, 1.0]
+    },
+    "triangle_count_lod0": 12
+  },
+  "materials": ["bb_mat_validation_orange_001"],
+  "textures": [
+    {
+      "texture_id": "bb_tex_validation_orange_001",
+      "role": "albedo",
+      "path": "asset_lab/materials/bb_tex_validation_orange_001_albedo.png",
+      "width": 256,
+      "height": 256,
+      "estimated_memory_bytes": 262144
+    }
+  ],
+  "lods": [
+    {"level": 0, "path": "asset_lab/exports/glb/bb_props_validation_cube_001_lod0.glb", "triangle_count": 12, "distance_start_m": 0, "distance_end_m": 20},
+    {"level": 1, "path": "asset_lab/exports/glb/bb_props_validation_cube_001_lod1.glb", "triangle_count": 12, "distance_start_m": 20, "distance_end_m": 50},
+    {"level": 2, "path": "asset_lab/exports/glb/bb_props_validation_cube_001_lod2.glb", "triangle_count": 12, "distance_start_m": 50, "distance_end_m": null}
+  ],
+  "collision": {"type": "box", "path": "asset_lab/exports/glb/bb_props_validation_cube_001_col.glb"},
+  "navigation": {"behavior": "obstacle", "path": "asset_lab/exports/glb/bb_props_validation_cube_001_nav.glb"},
+  "sockets": [
+    {"name": "top_attach_socket", "purpose": "Validation attachment point", "position_m": [0.0, 1.0, 0.0], "forward_axis": "-Z"}
+  ],
+  "cultural_review": {
+    "bahrain_specific": false,
+    "status": "not_required",
+    "reviewer_note": "Technical validation fixture; no Bahrain-specific cultural representation."
+  },
+  "approvals": {
+    "technical": {"state": "approved", "note": "Phase 1 geometry and Android runtime evidence exists."},
+    "art": {"state": "pending", "note": "Schema example only; not a production art approval."},
+    "android_runtime": {"state": "approved", "note": "Phase 1 API-34 swangle qualification passed for the canonical 1 m cube."}
+  }
+}

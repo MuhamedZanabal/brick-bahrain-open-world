@@ -6,21 +6,23 @@ import json
 from pathlib import Path
 
 from check_repository_binaries import scan_repository
-from validate_manifest_schema import validate_manifest_tree
+from validate_manifest_schema import validate_examples, validate_manifest_tree
 
 
 def run_checks(root: Path) -> dict[str, object]:
     binary = scan_repository(root)
-    manifests = validate_manifest_tree(root, allow_empty=True)
+    manifests = validate_manifest_tree(root, allow_empty=False)
+    examples = validate_examples(root)
     return {
-        "passed": bool(binary["passed"] and manifests["passed"]),
+        "passed": bool(binary["passed"] and manifests["passed"] and examples["passed"]),
         "binary_policy": binary,
         "manifest_schema": manifests,
+        "manifest_examples": examples
     }
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run Bahrain Brick Phase 2 repository architecture checks.")
+    parser = argparse.ArgumentParser(description="Run Bahrain Brick repository architecture and manifest-contract checks.")
     parser.add_argument("--root", type=Path, default=Path.cwd())
     args = parser.parse_args()
     report = run_checks(args.root)
