@@ -68,7 +68,7 @@ jobs:
           independent = json.loads((source / "reports/CUBE_INDEPENDENT_VALIDATION.json").read_text())
           assert a["dimensions_m"] == [1.0, 1.0, 1.0], a
           assert b["dimensions_m"] == [1.0, 1.0, 1.0], b
-          assert independent["dimensions_m"] == [1.0, 1.0, 1.0], independent
+          assert independent["bounds"]["dimensions"] == [1.0, 1.0, 1.0], independent
           assert independent["passed"] is True, independent
           glb_a = source / "cube-a/bb_validation_cube_1m.glb"
           glb_b = source / "cube-b/bb_validation_cube_1m.glb"
