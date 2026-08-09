@@ -1,0 +1,372 @@
+name: Bahrain Brick Master Asset Phase 1 Cube Landscape Runtime V3
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-master-asset-integration-v1
+    paths:
+      - .github/workflows/master-asset-phase1-cube-landscape-runtime-v3.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: master-asset-phase1-cube-landscape-runtime-v3
+  cancel-in-progress: true
+
+env:
+  SOURCE_RUN_ID: "31290094969"
+  SOURCE_ARTIFACT_ID: "9031108247"
+  EXPECTED_CUBE_SHA256: "00b2e146a7af0cc1043e9492f87c9ef2747d884aa0ada987e9be812537de8e2b"
+  GODOT_VERSION: "4.3"
+  EXPECTED_GODOT_VERSION: "4.3.stable.official.77dcf97d8"
+  ANDROID_BUILD_TOOLS: "34.0.0"
+  SYSTEM_IMAGE: "system-images;android-34;default;x86_64"
+  PACKAGE_NAME: "com.bahrainbrick.cubesmoke"
+  VERSION_CODE: "4"
+  VERSION_NAME: "0.1.3-phase1-landscape-v3"
+  APK_NAME: "bahrain-brick-phase1-cube-landscape-v3.apk"
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout qualification commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Recover and verify canonical cube
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-landscape-v3"
+          mkdir -p "$ROOT/source" "$ROOT/project/assets" "$ROOT/reports" "$ROOT/logs" "$ROOT/artifacts"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > "$ROOT/source.zip"
+          unzip -tq "$ROOT/source.zip"
+          unzip -q "$ROOT/source.zip" -d "$ROOT/source"
+          cmp "$ROOT/source/cube-a/bb_validation_cube_1m.glb" "$ROOT/source/cube-b/bb_validation_cube_1m.glb"
+          printf '%s  %s\n' "$EXPECTED_CUBE_SHA256" "$ROOT/source/cube-a/bb_validation_cube_1m.glb" | sha256sum -c -
+          python3 - "$ROOT" <<'PY'
+          from pathlib import Path
+          import json, sys
+          root = Path(sys.argv[1])
+          reports = root / "source/reports"
+          a = json.loads((reports / "CUBE_GENERATION_A.json").read_text())
+          b = json.loads((reports / "CUBE_GENERATION_B.json").read_text())
+          v = json.loads((reports / "CUBE_INDEPENDENT_VALIDATION.json").read_text())
+          assert a["dimensions_m"] == [1.0, 1.0, 1.0]
+          assert b["dimensions_m"] == [1.0, 1.0, 1.0]
+          assert v["passed"] is True
+          assert v["bounds"]["dimensions"] == [1.0, 1.0, 1.0]
+          (root / "reports/SOURCE_AUTHORITY.json").write_text(json.dumps({
+              "source_run_id": 31290094969,
+              "source_artifact_id": 9031108247,
+              "cube_sha256": "00b2e146a7af0cc1043e9492f87c9ef2747d884aa0ada987e9be812537de8e2b",
+              "cube_dimensions_m": [1.0, 1.0, 1.0],
+              "deterministic_repeat": True,
+              "independent_validation": "PASS"
+          }, indent=2, sort_keys=True) + "\n")
+          PY
+          cp "$ROOT/source/cube-a/bb_validation_cube_1m.glb" "$ROOT/project/assets/"
+
+      - name: Provision Java 17
+        uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Provision Android API 34
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: "14742923"
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+            emulator
+            ${{ env.SYSTEM_IMAGE }}
+
+      - name: Provision emulator dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libpulse0
+          ldconfig -p | grep -q 'libpulse.so.0'
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+
+      - name: Install pinned Godot 4.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-landscape-v3"
+          D="$ROOT/downloads"
+          mkdir -p "$D"
+          cd "$D"
+          BASE="https://github.com/godotengine/godot/releases/download/4.3-stable"
+          BIN="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          TPL="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$BASE/SHA512-SUMS.txt" -o sums.txt
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$BASE/$BIN" -o "$BIN"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' "$BASE/$TPL" -o "$TPL"
+          grep " $BIN$" sums.txt | sha512sum -c -
+          grep " $TPL$" sums.txt | sha512sum -c -
+          unzip -q "$BIN" -d godot-bin
+          unzip -q "$TPL" -d templates
+          GODOT="$D/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          cp -a templates/templates/. "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          "$GODOT" --version | tee "$ROOT/reports/GODOT_VERSION.txt"
+          grep -qx "$EXPECTED_GODOT_VERSION" "$ROOT/reports/GODOT_VERSION.txt"
+          JAVA_SDK_PATH="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "$JAVA_SDK_PATH"
+          export/android/android_sdk_path = "$SDK_ROOT"
+          EOF
+          echo "GODOT=$GODOT" >> "$GITHUB_ENV"
+
+      - name: Create import and execute isolated landscape cube scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-landscape-v3"
+          P="$ROOT/project"
+          cat > "$P/project.godot" <<'EOF'
+          config_version=5
+
+          [application]
+          config/name="Bahrain Brick Phase 1 Cube Landscape V3"
+          run/main_scene="res://main.tscn"
+          config/features=PackedStringArray("4.3", "GL Compatibility")
+
+          [display]
+          window/size/viewport_width=1280
+          window/size/viewport_height=720
+          window/handheld/orientation=0
+
+          [rendering]
+          renderer/rendering_method="gl_compatibility"
+          renderer/rendering_method.mobile="gl_compatibility"
+          environment/defaults/default_clear_color=Color(0.02, 0.03, 0.05, 1)
+          textures/vram_compression/import_etc2_astc=true
+          EOF
+          cat > "$P/main.gd" <<'EOF'
+          extends Node3D
+
+          func _ready() -> void:
+              var camera := $Camera3D as Camera3D
+              camera.look_at(Vector3.ZERO, Vector3.UP)
+              var meshes := find_children("*", "MeshInstance3D", true, false)
+              if meshes.size() != 1:
+                  push_error("CUBE_SMOKE_MESH_COUNT_INVALID count=%d" % meshes.size())
+                  get_tree().quit(2)
+                  return
+              var mesh := meshes[0] as MeshInstance3D
+              var material := StandardMaterial3D.new()
+              material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+              material.albedo_color = Color(1.0, 0.38, 0.04, 1.0)
+              mesh.material_override = material
+              var size := mesh.get_aabb().size
+              print("BAHRAIN_BRICK_CUBE_SMOKE_READY size=%.3f,%.3f,%.3f" % [size.x, size.y, size.z])
+          EOF
+          cat > "$P/main.tscn" <<'EOF'
+          [gd_scene load_steps=3 format=3]
+          [ext_resource type="PackedScene" path="res://assets/bb_validation_cube_1m.glb" id="1_cube"]
+          [ext_resource type="Script" path="res://main.gd" id="2_script"]
+          [node name="CubeSmoke" type="Node3D"]
+          script = ExtResource("2_script")
+          [node name="Cube" parent="." instance=ExtResource("1_cube")]
+          [node name="Camera3D" type="Camera3D" parent="."]
+          transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4, 1.8, 2.4)
+          current = true
+          EOF
+          cp export_presets.cfg "$P/export_presets.cfg"
+          KEYSTORE="$RUNNER_TEMP/bb-phase1-v3.keystore"
+          keytool -genkeypair -noprompt -keystore "$KEYSTORE" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Bahrain Brick Phase 1 V3,O=Zanabal Gaming,C=BH'
+          python3 - "$P/export_presets.cfg" "$KEYSTORE" <<'PY'
+          from pathlib import Path
+          import re, sys
+          p = Path(sys.argv[1])
+          key = Path(sys.argv[2]).resolve().as_posix()
+          text = p.read_text()
+          changes = [
+              (r'(?m)^architectures/armeabi-v7a=.*$', 'architectures/armeabi-v7a=false'),
+              (r'(?m)^architectures/arm64-v8a=.*$', 'architectures/arm64-v8a=false'),
+              (r'(?m)^architectures/x86_64=.*$', 'architectures/x86_64=true'),
+              (r'(?m)^architectures/x86=.*$', 'architectures/x86=false'),
+              (r'(?m)^keystore/debug=.*$', f'keystore/debug="{key}"'),
+              (r'(?m)^keystore/release=.*$', f'keystore/release="{key}"'),
+              (r'(?m)^version/code=.*$', 'version/code=4'),
+              (r'(?m)^version/name=.*$', 'version/name="0.1.3-phase1-landscape-v3"'),
+              (r'(?m)^package/unique_name=.*$', 'package/unique_name="com.bahrainbrick.cubesmoke"'),
+              (r'(?m)^package/name=.*$', 'package/name="Bahrain Brick Cube Landscape V3"'),
+          ]
+          for pattern, replacement in changes:
+              text, count = re.subn(pattern, replacement, text)
+              assert count == 1, (pattern, count)
+          text = re.sub(r'(?m)^launcher_icons/.*\n?', '', text)
+          p.write_text(text)
+          PY
+          "$GODOT" --headless --path "$P" --editor --import --quit --verbose 2>&1 | tee "$ROOT/logs/GODOT_IMPORT.log"
+          grep -q 'bb_validation_cube_1m' "$ROOT/logs/GODOT_IMPORT.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$ROOT/logs/GODOT_IMPORT.log"
+          timeout 30 "$GODOT" --headless --path "$P" --quit-after 2 2>&1 | tee "$ROOT/logs/GODOT_DESKTOP_SCENE_SMOKE.log"
+          grep -q 'BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000' "$ROOT/logs/GODOT_DESKTOP_SCENE_SMOKE.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|CUBE_SMOKE_MESH_COUNT_INVALID' "$ROOT/logs/GODOT_DESKTOP_SCENE_SMOKE.log"
+
+      - name: Export and validate exact APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-landscape-v3"
+          P="$ROOT/project"
+          APK="$ROOT/artifacts/$APK_NAME"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          TOOLS="$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS"
+          "$GODOT" --headless --path "$P" --verbose --export-debug Android "$APK" 2>&1 | tee "$ROOT/logs/ANDROID_EXPORT.log"
+          test -s "$APK"
+          sha256sum "$APK" | tee "$ROOT/reports/APK_SHA256SUM.txt"
+          "$TOOLS/aapt" dump badging "$APK" | tee "$ROOT/reports/APK_BADGING.txt"
+          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" "$ROOT/reports/APK_BADGING.txt"
+          "$TOOLS/aapt" dump xmltree "$APK" AndroidManifest.xml > "$ROOT/reports/APK_MANIFEST_TREE.txt"
+          grep -Eq 'screenOrientation.*0x0([[:space:]]|$)' "$ROOT/reports/APK_MANIFEST_TREE.txt"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" > "$ROOT/reports/APK_SIGNING.txt"
+          "$TOOLS/zipalign" -c -v 4 "$APK" > "$ROOT/reports/APK_ZIPALIGN.txt"
+          unzip -t "$APK" > "$ROOT/logs/APK_ZIP_INTEGRITY.txt"
+          unzip -Z1 "$APK" | grep -q '^lib/x86_64/libgodot_android.so$'
+          unzip -Z1 "$APK" | grep -q 'assets/.godot/imported/bb_validation_cube_1m.glb'
+
+      - name: Run bounded API 34 Android qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-landscape-v3"
+          APK="$ROOT/artifacts/$APK_NAME"
+          REPORTS="$ROOT/reports"
+          LOGS="$ROOT/logs"
+          ARTIFACTS="$ROOT/artifacts"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
+          AVDMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+          "$EMULATOR" -version 2>&1 | tee "$REPORTS/EMULATOR_VERSION.txt"
+          export ANDROID_USER_HOME="$ROOT/android-user"
+          export ANDROID_AVD_HOME="$ROOT/android-user/avd"
+          rm -rf "$ANDROID_USER_HOME"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVD="bb-phase1-v3-api34"
+          echo no | "$AVDMANAGER" create avd --force --name "$AVD" --package "$SYSTEM_IMAGE" --device pixel_7 > "$LOGS/AVD_CREATE.txt" 2>&1
+          "$EMULATOR" -list-avds | tee "$REPORTS/AVD_LIST.txt"
+          grep -qx "$AVD" "$REPORTS/AVD_LIST.txt"
+          sudo chmod a+rw /dev/kvm || true
+          "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect -camera-back none -camera-front none -memory 3072 -cores 2 -no-metrics > "$LOGS/EMULATOR.txt" 2>&1 &
+          EMULATOR_PID=$!
+          cleanup(){ adb emu kill >/dev/null 2>&1 || true; kill "$EMULATOR_PID" >/dev/null 2>&1 || true; wait "$EMULATOR_PID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          connected=false
+          for _ in $(seq 1 120); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then cat "$LOGS/EMULATOR.txt"; exit 1; fi
+            if [[ "$(adb get-state 2>/dev/null || true)" == "device" ]]; then connected=true; break; fi
+            sleep 2
+          done
+          [[ "$connected" == true ]] || { tail -200 "$LOGS/EMULATOR.txt"; exit 1; }
+
+          booted=false
+          for _ in $(seq 1 120); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then cat "$LOGS/EMULATOR.txt"; exit 1; fi
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then booted=true; break; fi
+            sleep 2
+          done
+          [[ "$booted" == true ]] || { adb shell getprop > "$LOGS/BOOT_GETPROP.txt" || true; exit 1; }
+
+          adb shell settings put system accelerometer_rotation 0
+          adb shell settings put system user_rotation 1
+          adb shell settings put secure immersive_mode_confirmations confirmed
+          adb shell settings put system screen_off_timeout 2147483647
+          test "$(adb shell settings get secure immersive_mode_confirmations | tr -d '\r')" = confirmed
+          timeout 120 adb install -r -t "$APK" | tee "$LOGS/APK_INSTALL.txt"
+          grep -q 'Success' "$LOGS/APK_INSTALL.txt"
+          adb logcat -c
+          adb shell am force-stop "$PACKAGE_NAME"
+          timeout 45 adb shell am start -W -n "$PACKAGE_NAME/com.godot.game.GodotApp" | tee "$LOGS/APK_LAUNCH.txt"
+          grep -q 'Status: ok' "$LOGS/APK_LAUNCH.txt"
+
+          ready=false
+          for _ in $(seq 1 60); do
+            timeout 10 adb logcat -d -v threadtime -t 2500 > "$LOGS/CUBE_ANDROID_RECENT.txt"
+            if grep -q 'BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000' "$LOGS/CUBE_ANDROID_RECENT.txt"; then ready=true; break; fi
+            test -n "$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')" || { cat "$LOGS/CUBE_ANDROID_RECENT.txt"; exit 1; }
+            sleep 2
+          done
+          [[ "$ready" == true ]] || { cat "$LOGS/CUBE_ANDROID_RECENT.txt"; exit 1; }
+          sleep 5
+          timeout 15 adb logcat -d -v threadtime -t 10000 > "$LOGS/CUBE_ANDROID_LOGCAT.txt"
+          grep -Ei "$PACKAGE_NAME|Godot|godot|BAHRAIN_BRICK_CUBE_SMOKE_READY|FATAL EXCEPTION|Fatal signal|am_crash|am_anr|ANR in|Program linking failed|shader failed to compile" "$LOGS/CUBE_ANDROID_LOGCAT.txt" > "$LOGS/CUBE_ANDROID_FILTERED.txt" || true
+          ! grep -Eq 'FATAL EXCEPTION|Fatal signal|am_crash|am_anr|ANR in|Program linking failed|shader failed to compile' "$LOGS/CUBE_ANDROID_FILTERED.txt"
+          test -n "$(adb shell pidof "$PACKAGE_NAME" | tr -d '\r')"
+          timeout 15 adb shell dumpsys window windows > "$REPORTS/WINDOW_STATE.txt"
+          grep -q "$PACKAGE_NAME" "$REPORTS/WINDOW_STATE.txt"
+          timeout 15 adb shell dumpsys activity activities > "$REPORTS/ACTIVITY_STATE.txt"
+          grep -q "$PACKAGE_NAME/com.godot.game.GodotApp" "$REPORTS/ACTIVITY_STATE.txt"
+          timeout 15 adb exec-out screencap -p > "$ARTIFACTS/cube-smoke-android-landscape-v3.png"
+          python3 - "$ARTIFACTS/cube-smoke-android-landscape-v3.png" "$REPORTS/SCREENSHOT_VALIDATION.json" <<'PY'
+          from PIL import Image, ImageStat
+          import json, sys
+          im = Image.open(sys.argv[1]).convert("RGB")
+          w, h = im.size
+          stat = ImageStat.Stat(im)
+          orange = sum(1 for r,g,b in im.getdata() if r >= 150 and 35 <= g <= 180 and b <= 120 and r >= g + 35)
+          report = {"width": w, "height": h, "mean_rgb": stat.mean, "extrema": stat.extrema, "orange_cube_pixels": orange}
+          assert w > h, report
+          assert orange >= 500, report
+          assert sum(stat.mean) / 3 > 4, report
+          open(sys.argv[2], "w").write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+          sha256sum "$ARTIFACTS/cube-smoke-android-landscape-v3.png" | tee "$REPORTS/SCREENSHOT_SHA256SUM.txt"
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')" SCREEN_SHA="$(sha256sum "$ARTIFACTS/cube-smoke-android-landscape-v3.png" | awk '{print $1}')" QUALIFICATION_SHA="$GITHUB_SHA" python3 - "$REPORTS/PHASE1_CUBE_ANDROID_RESULT.json" <<'PY'
+          import json, os, sys
+          report = {
+              "status": "PASS",
+              "qualification_sha": os.environ["QUALIFICATION_SHA"],
+              "source_run_id": 31290094969,
+              "source_artifact_id": 9031108247,
+              "cube_sha256": "00b2e146a7af0cc1043e9492f87c9ef2747d884aa0ada987e9be812537de8e2b",
+              "api_level": 34,
+              "abi": "x86_64",
+              "orientation": "landscape",
+              "package": "com.bahrainbrick.cubesmoke",
+              "activity": "com.godot.game.GodotApp",
+              "apk_sha256": os.environ["APK_SHA"],
+              "runtime_marker": "BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000",
+              "screenshot_sha256": os.environ["SCREEN_SHA"],
+              "crash_and_shader_scan": "PASS",
+              "visible_cube_pixel_check": "PASS"
+          }
+          open(sys.argv[1], "w").write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload V3 qualification evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-master-asset-phase1-landscape-v3-${{ github.run_id }}
+          path: |
+            build/phase1-landscape-v3/reports
+            build/phase1-landscape-v3/logs
+            build/phase1-landscape-v3/artifacts
+            build/phase1-landscape-v3/project
+          if-no-files-found: error
+          retention-days: 30
