@@ -1,0 +1,43 @@
+# Bahrain Brick Phase 2 Git LFS policy.
+# Source masters and runtime GLBs are binary source-of-truth artifacts.
+asset_lab/**/*.blend filter=lfs diff=lfs merge=lfs -text
+asset_lab/**/*.glb filter=lfs diff=lfs merge=lfs -text
+game/assets/bahrain/**/*.glb filter=lfs diff=lfs merge=lfs -text
+
+# High-resolution reference/material sources are always stored through LFS in controlled roots.
+asset_lab/references/**/*.png filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.tif filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.tiff filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.exr filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.psd filter=lfs diff=lfs merge=lfs -text
+asset_lab/references/**/*.kra filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.png filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.tif filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.tiff filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.exr filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.psd filter=lfs diff=lfs merge=lfs -text
+asset_lab/materials/**/*.kra filter=lfs diff=lfs merge=lfs -text
+
+# Durable binary evidence and quarantine payloads use LFS. Text logs/reports remain normal Git text.
+asset_lab/evidence/**/*.png filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.webp filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.mp4 filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.mov filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.webm filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.mkv filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.apk filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.aab filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.zip filter=lfs diff=lfs merge=lfs -text
+asset_lab/evidence/**/*.pdf filter=lfs diff=lfs merge=lfs -text
+asset_lab/quarantine/**/*.blend filter=lfs diff=lfs merge=lfs -text
+asset_lab/quarantine/**/*.glb filter=lfs diff=lfs merge=lfs -text
+asset_lab/quarantine/**/*.png filter=lfs diff=lfs merge=lfs -text
+asset_lab/quarantine/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+asset_lab/quarantine/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+asset_lab/quarantine/**/*.pdf filter=lfs diff=lfs merge=lfs -text

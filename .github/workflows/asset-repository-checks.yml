@@ -1,0 +1,52 @@
+name: Bahrain Brick Asset Repository Checks
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-master-asset-integration-v1
+    paths:
+      - '.gitattributes'
+      - '.gitignore'
+      - 'asset_lab/**'
+      - 'game/assets/bahrain/**'
+      - 'game/scenes/world/chunks/manama_demo/**'
+      - 'tools/asset_lab/check_repository_binaries.py'
+      - 'tools/asset_lab/validate_manifest_schema.py'
+      - 'tools/asset_lab/run_repository_checks.py'
+      - 'tools/tests/test_asset_lab_phase2_checks.py'
+      - '.github/workflows/asset-repository-checks.yml'
+  pull_request:
+    paths:
+      - '.gitattributes'
+      - '.gitignore'
+      - 'asset_lab/**'
+      - 'game/assets/bahrain/**'
+      - 'game/scenes/world/chunks/manama_demo/**'
+      - 'tools/asset_lab/check_repository_binaries.py'
+      - 'tools/asset_lab/validate_manifest_schema.py'
+      - 'tools/asset_lab/run_repository_checks.py'
+      - 'tools/tests/test_asset_lab_phase2_checks.py'
+      - '.github/workflows/asset-repository-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  architecture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          lfs: true
+
+      - name: Record Python
+        run: python3 --version
+
+      - name: Run Phase 2 unit tests
+        run: python3 -m unittest discover -s tools/tests -p 'test_asset_lab_phase2_checks.py' -v
+
+      - name: Run repository architecture checks
+        run: python3 tools/asset_lab/run_repository_checks.py --root .
