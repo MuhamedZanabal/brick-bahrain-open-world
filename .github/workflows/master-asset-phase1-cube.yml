@@ -299,6 +299,10 @@ jobs:
           SCREENSHOT="$ARTIFACTS/cube-smoke-android.png"
           LOGCAT="$LOGS/CUBE_ANDROID_LOGCAT.txt"
           FILTERED="$LOGS/CUBE_ANDROID_LOGCAT_FILTERED.txt"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
+          test -x "$EMULATOR"
+          "$EMULATOR" -version 2>&1 | tee "$REPORTS/EMULATOR_VERSION.txt"
           export ANDROID_USER_HOME="$BUILD/android-user"
           export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
           AVD_NAME="bahrain-brick-phase1-cube-api34"
@@ -309,11 +313,11 @@ jobs:
             --name "$AVD_NAME" \
             --package "$SYSTEM_IMAGE" \
             --device pixel_7 > "$LOGS/AVD_CREATE.txt" 2>&1
-          emulator -list-avds | tee "$REPORTS/AVD_LIST.txt"
+          "$EMULATOR" -list-avds | tee "$REPORTS/AVD_LIST.txt"
           grep -qx "$AVD_NAME" "$REPORTS/AVD_LIST.txt"
 
           sudo chmod a+rw /dev/kvm || true
-          emulator -avd "$AVD_NAME" \
+          "$EMULATOR" -avd "$AVD_NAME" \
             -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
             -gpu swiftshader_indirect -camera-back none -camera-front none \
             -memory 3072 -cores 2 -no-metrics > "$LOGS/EMULATOR.txt" 2>&1 &
