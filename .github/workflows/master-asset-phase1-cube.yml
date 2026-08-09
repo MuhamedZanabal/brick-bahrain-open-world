@@ -104,6 +104,22 @@ jobs:
           sdkmanager --version | tee "$REPORTS/ANDROID_SDKMANAGER_VERSION.txt"
           adb version | tee "$REPORTS/ADB_VERSION.txt"
 
+          JAVA_SDK_PATH="$(dirname "$(dirname "$(readlink -f "$(command -v javac)")")")"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          test -x "$JAVA_SDK_PATH/bin/java"
+          test -x "$SDK_ROOT/platform-tools/adb"
+          test -x "$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS/apksigner"
+          mkdir -p "$HOME/.config/godot"
+          cat > "$HOME/.config/godot/editor_settings-4.3.tres" <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/java_sdk_path = "$JAVA_SDK_PATH"
+          export/android/android_sdk_path = "$SDK_ROOT"
+          EOF
+          printf 'java_sdk_path=%s\nandroid_sdk_path=%s\n' "$JAVA_SDK_PATH" "$SDK_ROOT" \
+            | tee "$REPORTS/GODOT_ANDROID_EDITOR_SETTINGS.txt"
+
           {
             echo "BLENDER=$BLENDER"
             echo "GODOT=$GODOT"
@@ -396,6 +412,12 @@ jobs:
         uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
         with:
           name: bahrain-brick-master-asset-phase1-${{ github.run_id }}
-          path: build/master-asset-phase1/
+          path: |
+            build/master-asset-phase1/reports
+            build/master-asset-phase1/logs
+            build/master-asset-phase1/artifacts
+            build/master-asset-phase1/cube-a
+            build/master-asset-phase1/cube-b
+            build/master-asset-phase1/project
           if-no-files-found: error
           retention-days: 30
