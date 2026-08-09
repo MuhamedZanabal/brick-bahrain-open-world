@@ -1,0 +1,401 @@
+name: Bahrain Brick Master Asset Phase 1 Cube
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-master-asset-integration-v1
+    paths:
+      - .github/workflows/master-asset-phase1-cube.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bahrain-brick-master-asset-phase1-cube-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BLENDER_VERSION: "4.3.2"
+  GODOT_VERSION: "4.3"
+  EXPECTED_GODOT_VERSION: "4.3.stable.official.77dcf97d8"
+  ANDROID_BUILD_TOOLS: "34.0.0"
+  SYSTEM_IMAGE: "system-images;android-34;default;x86_64"
+  PACKAGE_NAME: "com.bahrainbrick.cubesmoke"
+  VERSION_CODE: "1"
+  VERSION_NAME: "0.1.0-phase1-cube"
+  APK_NAME: "bahrain-brick-phase1-cube-smoke.apk"
+
+jobs:
+  cube_e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact Phase 1 branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Provision Java 17
+        uses: actions/setup-java@81c13a41f910e657690fdbe251b91fddc27e217c
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Provision pinned Android SDK tools
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: "14742923"
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+            emulator
+            ${{ env.SYSTEM_IMAGE }}
+
+      - name: Provision deterministic image checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+
+      - name: Install checksum-verified Blender and Godot
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="$GITHUB_WORKSPACE/build/master-asset-phase1"
+          DOWNLOADS="$BUILD/downloads"
+          REPORTS="$BUILD/reports"
+          mkdir -p "$DOWNLOADS" "$REPORTS"
+          cd "$DOWNLOADS"
+
+          blender_archive="blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+          blender_base="https://download.blender.org/release/Blender4.3"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
+            "$blender_base/$blender_archive" -o "$blender_archive"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
+            "$blender_base/blender-${BLENDER_VERSION}.sha256" -o blender.sha256
+          grep " $blender_archive$" blender.sha256 | sha256sum -c -
+          tar -xf "$blender_archive"
+          BLENDER="$DOWNLOADS/blender-${BLENDER_VERSION}-linux-x64/blender"
+
+          godot_base="https://github.com/godotengine/godot/releases/download/4.3-stable"
+          godot_archive="Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          templates_archive="Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
+            "$godot_base/SHA512-SUMS.txt" -o godot-SHA512-SUMS.txt
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
+            "$godot_base/$godot_archive" -o "$godot_archive"
+          curl --fail --location --retry 8 --retry-all-errors --proto '=https' \
+            "$godot_base/$templates_archive" -o "$templates_archive"
+          grep " $godot_archive$" godot-SHA512-SUMS.txt | sha512sum -c -
+          grep " $templates_archive$" godot-SHA512-SUMS.txt | sha512sum -c -
+          unzip -q "$godot_archive" -d godot-bin
+          GODOT="$DOWNLOADS/godot-bin/Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          unzip -q "$templates_archive" -d godot-templates
+          mkdir -p "$HOME/.local/share/godot/export_templates/4.3.stable"
+          cp -a godot-templates/templates/. "$HOME/.local/share/godot/export_templates/4.3.stable/"
+
+          "$BLENDER" --version | tee "$REPORTS/BLENDER_VERSION.txt"
+          grep -q '^Blender 4.3.2' "$REPORTS/BLENDER_VERSION.txt"
+          "$GODOT" --version | tee "$REPORTS/GODOT_VERSION.txt"
+          grep -q "^${EXPECTED_GODOT_VERSION}$" "$REPORTS/GODOT_VERSION.txt"
+          java -version 2>&1 | tee "$REPORTS/JAVA_VERSION.txt"
+          sdkmanager --version | tee "$REPORTS/ANDROID_SDKMANAGER_VERSION.txt"
+          adb version | tee "$REPORTS/ADB_VERSION.txt"
+
+          {
+            echo "BLENDER=$BLENDER"
+            echo "GODOT=$GODOT"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate deterministic 1 m cube twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="$GITHUB_WORKSPACE/build/master-asset-phase1"
+          REPORTS="$BUILD/reports"
+          for run in a b; do
+            "$BLENDER" --background --factory-startup \
+              --python tools/asset_lab/generate_validation_cube.py -- \
+              --output-dir "$BUILD/cube-$run" \
+              --report "$REPORTS/CUBE_GENERATION_${run^^}.json"
+          done
+          cmp "$BUILD/cube-a/bb_validation_cube_1m.glb" "$BUILD/cube-b/bb_validation_cube_1m.glb"
+          sha256sum "$BUILD/cube-a/bb_validation_cube_1m.blend" \
+            "$BUILD/cube-a/bb_validation_cube_1m.glb" | tee "$REPORTS/CUBE_SHA256SUMS.txt"
+          python3 tools/asset_lab/validate_glb_asset.py \
+            "$BUILD/cube-a/bb_validation_cube_1m.glb" \
+            --expected-name bb_validation_cube_1m \
+            --expected-size 1.0 \
+            --report "$REPORTS/CUBE_INDEPENDENT_VALIDATION.json"
+
+      - name: Build isolated Godot cube project
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="$GITHUB_WORKSPACE/build/master-asset-phase1"
+          PROJECT="$BUILD/project"
+          REPORTS="$BUILD/reports"
+          LOGS="$BUILD/logs"
+          mkdir -p "$PROJECT/assets" "$REPORTS" "$LOGS"
+          cp "$BUILD/cube-a/bb_validation_cube_1m.glb" "$PROJECT/assets/"
+
+          cat > "$PROJECT/project.godot" <<'EOF'
+          ; Isolated Bahrain Brick Phase 1 cube smoke project.
+          config_version=5
+
+          [application]
+
+          config/name="Bahrain Brick Phase 1 Cube Smoke"
+          run/main_scene="res://main.tscn"
+          config/features=PackedStringArray("4.3", "GL Compatibility")
+
+          [display]
+
+          window/size/viewport_width=1280
+          window/size/viewport_height=720
+          window/handheld/orientation=1
+
+          [rendering]
+
+          renderer/rendering_method="gl_compatibility"
+          renderer/rendering_method.mobile="gl_compatibility"
+          environment/defaults/default_clear_color=Color(0.18, 0.28, 0.42, 1)
+          EOF
+
+          cat > "$PROJECT/main.gd" <<'EOF'
+          extends Node3D
+
+          func _ready() -> void:
+              var camera := $Camera3D as Camera3D
+              camera.look_at(Vector3.ZERO, Vector3.UP)
+              var meshes := find_children("*", "MeshInstance3D", true, false)
+              if meshes.size() != 1:
+                  push_error("CUBE_SMOKE_MESH_COUNT_INVALID count=%d" % meshes.size())
+                  get_tree().quit(2)
+                  return
+              var mesh := meshes[0] as MeshInstance3D
+              var size := mesh.get_aabb().size
+              print("BAHRAIN_BRICK_CUBE_SMOKE_READY size=%.3f,%.3f,%.3f" % [size.x, size.y, size.z])
+          EOF
+
+          cat > "$PROJECT/main.tscn" <<'EOF'
+          [gd_scene load_steps=3 format=3]
+
+          [ext_resource type="PackedScene" path="res://assets/bb_validation_cube_1m.glb" id="1_cube"]
+          [ext_resource type="Script" path="res://main.gd" id="2_script"]
+
+          [node name="CubeSmoke" type="Node3D"]
+          script = ExtResource("2_script")
+
+          [node name="Cube" parent="." instance=ExtResource("1_cube")]
+
+          [node name="Camera3D" type="Camera3D" parent="."]
+          transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.4, 1.8, 2.4)
+          current = true
+
+          [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+          rotation_degrees = Vector3(-48, -35, 0)
+          light_energy = 1.8
+          shadow_enabled = true
+          EOF
+
+          cp export_presets.cfg "$PROJECT/export_presets.cfg"
+          KEYSTORE="$RUNNER_TEMP/bahrain-brick-phase1-cube-debug.keystore"
+          rm -f "$KEYSTORE"
+          keytool -genkeypair -noprompt \
+            -keystore "$KEYSTORE" -storepass android \
+            -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname 'CN=Bahrain Brick Phase 1 Cube Smoke,O=Zanabal Gaming,C=BH'
+          python3 - "$PROJECT/export_presets.cfg" "$KEYSTORE" <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          path = Path(sys.argv[1])
+          key = Path(sys.argv[2]).resolve().as_posix()
+          text = path.read_text(encoding="utf-8")
+          replacements = [
+              (r'(?m)^architectures/armeabi-v7a=.*$', 'architectures/armeabi-v7a=false'),
+              (r'(?m)^architectures/arm64-v8a=.*$', 'architectures/arm64-v8a=false'),
+              (r'(?m)^architectures/x86_64=.*$', 'architectures/x86_64=true'),
+              (r'(?m)^architectures/x86=.*$', 'architectures/x86=false'),
+              (r'(?m)^keystore/debug=.*$', f'keystore/debug="{key}"'),
+              (r'(?m)^keystore/release=.*$', f'keystore/release="{key}"'),
+              (r'(?m)^version/code=.*$', 'version/code=1'),
+              (r'(?m)^version/name=.*$', 'version/name="0.1.0-phase1-cube"'),
+              (r'(?m)^package/unique_name=.*$', 'package/unique_name="com.bahrainbrick.cubesmoke"'),
+              (r'(?m)^package/name=.*$', 'package/name="Bahrain Brick Cube Smoke"'),
+          ]
+          for pattern, replacement in replacements:
+              text, count = re.subn(pattern, replacement, text)
+              if count != 1:
+                  raise SystemExit(f"replacement count={count}: {pattern}")
+          text = re.sub(r'(?m)^launcher_icons/.*\n?', '', text)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          "$GODOT" --headless --path "$PROJECT" --editor --import --quit --verbose \
+            2>&1 | tee "$LOGS/GODOT_IMPORT.log"
+          grep -q 'bb_validation_cube_1m' "$LOGS/GODOT_IMPORT.log"
+          ! grep -Eiq 'SCRIPT ERROR|Parse Error|ERROR:.*(failed|missing|invalid)' "$LOGS/GODOT_IMPORT.log"
+
+      - name: Export and validate cube smoke APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="$GITHUB_WORKSPACE/build/master-asset-phase1"
+          PROJECT="$BUILD/project"
+          REPORTS="$BUILD/reports"
+          LOGS="$BUILD/logs"
+          ARTIFACTS="$BUILD/artifacts"
+          APK="$ARTIFACTS/$APK_NAME"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          TOOLS="$SDK_ROOT/build-tools/$ANDROID_BUILD_TOOLS"
+          mkdir -p "$ARTIFACTS"
+
+          "$GODOT" --headless --path "$PROJECT" --verbose \
+            --export-debug Android "$APK" 2>&1 | tee "$LOGS/ANDROID_EXPORT.log"
+          test -s "$APK"
+          unzip -t "$APK" > "$LOGS/APK_ZIP_INTEGRITY.txt"
+          sha256sum "$APK" | tee "$REPORTS/APK_SHA256SUM.txt"
+          stat -c '%n %s' "$APK" | tee "$REPORTS/APK_SIZE.txt"
+          "$TOOLS/aapt" dump badging "$APK" | tee "$REPORTS/APK_BADGING.txt"
+          grep -q "package: name='$PACKAGE_NAME' versionCode='$VERSION_CODE' versionName='$VERSION_NAME'" \
+            "$REPORTS/APK_BADGING.txt"
+          "$TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee "$REPORTS/APK_SIGNING.txt"
+          "$TOOLS/zipalign" -c -v 4 "$APK" > "$REPORTS/APK_ZIPALIGN.txt"
+          grep -q 'assets/.godot/imported/bb_validation_cube_1m.glb' <(unzip -Z1 "$APK")
+
+      - name: Launch exact cube APK on API 34
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD="$GITHUB_WORKSPACE/build/master-asset-phase1"
+          REPORTS="$BUILD/reports"
+          LOGS="$BUILD/logs"
+          ARTIFACTS="$BUILD/artifacts"
+          APK="$ARTIFACTS/$APK_NAME"
+          SCREENSHOT="$ARTIFACTS/cube-smoke-android.png"
+          LOGCAT="$LOGS/CUBE_ANDROID_LOGCAT.txt"
+          FILTERED="$LOGS/CUBE_ANDROID_LOGCAT_FILTERED.txt"
+          export ANDROID_USER_HOME="$BUILD/android-user"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          AVD_NAME="bahrain-brick-phase1-cube-api34"
+          rm -rf "$ANDROID_USER_HOME"
+          mkdir -p "$ANDROID_AVD_HOME"
+
+          echo no | avdmanager create avd --force \
+            --name "$AVD_NAME" \
+            --package "$SYSTEM_IMAGE" \
+            --device pixel_7 > "$LOGS/AVD_CREATE.txt" 2>&1
+          emulator -list-avds | tee "$REPORTS/AVD_LIST.txt"
+          grep -qx "$AVD_NAME" "$REPORTS/AVD_LIST.txt"
+
+          sudo chmod a+rw /dev/kvm || true
+          emulator -avd "$AVD_NAME" \
+            -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
+            -gpu swiftshader_indirect -camera-back none -camera-front none \
+            -memory 3072 -cores 2 -no-metrics > "$LOGS/EMULATOR.txt" 2>&1 &
+          EMULATOR_PID=$!
+          cleanup() {
+            adb emu kill >/dev/null 2>&1 || true
+            kill "$EMULATOR_PID" >/dev/null 2>&1 || true
+            wait "$EMULATOR_PID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          timeout 300 adb wait-for-device
+          booted=false
+          for _ in $(seq 1 150); do
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              booted=true
+              break
+            fi
+            kill -0 "$EMULATOR_PID"
+            sleep 2
+          done
+          [[ "$booted" == true ]]
+          adb shell settings put system accelerometer_rotation 0 || true
+          adb shell settings put system user_rotation 1 || true
+          adb shell settings put system screen_off_timeout 2147483647 || true
+          sleep 3
+
+          adb install -r -t "$APK" | tee "$LOGS/APK_INSTALL.txt"
+          adb logcat -c
+          adb shell am force-stop "$PACKAGE_NAME"
+          adb shell am start -W -n "$PACKAGE_NAME/com.godot.game.GodotApp" \
+            | tee "$LOGS/APK_LAUNCH.txt"
+
+          ready=false
+          for _ in $(seq 1 120); do
+            adb logcat -d -v threadtime > "$LOGCAT"
+            if grep -q 'BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000' "$LOGCAT"; then
+              ready=true
+              break
+            fi
+            test -n "$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')"
+            sleep 2
+          done
+          [[ "$ready" == true ]]
+          sleep 3
+          adb logcat -d -v threadtime > "$LOGCAT"
+          grep -Ei "$PACKAGE_NAME|Godot|BAHRAIN_BRICK_CUBE_SMOKE_READY|FATAL EXCEPTION|Fatal signal|am_crash|am_anr|ANR in" \
+            "$LOGCAT" > "$FILTERED" || true
+          if grep -Eq 'FATAL EXCEPTION|Fatal signal|am_crash|am_anr|ANR in' "$FILTERED"; then
+            cat "$FILTERED"
+            exit 1
+          fi
+
+          adb exec-out screencap -p > "$SCREENSHOT"
+          python3 - "$SCREENSHOT" <<'PY'
+          from PIL import Image, ImageStat
+          import sys
+
+          image = Image.open(sys.argv[1]).convert("RGB")
+          width, height = image.size
+          stat = ImageStat.Stat(image)
+          assert width > height, (width, height)
+          assert sum(1 for lo, hi in stat.extrema if hi - lo > 25) >= 2, stat.extrema
+          assert sum(stat.mean) / 3 > 4, stat.mean
+          print(f"{width}x{height}")
+          PY
+          sha256sum "$SCREENSHOT" | tee "$REPORTS/ANDROID_SCREENSHOT_SHA256SUM.txt"
+
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')" \
+          SCREEN_SHA="$(sha256sum "$SCREENSHOT" | awk '{print $1}')" \
+          python3 - "$REPORTS/PHASE1_CUBE_ANDROID_RESULT.json" <<'PY'
+          import json
+          import os
+          import sys
+
+          report = {
+              "status": "PASS",
+              "api_level": 34,
+              "abi": "x86_64",
+              "package": "com.bahrainbrick.cubesmoke",
+              "activity": "com.godot.game.GodotApp",
+              "apk_sha256": os.environ["APK_SHA"],
+              "runtime_marker": "BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000",
+              "screenshot_sha256": os.environ["SCREEN_SHA"],
+              "evidence": {
+                  "logcat": "logs/CUBE_ANDROID_LOGCAT.txt",
+                  "screenshot": "artifacts/cube-smoke-android.png",
+              },
+          }
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              json.dump(report, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload Phase 1 evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-master-asset-phase1-${{ github.run_id }}
+          path: build/master-asset-phase1/
+          if-no-files-found: error
+          retention-days: 30
