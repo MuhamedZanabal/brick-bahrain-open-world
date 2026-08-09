@@ -1,0 +1,227 @@
+name: Bahrain Brick Master Asset Phase 1 GPU Recovery V4
+
+on:
+  push:
+    branches:
+      - work/bahrain-brick-master-asset-integration-v1
+    paths:
+      - .github/workflows/master-asset-phase1-cube-gpu-recovery-v4.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: master-asset-phase1-cube-gpu-recovery-v4
+  cancel-in-progress: true
+
+env:
+  SOURCE_RUN_ID: "31306171669"
+  SOURCE_ARTIFACT_ID: "9036038870"
+  EXPECTED_APK_SHA256: "5e56042a9f035459cbc618ad5b603703c7588597d5dace0fc49bb65145ec7d21"
+  EXPECTED_CUBE_SHA256: "00b2e146a7af0cc1043e9492f87c9ef2747d884aa0ada987e9be812537de8e2b"
+  ANDROID_BUILD_TOOLS: "34.0.0"
+  SYSTEM_IMAGE: "system-images;android-34;default;x86_64"
+  PACKAGE_NAME: "com.bahrainbrick.cubesmoke"
+  APK_NAME: "bahrain-brick-phase1-cube-landscape-v3.apk"
+
+jobs:
+  qualify:
+    name: qualify-${{ matrix.gpu }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        gpu: [software, swangle, lavapipe]
+    steps:
+      - name: Checkout qualification commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Recover exact V3 APK and source authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-gpu-v4-${{ matrix.gpu }}"
+          mkdir -p "$ROOT/source" "$ROOT/reports" "$ROOT/logs" "$ROOT/artifacts"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${SOURCE_ARTIFACT_ID}/zip" > "$ROOT/source.zip"
+          unzip -tq "$ROOT/source.zip"
+          unzip -q "$ROOT/source.zip" -d "$ROOT/source"
+          APK="$ROOT/source/artifacts/$APK_NAME"
+          CUBE="$ROOT/source/project/assets/bb_validation_cube_1m.glb"
+          test -s "$APK"
+          test -s "$CUBE"
+          printf '%s  %s\n' "$EXPECTED_APK_SHA256" "$APK" | sha256sum -c -
+          printf '%s  %s\n' "$EXPECTED_CUBE_SHA256" "$CUBE" | sha256sum -c -
+          python3 - "$ROOT/source/reports/SOURCE_AUTHORITY.json" <<'PY'
+          import json, sys
+          r = json.load(open(sys.argv[1]))
+          assert r["cube_sha256"] == "00b2e146a7af0cc1043e9492f87c9ef2747d884aa0ada987e9be812537de8e2b"
+          assert r["cube_dimensions_m"] == [1.0, 1.0, 1.0]
+          assert r["deterministic_repeat"] is True
+          assert r["independent_validation"] == "PASS"
+          PY
+          cp "$APK" "$ROOT/artifacts/$APK_NAME"
+          cp "$ROOT/source/reports/APK_BADGING.txt" "$ROOT/reports/SOURCE_APK_BADGING.txt"
+          cp "$ROOT/source/reports/APK_MANIFEST_TREE.txt" "$ROOT/reports/SOURCE_APK_MANIFEST_TREE.txt"
+          cp "$ROOT/source/reports/SOURCE_AUTHORITY.json" "$ROOT/reports/SOURCE_AUTHORITY.json"
+          printf 'source_run_id=%s\nsource_artifact_id=%s\napk_sha256=%s\ncube_sha256=%s\ngpu_mode=%s\n' \
+            "$SOURCE_RUN_ID" "$SOURCE_ARTIFACT_ID" "$EXPECTED_APK_SHA256" "$EXPECTED_CUBE_SHA256" "${{ matrix.gpu }}" \
+            > "$ROOT/reports/RECOVERY_AUTHORITY.txt"
+
+      - name: Provision Android API 34
+        uses: android-actions/setup-android@4d90f943634881869c98b16d759177c8ee849798
+        with:
+          cmdline-tools-version: "14742923"
+          packages: >-
+            platform-tools
+            platforms;android-34
+            build-tools;34.0.0
+            emulator
+            ${{ env.SYSTEM_IMAGE }}
+
+      - name: Provision emulator dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends libpulse0
+          ldconfig -p | grep -q 'libpulse.so.0'
+          python3 -m pip install --disable-pip-version-check --no-cache-dir Pillow==12.3.0
+
+      - name: Qualify exact APK on API 34 with ${{ matrix.gpu }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$GITHUB_WORKSPACE/build/phase1-gpu-v4-${{ matrix.gpu }}"
+          APK="$ROOT/artifacts/$APK_NAME"
+          REPORTS="$ROOT/reports"
+          LOGS="$ROOT/logs"
+          ARTIFACTS="$ROOT/artifacts"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          EMULATOR="$SDK_ROOT/emulator/emulator"
+          AVDMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/avdmanager"
+
+          "$EMULATOR" -version 2>&1 | tee "$REPORTS/EMULATOR_VERSION.txt"
+          "$EMULATOR" -help-gpu 2>&1 | tee "$REPORTS/EMULATOR_GPU_HELP.txt" || true
+          export ANDROID_USER_HOME="$ROOT/android-user"
+          export ANDROID_AVD_HOME="$ROOT/android-user/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          AVD="bb-phase1-v4-${{ matrix.gpu }}"
+          echo no | "$AVDMANAGER" create avd --force --name "$AVD" --package "$SYSTEM_IMAGE" --device pixel_7 > "$LOGS/AVD_CREATE.txt" 2>&1
+          sudo chmod a+rw /dev/kvm || true
+          "$EMULATOR" -avd "$AVD" -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data \
+            -gpu "${{ matrix.gpu }}" -camera-back none -camera-front none -memory 3072 -cores 2 -no-metrics \
+            > "$LOGS/EMULATOR.txt" 2>&1 &
+          EMULATOR_PID=$!
+          cleanup(){ adb emu kill >/dev/null 2>&1 || true; kill "$EMULATOR_PID" >/dev/null 2>&1 || true; wait "$EMULATOR_PID" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+
+          connected=false
+          for _ in $(seq 1 120); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then tail -250 "$LOGS/EMULATOR.txt"; exit 1; fi
+            if [[ "$(adb get-state 2>/dev/null || true)" == "device" ]]; then connected=true; break; fi
+            sleep 2
+          done
+          [[ "$connected" == true ]] || { tail -250 "$LOGS/EMULATOR.txt"; exit 1; }
+
+          booted=false
+          for _ in $(seq 1 120); do
+            if ! kill -0 "$EMULATOR_PID" 2>/dev/null; then tail -250 "$LOGS/EMULATOR.txt"; exit 1; fi
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then booted=true; break; fi
+            sleep 2
+          done
+          [[ "$booted" == true ]] || { adb shell getprop > "$LOGS/BOOT_GETPROP.txt" || true; exit 1; }
+
+          adb shell settings put system accelerometer_rotation 0
+          adb shell settings put system user_rotation 1
+          adb shell settings put secure immersive_mode_confirmations confirmed
+          adb shell settings put system screen_off_timeout 2147483647
+          timeout 120 adb install -r -t "$APK" | tee "$LOGS/APK_INSTALL.txt"
+          grep -q 'Success' "$LOGS/APK_INSTALL.txt"
+          adb logcat -c
+          adb shell am force-stop "$PACKAGE_NAME"
+          timeout 45 adb shell am start -W -n "$PACKAGE_NAME/com.godot.game.GodotApp" | tee "$LOGS/APK_LAUNCH.txt"
+          grep -q 'Status: ok' "$LOGS/APK_LAUNCH.txt"
+
+          ready=false
+          for _ in $(seq 1 60); do
+            timeout 10 adb logcat -d -v threadtime -t 4000 > "$LOGS/CUBE_ANDROID_RECENT.txt"
+            if grep -q 'BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000' "$LOGS/CUBE_ANDROID_RECENT.txt"; then ready=true; break; fi
+            test -n "$(adb shell pidof "$PACKAGE_NAME" 2>/dev/null | tr -d '\r')" || { cat "$LOGS/CUBE_ANDROID_RECENT.txt"; exit 1; }
+            sleep 2
+          done
+          [[ "$ready" == true ]] || { cat "$LOGS/CUBE_ANDROID_RECENT.txt"; exit 1; }
+          sleep 5
+
+          timeout 15 adb logcat -d -v threadtime -t 12000 > "$LOGS/CUBE_ANDROID_LOGCAT.txt"
+          grep -E 'OpenGL API|Vulkan API|BAHRAIN_BRICK_CUBE_SMOKE_READY|SceneShader|Program linking failed|shader failed to compile|GL_MAX_FRAGMENT_UNIFORM|FATAL EXCEPTION|Fatal signal|am_crash|am_anr|ANR in' \
+            "$LOGS/CUBE_ANDROID_LOGCAT.txt" > "$LOGS/CUBE_ANDROID_RENDER_DIAGNOSTICS.txt" || true
+          cat "$LOGS/CUBE_ANDROID_RENDER_DIAGNOSTICS.txt"
+          if grep -Eq 'FATAL EXCEPTION|Fatal signal|am_crash|am_anr|ANR in|Program linking failed|shader failed to compile|GL_MAX_FRAGMENT_UNIFORM' "$LOGS/CUBE_ANDROID_LOGCAT.txt"; then
+            echo 'Fail-closed: crash/ANR/shader compilation failure detected.' >&2
+            exit 1
+          fi
+
+          test -n "$(adb shell pidof "$PACKAGE_NAME" | tr -d '\r')"
+          timeout 15 adb shell dumpsys window windows > "$REPORTS/WINDOW_STATE.txt"
+          grep -q "$PACKAGE_NAME" "$REPORTS/WINDOW_STATE.txt"
+          timeout 15 adb shell dumpsys activity activities > "$REPORTS/ACTIVITY_STATE.txt"
+          grep -q "$PACKAGE_NAME/com.godot.game.GodotApp" "$REPORTS/ACTIVITY_STATE.txt"
+          timeout 15 adb exec-out screencap -p > "$ARTIFACTS/cube-smoke-${{ matrix.gpu }}.png"
+          python3 - "$ARTIFACTS/cube-smoke-${{ matrix.gpu }}.png" "$REPORTS/SCREENSHOT_VALIDATION.json" <<'PY'
+          from PIL import Image, ImageStat
+          import json, sys
+          im = Image.open(sys.argv[1]).convert("RGB")
+          w, h = im.size
+          stat = ImageStat.Stat(im)
+          orange = sum(1 for r,g,b in im.getdata() if r >= 150 and 35 <= g <= 180 and b <= 120 and r >= g + 35)
+          report = {"width": w, "height": h, "mean_rgb": stat.mean, "extrema": stat.extrema, "orange_cube_pixels": orange}
+          assert w > h, report
+          assert orange >= 500, report
+          assert sum(stat.mean) / 3 > 4, report
+          open(sys.argv[2], "w").write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+          sha256sum "$ARTIFACTS/cube-smoke-${{ matrix.gpu }}.png" | tee "$REPORTS/SCREENSHOT_SHA256SUM.txt"
+          APK_SHA="$(sha256sum "$APK" | awk '{print $1}')" SCREEN_SHA="$(sha256sum "$ARTIFACTS/cube-smoke-${{ matrix.gpu }}.png" | awk '{print $1}')" QUALIFICATION_SHA="$GITHUB_SHA" GPU_MODE="${{ matrix.gpu }}" python3 - "$REPORTS/PHASE1_GPU_RECOVERY_RESULT.json" <<'PY'
+          import json, os, sys
+          report = {
+              "status": "PASS",
+              "qualification_sha": os.environ["QUALIFICATION_SHA"],
+              "source_run_id": 31306171669,
+              "source_artifact_id": 9036038870,
+              "source_apk_sha256": "5e56042a9f035459cbc618ad5b603703c7588597d5dace0fc49bb65145ec7d21",
+              "cube_sha256": "00b2e146a7af0cc1043e9492f87c9ef2747d884aa0ada987e9be812537de8e2b",
+              "api_level": 34,
+              "abi": "x86_64",
+              "gpu_mode": os.environ["GPU_MODE"],
+              "orientation": "landscape",
+              "package": "com.bahrainbrick.cubesmoke",
+              "activity": "com.godot.game.GodotApp",
+              "runtime_marker": "BAHRAIN_BRICK_CUBE_SMOKE_READY size=1.000,1.000,1.000",
+              "apk_sha256": os.environ["APK_SHA"],
+              "screenshot_sha256": os.environ["SCREEN_SHA"],
+              "crash_anr_shader_scan": "PASS",
+              "visible_cube_pixel_check": "PASS"
+          }
+          open(sys.argv[1], "w").write(json.dumps(report, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(report, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload V4 GPU recovery evidence
+        if: always()
+        uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808
+        with:
+          name: bahrain-brick-phase1-gpu-v4-${{ matrix.gpu }}-${{ github.run_id }}
+          path: |
+            build/phase1-gpu-v4-${{ matrix.gpu }}/reports
+            build/phase1-gpu-v4-${{ matrix.gpu }}/logs
+            build/phase1-gpu-v4-${{ matrix.gpu }}/artifacts/cube-smoke-${{ matrix.gpu }}.png
+          if-no-files-found: warn
+          retention-days: 30
